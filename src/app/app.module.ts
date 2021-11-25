@@ -10,6 +10,8 @@ import { ResearchComponent } from './components/research/research.component';
 import { TeachingComponent } from './components/teaching/teaching.component';
 import { AboutComponent } from './components/about/about.component';
 import { ProjectsComponent } from './components/projects/projects.component';
+import { UnionGamesComponent } from './components/union-games/union-games.component';
+import { EightBitComponent } from './components/union-games/eight-bit/eight-bit.component';
 
 @NgModule({
   declarations: [
@@ -20,7 +22,9 @@ import { ProjectsComponent } from './components/projects/projects.component';
     ResearchComponent,
     TeachingComponent,
     AboutComponent,
-    ProjectsComponent
+    ProjectsComponent,
+    UnionGamesComponent,
+    EightBitComponent
   ],
   imports: [
     BrowserModule,

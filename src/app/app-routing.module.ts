@@ -6,6 +6,7 @@ import { ResearchComponent } from './components/research/research.component';
 import { TeachingComponent } from './components/teaching/teaching.component';
 import { AboutComponent } from './components/about/about.component';
 import { ProjectsComponent } from './components/projects/projects.component';
+import { EightBitComponent } from './components/union-games/eight-bit/eight-bit.component';
 
 const routes: Routes = [
   {
@@ -27,6 +28,10 @@ const routes: Routes = [
   {
     path: 'projects',
     component: ProjectsComponent
+  },
+  {
+    path: 'union-games/8bit',
+    component: EightBitComponent
   },
 
 ]
