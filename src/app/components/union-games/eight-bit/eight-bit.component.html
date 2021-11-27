@@ -1,3 +1,15 @@
-<p>{{ binaryStringArray[0] }}</p>
-<p>{{ binaryStringArray[1] }}</p>
-<p>{{ binaryStringArray[2] }}</p>
+<table class="table is-striped">
+    <tr>
+        <th style="color:#000000">Black</th>
+        <th style="color:#9932CC">Purple</th>
+        <th style="color:#FFA500">Orange</th>
+        <th style="color:#FF69B4">Pink</th>
+        <th style="color:#eFeF00">Yellow</th>
+        <th style="color:#00FF00">Green</th>
+        <th style="color:#FF0000">Red</th>
+        <th style="color:#0000FF">Blue</th>
+    </tr>
+    <tr *ngFor="let binaryString of binaryStringMatrix;">
+       <td *ngFor="let bit of binaryString;">{{bit}}</td>
+    </tr>
+ </table>

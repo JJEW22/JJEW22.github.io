@@ -6,14 +6,15 @@ import { Component, OnInit } from '@angular/core';
   styleUrls: ['./eight-bit.component.scss']
 })
 export class EightBitComponent implements OnInit {
-  binaryStringArray:String[] = [];
+  binaryStringMatrix:String[][] = [];
   constructor() {
     for (let i = 0; i < 3; i++) {
       let decimalNumber: number = Math.floor(Math.random() * 256);
       let binaryString: String = decimalNumber.toString(2);
-      this.binaryStringArray.push(binaryString);
+      binaryString = binaryString.padStart(8, "0");
+      let binaryArray: String[] = [...binaryString];
+      this.binaryStringMatrix.push(binaryArray);
     }
-
   }
 
   ngOnInit(): void {
