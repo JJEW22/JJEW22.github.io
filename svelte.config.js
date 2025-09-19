@@ -12,10 +12,8 @@ const config = {
             fallback: undefined,
             precompress: false,
             strict: true
-        }),
-        paths: {
-            base: process.env.NODE_ENV === 'production' ? '/my-website' : '',
-        }
+        })
+        // Remove the paths configuration since you're using username.github.io
     }
 };
 
