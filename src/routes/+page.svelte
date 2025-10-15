@@ -29,10 +29,10 @@
                 <p class="tagline">{tagline}</p>
                 
                 <div class="bio-section">
-                    <h3>About Me</h3>
+                    <h3>About <a class="hidden" href="/me">Me</a> (<a href="/cv">CV</a>)</h3>
                     <div class="bio-text">
                             <p>
-                            I am a fourth-year Computer Science PhD Student at Northeastern University, where I am advised by <a href="https://www.ccs.neu.edu/home/koods/"> Ravi Sundaram </a>. My research interests are in algorithmic fairness theory and its applications to personal finance outcomes.
+                            I am a third-year Computer Science PhD Student at Northeastern University, where I am advised by <a href="https://www.ccs.neu.edu/home/koods/"> Ravi Sundaram </a>. My research interests are in algorithmic fairness theory and its applications to personal finance outcomes.
                             </p>
                             <p>
                             In addition to conducting research I have passed the Series 65 exam and am seeking employment as an investment advisor representative while pursuing the CFP designation.
@@ -259,5 +259,11 @@
     
     .update-info p {
         margin: 0;
+    }
+
+    a.hidden {
+    color: inherit; /* Inherits the color from its parent element */
+    text-decoration: none; /* Removes the underline */
+    cursor: default; /* Changes the cursor from a pointer to a normal text cursor */
     }
 </style>
