@@ -16,11 +16,86 @@
     let excelData = {}; // Will store all sheet data
     let dataReady = false;
     let teams = []; // will store the name of all teams
+
+    onMount(() => {
+        // Add smooth scrolling to all anchor links
+        
+    });
+    
+    // Function to scroll to top
+    function scrollToTop() {
+        window.scrollTo({ 
+            top: 0, 
+            behavior: 'smooth' 
+        });
+    }
     
     onMount(async () => {
         await loadExcelData();
+        // Add smooth scrolling to all anchor links
+        const links = document.querySelectorAll('a[href^="#"]');
+        
+        links.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href');
+                if (!targetId) return;
+                
+                const targetElement = document.querySelector(targetId);
+                
+                if (targetElement) {
+                    // You can adjust the offset here (e.g., for fixed headers)
+                    const offset = 80; // Adjust based on your header height
+                    const elementPosition = targetElement.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - offset;
+                    
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Update URL without jumping
+                    history.pushState(null, null, targetId);
+                }
+            });
+        });
+        
+        // Handle scroll events
+        const handleScroll = () => {
+            // Update scroll progress
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            scrollProgress = (winScroll / height) * 100;
+            
+            // Show/hide back to top button
+            showBackToTop = winScroll > 300;
+        };
+        
+        window.addEventListener('scroll', handleScroll);
+        
+        // Handle direct navigation to hash
+        if (window.location.hash) {
+            setTimeout(() => {
+                const target = document.querySelector(window.location.hash);
+                if (target) {
+                    const offset = 80;
+                    const elementPosition = target.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - offset;
+                    
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            }, 100);
+        }
+        
+        // Cleanup
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
     });
-    
+
     async function loadExcelData() {
         loading = true;
         error = null;
@@ -161,8 +236,13 @@
     </nav>
     
     <main>
-        <h1>JP Flicks - Season 2</h1>
-        Welcome to Boston's premier Crokinole league season 2. We will meet Thursday's at 7:00pm and run till about 10
+        <h1>JP Flicks - Season 2: The Crok Wars</h1>
+        <p>
+            Boston's premier Crokinole league <b>JP Flicks is back for a season 2</b>! We will meet <b>Thursday's at 7pm</b> and run till about 10pm.
+            This seasons league is planned to go from late October to end of March and will <b>feature 2 tournaments</b> that will have their own prizes.
+            Because of the longer format we only request that you believe you could make it to half the sessions and request to join no later than the 3rd session.
+            <b>Check League Format for a full breakdown</b> of session dates and tournament dates. 
+        </p>
         <Collapsible 
         title="League Format"
         variant="minimal"
@@ -172,26 +252,86 @@
         iconType="arrow"
         >
         <p>
-            This seasons league will follow a similar format to the first but take a more Fed-Ex cup approach (balancing how much you play but also how well you performed). In addition will no longer have an individual category.
-        The league will run through the cold months of Boston.
-        Each person can sign up for up to 2 teams.
-        each team will play each other up to 2 times (with the exception of you will never play yourself).
+            This seasons league will follow a similar format to the first with some changes. 
         </p>
-        <div class="subsection">
-            <h3>Points for games</h3>
+            <div class="subsection">
+            <h3>Similarities</h3>
             <ul>
-                <li>winning a game awards 2 points</li>
-                <li>tieing a game awards 1 point</li>
-                <li>losing a game awards 0 points</li>
-                <li>winning a series (combined score of both games against a team) awards 1 bonus point</li>
+                <li>Each person can sign up for up to 2 teams</li>
+                <li>Each team will play each other up to 2 times (with the exception of you will never play yourself).</li>
+                <li>Each game awards <a href="#point-per-game">points</a> based on outcome</li>
+                <li>The winner of the league the team at the end with the most points!</li>
+            </ul>
+            <h3>Differences</h3>
+            <ul>
+                <li>More crokinole (8 more sessions to be exact)! Meaning more time to play, with a lower requirement to be there each week</li>
+                <li>2 new <a href="#tournaments-section">Tournaments</a> that also award points</li>
+                <li>Prizes for winning the league and each of the tournaments</li>
+                <li>No longer an individual category</li>
+
+            </ul>
+            <h3>Schedule</h3>
+            </div>
+
+        <div class="center">
+                <table class="basic-table">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Session 0</td>
+                        <td>October 23rd</td>
+                    </tr>
+                    <tr>
+                        <td>First Day of League</td>
+                        <td>October 30th</td>
+                    </tr>
+                    <tr>
+                        <td>Off for Thanksgiving</td>
+                        <td>November 27th</td>
+                    </tr>
+                    <tr>
+                        <td><b>Winter Tournament</b></td>
+                        <td>December 11th</td>
+                    </tr>
+                    <tr>
+                        <td>Beginning of holiday</td>
+                        <td>December 17th</td>
+                    </tr>
+                    <tr>
+                        <td>Games Resume</td>
+                        <td>January 8th</td>
+                    </tr>
+                    <tr>
+                        <td>Off for Spring Break</td>
+                        <td>March 5th</td>
+                    </tr>
+                    <tr>
+                        <td><b>Final Tournament</b></td>
+                        <td>March 26th</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="subsection">
+            <h3 id="point-per-game">Points for games</h3>
+            <ul>
+                <li>Winning a game awards 2 points</li>
+                <li>Tieing a game awards 1 point</li>
+                <li>Losing a game awards 0 points</li>
+                <li>Winning a series (combined score of both games against a team) awards 1 bonus point</li>
             </ul>
             
-            <h3>Tournaments</h3>
-            This year we have 2 tournaments! Anyone including (those not in the league) can compete so if you can only come for 1 day are the ones to do it! They will take place one of the last 2 weeks before winter break (depending on availability) and at the end of the league 
+            <h3 id="tournaments-section">Tournaments</h3>
+            This year we have 2 tournaments! Anyone including (those not in the league) can compete so if you can only come for 1 day these are the ones to do it! 
             The exact format of the tournament will depend on the number of players but it will follow a round robin + elimination set up.
-            League points up for grabs (half awarded to each player in tournament)
+            League points up for grabs (half awarded to each player in the team)
             <div class="center">
-                <table>
+                <table class="basic-table">
                 <thead>
                     <tr>
                         <th>Place</th>
@@ -201,27 +341,27 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <th>1st</th>
+                        <td><b>1st</b></td>
                         <td>6 pts</td>
                         <td>10 pts</td>
                     </tr>
                     <tr>
-                        <th>2nd</th>
+                        <td><b>2nd</b></td>
                         <td>4 pts</td>
                         <td>8 pts</td>
                     </tr>
                     <tr>
-                        <th>3rd</th>
+                        <td><b>3rd</b></td>
                         <td>2 pts</td>
                         <td>6 pts</td>
                     </tr>
                     <tr>
-                        <th>4th </th>
+                        <td><b>4th</b></td>
                         <td>2 pts</td>
                         <td>4 pts</td>
                     </tr>
                     <tr>
-                        <th>5th-8th </th>
+                        <td><b>5th-8th</b></td>
                         <td>0 pts</td>
                         <td>2 pts</td>
                     </tr>
@@ -230,7 +370,6 @@
             </div>
         </div>
         
-        <p>The winner of the league the team at the end with the most points! For winning the league</p>
     </Collapsible>
         
         <Collapsible 
@@ -245,13 +384,13 @@
             <li>Each game consists of at least 2 rounds and at most 4</li>
             <li>If after a round a team is winning by 100 points they win the game</li>
             <li>After 4 rounds the winner is the team with the most points. Ties are possible</li>
-            <li>the standard crokinole rules can be found <a href="https://www.worldcrokinole.com/thegame.html">here</a></li>
-            <li>all shots must be a flick - you can not start with contact on the disk with the finger you shoot with</li>
-            <li>your hand can not move past the shooting line (i.e. you hand move forward as part of your shot)</li>
+            <li>The standard crokinole rules can be found <a href="https://www.worldcrokinole.com/thegame.html">here</a></li>
+            <li>All shots must be a flick - you can not start with contact on the disk with the finger you shoot with</li>
+            <li>Your hand can not move past the shooting line (i.e. you hand move forward as part of your shot)</li>
             <li>When not playing in a regulation stool all players are only allowed to lean from their seated position (no sliding)</li>
             <li>Jack has the final say</li>
             <li>You can never deny a team a match if they ask to play and you have not already played them twice</li>
-            <li>have fun</li>
+            <li>HAVE FUN</li>
         </ul>
         </Collapsible>
         {#if loading}
@@ -262,15 +401,16 @@
                 <p>{error}</p>
             </div>
         {:else if dataReady}
-            <div class="status success">
+        <p></p>
+            <!-- <div class="status success">
                 Data loaded successfully! Sheets available: {Object.keys(excelData).join(', ')}
             </div>
-            <div>{teams}</div>
+            <div>{teams}</div> -->
+
             <!-- Your custom table/visualization will go here -->
-            <section class="custom-content">
+            <!-- <section class="custom-content">
                 <h2>Custom Data View</h2>
                 
-                <!-- Example: Show data summary -->
                 <div class="data-summary">
                     {#each Object.entries(excelData) as [sheetName, sheetData]}
                         <div class="sheet-summary">
@@ -279,23 +419,54 @@
                             <p>Columns: {sheetData.headers.length}</p>
                         </div>
                     {/each}
-                </div>
+                </div> -->
                 
                 <!-- Add your custom table component here -->
                 <!-- Example: -->
                 <!-- <MyCustomTable data={createCustomTable()} /> -->
                 
                 <!-- Debug view (remove in production) -->
-                <details class="debug">
+                <!-- <details class="debug">
                     <summary>Debug: View Raw Data</summary>
                     <pre>{JSON.stringify(excelData, null, 2)}</pre>
                 </details>
-            </section>
+            </section> -->
         {/if}
     </main>
 </div>
 
 <style>
+
+    /* Style 1: Clean and Modern */
+        .basic-table {
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-collapse: collapse;
+        }
+        
+        .basic-table th {
+            background: #4a5568;
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            padding: 1rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .basic-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .basic-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
     .container {
         max-width: 1200px;
         margin: 0 auto;
