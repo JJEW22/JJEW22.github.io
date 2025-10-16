@@ -243,7 +243,7 @@
 
 <svelte:head>
     <title>JP Flicks</title>
-    <meta name="description" content="Excel data visualization">
+    <meta name="description" content="Crokinole better than ever">
 </svelte:head>
 
 <div class="container">
