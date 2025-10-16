@@ -89,6 +89,22 @@
                 }
             }, 100);
         }
+
+        const tableWrappers = document.querySelectorAll('.table-wrapper');
+        
+        tableWrappers.forEach(wrapper => {
+            const table = wrapper.querySelector('table');
+            
+            // Check if table is wider than wrapper
+            if (table.scrollWidth > wrapper.clientWidth) {
+                wrapper.setAttribute('data-scrollable', '');
+                
+                // Remove indicator after first scroll
+                wrapper.addEventListener('scroll', function() {
+                    this.classList.add('has-scrolled');
+                }, { once: true });
+            }
+        });
         
         // Cleanup
         return () => {
@@ -244,6 +260,7 @@
             <b>Check League Format for a full breakdown</b> of session dates and tournament dates. 
         </p>
         <Collapsible 
+        id="league-format"
         title="League Format"
         variant="minimal"
         titleSize="1.75rem"
@@ -273,7 +290,7 @@
             <h3>Schedule</h3>
             </div>
 
-        <div class="center">
+            <div class="table-wrapper">
                 <table class="basic-table">
                 <thead>
                     <tr>
@@ -330,8 +347,8 @@
             This year we have 2 tournaments! Anyone including (those not in the league) can compete so if you can only come for 1 day these are the ones to do it! 
             The exact format of the tournament will depend on the number of players but it will follow a round robin + elimination set up.
             League points up for grabs (half awarded to each player in the team)
-            <div class="center">
-                <table class="basic-table">
+                <div class="table-wrapper">
+                    <table class="basic-table">
                 <thead>
                     <tr>
                         <th>Place</th>
@@ -367,7 +384,7 @@
                     </tr>
                 </tbody>
             </table>
-            </div>
+                </div> 
         </div>
         
     </Collapsible>
@@ -437,12 +454,227 @@
 
 <style>
 
+    /* Center tables on desktop only */
+    @media (min-width: 769px) {
+        .table-wrapper {
+            max-width: 600px;
+            margin: 1rem auto;
+        }
+    }
+    
+    /* Full width on mobile */
+    @media (max-width: 768px) {
+        .table-wrapper {
+            margin: 1rem -1.5rem; /* Negative margins to extend beyond padding */
+            padding: 0 1rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Visual indicator that table is scrollable */
+        .table-wrapper {
+            background: 
+                linear-gradient(to right, white 30%, rgba(255, 255, 255, 0)),
+                linear-gradient(to right, rgba(255, 255, 255, 0), white 70%) 100% 0,
+                linear-gradient(to right, rgba(0, 0, 0, 0.1), transparent 10%),
+                linear-gradient(to left, rgba(0, 0, 0, 0.1), transparent 10%) 100% 0;
+            background-repeat: no-repeat;
+            background-size: 40px 100%, 40px 100%, 10px 100%, 10px 100%;
+            background-attachment: local, local, scroll, scroll;
+        }
+    }
+    
+    /* Ensure minimum table width */
+    .basic-table {
+        min-width: 300px;
+        width: 100%;
+    }
+    
+    /* Optional: Add horizontal scroll indicator */
+    .table-wrapper[data-scrollable]::after {
+        content: '← Swipe to see more →';
+        display: block;
+        text-align: center;
+        padding: 0.5rem;
+        font-size: 0.75rem;
+        color: #666;
+    }
+    
+    /* Hide indicator once user has scrolled */
+    .table-wrapper.has-scrolled::after {
+        display: none;
+    }
+
+    /* Add these styles to your existing <style> section */
+
+    /* Mobile-specific adjustments */
+    @media (max-width: 768px) {
+        /* Container and main layout */
+        .container {
+            padding: 1rem;
+        }
+        
+        main {
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+        
+        /* Typography adjustments */
+        h1 {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+        
+        h3 {
+            font-size: 1.25rem;
+        }
+        
+        p {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        /* Remove subsection margin on mobile */
+        .subsection {
+            margin-left: 0;
+        }
+        
+        /* Make center div full width on mobile */
+        .center {
+            width: 100%;
+            margin: 0;
+            overflow-x: auto;
+        }
+        
+        /* Table adjustments */
+        .basic-table {
+            font-size: 0.85rem;
+            box-shadow: none;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .basic-table th {
+            padding: 0.75rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .basic-table td {
+            padding: 0.75rem 0.5rem;
+        }
+        
+        /* Make tables scrollable */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -1rem;
+            padding: 0 1rem;
+        }
+        
+        /* Lists */
+        ul {
+            padding-left: 1.5rem;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+        
+        /* Breadcrumb */
+        .breadcrumb {
+            margin-bottom: 1rem;
+        }
+    }
+
+    /* Even smaller screens */
+    @media (max-width: 480px) {
+        h1 {
+            font-size: 1.5rem;
+        }
+        
+        main {
+            padding: 1rem;
+        }
+        
+        /* Stack table cells on very small screens */
+        .basic-table thead {
+            display: none;
+        }
+        
+        .basic-table tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+        }
+        
+        .basic-table td {
+            display: block;
+            text-align: right;
+            padding: 0.5rem;
+            position: relative;
+            padding-left: 50%;
+        }
+        
+        .basic-table td:before {
+            content: attr(data-label);
+            position: absolute;
+            left: 0.5rem;
+            font-weight: 600;
+            text-align: left;
+        }
+    }
+
+    /* Improved base styles for better mobile experience */
+    * {
+        box-sizing: border-box;
+    }
+
+    /* Prevent horizontal scroll */
+    body {
+        overflow-x: hidden;
+    }
+
+    /* Make links easier to tap on mobile */
+    a {
+        padding: 0.25rem 0;
+        display: inline-block;
+    }
+
+    /* Larger touch targets for Collapsible headers on mobile */
+    @media (max-width: 768px) {
+        :global(.collapsible .header) {
+            padding: 1rem !important;
+            touch-action: manipulation;
+        }
+    }
+
+    /* Add smooth scrolling */
+    :global(html) {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Ensure tables don't break layout */
+    table {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    /* Responsive images if you add any */
+    img {
+        max-width: 100%;
+        height: auto;
+    }
+
     /* Style 1: Clean and Modern */
         .basic-table {
             width: 100%;
             background: white;
             border-radius: 8px;
             overflow: hidden;
+            table-layout: fixed; /* Forces table to use full width */
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             border-collapse: collapse;
         }
