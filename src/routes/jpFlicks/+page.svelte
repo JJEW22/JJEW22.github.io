@@ -6,8 +6,7 @@
     // Configuration
     const config = {
         fileName: 'jpFlicksDoubles.xlsx', // Your Excel file name
-        sheetsToLoad: [0, 1], // Which sheets to load (by index or names)
-        // sheetsToLoad: ['Sheet1', 'Sheet2'], // Or use sheet names
+        sheetsToLoad: ['HomeGames', 'AwayGames', 'TeamInfo'], // Which sheets to load (by index or names)
     };
     
     // Data storage
@@ -15,20 +14,11 @@
     let error = null;
     let excelData = {}; // Will store all sheet data
     let dataReady = false;
-    let teams = []; // will store the name of all teams
+    let team_names = []; // will store the name of all teams
 
-    onMount(() => {
-        // Add smooth scrolling to all anchor links
-        
-    });
-    
-    // Function to scroll to top
-    function scrollToTop() {
-        window.scrollTo({ 
-            top: 0, 
-            behavior: 'smooth' 
-        });
-    }
+    const WIN_SCORE = 2;
+    const TIES_SCORE = 1;
+    const SERIES_WIN_SCORE = 1;
     
     onMount(async () => {
         await loadExcelData();
@@ -167,9 +157,15 @@
                     rows: arrayData.slice(1), // Data rows only
                 };
             });
-            teams = getTeams("Sheet1")
-            dataReady = true;
+            // team_names = getTeams("Sheet1")
+
+            let teamInfo = pullTeamInfo();
+            console.log('teamInfo');
+            console.log(teamInfo);
+            teams = pullWinsInfo(teamInfo);
             
+            
+            dataReady = true;
             // Log the loaded data for debugging
             console.log('Excel data loaded:', excelData);
             
@@ -208,21 +204,53 @@
         return tempTeams;
     }
     
-    // Example: Create custom table from loaded data
-    function createCustomTable() {
-        if (!dataReady) return [];
+    // Pull the Team Info
+    function pullTeamInfo() {
+        const teamData = getSheetData('TeamInfo', 'json');
         
-        // Example: Combine data from two sheets
-        const sheet1Data = getSheetData('Sheet1', 'json');
-        const sheet2Data = getSheetData('Sheet2', 'json');
+        return teamData;
+    }
+
+    function pullWinsInfo(teamInfo) {
+        const homeGames = getSheetData('HomeGames', 'json');
+        const awayGames = getSheetData('AwayGames', 'json');
+        const something = teamInfo
+        console.log("teamInfo2")
+        console.log(teamInfo)
+        return teamInfo.map((val, idx) => {
+            let wins = 0;
+            let losses = 0;
+            let ties = 0;
+            let pointDiff = 0;
+            let seriesWins = 0;
+            let seriesLosses = 0;
+            console.log(homeGames)
+            console.log(val.name)
+            const homeRowIndex = homeGames.findIndex(row => {
+                return row.name === val.name 
+            }
+            );
+            console.log('home row idx')
+            console.log(homeRowIndex)
+            const awayHomeIndex = awayGames.findIndex(row => row.Name === val.name);
+
+            const homeRow = val[homeRowIndex];
+            const awayRow = val[awayHomeIndex];
+            console.log('home row')
+            console.log(homeRow)
+
+            return {
+            ...val,
+            wins: wins,
+            ties: ties,
+            losses: losses,
+            pointDiff: pointDiff,
+            seriesWins: seriesWins,
+            seriesLosses: seriesLosses,
+        }
+        }
         
-        // Your custom logic here
-        // This is just an example that combines data
-        return sheet1Data?.map((row, index) => ({
-            ...row,
-            // Add data from sheet 2 if exists
-            ...(sheet2Data?.[index] || {})
-        })) || [];
+        )
     }
     
     // Example: Get specific columns from different sheets
@@ -237,6 +265,100 @@
             sheet1Value: val,
             sheet2Value: sheet2Col2[index] || 'N/A'
         }));
+    }
+
+    // Sample data structure - replace with your actual data
+    let teams = [
+        {
+            teamName: "Thunder Hawks",
+            player1: "John",
+            player2: "Sarah",
+            seriesWins: 7,
+            wins: 15,
+            ties: 2,
+            losses: 3,
+            pointDiff: 245
+        },
+        {
+            teamName: "Lightning Bolts",
+            player1: "Mike",
+            player2: "Emma",
+            seriesWins: 5,
+            wins: 12,
+            ties: 3,
+            losses: 5,
+            pointDiff: 120
+        },
+        // Add more teams here
+    ];
+    
+    // Sort configuration
+    let sortColumn = 'score';
+    let sortDirection = 'desc';
+    console.log('team loading')
+    console.log(teams)
+    // Add this computed property to calculate scores before sorting
+    let teamsWithScores = teams.map(team => ({
+        ...team,
+        score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins),
+        gamesPlayed: team.wins + team.ties + team.seriesWins
+    }));
+    let ranking = teamsWithScores.sort((a, b) => {
+        if (a.score !== b.score) {
+            return -1 * (a.score - b.score);
+        }
+
+        if (a.pointDiff !== b.pointDiff) {
+            return a.pointDiff - b.pointDiff
+        }
+
+        return a.gamesPlayed - b.gamesPlayed
+    })
+
+    $: teamsWithRanking = ranking.map((team,index) => ({
+        ...team,
+        ranking: index + 1
+    }));
+    
+    // Update sort function to work with the computed scores
+    let sortedTeams = [];
+    
+    function sortTable(column) {
+        if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = ['teamName', 'player1', 'player2'].includes(column) ? 'asc' : 'desc';
+        }
+        
+        sortedTeams = [...teamsWithRanking].sort((a, b) => {
+            let aVal = a[column];
+            let bVal = b[column];
+            
+            if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = bVal.toLowerCase();
+            }
+            
+            if (sortDirection === 'asc') {
+                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+            } else {
+                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+            }
+        });
+    }
+    
+    // Initialize the sorted teams
+    $: {
+        if (teamsWithScores.length > 0 && sortedTeams.length === 0) {
+            sortTable('ranking'); // Default sort by ranking
+        }
+    }
+    
+    // Update getSortIndicator to use proper arrows
+    function getSortIndicator(column) {
+        if (sortColumn !== column) return '';
+        return sortDirection === 'asc' ? '↑' : '↓';
     }
 
 </script>
@@ -410,6 +532,16 @@
             <li>HAVE FUN</li>
         </ul>
         </Collapsible>
+        <Collapsible 
+        id="games-finder"
+        title="Games Finder"
+        variant="minimal"
+        titleSize="1.75rem"
+        titleWeight="300"
+        titleColor="#1a202c"
+        iconType="arrow"
+        >
+        </Collapsible>
         {#if loading}
             <div class="status">Loading Excel data...</div>
         {:else if error}
@@ -421,8 +553,89 @@
         <p></p>
             <!-- <div class="status success">
                 Data loaded successfully! Sheets available: {Object.keys(excelData).join(', ')}
-            </div>
-            <div>{teams}</div> -->
+            </div> -->
+            <div>{team_names}</div>
+
+            <div class="standings-container">
+    <h2>League Standings</h2>
+    
+    <div class="table-wrapper">
+        <table class="standings-table">
+            <thead>
+    <tr>
+        <th>
+            #
+        </th>
+        <th>
+            Team
+        </th>
+        <th class="sortable numeric" on:click={() => sortTable('gamesPlayed')}>
+            GP {getSortIndicator('gamesPlayed')}
+        </th>
+        <th class="sortable numeric" on:click={() => sortTable('seriesWins')}>
+            Series W {getSortIndicator('seriesWins')}
+        </th>
+        <th class="sortable numeric" on:click={() => sortTable('wins')}>
+            W {getSortIndicator('wins')}
+        </th>
+        <th class="sortable numeric" on:click={() => sortTable('ties')}>
+            D {getSortIndicator('ties')}
+        </th>
+        <th class="sortable numeric" on:click={() => sortTable('losses')}>
+            L {getSortIndicator('losses')}
+        </th>
+        <th class="sortable numeric highlight" on:click={() => sortTable('ranking')}>
+            Score {getSortIndicator('ranking')}
+        </th>
+        <th class="sortable numeric" on:click={() => sortTable('pointDiff')}>
+            +/- {getSortIndicator('pointDiff')}
+        </th>
+                <th>
+            Player 1
+        </th>
+        <th>
+            Player 2
+        </th>
+    </tr>
+</thead>
+
+<!-- Update tbody to use sortedTeams instead of rankedTeams -->
+<tbody>
+    {#each sortedTeams as team, index}
+        <tr class:top-three={sortColumn === 'score' && sortDirection === 'desc' && index < 3}>
+            <td class="position-column">
+                {#if team.ranking === 1}
+                    <span class="medal gold">🥇</span>
+                {:else if team.ranking === 2}
+                    <span class="medal silver">🥈</span>
+                {:else if team.ranking === 3}
+                    <span class="medal bronze">🥉</span>
+                {:else}
+                    {team.ranking}
+                {/if}
+            </td>
+            <td class="team-name">{team.teamName}</td>
+            <td class="numeric">{team.gamesPlayed}</td>
+            <td class="numeric">{team.seriesWins}</td>
+            <td class="numeric">{team.wins}</td>
+            <td class="numeric">{team.ties}</td>
+            <td class="numeric">{team.losses}</td>
+            <td class="numeric highlight">{team.score}</td>
+            <td class="numeric {team.pointDiff >= 0 ? 'positive' : 'negative'}">
+                {team.pointDiff > 0 ? '+' : ''}{team.pointDiff}
+            </td>
+            <td>{team.player1}</td>
+            <td>{team.player2}</td>
+        </tr>
+    {/each}
+</tbody>
+        </table>
+    </div>
+    
+    <div class="table-legend">
+    <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>+/-:</strong> Point Differential</p>
+</div>
+</div>
 
             <!-- Your custom table/visualization will go here -->
             <!-- <section class="custom-content">
@@ -440,7 +653,6 @@
                 
                 <!-- Add your custom table component here -->
                 <!-- Example: -->
-                <!-- <MyCustomTable data={createCustomTable()} /> -->
                 
                 <!-- Debug view (remove in production) -->
                 <!-- <details class="debug">
@@ -812,5 +1024,175 @@
     .center {
         width: 50%; /* Or any specific width */
         margin: 0 auto;
+    }
+
+    .standings-container {
+        margin: 2rem 0;
+    }
+    
+    h2 {
+        margin-bottom: 1.5rem;
+        color: #1a1a1a;
+    }
+    
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 1rem;
+    }
+    
+    .standings-table {
+        width: 100%;
+        min-width: 700px;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Header styles */
+    th {
+        background: #2c5aa0;
+        color: white;
+        padding: 1rem 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+    
+    th.sortable {
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s;
+    }
+    
+    th.sortable:hover {
+        background: #1e4080;
+    }
+    
+    th.numeric {
+        text-align: center;
+    }
+    
+    /* Cell styles */
+    td {
+        padding: 0.875rem 0.75rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    tbody tr:hover {
+        background: #f0f9ff;
+    }
+    
+    /* Position column */
+    .position-column {
+        width: 50px;
+        text-align: center;
+        font-weight: 600;
+    }
+    
+    .medal {
+        font-size: 1.25rem;
+    }
+    
+    /* Team name styling */
+    .team-name {
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+    
+    /* Numeric columns */
+    .numeric {
+        text-align: center;
+    }
+    
+    /* Highlight score column */
+    .highlight {
+        background: rgba(44, 90, 160, 0.1);
+        font-weight: 700;
+    }
+    
+    th.highlight {
+        background: #1e4080;
+    }
+    
+    /* Point differential coloring */
+    .positive {
+        color: #059669;
+    }
+    
+    .negative {
+        color: #dc2626;
+    }
+    
+    /* Top 3 teams highlighting */
+    .top-three {
+        background: #fef3c7;
+    }
+    
+    .top-three:hover {
+        background: #fde68a;
+    }
+    
+    /* Table legend */
+    .table-legend {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: #666;
+        text-align: center;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .table-wrapper {
+            margin: 0 -1rem;
+            padding: 0;
+        }
+        
+        .standings-table {
+            font-size: 0.75rem;
+            min-width: 600px;
+        }
+        
+        th {
+            padding: 0.5rem;
+            font-size: 0.7rem;
+        }
+        
+        td {
+            padding: 0.5rem;
+        }
+        
+        .position-column {
+            width: 40px;
+        }
+        
+        .medal {
+            font-size: 1rem;
+        }
+    }
+    
+    /* Sort indicators */
+    th.sortable::after {
+        content: ' ↕';
+        opacity: 0.3;
+        font-size: 0.75em;
+    }
+    
+    th.sortable:hover::after {
+        opacity: 0.6;
     }
 </style>
