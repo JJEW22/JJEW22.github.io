@@ -3,22 +3,29 @@
     import * as XLSX from 'xlsx';
     import Collapsible from '$lib/Collapsible.svelte';
     
-    // Configuration
-    const config = {
-        fileName: 'jpFlicksDoubles.xlsx', // Your Excel file name
-        sheetsToLoad: ['HomeGames', 'AwayGames', 'TeamInfo'], // Which sheets to load (by index or names)
-    };
-    
     // Data storage
     let loading = true;
     let error = null;
     let excelData = {}; // Will store all sheet data
     let dataReady = false;
     let team_names = []; // will store the name of all teams
+    let teams_info = undefined; // will store all the teams info
+    $: teamsWithRanking = undefined;
 
     const WIN_SCORE = 2;
     const TIES_SCORE = 1;
+    const LOSS_SCORE = 0;
     const SERIES_WIN_SCORE = 1;
+    const UNPLAYED_STRING = "UNPLAYED"
+    const WONT_PLAY_STRING = "XXX"
+    const HOME_GAMES_PAGE_NAME = "HomeGames"
+    const AWAY_GAMES_PAGE_NAME = "AwayGames"
+
+    // Configuration
+    const config = {
+        fileName: 'jpFlicksDoubles.xlsx', // Your Excel file name
+        sheetsToLoad: [HOME_GAMES_PAGE_NAME, AWAY_GAMES_PAGE_NAME, 'TeamInfo'], // Which sheets to load (by index or names)
+    };
     
     onMount(async () => {
         await loadExcelData();
@@ -157,13 +164,36 @@
                     rows: arrayData.slice(1), // Data rows only
                 };
             });
-            // team_names = getTeams("Sheet1")
+            team_names = getTeams(HOME_GAMES_PAGE_NAME)
 
             let teamInfo = pullTeamInfo();
             console.log('teamInfo');
             console.log(teamInfo);
-            teams = pullWinsInfo(teamInfo);
-            
+            teams_info = pullWinsInfo(teamInfo);
+            console.log('TEAMS INFO!')
+            console.log(teams_info)
+
+        let teamsWithScores = teams_info.map(team => ({
+            ...team,
+            score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins),
+            gamesPlayed: team.wins + team.ties + team.losses
+        }));
+        let ranking = teamsWithScores.sort((a, b) => {
+            if (a.score !== b.score) {
+                return -1 * (a.score - b.score);
+            }
+
+            if (a.pointDiff !== b.pointDiff) {
+                return -1 * (a.pointDiff - b.pointDiff)
+            }
+
+            return a.gamesPlayed - b.gamesPlayed
+        })
+
+        teamsWithRanking = ranking.map((team,index) => ({
+            ...team,
+            ranking: index + 1
+        }));
             
             dataReady = true;
             // Log the loaded data for debugging
@@ -207,47 +237,115 @@
     // Pull the Team Info
     function pullTeamInfo() {
         const teamData = getSheetData('TeamInfo', 'json');
+        console.log("the data")
+        console.log(teamData)
+        console.log(teamData[0])
+        console.log(teamData[0]["Player 1"])
+        let final_info = teamData.map((info) => ({
+            teamName: info.name,
+            player1: info["Player 1"],
+            player2: info["Player 2"]
+        }))
         
-        return teamData;
+        return final_info;
     }
 
-    function pullWinsInfo(teamInfo) {
-        const homeGames = getSheetData('HomeGames', 'json');
-        const awayGames = getSheetData('AwayGames', 'json');
-        const something = teamInfo
-        console.log("teamInfo2")
-        console.log(teamInfo)
-        return teamInfo.map((val, idx) => {
-            let wins = 0;
-            let losses = 0;
-            let ties = 0;
-            let pointDiff = 0;
-            let seriesWins = 0;
-            let seriesLosses = 0;
-            console.log(homeGames)
-            console.log(val.name)
-            const homeRowIndex = homeGames.findIndex(row => {
-                return row.name === val.name 
-            }
-            );
-            console.log('home row idx')
-            console.log(homeRowIndex)
-            const awayHomeIndex = awayGames.findIndex(row => row.Name === val.name);
+    // returns true if game value is unplayed
+    function isUnplayed(game_value) {
+        return (typeof game_value === "string") && ((game_value === UNPLAYED_STRING) || (game_value === WONT_PLAY_STRING));
+    }
 
-            const homeRow = val[homeRowIndex];
-            const awayRow = val[awayHomeIndex];
-            console.log('home row')
-            console.log(homeRow)
-
-            return {
-            ...val,
-            wins: wins,
-            ties: ties,
-            losses: losses,
-            pointDiff: pointDiff,
-            seriesWins: seriesWins,
-            seriesLosses: seriesLosses,
+    function update_for_game(team_info, score) {
+        if (score > 0) {
+            team_info.wins += 1
+        } else if (score < 0) {  
+            team_info.losses += 1
         }
+        else {
+            team_info.ties += 1
+        }
+        team_info.pointDiff += score
+        
+    }
+
+    function update_series(team_info, home_score, away_score) {
+        const combined_score = home_score + away_score
+        if (combined_score > 0) {
+            team_info.seriesWins += 1
+        } else if (combined_score < 0) {
+            team_info.seriesLosses += 1
+        } else {
+            throw new Error("Given a series that ended in a tie");
+        }
+    }
+
+    function update_for_series(team_info, home_result, away_result) {
+         if (!isUnplayed(home_result)) {
+            update_for_game(team_info, home_result)
+        }
+
+        if (!isUnplayed(away_result)) {
+            update_for_game(team_info, away_result)
+        }
+
+        if (!isUnplayed(home_result) && !isUnplayed(away_result)) {
+            update_series(team_info, home_result, away_result);
+        }
+        
+        
+    }
+
+
+    function pullWinsInfo(teamInfo) {
+        const homeGames = getSheetData(HOME_GAMES_PAGE_NAME, 'json');
+        const awayGames = getSheetData(AWAY_GAMES_PAGE_NAME, 'json');
+        return teamInfo.map((val, idx) => {
+            let teamInfo = {
+                ...val,
+                wins: 0,
+                losses: 0,
+                ties: 0,
+                pointDiff: 0,
+                seriesWins: 0,
+                seriesLosses: 0,
+            }
+            console.log('current test')
+            console.log(homeGames)
+            console.log(val.teamName)
+            console.log(val)
+            function compare_names(row) {
+                console.log('row data')
+                console.log(row)
+                return row.teamName.toLowerCase() === val.teamName.toLowerCase();
+            }
+            const homeRowIndex = homeGames.findIndex(compare_names);
+            if (homeRowIndex === -1) {
+                throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+            }
+            const awayRowIndex = awayGames.findIndex(compare_names);
+            if (awayRowIndex === -1) {
+                throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+            }
+
+            const homeRow = homeGames[homeRowIndex];
+            const awayRow = awayGames[awayRowIndex];
+            team_names.forEach((team_name) => {
+                if (team_name === homeRow.name) {
+                    return;
+                }
+                let homeResult = homeRow[team_name]
+                if (homeResult === undefined) {
+                    console.log(`error home undefined ${team_name}`)
+                }
+                let awayResult = awayRow[team_name]
+                if (awayResult === undefined) {
+                    console.log(`error away undefined ${team_name}`)
+                }
+                update_for_series(teamInfo, homeResult, awayResult)
+            })
+
+
+            return teamInfo
         }
         
         )
@@ -268,57 +366,11 @@
     }
 
     // Sample data structure - replace with your actual data
-    let teams = [
-        {
-            teamName: "Thunder Hawks",
-            player1: "John",
-            player2: "Sarah",
-            seriesWins: 7,
-            wins: 15,
-            ties: 2,
-            losses: 3,
-            pointDiff: 245
-        },
-        {
-            teamName: "Lightning Bolts",
-            player1: "Mike",
-            player2: "Emma",
-            seriesWins: 5,
-            wins: 12,
-            ties: 3,
-            losses: 5,
-            pointDiff: 120
-        },
-        // Add more teams here
-    ];
     
     // Sort configuration
     let sortColumn = 'score';
     let sortDirection = 'desc';
-    console.log('team loading')
-    console.log(teams)
     // Add this computed property to calculate scores before sorting
-    let teamsWithScores = teams.map(team => ({
-        ...team,
-        score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins),
-        gamesPlayed: team.wins + team.ties + team.seriesWins
-    }));
-    let ranking = teamsWithScores.sort((a, b) => {
-        if (a.score !== b.score) {
-            return -1 * (a.score - b.score);
-        }
-
-        if (a.pointDiff !== b.pointDiff) {
-            return a.pointDiff - b.pointDiff
-        }
-
-        return a.gamesPlayed - b.gamesPlayed
-    })
-
-    $: teamsWithRanking = ranking.map((team,index) => ({
-        ...team,
-        ranking: index + 1
-    }));
     
     // Update sort function to work with the computed scores
     let sortedTeams = [];
@@ -330,8 +382,8 @@
             sortColumn = column;
             sortDirection = ['teamName', 'player1', 'player2'].includes(column) ? 'asc' : 'desc';
         }
-        
-        sortedTeams = [...teamsWithRanking].sort((a, b) => {
+        if (teamsWithRanking !== undefined) {
+            sortedTeams = [...teamsWithRanking].sort((a, b) => {
             let aVal = a[column];
             let bVal = b[column];
             
@@ -346,11 +398,12 @@
                 return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
             }
         });
+        }
     }
     
     // Initialize the sorted teams
     $: {
-        if (teamsWithScores.length > 0 && sortedTeams.length === 0) {
+        if (teamsWithRanking !== undefined && teamsWithRanking.length > 0 && sortedTeams.length === 0) {
             sortTable('ranking'); // Default sort by ranking
         }
     }
@@ -376,7 +429,7 @@
     <main>
         <h1>JP Flicks - Season 2: The Crok Wars</h1>
         <p>
-            Boston's premier Crokinole league <b>JP Flicks is back for a season 2</b>! We will meet <b>Thursday's at 7pm</b> and run till about 10pm.
+            Boston's premier Crokinole league <b>JP Flicks is back for a season 2</b>! We will meet <b>Thursdays at 7pm</b> and run till about 10pm.
             This seasons league is planned to go from late October to end of March and will <b>feature 2 tournaments</b> that will have their own prizes.
             Because of the longer format we only request that you believe you could make it to half the sessions and request to join no later than the 3rd session.
             <b>Check League Format for a full breakdown</b> of session dates and tournament dates. 
@@ -463,6 +516,7 @@
                 <li>Tieing a game awards 1 point</li>
                 <li>Losing a game awards 0 points</li>
                 <li>Winning a series (combined score of both games against a team) awards 1 bonus point</li>
+                <li>In the event of a tie in a series there will be 20s shootout</li>
             </ul>
             
             <h3 id="tournaments-section">Tournaments</h3>
@@ -554,7 +608,6 @@
             <!-- <div class="status success">
                 Data loaded successfully! Sheets available: {Object.keys(excelData).join(', ')}
             </div> -->
-            <div>{team_names}</div>
 
             <div class="standings-container">
     <h2>League Standings</h2>
