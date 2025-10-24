@@ -194,10 +194,12 @@
             ...team,
             ranking: index + 1
         }));
+
+        sortTable('ranking');
             
-            dataReady = true;
-            // Log the loaded data for debugging
-            console.log('Excel data loaded:', excelData);
+        dataReady = true;
+        // Log the loaded data for debugging
+        console.log('Excel data loaded:', excelData);
             
         } catch (err) {
             error = err.message;
@@ -368,7 +370,7 @@
     // Sample data structure - replace with your actual data
     
     // Sort configuration
-    let sortColumn = 'score';
+    let sortColumn = 'ranking';
     let sortDirection = 'desc';
     // Add this computed property to calculate scores before sorting
     
@@ -398,13 +400,6 @@
                 return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
             }
         });
-        }
-    }
-    
-    // Initialize the sorted teams
-    $: {
-        if (teamsWithRanking !== undefined && teamsWithRanking.length > 0 && sortedTeams.length === 0) {
-            sortTable('ranking'); // Default sort by ranking
         }
     }
     
