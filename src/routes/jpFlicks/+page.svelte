@@ -419,6 +419,7 @@
 <svelte:head>
     <title>JP Flicks</title>
     <meta name="description" content="Crokinole better than ever">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </svelte:head>
 
 <div class="container">
