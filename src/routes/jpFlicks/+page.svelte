@@ -352,20 +352,7 @@
         
         )
     }
-    
-    // Example: Get specific columns from different sheets
-    function getCombinedColumns() {
-        if (!dataReady) return [];
-        
-        const sheet1Col0 = getColumnData('Sheet1', 0); // First column of Sheet1
-        const sheet2Col2 = getColumnData('Sheet2', 2); // Third column of Sheet2
-        
-        // Combine into a new structure
-        return sheet1Col0.map((val, index) => ({
-            sheet1Value: val,
-            sheet2Value: sheet2Col2[index] || 'N/A'
-        }));
-    }
+
 
     // Sample data structure - replace with your actual data
     
