@@ -501,7 +501,6 @@
     
     // Total games count
     $: shownGames = filteredGames.length;
-    $: totalGames = filteredGames.length;
     
     // Generate games data from your Excel data
     function generateGamesData() {
@@ -737,7 +736,9 @@
         {#if playerName && (shownGames > 0 || hiddenTeams.size > 0)}
             <div class="summary-section">
                 <div class="total-games">
-                    Showing <strong>{shownGames}</strong> out of {totalGames} Total games to play
+                    Showing <strong>{shownGames}</strong> out of {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
+                        return accumulator + currentValue;
+                    })} Total games to play
                     {#if hiddenTeams.size > 0 && shownGames === 0}
                         <span class="filtered-warning"> (All games filtered out)</span>
                     {/if}
