@@ -20,6 +20,16 @@
     const WONT_PLAY_STRING = "XXX"
     const HOME_GAMES_PAGE_NAME = "HomeGames"
     const AWAY_GAMES_PAGE_NAME = "AwayGames"
+    const SESSION_COUNT = 16
+    const HOME_GAME_STRING = 'Council'
+    const AWAY_GAME_STRING = 'Anish'
+
+    // access constants
+    const TEAM_NAME = 'teamName'
+    const PLAYER_ONE = 'player1'
+    const PLAYER_TWO = 'player2'
+    const IS_HOME = 'isHome'
+    const PLAYED = 'played'
 
     // Configuration
     const config = {
@@ -62,10 +72,10 @@
             // Update scroll progress
             const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
             const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-            scrollProgress = (winScroll / height) * 100;
+            // scrollProgress = (winScroll / height) * 100;
             
-            // Show/hide back to top button
-            showBackToTop = winScroll > 300;
+            // // Show/hide back to top button
+            // showBackToTop = winScroll > 300;
         };
         
         window.addEventListener('scroll', handleScroll);
@@ -257,7 +267,11 @@
         return (typeof game_value === "string") && ((game_value === UNPLAYED_STRING) || (game_value === WONT_PLAY_STRING));
     }
 
-    function update_for_game(team_info, score) {
+    function isValidGame(game_value) {
+        return (typeof game_value === "number") || (game_value === UNPLAYED_STRING);
+    }
+
+    function update_team_for_game(team_info, score) {
         if (score > 0) {
             team_info.wins += 1
         } else if (score < 0) {  
@@ -281,13 +295,14 @@
         }
     }
 
+
     function update_for_series(team_info, home_result, away_result) {
-         if (!isUnplayed(home_result)) {
-            update_for_game(team_info, home_result)
+        if (!isUnplayed(home_result)) {
+            update_team_for_game(team_info, home_result)
         }
 
         if (!isUnplayed(away_result)) {
-            update_for_game(team_info, away_result)
+            update_team_for_game(team_info, away_result)
         }
 
         if (!isUnplayed(home_result) && !isUnplayed(away_result)) {
@@ -311,13 +326,12 @@
                 seriesWins: 0,
                 seriesLosses: 0,
             }
+            let games_info = []
             console.log('current test')
             console.log(homeGames)
             console.log(val.teamName)
             console.log(val)
             function compare_names(row) {
-                console.log('row data')
-                console.log(row)
                 return row.teamName.toLowerCase() === val.teamName.toLowerCase();
             }
             const homeRowIndex = homeGames.findIndex(compare_names);
@@ -394,6 +408,265 @@
     function getSortIndicator(column) {
         if (sortColumn !== column) return '';
         return sortDirection === 'asc' ? '↑' : '↓';
+    }
+
+    let allGames = [
+        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Lightning Bolts", player2_1: "Mike", player2_2: "Emma", isHome: false, played: false },
+        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Fire Dragons", player2_1: "Alex", player2_2: "Lisa", isHome: true, played: false },
+        { team1: "Lightning Bolts", player1_1: "Mike", player1_2: "Emma", team2: "Ice Wolves", player2_1: "Tom", player2_2: "Jane", isHome: false, played: false },
+        { team1: "Fire Dragons", player1_1: "Alex", player1_2: "Lisa", team2: "Storm Eagles", player2_1: "John", player2_2: "Kate", isHome: false, played: false },
+        { team1: "Fire Dragons", player1_1: "Alex", player1_2: "Lisa", team2: "Storm Eagles", player2_1: "John", player2_2: "Kate", isHome: true, played: false },
+        // Add more games...
+    ];
+    
+    // State variables
+    let playerName = '';
+    let filteredGames = [];
+    let hiddenTeams = new Set(); // Teams to hide from the display
+    let teamGameCounts = {};
+    
+    // Filter games based on player name
+    function filterGamesByPlayer() {
+        if (!playerName.trim()) {
+            filteredGames = [];
+            teamGameCounts = {};
+            return;
+        }
+        
+        const searchName = playerName.toLowerCase().trim();
+        
+        // Filter games where the player is involved and not yet played
+        filteredGames = allGames.filter(game => {
+            if (game.played) return false;
+            
+            const playerInTeam1 = game.player1_1.toLowerCase().includes(searchName) || 
+                                 game.player1_2.toLowerCase().includes(searchName);
+            const playerInTeam2 = game.player2_1.toLowerCase().includes(searchName) || 
+                                 game.player2_2.toLowerCase().includes(searchName);
+            
+            return playerInTeam1 || playerInTeam2;
+        });
+        
+        // Apply hidden teams filter
+        filteredGames = filteredGames.filter(game => {
+            return !hiddenTeams.has(game.team1) && !hiddenTeams.has(game.team2);
+        });
+        
+        // Count games per team
+        updateTeamCounts();
+    }
+    
+    // Update team game counts - fixed to track all teams
+    function updateTeamCounts() {
+        teamGameCounts = {};
+        const searchName = playerName.toLowerCase().trim();
+        
+        // First pass: count all games including hidden ones
+        allGames.forEach(game => {
+            if (game.played) return;
+            
+            // Check which team the player is on
+            const playerInTeam1 = game.player1_1.toLowerCase().includes(searchName) || 
+                                 game.player1_2.toLowerCase().includes(searchName);
+            const playerInTeam2 = game.player2_1.toLowerCase().includes(searchName) || 
+                                 game.player2_2.toLowerCase().includes(searchName);
+            
+            if (playerInTeam1 || playerInTeam2) {
+                if (playerInTeam1) {
+                    teamGameCounts[game.team1] = (teamGameCounts[game.team1] || 0) + 1;
+                }
+                if (playerInTeam2) {
+                    teamGameCounts[game.team2] = (teamGameCounts[game.team2] || 0) + 1;
+                }
+            }
+        });
+    }
+    
+    // Toggle team filter
+    function toggleTeamFilter(teamName) {
+        if (hiddenTeams.has(teamName)) {
+            hiddenTeams.delete(teamName);
+        } else {
+            hiddenTeams.add(teamName);
+        }
+        hiddenTeams = new Set(hiddenTeams); // Trigger reactivity
+        filterGamesByPlayer(); // Re-filter games
+    }
+    
+    // Get player's team for a specific game
+    function getPlayerTeam(game) {
+        const searchName = playerName.toLowerCase().trim();
+        const playerInTeam1 = game.player1_1.toLowerCase().includes(searchName) || 
+                             game.player1_2.toLowerCase().includes(searchName);
+        
+        return playerInTeam1 ? game.team1 : game.team2;
+    }
+    
+    // Get opponent team for a specific game
+    function getOpponentTeam(game) {
+        const playerTeam = getPlayerTeam(game);
+        return playerTeam === game.team1 ? game.team2 : game.team1;
+    }
+    
+    // Reset filters
+    function resetFilters() {
+        hiddenTeams.clear();
+        filterGamesByPlayer();
+    }
+
+    function getInfoForTeam(teams_info, team_name) {
+        let result = undefined
+        teams_info.forEach((val) => {
+            if (val[TEAM_NAME].toLowerCase() === team_name.toLowerCase()) {
+                result = val;
+            }
+        })
+
+        return result
+    }
+    
+    // Total games count
+    $: shownGames = filteredGames.length;
+
+    function gameInGames(games, team1, team2, isHome) {
+        let gameExists = false;
+        // if (team1 === 'TGIAJF' || team2 === 'TGIAJF') {
+        //         console.log('high lvl', team1, team2, isHome, games)
+        // }
+        games.forEach((game) => {
+            let alreadyExists = (game.team1.toLowerCase() === team1.toLowerCase())
+                && (game.team2.toLowerCase() === team2.toLowerCase())
+                && (game[IS_HOME] === isHome)
+            let flippedExists = (game.team2.toLowerCase() === team1.toLowerCase())
+                && (game.team1.toLowerCase() === team2.toLowerCase())
+                && (game[IS_HOME] === isHome)
+
+            // if (team1 === 'TGIAJF' || team2 === 'TGIAJF') {
+            //     console.log(game.team1, game.team2, game, alreadyExists, flippedExists)
+            // }
+
+            if (alreadyExists || flippedExists)
+            {
+                gameExists = true;
+            }
+        })
+        return gameExists
+    }
+
+    function generateGamesFromSheet(games, gamesMatrix, teams_info, isHomeGame) {
+        console.log('generating games');
+        console.log('team info', teams_info)
+        gamesMatrix.forEach((game_row) => {
+            const team_name = game_row[TEAM_NAME]
+            for (const key in game_row) {
+                const game_value = game_row[key]
+                if (isValidGame(game_value) && (!gameInGames(games, team_name, key, isHomeGame))) {
+                    const team1Info = getInfoForTeam(teams_info, team_name)
+                    const team2Info = getInfoForTeam(teams_info, key)
+                    if (team1Info === undefined || team2Info === undefined) {
+                        throw Error(`undefined teamInfo ${team1Info} ${team2Info}`);
+                    }
+                    console.log('game', game_row)
+                    console.log('team 1', team1Info)
+                    console.log('team 2', team2Info)
+                    games.push({
+                    team1: team1Info[TEAM_NAME],
+                    player1_1: team1Info[PLAYER_ONE],
+                    player2_1: team1Info[PLAYER_TWO],
+                    team2: team2Info[TEAM_NAME],
+                    player1_2: team2Info[PLAYER_ONE],
+                    player2_2: team2Info[PLAYER_TWO],
+                    played: !isUnplayed(game_value),
+                    isHome: isHomeGame,
+                    result: game_value
+                    })
+            }
+            }
+            
+        })
+    }
+    
+    // Generate games data from your Excel data
+    function generateGamesData() {
+        // return allGames
+        if (!dataReady) return [];
+        
+        const games = [];
+        const teams_data = teams_info; // Your existing team info
+        const homeGames = getSheetData(HOME_GAMES_PAGE_NAME, 'json');
+        const awayGames = getSheetData(AWAY_GAMES_PAGE_NAME, 'json');
+
+        generateGamesFromSheet(games, homeGames, teams_data, true);
+        generateGamesFromSheet(games, awayGames, teams_data, false);
+        
+        console.log('done', games)
+        return games;
+        
+        // // You'll need to parse your Excel data to create the games list
+        // // This is a placeholder - adjust based on your actual data structure
+        
+        // // Example: If your Excel has a games sheet
+        // const gamesSheet = getSheetData("Sheet2"); // or wherever games are stored
+        
+        // // Parse and format the games data
+        // // This will depend on your Excel structure
+        // // return games;
+        // return teamInfo.map((val, idx) => {
+        //     let teamInfo = {
+        //         ...val,
+        //         wins: 0,
+        //         losses: 0,
+        //         ties: 0,
+        //         pointDiff: 0,
+        //         seriesWins: 0,
+        //         seriesLosses: 0,
+        //     }
+        //     let games_info = []
+        //     console.log('current test')
+        //     console.log(homeGames)
+        //     console.log(val.teamName)
+        //     console.log(val)
+        //     function compare_names(row) {
+        //         console.log('row data')
+        //         console.log(row)
+        //         return row.teamName.toLowerCase() === val.teamName.toLowerCase();
+        //     }
+        //     const homeRowIndex = homeGames.findIndex(compare_names);
+        //     if (homeRowIndex === -1) {
+        //         throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+        //     }
+        //     const awayRowIndex = awayGames.findIndex(compare_names);
+        //     if (awayRowIndex === -1) {
+        //         throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+        //     }
+
+        //     const homeRow = homeGames[homeRowIndex];
+        //     const awayRow = awayGames[awayRowIndex];
+        //     team_names.forEach((team_name) => {
+        //         if (team_name === homeRow.name) {
+        //             return;
+        //         }
+        //         let homeResult = homeRow[team_name]
+        //         if (homeResult === undefined) {
+        //             console.log(`error home undefined ${team_name}`)
+        //         }
+        //         let awayResult = awayRow[team_name]
+        //         if (awayResult === undefined) {
+        //             console.log(`error away undefined ${team_name}`)
+        //         }
+        //         update_for_series(teamInfo, games_info, homeResult, awayResult)
+        //     })
+
+
+        //     return teamInfo
+        // }
+        
+        // )
+    }
+    
+    // Update allGames when data is ready
+    $: if (dataReady) {
+        allGames = generateGamesData();
     }
 
 </script>
@@ -578,6 +851,153 @@
         titleColor="#1a202c"
         iconType="arrow"
         >
+<div class="games-finder-container">
+    <p class="intro-text">
+            Find all the games you need to play across your teams. 
+            Type your name below to see your remaining matches.
+    </p>
+        
+        <!-- The rest of the games finder component code goes here -->
+        <!-- (Copy from the first artifact) -->
+    <div class="search-section">
+        <div class="search-bar">
+            <input 
+                type="text" 
+                placeholder="Enter your name..." 
+                bind:value={playerName}
+                on:input={filterGamesByPlayer}
+                class="name-input"
+            />
+            {#if playerName}
+                <button on:click={() => { playerName = ''; filterGamesByPlayer(); }} class="clear-btn">
+                    Clear
+                </button>
+            {/if}
+        </div>
+        
+        {#if playerName && (shownGames > 0 || hiddenTeams.size > 0)}
+            <div class="summary-section">
+                <div class="total-games">
+                    Showing <strong>{shownGames}</strong> out of {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
+                        return accumulator + currentValue;
+                    })} Total games to play. On average you need to play {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {return accumulator + currentValue;}) / SESSION_COUNT} games per session to complete all your games by the end of the season.
+                    {#if hiddenTeams.size > 0 && shownGames === 0}
+                        <span class="filtered-warning"> (All games filtered out)</span>
+                    {/if}
+                </div>
+                
+                <div class="team-summary">
+                    <h4>Games by team:</h4>
+                    <div class="team-pills">
+                        {#each Object.entries(teamGameCounts) as [team, count]}
+                            <button 
+                                class="team-pill"
+                                class:hidden={hiddenTeams.has(team)}
+                                on:click={() => toggleTeamFilter(team)}
+                                title="Click to {hiddenTeams.has(team) ? 'show' : 'hide'} games with {team}"
+                            >
+                                {team}: {count} {count === 1 ? 'game' : 'games'} ({count / SESSION_COUNT} Avg)
+                                {#if hiddenTeams.has(team)}
+                                    <span class="pill-icon">✕</span>
+                                {/if}
+                            </button>
+                        {/each}
+                    </div>
+                    
+                    {#if hiddenTeams.size > 0}
+                        <div class="active-filters">
+                            <h4>Active filters (hidden teams):</h4>
+                            <div class="filter-tags">
+                                {#each [...hiddenTeams] as team}
+                                    <div class="filter-tag">
+                                        <span>{team}</span>
+                                        <button 
+                                            class="remove-filter"
+                                            on:click={() => toggleTeamFilter(team)}
+                                            title="Show games with {team}"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                        <button on:click={resetFilters} class="reset-btn">
+                            Clear all filters
+                        </button>
+                    {/if}
+                </div>
+            </div>
+            
+            {#if shownGames > 0}
+            <div class="games-table-wrapper">
+                <table class="games-table">
+                    <thead>
+                        <tr>
+                            <th>Your Team</th>
+                            <th>Your Partner</th>
+                            <th>vs</th>
+                            <th>Opponent Team</th>
+                            <th>Opponent 1</th>
+                            <th>Opponent 2</th>
+                            <th>Board</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {#each filteredGames as game}
+                            {@const playerTeam = getPlayerTeam(game)}
+                            {@const opponentTeam = getOpponentTeam(game)}
+                            {@const isTeam1 = playerTeam === game.team1}
+                            <tr>
+                                <td class="team-name">
+                                    <button 
+                                        class="team-link"
+                                        on:click={() => toggleTeamFilter(playerTeam)}
+                                        title="Click to hide games with {playerTeam}"
+                                    >
+                                        {playerTeam}
+                                    </button>
+                                </td>
+                                <td>
+                                    {#if isTeam1}
+                                        {game.player1_1 === playerName ? game.player2_1 : game.player1_1}
+                                    {:else}
+                                        {game.player1_2 === playerName ? game.player2_2 : game.player1_2}
+                                    {/if}
+                                </td>
+                                <td class="vs">vs</td>
+                                <td class="team-name">
+                                    <button 
+                                        class="team-link"
+                                        on:click={() => toggleTeamFilter(opponentTeam)}
+                                        title="Click to hide games with {opponentTeam}"
+                                    >
+                                        {opponentTeam}
+                                    </button>
+                                </td>
+                                <td>{isTeam1 ? game.player1_2 : game.player1_1}</td>
+                                <td>{isTeam1 ? game.player2_2 : game.player2_1}</td>
+                                <td>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td>
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
+            </div>
+            {:else if hiddenTeams.size > 0}
+            <div class="no-games filtered">
+                <p>All games have been filtered out.</p>
+                <button on:click={resetFilters} class="reset-btn-large">
+                    Show all games
+                </button>
+            </div>
+            {:else}
+            <div class="no-games">
+                No games found for "{playerName}"
+            </div>
+            {/if}
+        {/if}
+    </div>
+</div>
         </Collapsible>
         {#if loading}
             <div class="status">Loading Excel data...</div>
@@ -1230,5 +1650,297 @@
     
     th.sortable:hover::after {
         opacity: 0.6;
+    }
+
+    .games-finder-container {
+        margin: 2rem 0;
+    }
+    
+    .search-section {
+        margin-bottom: 2rem;
+    }
+    
+    .search-bar {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .name-input {
+        flex: 1;
+        max-width: 400px;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        transition: border-color 0.2s;
+    }
+    
+    .name-input:focus {
+        outline: none;
+        border-color: #2c5aa0;
+    }
+    
+    .clear-btn {
+        padding: 0.75rem 1.5rem;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+    
+    .clear-btn:hover {
+        background: #dc2626;
+    }
+    
+    .summary-section {
+        background: #f3f4f6;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    
+    .total-games {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        color: #1a1a1a;
+    }
+    
+    .team-summary h4 {
+        margin: 0 0 0.75rem 0;
+        color: #4b5563;
+    }
+    
+    .team-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .team-pill {
+        padding: 0.5rem 1rem;
+        background: #2c5aa0;
+        color: white;
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+        position: relative;
+    }
+    
+    .team-pill:hover {
+        background: #1e4080;
+        transform: translateY(-1px);
+    }
+    
+    .team-pill.hidden {
+        background: #9ca3af;
+        text-decoration: line-through;
+    }
+    
+    .pill-icon {
+        margin-left: 0.5rem;
+    }
+    
+    .reset-btn {
+        padding: 0.5rem 1rem;
+        background: transparent;
+        color: #2c5aa0;
+        border: 1px solid #2c5aa0;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+    
+    .reset-btn:hover {
+        background: #2c5aa0;
+        color: white;
+    }
+    
+    .games-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .games-table {
+        width: 100%;
+        min-width: 600px;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .games-table th {
+        background: #4a5568;
+        color: white;
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.875rem;
+        white-space: nowrap;
+    }
+    
+    .games-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .games-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .games-table tbody tr:hover {
+        background: #f9fafb;
+    }
+    
+    .team-name {
+        font-weight: 600;
+    }
+    
+    .team-link {
+        background: none;
+        border: none;
+        color: #2c5aa0;
+        cursor: pointer;
+        text-decoration: underline;
+        font-weight: 600;
+        padding: 0;
+        transition: color 0.2s;
+    }
+    
+    .team-link:hover {
+        color: #1e4080;
+    }
+    
+    .vs {
+        text-align: center;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    
+    .no-games.filtered {
+        text-align: center;
+        padding: 2rem;
+        background: #fff5f5;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        margin-top: 1rem;
+    }
+    
+    .reset-btn-large {
+        margin-top: 1rem;
+        padding: 0.75rem 2rem;
+        background: #2c5aa0;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    .reset-btn-large:hover {
+        background: #1e4080;
+        transform: translateY(-1px);
+    }
+    
+    .filtered-warning {
+        color: #dc2626;
+        font-size: 0.875rem;
+    }
+    
+    .active-filters {
+        margin: 1.5rem 0 1rem 0;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .active-filters h4 {
+        margin: 0 0 0.75rem 0;
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .filter-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .filter-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0.5rem;
+        background: #fef3c7;
+        border: 1px solid #fbbf24;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        color: #92400e;
+    }
+    
+    .filter-tag span {
+        font-weight: 500;
+    }
+    
+    .remove-filter {
+        background: none;
+        border: none;
+        color: #b45309;
+        cursor: pointer;
+        font-size: 1.2rem;
+        line-height: 1;
+        padding: 0;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+    
+    .remove-filter:hover {
+        background: #fbbf24;
+        color: #78350f;
+    }
+    
+    @media (max-width: 768px) {
+        .search-bar {
+            flex-direction: column;
+        }
+        
+        .name-input {
+            max-width: none;
+        }
+        
+        .team-pills {
+            gap: 0.4rem;
+        }
+        
+        .team-pill {
+            font-size: 0.8rem;
+            padding: 0.4rem 0.8rem;
+        }
+        
+        .games-table {
+            font-size: 0.8rem;
+            min-width: 500px;
+        }
+        
+        .games-table th,
+        .games-table td {
+            padding: 0.5rem;
+        }
     }
 </style>
