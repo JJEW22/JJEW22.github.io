@@ -20,6 +20,16 @@
     const WONT_PLAY_STRING = "XXX"
     const HOME_GAMES_PAGE_NAME = "HomeGames"
     const AWAY_GAMES_PAGE_NAME = "AwayGames"
+    const SESSION_COUNT = 16
+    const HOME_GAME_STRING = 'Council'
+    const AWAY_GAME_STRING = 'Anish'
+
+    // access constants
+    const TEAM_NAME = 'teamName'
+    const PLAYER_ONE = 'player1'
+    const PLAYER_TWO = 'player2'
+    const IS_HOME = 'isHome'
+    const PLAYED = 'played'
 
     // Configuration
     const config = {
@@ -62,10 +72,10 @@
             // Update scroll progress
             const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
             const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-            scrollProgress = (winScroll / height) * 100;
+            // scrollProgress = (winScroll / height) * 100;
             
-            // Show/hide back to top button
-            showBackToTop = winScroll > 300;
+            // // Show/hide back to top button
+            // showBackToTop = winScroll > 300;
         };
         
         window.addEventListener('scroll', handleScroll);
@@ -257,7 +267,11 @@
         return (typeof game_value === "string") && ((game_value === UNPLAYED_STRING) || (game_value === WONT_PLAY_STRING));
     }
 
-    function update_for_game(team_info, score) {
+    function isValidGame(game_value) {
+        return (typeof game_value === "number") || (game_value === UNPLAYED_STRING);
+    }
+
+    function update_team_for_game(team_info, score) {
         if (score > 0) {
             team_info.wins += 1
         } else if (score < 0) {  
@@ -281,13 +295,14 @@
         }
     }
 
+
     function update_for_series(team_info, home_result, away_result) {
-         if (!isUnplayed(home_result)) {
-            update_for_game(team_info, home_result)
+        if (!isUnplayed(home_result)) {
+            update_team_for_game(team_info, home_result)
         }
 
         if (!isUnplayed(away_result)) {
-            update_for_game(team_info, away_result)
+            update_team_for_game(team_info, away_result)
         }
 
         if (!isUnplayed(home_result) && !isUnplayed(away_result)) {
@@ -311,13 +326,12 @@
                 seriesWins: 0,
                 seriesLosses: 0,
             }
+            let games_info = []
             console.log('current test')
             console.log(homeGames)
             console.log(val.teamName)
             console.log(val)
             function compare_names(row) {
-                console.log('row data')
-                console.log(row)
                 return row.teamName.toLowerCase() === val.teamName.toLowerCase();
             }
             const homeRowIndex = homeGames.findIndex(compare_names);
@@ -397,10 +411,11 @@
     }
 
     let allGames = [
-        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Lightning Bolts", player2_1: "Mike", player2_2: "Emma", played: false },
-        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Fire Dragons", player2_1: "Alex", player2_2: "Lisa", played: false },
-        { team1: "Lightning Bolts", player1_1: "Mike", player1_2: "Emma", team2: "Ice Wolves", player2_1: "Tom", player2_2: "Jane", played: false },
-        { team1: "Fire Dragons", player1_1: "Alex", player1_2: "Lisa", team2: "Storm Eagles", player2_1: "John", player2_2: "Kate", played: false },
+        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Lightning Bolts", player2_1: "Mike", player2_2: "Emma", isHome: false, played: false },
+        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Fire Dragons", player2_1: "Alex", player2_2: "Lisa", isHome: true, played: false },
+        { team1: "Lightning Bolts", player1_1: "Mike", player1_2: "Emma", team2: "Ice Wolves", player2_1: "Tom", player2_2: "Jane", isHome: false, played: false },
+        { team1: "Fire Dragons", player1_1: "Alex", player1_2: "Lisa", team2: "Storm Eagles", player2_1: "John", player2_2: "Kate", isHome: false, played: false },
+        { team1: "Fire Dragons", player1_1: "Alex", player1_2: "Lisa", team2: "Storm Eagles", player2_1: "John", player2_2: "Kate", isHome: true, played: false },
         // Add more games...
     ];
     
@@ -498,28 +513,155 @@
         hiddenTeams.clear();
         filterGamesByPlayer();
     }
+
+    function getInfoForTeam(teams_info, team_name) {
+        let result = undefined
+        teams_info.forEach((val) => {
+            if (val[TEAM_NAME].toLowerCase() === team_name.toLowerCase()) {
+                result = val;
+            }
+        })
+
+        return result
+    }
     
     // Total games count
     $: shownGames = filteredGames.length;
+
+    function gameInGames(games, team1, team2, isHome) {
+        let gameExists = false;
+        // if (team1 === 'TGIAJF' || team2 === 'TGIAJF') {
+        //         console.log('high lvl', team1, team2, isHome, games)
+        // }
+        games.forEach((game) => {
+            let alreadyExists = (game.team1.toLowerCase() === team1.toLowerCase())
+                && (game.team2.toLowerCase() === team2.toLowerCase())
+                && (game[IS_HOME] === isHome)
+            let flippedExists = (game.team2.toLowerCase() === team1.toLowerCase())
+                && (game.team1.toLowerCase() === team2.toLowerCase())
+                && (game[IS_HOME] === isHome)
+
+            // if (team1 === 'TGIAJF' || team2 === 'TGIAJF') {
+            //     console.log(game.team1, game.team2, game, alreadyExists, flippedExists)
+            // }
+
+            if (alreadyExists || flippedExists)
+            {
+                gameExists = true;
+            }
+        })
+        return gameExists
+    }
+
+    function generateGamesFromSheet(games, gamesMatrix, teams_info, isHomeGame) {
+        console.log('generating games');
+        console.log('team info', teams_info)
+        gamesMatrix.forEach((game_row) => {
+            const team_name = game_row[TEAM_NAME]
+            for (const key in game_row) {
+                const game_value = game_row[key]
+                if (isValidGame(game_value) && (!gameInGames(games, team_name, key, isHomeGame))) {
+                    const team1Info = getInfoForTeam(teams_info, team_name)
+                    const team2Info = getInfoForTeam(teams_info, key)
+                    if (team1Info === undefined || team2Info === undefined) {
+                        throw Error(`undefined teamInfo ${team1Info} ${team2Info}`);
+                    }
+                    console.log('game', game_row)
+                    console.log('team 1', team1Info)
+                    console.log('team 2', team2Info)
+                    games.push({
+                    team1: team1Info[TEAM_NAME],
+                    player1_1: team1Info[PLAYER_ONE],
+                    player2_1: team1Info[PLAYER_TWO],
+                    team2: team2Info[TEAM_NAME],
+                    player1_2: team2Info[PLAYER_ONE],
+                    player2_2: team2Info[PLAYER_TWO],
+                    played: !isUnplayed(game_value),
+                    isHome: isHomeGame,
+                    result: game_value
+                    })
+            }
+            }
+            
+        })
+    }
     
     // Generate games data from your Excel data
     function generateGamesData() {
+        // return allGames
         if (!dataReady) return [];
         
         const games = [];
-        const teams = team_names; // Your existing team names
-        const sheet1 = getSheetData("Sheet1");
+        const teams_data = teams_info; // Your existing team info
+        const homeGames = getSheetData(HOME_GAMES_PAGE_NAME, 'json');
+        const awayGames = getSheetData(AWAY_GAMES_PAGE_NAME, 'json');
+
+        generateGamesFromSheet(games, homeGames, teams_data, true);
+        generateGamesFromSheet(games, awayGames, teams_data, false);
         
-        // You'll need to parse your Excel data to create the games list
-        // This is a placeholder - adjust based on your actual data structure
+        console.log('done', games)
+        return games;
         
-        // Example: If your Excel has a games sheet
-        const gamesSheet = getSheetData("Sheet2"); // or wherever games are stored
+        // // You'll need to parse your Excel data to create the games list
+        // // This is a placeholder - adjust based on your actual data structure
         
-        // Parse and format the games data
-        // This will depend on your Excel structure
-        return allGames;
-        // return games;
+        // // Example: If your Excel has a games sheet
+        // const gamesSheet = getSheetData("Sheet2"); // or wherever games are stored
+        
+        // // Parse and format the games data
+        // // This will depend on your Excel structure
+        // // return games;
+        // return teamInfo.map((val, idx) => {
+        //     let teamInfo = {
+        //         ...val,
+        //         wins: 0,
+        //         losses: 0,
+        //         ties: 0,
+        //         pointDiff: 0,
+        //         seriesWins: 0,
+        //         seriesLosses: 0,
+        //     }
+        //     let games_info = []
+        //     console.log('current test')
+        //     console.log(homeGames)
+        //     console.log(val.teamName)
+        //     console.log(val)
+        //     function compare_names(row) {
+        //         console.log('row data')
+        //         console.log(row)
+        //         return row.teamName.toLowerCase() === val.teamName.toLowerCase();
+        //     }
+        //     const homeRowIndex = homeGames.findIndex(compare_names);
+        //     if (homeRowIndex === -1) {
+        //         throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+        //     }
+        //     const awayRowIndex = awayGames.findIndex(compare_names);
+        //     if (awayRowIndex === -1) {
+        //         throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+        //     }
+
+        //     const homeRow = homeGames[homeRowIndex];
+        //     const awayRow = awayGames[awayRowIndex];
+        //     team_names.forEach((team_name) => {
+        //         if (team_name === homeRow.name) {
+        //             return;
+        //         }
+        //         let homeResult = homeRow[team_name]
+        //         if (homeResult === undefined) {
+        //             console.log(`error home undefined ${team_name}`)
+        //         }
+        //         let awayResult = awayRow[team_name]
+        //         if (awayResult === undefined) {
+        //             console.log(`error away undefined ${team_name}`)
+        //         }
+        //         update_for_series(teamInfo, games_info, homeResult, awayResult)
+        //     })
+
+
+        //     return teamInfo
+        // }
+        
+        // )
     }
     
     // Update allGames when data is ready
@@ -738,7 +880,7 @@
                 <div class="total-games">
                     Showing <strong>{shownGames}</strong> out of {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
                         return accumulator + currentValue;
-                    })} Total games to play
+                    })} Total games to play. On average you need to play {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {return accumulator + currentValue;}) / SESSION_COUNT} games per session to complete all your games by the end of the season.
                     {#if hiddenTeams.size > 0 && shownGames === 0}
                         <span class="filtered-warning"> (All games filtered out)</span>
                     {/if}
@@ -754,7 +896,7 @@
                                 on:click={() => toggleTeamFilter(team)}
                                 title="Click to {hiddenTeams.has(team) ? 'show' : 'hide'} games with {team}"
                             >
-                                {team}: {count} {count === 1 ? 'game' : 'games'}
+                                {team}: {count} {count === 1 ? 'game' : 'games'} ({count / SESSION_COUNT} Avg)
                                 {#if hiddenTeams.has(team)}
                                     <span class="pill-icon">✕</span>
                                 {/if}
@@ -798,6 +940,7 @@
                             <th>Opponent Team</th>
                             <th>Opponent 1</th>
                             <th>Opponent 2</th>
+                            <th>Board</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -817,9 +960,9 @@
                                 </td>
                                 <td>
                                     {#if isTeam1}
-                                        {game.player1_1 === playerName ? game.player1_2 : game.player1_1}
+                                        {game.player1_1 === playerName ? game.player2_1 : game.player1_1}
                                     {:else}
-                                        {game.player2_1 === playerName ? game.player2_2 : game.player2_1}
+                                        {game.player1_2 === playerName ? game.player2_2 : game.player1_2}
                                     {/if}
                                 </td>
                                 <td class="vs">vs</td>
@@ -832,8 +975,9 @@
                                         {opponentTeam}
                                     </button>
                                 </td>
-                                <td>{isTeam1 ? game.player2_1 : game.player1_1}</td>
-                                <td>{isTeam1 ? game.player2_2 : game.player1_2}</td>
+                                <td>{isTeam1 ? game.player1_2 : game.player1_1}</td>
+                                <td>{isTeam1 ? game.player2_2 : game.player2_1}</td>
+                                <td>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td>
                             </tr>
                         {/each}
                     </tbody>
