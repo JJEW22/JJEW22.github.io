@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import * as XLSX from 'xlsx';
     import Collapsible from '$lib/Collapsible.svelte';
+    import HallOfFame from '$lib/HallOfFame.svelte';
     
     // Data storage
     let loading = true;
@@ -18,11 +19,17 @@
     const SERIES_WIN_SCORE = 1;
     const UNPLAYED_STRING = "UNPLAYED"
     const WONT_PLAY_STRING = "XXX"
-    const HOME_GAMES_PAGE_NAME = "HomeGames"
-    const AWAY_GAMES_PAGE_NAME = "AwayGames"
     const SESSION_COUNT = 16
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
+
+    // file information
+    const HOME_GAMES_PAGE_NAME = "HomeGames"
+    const AWAY_GAMES_PAGE_NAME = "AwayGames"
+    const TEAM_INFO_PAGE_NAME = 'TeamInfo'
+    const SEASON_NUMBER = 1
+    const FILE_PREFIX = 'jpFlicksSeason'
+    const FILE_NAME = `${FILE_PREFIX}${SEASON_NUMBER}.xlsx`
 
     // access constants
     const TEAM_NAME = 'teamName'
@@ -33,8 +40,8 @@
 
     // Configuration
     const config = {
-        fileName: 'jpFlicksDoubles.xlsx', // Your Excel file name
-        sheetsToLoad: [HOME_GAMES_PAGE_NAME, AWAY_GAMES_PAGE_NAME, 'TeamInfo'], // Which sheets to load (by index or names)
+        fileName: FILE_NAME, // Your Excel file name
+        sheetsToLoad: [HOME_GAMES_PAGE_NAME, AWAY_GAMES_PAGE_NAME, TEAM_INFO_PAGE_NAME], // Which sheets to load (by index or names)
     };
     
     onMount(async () => {
@@ -566,9 +573,6 @@
                     if (team1Info === undefined || team2Info === undefined) {
                         throw Error(`undefined teamInfo ${team1Info} ${team2Info}`);
                     }
-                    console.log('game', game_row)
-                    console.log('team 1', team1Info)
-                    console.log('team 2', team2Info)
                     games.push({
                     team1: team1Info[TEAM_NAME],
                     player1_1: team1Info[PLAYER_ONE],
@@ -601,67 +605,7 @@
         
         console.log('done', games)
         return games;
-        
-        // // You'll need to parse your Excel data to create the games list
-        // // This is a placeholder - adjust based on your actual data structure
-        
-        // // Example: If your Excel has a games sheet
-        // const gamesSheet = getSheetData("Sheet2"); // or wherever games are stored
-        
-        // // Parse and format the games data
-        // // This will depend on your Excel structure
-        // // return games;
-        // return teamInfo.map((val, idx) => {
-        //     let teamInfo = {
-        //         ...val,
-        //         wins: 0,
-        //         losses: 0,
-        //         ties: 0,
-        //         pointDiff: 0,
-        //         seriesWins: 0,
-        //         seriesLosses: 0,
-        //     }
-        //     let games_info = []
-        //     console.log('current test')
-        //     console.log(homeGames)
-        //     console.log(val.teamName)
-        //     console.log(val)
-        //     function compare_names(row) {
-        //         console.log('row data')
-        //         console.log(row)
-        //         return row.teamName.toLowerCase() === val.teamName.toLowerCase();
-        //     }
-        //     const homeRowIndex = homeGames.findIndex(compare_names);
-        //     if (homeRowIndex === -1) {
-        //         throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
-        //     }
-        //     const awayRowIndex = awayGames.findIndex(compare_names);
-        //     if (awayRowIndex === -1) {
-        //         throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
-        //     }
 
-        //     const homeRow = homeGames[homeRowIndex];
-        //     const awayRow = awayGames[awayRowIndex];
-        //     team_names.forEach((team_name) => {
-        //         if (team_name === homeRow.name) {
-        //             return;
-        //         }
-        //         let homeResult = homeRow[team_name]
-        //         if (homeResult === undefined) {
-        //             console.log(`error home undefined ${team_name}`)
-        //         }
-        //         let awayResult = awayRow[team_name]
-        //         if (awayResult === undefined) {
-        //             console.log(`error away undefined ${team_name}`)
-        //         }
-        //         update_for_series(teamInfo, games_info, homeResult, awayResult)
-        //     })
-
-
-        //     return teamInfo
-        // }
-        
-        // )
     }
     
     // Update allGames when data is ready
@@ -1091,31 +1035,8 @@
     <div class="table-legend">
     <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>+/-:</strong> Point Differential</p>
 </div>
+<HallOfFame />
 </div>
-
-            <!-- Your custom table/visualization will go here -->
-            <!-- <section class="custom-content">
-                <h2>Custom Data View</h2>
-                
-                <div class="data-summary">
-                    {#each Object.entries(excelData) as [sheetName, sheetData]}
-                        <div class="sheet-summary">
-                            <h3>{sheetName}</h3>
-                            <p>Rows: {sheetData.rows.length}</p>
-                            <p>Columns: {sheetData.headers.length}</p>
-                        </div>
-                    {/each}
-                </div> -->
-                
-                <!-- Add your custom table component here -->
-                <!-- Example: -->
-                
-                <!-- Debug view (remove in production) -->
-                <!-- <details class="debug">
-                    <summary>Debug: View Raw Data</summary>
-                    <pre>{JSON.stringify(excelData, null, 2)}</pre>
-                </details>
-            </section> -->
         {/if}
     </main>
 </div>
