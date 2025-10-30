@@ -27,7 +27,7 @@
     const HOME_GAMES_PAGE_NAME = "HomeGames"
     const AWAY_GAMES_PAGE_NAME = "AwayGames"
     const TEAM_INFO_PAGE_NAME = 'TeamInfo'
-    const SEASON_NUMBER = 1
+    const SEASON_NUMBER = 2
     const FILE_PREFIX = 'jpFlicksSeason'
     const FILE_NAME = `${FILE_PREFIX}${SEASON_NUMBER}.xlsx`
 
@@ -37,6 +37,10 @@
     const PLAYER_TWO = 'player2'
     const IS_HOME = 'isHome'
     const PLAYED = 'played'
+    const PLAYER1_TEAM1 = 'player1_team1'
+    const PLAYER2_TEAM1 = 'player2_team1'
+    const PLAYER1_TEAM2 = 'player1_team2'
+    const PLAYER2_TEAM2 = 'player2_team2'
 
     // Configuration
     const config = {
@@ -173,51 +177,91 @@
                     blankrows: false
                 });
                 
-                // Store both formats
+                // Filter out empty headers and clean the data
+                const rawHeaders = arrayData[0] || [];
+                const validHeaderIndices = [];
+                const cleanHeaders = [];
+                
+                // Identify valid headers (non-empty, non-whitespace)
+                rawHeaders.forEach((header, index) => {
+                    const cleanedHeader = typeof header === 'string' ? header.trim() : header;
+                    if (cleanedHeader !== '' && cleanedHeader !== null && cleanedHeader !== undefined) {
+                        validHeaderIndices.push(index);
+                        cleanHeaders.push(cleanedHeader);
+                    }
+                });
+                
+                // Filter rows to only include columns with valid headers
+                const cleanRows = arrayData.slice(1).map(row => {
+                    return validHeaderIndices.map(index => row[index] || '');
+                });
+                
+                // Clean JSON data to remove empty-header properties
+                const cleanJsonData = jsonData.map(row => {
+                    const cleanedRow = {};
+                    for (const key in row) {
+                        const cleanedKey = typeof key === 'string' ? key.trim() : key;
+                        // Only include properties with non-empty keys
+                        if (cleanedKey !== '' && cleanedKey !== null && cleanedKey !== undefined) {
+                            cleanedRow[cleanedKey] = row[key];
+                        }
+                    }
+                    return cleanedRow;
+                });
+                
+                // Store both formats with cleaned data
                 excelData[sheetName] = {
-                    json: jsonData, // Array of objects [{col1: val1, col2: val2}, ...]
-                    array: arrayData, // Array of arrays [[val1, val2], ...]
-                    headers: arrayData[0] || [], // First row as headers
-                    rows: arrayData.slice(1), // Data rows only
+                    json: cleanJsonData, // Array of objects with cleaned keys
+                    array: [cleanHeaders, ...cleanRows], // Array of arrays with valid columns only
+                    headers: cleanHeaders, // Valid headers only
+                    rows: cleanRows, // Data rows with valid columns only
                 };
+                
+                console.log(`Loaded ${sheetName}:`, {
+                    headers: cleanHeaders,
+                    rowCount: cleanRows.length,
+                    sampleRow: cleanJsonData[0]
+                });
             });
-            team_names = getTeams(HOME_GAMES_PAGE_NAME)
+            
+            team_names = getTeams(HOME_GAMES_PAGE_NAME);
 
             let teamInfo = pullTeamInfo();
             console.log('teamInfo');
             console.log(teamInfo);
             teams_info = pullWinsInfo(teamInfo);
-            console.log('TEAMS INFO!')
-            console.log(teams_info)
+            console.log('TEAMS INFO!');
+            console.log(teams_info);
 
-        let teamsWithScores = teams_info.map(team => ({
-            ...team,
-            score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins),
-            gamesPlayed: team.wins + team.ties + team.losses
-        }));
-        let ranking = teamsWithScores.sort((a, b) => {
-            if (a.score !== b.score) {
-                return -1 * (a.score - b.score);
-            }
-
-            if (a.pointDiff !== b.pointDiff) {
-                return -1 * (a.pointDiff - b.pointDiff)
-            }
-
-            return a.gamesPlayed - b.gamesPlayed
-        })
-
-        teamsWithRanking = ranking.map((team,index) => ({
-            ...team,
-            ranking: index + 1
-        }));
-
-        sortTable('ranking');
+            let teamsWithScores = teams_info.map(team => ({
+                ...team,
+                score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins),
+                gamesPlayed: team.wins + team.ties + team.losses
+            }));
             
-        dataReady = true;
-        // Log the loaded data for debugging
-        console.log('Excel data loaded:', excelData);
-            
+            let ranking = teamsWithScores.sort((a, b) => {
+                if (a.score !== b.score) {
+                    return -1 * (a.score - b.score);
+                }
+
+                if (a.pointDiff !== b.pointDiff) {
+                    return -1 * (a.pointDiff - b.pointDiff);
+                }
+
+                return a.gamesPlayed - b.gamesPlayed;
+            });
+
+            teamsWithRanking = ranking.map((team, index) => ({
+                ...team,
+                ranking: index + 1
+            }));
+
+            sortTable('ranking');
+                
+            dataReady = true;
+            // Log the loaded data for debugging
+            console.log('Excel data loaded:', excelData);
+                
         } catch (err) {
             error = err.message;
             console.error('Error loading Excel file:', err);
@@ -304,6 +348,10 @@
 
 
     function update_for_series(team_info, home_result, away_result) {
+        if (home_result === undefined || away_result === undefined) {
+            throw new Error(`Given a result that is undefined | Home: ${home_result}, Away: ${away_result}`)
+        }
+
         if (!isUnplayed(home_result)) {
             update_team_for_game(team_info, home_result)
         }
@@ -333,11 +381,6 @@
                 seriesWins: 0,
                 seriesLosses: 0,
             }
-            let games_info = []
-            console.log('current test')
-            console.log(homeGames)
-            console.log(val.teamName)
-            console.log(val)
             function compare_names(row) {
                 return row.teamName.toLowerCase() === val.teamName.toLowerCase();
             }
@@ -358,11 +401,13 @@
                 }
                 let homeResult = homeRow[team_name]
                 if (homeResult === undefined) {
-                    console.log(`error home undefined ${team_name}`)
+                    console.log(`error home undefined Name: ${team_name}`)
+                    throw new Error('Home result is undefined')
                 }
                 let awayResult = awayRow[team_name]
                 if (awayResult === undefined) {
-                    console.log(`error away undefined ${team_name}`)
+                    console.log(`error away undefined Name: ${team_name}`)
+                    throw new Error('Home result is undefined')
                 }
                 update_for_series(teamInfo, homeResult, awayResult)
             })
@@ -418,11 +463,11 @@
     }
 
     let allGames = [
-        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Lightning Bolts", player2_1: "Mike", player2_2: "Emma", isHome: false, played: false },
-        { team1: "Thunder Hawks", player1_1: "John", player1_2: "Sarah", team2: "Fire Dragons", player2_1: "Alex", player2_2: "Lisa", isHome: true, played: false },
-        { team1: "Lightning Bolts", player1_1: "Mike", player1_2: "Emma", team2: "Ice Wolves", player2_1: "Tom", player2_2: "Jane", isHome: false, played: false },
-        { team1: "Fire Dragons", player1_1: "Alex", player1_2: "Lisa", team2: "Storm Eagles", player2_1: "John", player2_2: "Kate", isHome: false, played: false },
-        { team1: "Fire Dragons", player1_1: "Alex", player1_2: "Lisa", team2: "Storm Eagles", player2_1: "John", player2_2: "Kate", isHome: true, played: false },
+        { team1: "Thunder Hawks", player1_team1: "John", player2_team1: "Sarah", team2: "Lightning Bolts", player1_team2: "Mike", player2_team2: "Emma", isHome: false, played: false },
+        { team1: "Thunder Hawks", player1_team1: "John", player2_team1: "Sarah", team2: "Fire Dragons", player1_team2: "Alex", player2_team2: "Lisa", isHome: true, played: false },
+        { team1: "Lightning Bolts", player1_team1: "Mike", player2_team1: "Emma", team2: "Ice Wolves", player1_team2: "Tom", player2_team2: "Jane", isHome: false, played: false },
+        { team1: "Fire Dragons", player1_team1: "Alex", player2_team1: "Lisa", team2: "Storm Eagles", player1_team2: "John", player2_team2: "Kate", isHome: false, played: false },
+        { team1: "Fire Dragons", player1_team1: "Alex", player2_team1: "Lisa", team2: "Storm Eagles", player1_team2: "John", player2_team2: "Kate", isHome: true, played: false },
         // Add more games...
     ];
     
@@ -446,10 +491,10 @@
         filteredGames = allGames.filter(game => {
             if (game.played) return false;
             
-            const playerInTeam1 = game.player1_1.toLowerCase().includes(searchName) || 
-                                 game.player1_2.toLowerCase().includes(searchName);
-            const playerInTeam2 = game.player2_1.toLowerCase().includes(searchName) || 
-                                 game.player2_2.toLowerCase().includes(searchName);
+            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                 game[PLAYER1_TEAM2].toLowerCase().includes(searchName);
+            const playerInTeam2 = game[PLAYER2_TEAM1].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
             
             return playerInTeam1 || playerInTeam2;
         });
@@ -473,10 +518,10 @@
             if (game.played) return;
             
             // Check which team the player is on
-            const playerInTeam1 = game.player1_1.toLowerCase().includes(searchName) || 
-                                 game.player1_2.toLowerCase().includes(searchName);
-            const playerInTeam2 = game.player2_1.toLowerCase().includes(searchName) || 
-                                 game.player2_2.toLowerCase().includes(searchName);
+            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+            const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
             
             if (playerInTeam1 || playerInTeam2) {
                 if (playerInTeam1) {
@@ -503,8 +548,8 @@
     // Get player's team for a specific game
     function getPlayerTeam(game) {
         const searchName = playerName.toLowerCase().trim();
-        const playerInTeam1 = game.player1_1.toLowerCase().includes(searchName) || 
-                             game.player1_2.toLowerCase().includes(searchName);
+        const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                             game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
         
         return playerInTeam1 ? game.team1 : game.team2;
     }
@@ -575,11 +620,11 @@
                     }
                     games.push({
                     team1: team1Info[TEAM_NAME],
-                    player1_1: team1Info[PLAYER_ONE],
-                    player2_1: team1Info[PLAYER_TWO],
+                    player1_team1: team1Info[PLAYER_ONE],
+                    player2_team1: team1Info[PLAYER_TWO],
                     team2: team2Info[TEAM_NAME],
-                    player1_2: team2Info[PLAYER_ONE],
-                    player2_2: team2Info[PLAYER_TWO],
+                    player1_team2: team2Info[PLAYER_ONE],
+                    player2_team2: team2Info[PLAYER_TWO],
                     played: !isUnplayed(game_value),
                     isHome: isHomeGame,
                     result: game_value
@@ -592,7 +637,6 @@
     
     // Generate games data from your Excel data
     function generateGamesData() {
-        // return allGames
         if (!dataReady) return [];
         
         const games = [];
@@ -904,9 +948,9 @@
                                 </td>
                                 <td>
                                     {#if isTeam1}
-                                        {game.player1_1 === playerName ? game.player2_1 : game.player1_1}
+                                        {game[PLAYER1_TEAM1] === playerName ? game[PLAYER2_TEAM1] : game[PLAYER1_TEAM1]}
                                     {:else}
-                                        {game.player1_2 === playerName ? game.player2_2 : game.player1_2}
+                                        {game[PLAYER1_TEAM2] === playerName ? game[PLAYER2_TEAM2] : game[PLAYER1_TEAM2]}
                                     {/if}
                                 </td>
                                 <td class="vs">vs</td>
@@ -919,8 +963,8 @@
                                         {opponentTeam}
                                     </button>
                                 </td>
-                                <td>{isTeam1 ? game.player1_2 : game.player1_1}</td>
-                                <td>{isTeam1 ? game.player2_2 : game.player2_1}</td>
+                                <td>{isTeam1 ? game[PLAYER1_TEAM2] : game[PLAYER1_TEAM1]}</td>
+                                <td>{isTeam1 ? game[PLAYER2_TEAM2] : game[PLAYER2_TEAM1]}</td>
                                 <td>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td>
                             </tr>
                         {/each}

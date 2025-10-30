@@ -17,7 +17,7 @@
       runnerUpRecord: {
         score: 4,
         record: "2-0-1",
-        seriesRecord: "2-0",
+        seriesRecord: "0-0",
         PD: "+75"
       },
     },
