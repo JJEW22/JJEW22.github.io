@@ -1087,25 +1087,29 @@
 
 <style>
 
-    /* Center tables on desktop only */
-    @media (min-width: 769px) {
-        .table-wrapper {
+   /* Center tables on ALL screen sizes - more specific selector */
+    .table-wrapper,
+    :global(.mobile-friendly) .table-wrapper {
+        max-width: 600px;
+        margin: 1rem auto;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Mobile adjustments - keep centered but allow horizontal scroll */
+    @media (max-width: 768px) {
+        .table-wrapper,
+        :global(.mobile-friendly) .table-wrapper {
             max-width: 600px;
             margin: 1rem auto;
-        }
-    }
-    
-    /* Full width on mobile */
-    @media (max-width: 768px) {
-        .table-wrapper {
-            margin: 1rem -1.5rem; /* Negative margins to extend beyond padding */
             padding: 0 1rem;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
         
         /* Visual indicator that table is scrollable */
-        .table-wrapper {
+        .table-wrapper,
+        :global(.mobile-friendly) .table-wrapper {
             background: 
                 linear-gradient(to right, white 30%, rgba(255, 255, 255, 0)),
                 linear-gradient(to right, rgba(255, 255, 255, 0), white 70%) 100% 0,
@@ -1116,15 +1120,16 @@
             background-attachment: local, local, scroll, scroll;
         }
     }
-    
+
     /* Ensure minimum table width */
     .basic-table {
         min-width: 300px;
         width: 100%;
     }
-    
+
     /* Optional: Add horizontal scroll indicator */
-    .table-wrapper[data-scrollable]::after {
+    .table-wrapper[data-scrollable]::after,
+    :global(.mobile-friendly) .table-wrapper[data-scrollable]::after {
         content: '← Swipe to see more →';
         display: block;
         text-align: center;
@@ -1132,9 +1137,10 @@
         font-size: 0.75rem;
         color: #666;
     }
-    
+
     /* Hide indicator once user has scrolled */
-    .table-wrapper.has-scrolled::after {
+    .table-wrapper.has-scrolled::after,
+    :global(.mobile-friendly) .table-wrapper.has-scrolled::after {
         display: none;
     }
 

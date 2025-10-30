@@ -4,6 +4,7 @@
     export let animated = true;
     export let iconType = 'plus'; // 'plus', 'chevron', 'arrow', or 'none'
     export let variant = 'default'; // 'default', 'bordered', 'filled', 'minimal', 'custom'
+    export let id = ''; // Add id prop for linking
     
     // Typography customization
     export let titleSize = '1rem';
@@ -81,6 +82,7 @@
 </script>
 
 <div 
+    {id}
     class="collapsible {variant}" 
     class:open
     class:transparent
@@ -110,12 +112,12 @@
     
     {#if animated}
         <div class="content-wrapper" class:expanded={open}>
-            <div class="content" style={contentStyles}>
+            <div class="content mobile-friendly" style={contentStyles}>
                 <slot />
             </div>
         </div>
     {:else if open}
-        <div class="content" style={contentStyles}>
+        <div class="content mobile-friendly" style={contentStyles}>
             <slot />
         </div>
     {/if}
@@ -178,6 +180,25 @@
     .content {
         /* Default content styles */
         padding: 1rem;
+    }
+    
+    /* Mobile-friendly content wrapper */
+    .mobile-friendly {
+        /* Allow content to be responsive */
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Make tables inside collapsible mobile-friendly */
+    .mobile-friendly :global(table) {
+        width: 100%;
+        display: table;
+    }
+    
+    .mobile-friendly :global(.table-wrapper) {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0;
     }
     
     /* Animated wrapper */
@@ -287,5 +308,84 @@
     
     .transparent .content {
         background: transparent !important;
+    }
+    
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+        .header {
+            padding: 0.75rem 0.75rem;
+            font-size: 0.95rem;
+        }
+        
+        .content {
+            padding: 0.75rem;
+        }
+        
+        .title {
+            font-size: inherit;
+        }
+        
+        .icon {
+            font-size: 1.1rem;
+        }
+        
+        /* Reduce padding for minimal variant on mobile */
+        .minimal .content {
+            padding-left: 0;
+            padding-right: 0;
+        }
+        
+        /* Ensure tables scroll horizontally on mobile */
+        .mobile-friendly :global(.table-wrapper) {
+            margin: 0 -0.75rem;
+            padding: 0 0.75rem;
+        }
+        
+        /* Add scroll hint for tables */
+        .mobile-friendly :global(.table-wrapper) {
+            background: 
+                linear-gradient(to right, white 30%, rgba(255, 255, 255, 0)),
+                linear-gradient(to right, rgba(255, 255, 255, 0), white 70%) 100% 0,
+                linear-gradient(to right, rgba(0, 0, 0, 0.1), transparent 10%),
+                linear-gradient(to left, rgba(0, 0, 0, 0.1), transparent 10%) 100% 0;
+            background-repeat: no-repeat;
+            background-size: 40px 100%, 40px 100%, 10px 100%, 10px 100%;
+            background-attachment: local, local, scroll, scroll;
+        }
+        
+        /* Make lists more readable on mobile */
+        .mobile-friendly :global(ul),
+        .mobile-friendly :global(ol) {
+            padding-left: 1.25rem;
+        }
+        
+        .mobile-friendly :global(li) {
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Adjust text size for readability */
+        .mobile-friendly :global(p) {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 480px) {
+        .header {
+            padding: 0.6rem;
+        }
+        
+        .content {
+            padding: 0.6rem;
+        }
+        
+        .title {
+            font-size: 0.9rem;
+        }
+        
+        .icon {
+            font-size: 1rem;
+        }
     }
 </style>
