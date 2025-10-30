@@ -3,6 +3,7 @@
     import * as XLSX from 'xlsx';
     import Collapsible from '$lib/Collapsible.svelte';
     import HallOfFame from '$lib/HallOfFame.svelte';
+    import '../../app.css';
     
     // Data storage
     let loading = true;

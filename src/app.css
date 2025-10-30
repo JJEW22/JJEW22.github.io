@@ -1,0 +1,54 @@
+/* Mobile layout changes - remove gray background and move breadcrumb inside */
+@media (max-width: 768px) {
+    /* Remove all container padding/background on mobile */
+    .container {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Make breadcrumb appear inside white area with rounded top */
+    .breadcrumb {
+        background: white;
+        margin: 0;
+        padding: 1rem 1.5rem 0 1.5rem;
+        border-radius: 12px 12px 0 0; /* Rounded top corners only */
+    }
+    
+    /* Make main connect to breadcrumb seamlessly */
+    main {
+        padding: 0.5rem 1.5rem 1.5rem 1.5rem;
+        border-radius: 0; /* No top radius since breadcrumb has it */
+        margin: 0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Make breadcrumb link easily tappable on mobile */
+    .breadcrumb a {
+        display: inline-block;
+        padding: 0.5rem 0;
+        font-size: 1rem;
+    }
+}
+
+/* Desktop - keep everything as normal (no changes needed, but explicit for clarity) */
+@media (min-width: 769px) {
+    /* Container has gray background and padding */
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    
+    /* Breadcrumb appears on gray background */
+    .breadcrumb {
+        margin-bottom: 2rem;
+    }
+    
+    /* Main has white background with rounded corners */
+    main {
+        background: white;
+        border-radius: 12px;
+        padding: 3rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+}
