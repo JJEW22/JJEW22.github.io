@@ -387,11 +387,13 @@
             }
             const homeRowIndex = homeGames.findIndex(compare_names);
             if (homeRowIndex === -1) {
-                throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+                console.log(homeGames)
+                throw Error(`unable to find name in home games: name: ${val.teamName}`)
             }
             const awayRowIndex = awayGames.findIndex(compare_names);
             if (awayRowIndex === -1) {
-                throw Error(`unable to find name in home games: ${homeGames} name: ${val.teamName}`)
+                console.log(awayGames)
+                throw Error(`unable to find name in home games: name: ${val.teamName}`)
             }
 
             const homeRow = homeGames[homeRowIndex];
