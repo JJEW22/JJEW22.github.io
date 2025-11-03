@@ -1,31 +1,50 @@
 <script>
-    // You can add any JavaScript logic here
-    let interests = [
-        "Web Development",
-        "Open Source",
-        "Machine Learning",
-        "Photography"
-    ];
-    
-    let experience = [
+    import '../../app.css';
+
+     // Projects data
+    const projects = [
         {
-            role: "Software Engineer",
-            company: "Tech Company",
-            period: "2022 - Present",
-            description: "Working on cutting-edge web applications"
+            title: "JP Flicks",
+            description: "Website for hosting Boston's premier Crokinole league. We play weekly, reach out if you are interested!",
+            link: "/jpFlicks",
+            image: null, // Optional: add image URL
         },
         {
-            role: "Junior Developer",
-            company: "Startup Inc",
-            period: "2020 - 2022",
-            description: "Full-stack development with modern technologies"
+            title: "Project Two",
+            description: "A brief description of your second project. What problem does it solve? What technologies did you use?",
+            link: "#",
+            image: null,
+        },
+        {
+            title: "Project Three",
+            description: "Description of your third project goes here. Keep it concise but informative.",
+            link: "#",
+            image: null,
+        },
+        {
+            title: "Project Four",
+            description: "Another exciting project you've worked on. Highlight the key features or achievements.",
+            link: "#",
+            image: null,
+        },
+        {
+            title: "Project Five",
+            description: "Your fifth project description. What makes this project unique or interesting?",
+            link: "#",
+            image: null
+        },
+        {
+            title: "Project Six",
+            description: "Last project example. You can add as many projects as you want to this array.",
+            link: "#",
+            image: null,
         }
     ];
 </script>
 
 <svelte:head>
     <title>Just For Me</title>
-    <meta name="description" content="Learn more about my background, experience, and interests">
+    <meta name="description" content="Just for me and also you">
 </svelte:head>
 
 <div class="container">
@@ -38,62 +57,218 @@
         
         <section class="intro">
             <p>
-                You found the page that is "Just For Me". On here I link to fun projects I am working on or stuff I am experimenting with, feel free to check it out!
-            </p>
-        </section>
-        <div class="internal">
-            <section class="content-section">
-                <h2>My Journey</h2>
-                <p>
-                    Share your professional journey, education, or how you got into your field.
-                    This is a great place to tell your story in more detail than your homepage bio.
-                </p>
-            </section>
-
-            <section class="content-section">
-            <h2>Interests & Hobbies</h2>
-            <div class="interests-grid">
-                {#each interests as interest}
-                    <div class="interest-tag">{interest}</div>
-                {/each}
-            </div>
-            <p class="interests-description">
-                When I'm not coding, I enjoy exploring new technologies, contributing to open source,
-                and capturing moments through photography.
+                You found the page that is "Just For Me". On here I link to random projects I am working on or stuff I am experimenting with, feel free to check it out!
             </p>
         </section>
         
-        <section class="content-section">
-            <h2>Let's Connect</h2>
-            <p>
-                I'm always interested in new opportunities and collaborations.
-                Feel free to reach out if you'd like to work together or just chat!
-            </p>
-            <div class="cta-buttons">
-                <a href="mailto:your.email@example.com" class="button primary">Get in Touch</a>
-                <a href="/" class="button secondary">Back to Home</a>
-            </div>
-        </section>
-
-                <section class="content-section">
-            <h2>Experience</h2>
-            <div class="experience-list">
-                {#each experience as job}
-                    <div class="experience-item">
-                        <h3>{job.role}</h3>
-                        <div class="company">{job.company} • {job.period}</div>
-                        <p>{job.description}</p>
+        <div class="projects-grid">
+            {#each projects as project}
+                <a href={project.link} class="project-card">
+                    {#if project.image}
+                        <div class="card-image" style="background-image: url({project.image})"></div>
+                    {:else}
+                        <div class="card-image placeholder">
+                            <span class="placeholder-icon">📁</span>
+                        </div>
+                    {/if}
+                    
+                    <div class="card-content">
+                        <h2 class="card-title">{project.title}</h2>
+                        <p class="card-description">{project.description}</p>
                     </div>
-                {/each}
-            </div>
-        </section>
+                    
+                    <div class="card-footer">
+                        <span class="view-project">View Project →</span>
+                    </div>
+                </a>
+            {/each}
         </div>
-        
-        
+
     </main>
 </div>
 
 <style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    
+    .breadcrumb {
+        margin-bottom: 2rem;
+    }
+    
+    .breadcrumb a {
+        color: #666;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+    
+    .breadcrumb a:hover {
+        color: #0066cc;
+    }
+    
+    main {
+        background: white;
+        border-radius: 12px;
+        padding: 3rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        color: #1a1a1a;
+    }
+    
+    .subtitle {
+        font-size: 1.1rem;
+        color: #666;
+        margin-bottom: 3rem;
+    }
+    
+    /* Projects grid - 3 columns on desktop */
+    .projects-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+    }
+    
+    /* Project card styles */
+    .project-card {
+        display: flex;
+        flex-direction: column;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: inherit;
+        height: 100%;
+    }
+    
+    .project-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        border-color: #0066cc;
+    }
+    
+    /* Card image */
+    .card-image {
+        width: 100%;
+        height: 200px;
+        background-size: cover;
+        background-position: center;
+        background-color: #f3f4f6;
+    }
+    
+    .card-image.placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .placeholder-icon {
+        font-size: 4rem;
+    }
+    
+    /* Card content */
+    .card-content {
+        padding: 1.5rem;
+        flex: 1;
+    }
+    
+    .card-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0 0 0.75rem 0;
+        color: #1a1a1a;
+    }
+    
+    .card-description {
+        font-size: 0.95rem;
+        color: #666;
+        line-height: 1.6;
+        margin: 0;
+    }
+    
+    /* Tags */
+    .card-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .tag {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background: #e5e7eb;
+        color: #4b5563;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    /* Card footer */
+    .card-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        background: #f9fafb;
+    }
+    
+    .view-project {
+        color: #0066cc;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    
+    .project-card:hover .view-project {
+        text-decoration: underline;
+    }
+    
+    /* Tablet - 2 columns */
+    @media (max-width: 1024px) {
+        .projects-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+    }
+    
+    /* Mobile - 1 column */
+    @media (max-width: 768px) {
+        .container {
+            padding: 1rem;
+        }
+        
+        main {
+            padding: 1.5rem;
+        }
+        
+        h1 {
+            font-size: 1.75rem;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .projects-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        
+        .card-image {
+            height: 180px;
+        }
+        
+        .card-title {
+            font-size: 1.25rem;
+        }
+    }
     .container {
         max-width: 800px;
         margin: 0 auto;
@@ -261,3 +436,4 @@
         }
     }
 </style>
+
