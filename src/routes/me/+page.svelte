@@ -1,5 +1,6 @@
 <script>
     import '../../app.css';
+    import { onMount } from 'svelte';
 
      // Projects data
     const projects = [
@@ -7,39 +8,137 @@
             title: "JP Flicks",
             description: "Website for hosting Boston's premier Crokinole league. We play weekly, reach out if you are interested!",
             link: "/jpFlicks",
-            image: null, // Optional: add image URL
+            image: 'none', // Optional: add image URL
         },
-        {
-            title: "Project Two",
-            description: "A brief description of your second project. What problem does it solve? What technologies did you use?",
-            link: "#",
-            image: null,
-        },
-        {
-            title: "Project Three",
-            description: "Description of your third project goes here. Keep it concise but informative.",
-            link: "#",
-            image: null,
-        },
-        {
-            title: "Project Four",
-            description: "Another exciting project you've worked on. Highlight the key features or achievements.",
-            link: "#",
-            image: null,
-        },
-        {
-            title: "Project Five",
-            description: "Your fifth project description. What makes this project unique or interesting?",
-            link: "#",
-            image: null
-        },
-        {
-            title: "Project Six",
-            description: "Last project example. You can add as many projects as you want to this array.",
-            link: "#",
-            image: null,
-        }
+        // {
+        //     title: "Project Two",
+        //     description: "A brief description of your second project. What problem does it solve? What technologies did you use?",
+        //     link: "#",
+        //     image: null, // Will use placeholder
+        //     tags: ["React", "TypeScript"]
+        // },
+        // {
+        //     title: "Project Three",
+        //     description: "Description of your third project goes here. Keep it concise but informative.",
+        //     link: "#",
+        //     image: "none", // Will try to fetch from the page
+        //     tags: ["Python", "Data Science"]
+        // },
+        // {
+        //     title: "Project Four",
+        //     description: "Another exciting project you've worked on. Highlight the key features or achievements.",
+        //     link: "#",
+        //     image: null , // Direct image URL
+        //     tags: ["JavaScript", "API"]
+        // },
+        // {
+        //     title: "Project Five",
+        //     description: "Your fifth project description. What makes this project unique or interesting?",
+        //     link: "#",
+        //     image: null,
+        //     tags: ["Docker", "DevOps"]
+        // },
+        // {
+        //     title: "Project Six",
+        //     description: "Last project example. You can add as many projects as you want to this array.",
+        //     link: "#",
+        //     image: null,
+        //     tags: ["Full Stack"]
+        // }
     ];
+
+
+// Store resolved images - make it reactive by reassigning
+let projectImages = {};
+
+onMount(async () => {
+    console.log('Starting image fetch...');
+    
+    // Fetch images for projects with image="none"
+    for (let i = 0; i < projects.length; i++) {
+        const project = projects[i];
+        
+        if (project.image === "none" && project.link) {
+            try {
+                console.log(`Fetching image for project ${i}: ${project.link}`);
+                const imageUrl = await fetchPageImage(project.link);
+                
+                if (imageUrl) {
+                    // CRITICAL: Reassign the entire object to trigger reactivity
+                    projectImages = { ...projectImages, [i]: imageUrl };
+                    console.log(`Added image to projectImages at index ${i}:`, projectImages);
+                }
+            } catch (error) {
+                console.error(`Failed to fetch image for ${project.title}:`, error);
+            }
+        }
+    }
+    
+    console.log('Finished fetching images. Final projectImages:', projectImages);
+});
+
+async function fetchPageImage(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.warn(`Failed to fetch ${url}: ${response.status}`);
+            return null;
+        }
+        
+        const html = await response.text();
+        
+        // Create a temporary DOM parser
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Try to find og:image meta tag (most common)
+        let ogImage = doc.querySelector('meta[property="og:image"]');
+        if (ogImage) {
+            const content = ogImage.getAttribute('content');
+            console.log(`Found og:image for ${url}:`, content);
+            return content;
+        }
+        
+        // Try to find twitter:image meta tag
+        let twitterImage = doc.querySelector('meta[name="twitter:image"]');
+        if (twitterImage) {
+            const content = twitterImage.getAttribute('content');
+            console.log(`Found twitter:image for ${url}:`, content);
+            return content;
+        }
+        
+        // Try to find a regular image meta tag
+        let imageTag = doc.querySelector('meta[name="image"]');
+        if (imageTag) {
+            const content = imageTag.getAttribute('content');
+            console.log(`Found image meta tag for ${url}:`, content);
+            return content;
+        }
+        
+        console.warn(`No image meta tags found for ${url}`);
+        return null;
+    } catch (error) {
+        console.error(`Error fetching page image from ${url}:`, error);
+        return null;
+    }
+}
+
+// Make this a reactive statement so it updates when projectImages changes
+function getProjectImage(project, index) {
+    // Check if we have a fetched image
+    if (projectImages[index]) {
+        console.log(`Using fetched image for ${index}:`, projectImages[index]);
+        return projectImages[index];
+    }
+    
+    // If image is a valid URL (not null or "none"), use it
+    if (project.image && project.image !== "none") {
+        return project.image;
+    }
+    
+    // Otherwise, return null to use placeholder
+    return null;
+}
 </script>
 
 <svelte:head>
@@ -62,10 +161,10 @@
         </section>
         
         <div class="projects-grid">
-            {#each projects as project}
+            {#each projects as project, index}
                 <a href={project.link} class="project-card">
-                    {#if project.image}
-                        <div class="card-image" style="background-image: url({project.image})"></div>
+                    {#if getProjectImage(project, index)}
+                        <div class="card-image" style="background-image: url({getProjectImage(project, index)})"></div>
                     {:else}
                         <div class="card-image placeholder">
                             <span class="placeholder-icon">📁</span>
