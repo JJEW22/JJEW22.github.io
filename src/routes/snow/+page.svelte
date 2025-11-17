@@ -3,12 +3,13 @@
 
     // Snow predictions data - UPDATE THIS with your friends' predictions
     const predictions = [
-        { name: "Jack", predictedDate: "2024-12-15" },
-        { name: "Tyler", predictedDate: "2024-12-20" },
-        { name: "Sarah", predictedDate: "2024-12-10" },
-        { name: "Mike", predictedDate: "2024-12-18" },
-        { name: "Emma", predictedDate: "2024-12-22" },
-        { name: "Alex", predictedDate: "2024-12-12" },
+        { name: "Jack", predictedDate: "2025-11-29" },
+        { name: "Vedant", predictedDate: "2025-12-13" },
+        { name: "Dina", predictedDate: "2025-12-13" },
+        { name: "Shawty", predictedDate: "2025-12-03" },
+        { name: "Sam", predictedDate: "2025-12-22" },
+        { name: "Katelyn", predictedDate: "2025-11-18" },
+        { name: "Nick", predictedDate: "2025-12-21" },
     ];
 
     let today = new Date();
@@ -28,7 +29,9 @@
 
         // Process each prediction
         processedPredictions = predictions.map(pred => {
-            const predDate = new Date(pred.predictedDate);
+            // Parse date as local time, not UTC
+            const [year, month, day] = pred.predictedDate.split('-').map(Number);
+            const predDate = new Date(year, month - 1, day); // month is 0-indexed
             const predTime = predDate.getTime();
             const diffDays = Math.ceil((predTime - todayTime) / (1000 * 60 * 60 * 24));
             const diffMs = Math.abs(predTime - todayTime);
@@ -37,13 +40,53 @@
                 ...pred,
                 predictedDate: pred.predictedDate,
                 displayDate: formatDate(predDate),
+                predDateObj: predDate,
                 daysAway: diffDays,
                 isPast: diffDays < 0,
                 distance: diffMs
             };
         });
 
-        // Sort by how close they are to today
+        // Sort by date to calculate winning ranges
+        const sortedByDate = [...processedPredictions].sort((a, b) => 
+            a.predDateObj.getTime() - b.predDateObj.getTime()
+        );
+
+        // Calculate winning range for each person
+        sortedByDate.forEach((pred, index) => {
+            const predTime = pred.predDateObj.getTime();
+            
+            // Find the midpoint to previous prediction
+            let rangeStart;
+            if (index === 0) {
+                // First person wins from beginning of time
+                rangeStart = null;
+            } else {
+                const prevPredTime = sortedByDate[index - 1].predDateObj.getTime();
+                const midpointTime = (predTime + prevPredTime) / 2;
+                rangeStart = new Date(midpointTime);
+                if (rangeStart.getHours() === 12) {
+                    rangeStart.setHours(rangeStart.getHours() + 12);
+                }
+            }
+            
+            // Find the midpoint to next prediction
+            let rangeEnd;
+            if (index === sortedByDate.length - 1) {
+                // Last person wins until end of time
+                rangeEnd = null;
+            } else {
+                const nextPredTime = sortedByDate[index + 1].predDateObj.getTime();
+                const midpointTime = (predTime + nextPredTime) / 2;
+                rangeEnd = new Date(midpointTime);
+                rangeEnd.setHours(rangeEnd.getHours() - 12);
+            }
+            
+            pred.winningRangeStart = rangeStart;
+            pred.winningRangeEnd = rangeEnd;
+        });
+
+        // Sort by how close they are to today for display
         processedPredictions.sort((a, b) => a.distance - b.distance);
 
         // Find current winner (closest prediction that hasn't passed)
@@ -69,6 +112,24 @@
     function formatDate(date) {
         const options = { month: 'long', day: 'numeric', year: 'numeric' };
         return date.toLocaleDateString('en-US', options);
+    }
+
+    function formatDateShort(date) {
+        const options = { month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('en-US', options);
+    }
+
+    function formatWinningRange(pred) {
+        if (!pred.winningRangeStart && !pred.winningRangeEnd) {
+            return "Always";
+        }
+        if (!pred.winningRangeStart) {
+            return `Before or on ${formatDateShort(pred.winningRangeEnd)}`;
+        }
+        if (!pred.winningRangeEnd) {
+            return `After or on ${formatDateShort(pred.winningRangeStart)}`;
+        }
+        return `${formatDateShort(pred.winningRangeStart)} - ${formatDateShort(pred.winningRangeEnd)}`;
     }
 
     function getDaysText(days) {
@@ -132,7 +193,7 @@
     </nav>
     
     <main>
-        <h1>❄️ First Snow Predictions</h1>
+        <h1>❄️ First Snow Predictions ❄️</h1>
         
         <div class="info-section">
             <div class="today-banner">
@@ -189,6 +250,7 @@
                         <th>Rank</th>
                         <th>Name</th>
                         <th>Predicted Date</th>
+                        <th>Winning Range</th>
                         <th>Status</th>
                         {#if hasSnowed}
                             <th>Accuracy</th>
@@ -208,6 +270,7 @@
                             </td>
                             <td class="name-cell">{prediction.name}</td>
                             <td class="date-cell">{prediction.displayDate}</td>
+                            <td class="range-cell">{formatWinningRange(prediction)}</td>
                             <td class="status-cell">
                                 {#if !hasSnowed}
                                     <span class:status-past={prediction.isPast}
@@ -432,6 +495,12 @@
     
     .date-cell {
         color: #4b5563;
+    }
+
+    .range-cell {
+        color: #6b7280;
+        font-size: 0.9rem;
+        font-style: italic;
     }
     
     .status-cell {
