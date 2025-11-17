@@ -1,4 +1,6 @@
 <script>
+    import '../../app.css';
+
     // You can add any JavaScript logic here
     let interests = [
         "Web Development",
