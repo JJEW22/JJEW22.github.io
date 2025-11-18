@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import '../../app.css';
 
     // Snow predictions data - UPDATE THIS with your friends' predictions
     const predictions = [
