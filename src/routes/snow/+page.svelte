@@ -8,6 +8,7 @@
         { name: "Dina", predictedDate: "2025-12-13" },
         { name: "Shawty", predictedDate: "2025-12-03" },
         { name: "Sam", predictedDate: "2025-12-22" },
+        { name: "Na'ama", predictedDate: "2025-12-14" },
         { name: "Katelyn", predictedDate: "2025-11-18" },
         { name: "Nick", predictedDate: "2025-12-21" },
     ];
