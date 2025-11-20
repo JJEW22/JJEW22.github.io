@@ -10,6 +10,12 @@
             link: "/jpFlicks",
             image: 'none', // Optional: add image URL
         },
+        {
+            title: "Snow Prediction",
+            description: "Website for tracking who's gonna win this years cheesecake bet for predicting the first snow",
+            link: "/snow",
+            image: 'none', // Optional: add image URL
+        },
         // {
         //     title: "Project Two",
         //     description: "A brief description of your second project. What problem does it solve? What technologies did you use?",
