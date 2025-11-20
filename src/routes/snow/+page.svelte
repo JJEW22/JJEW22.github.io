@@ -5,13 +5,16 @@
     // Snow predictions data - UPDATE THIS with your friends' predictions
     const predictions = [
         { name: "Jack", predictedDate: "2025-11-29" },
-        { name: "Vedant", predictedDate: "2025-12-13" },
-        { name: "Dina", predictedDate: "2025-12-13" },
+        { name: "Vedant & Dina", predictedDate: "2025-12-13" },
         { name: "Shawty", predictedDate: "2025-12-03" },
         { name: "Sam", predictedDate: "2025-12-22" },
-        { name: "Na'ama", predictedDate: "2025-12-14" },
         { name: "Katelyn", predictedDate: "2025-11-18" },
-        { name: "Nick", predictedDate: "2025-12-21" },
+        { name: "Nick", predictedDate: "2025-12-25" },
+        { name: "Anish", predictedDate: "2025-12-11" },
+        { name: "Aidan & Na'ama", predictedDate: "2025-12-14" },
+        { name: "Tea", predictedDate: "2025-12-12" },
+        { name: "Haneen", predictedDate: "2025-12-15" },
+        { name: "Moll Ball", predictedDate: "2025-12-8" },
     ];
 
     let today = new Date();
@@ -92,7 +95,8 @@
         processedPredictions.sort((a, b) => a.distance - b.distance);
 
         // Find current winner (closest prediction that hasn't passed)
-        const futurePredictions = processedPredictions.filter(p => !p.isPast);
+        // const futurePredictions = processedPredictions.filter(p => !p.isPast);
+        const futurePredictions = processedPredictions;
         if (futurePredictions.length > 0) {
             currentWinner = futurePredictions[0];
             
@@ -262,7 +266,7 @@
                 <tbody>
                     {#each processedPredictions as prediction, index}
                         <tr class:winner={!hasSnowed && prediction.name === currentWinner?.name}
-                            class:past={!hasSnowed && prediction.isPast}>
+                            class:past={false}>
                             <td class="rank-cell">
                                 {#if !hasSnowed && prediction.name === currentWinner?.name}
                                     <span class="medal">🏆</span>
@@ -296,13 +300,13 @@
         </div>
 
         <!-- Admin button to mark when it actually snows (remove in production) -->
-        {#if !hasSnowed}
+        <!-- {#if !hasSnowed}
             <div class="admin-section">
                 <button class="admin-button" on:click={() => markSnowDate(todayString)}>
                     ❄️ Mark that it snowed today
                 </button>
             </div>
-        {/if}
+        {/if} -->
     </main>
 </div>
 
