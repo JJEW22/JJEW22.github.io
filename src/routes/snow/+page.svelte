@@ -13,8 +13,9 @@
         { name: "Anish", predictedDate: "2025-12-11" },
         { name: "Aidan & Na'ama", predictedDate: "2025-12-14" },
         { name: "Tea", predictedDate: "2025-12-12" },
-        { name: "Haneen", predictedDate: "2025-12-15" },
+        { name: "Haneen & Sandy", predictedDate: "2025-12-15" },
         { name: "Moll Ball", predictedDate: "2025-12-8" },
+        { name: "Calude", predictedDate: "2026-1-18" },
     ];
 
     let today = new Date();
