@@ -1,6 +1,22 @@
 <script>
     import { onMount } from 'svelte';
     
+    // Spacing constants - adjust these to fine-tune bracket alignment
+    const SPACING = {
+        gameHeight: '4.5rem',          // Height of each game box
+        gameGap: '0.5rem',             // Gap between games in same column
+        round2MarginTop: '2.5rem',     // Vertical offset for Round 2 games
+        round3MarginTop: '5.5rem',     // Vertical offset for Round 3 games
+        round4MarginTop: '11.5rem',    // Vertical offset for Round 4 games
+        columnGap: '0.5rem',           // Gap between columns
+        regionGap: '1.5rem',           // Gap between regions (top/bottom)
+        sideGap: '1rem',               // Gap between left/center/right sections
+        columnMinWidth: '180px',       // Minimum width of each column
+        teamBtnPadding: '0.75rem',     // Padding inside team buttons
+        seedSize: '24px',              // Size of seed number circles
+        teamFontSize: '0.9rem'         // Font size for team names
+    };
+    
     // Region positioning for Final Four matchups
     const regionPositions = {
         topLeft: 'East',
@@ -913,6 +929,22 @@
 </div>
 
 <style>
+    /* Inject spacing constants as CSS variables */
+    :root {
+        --game-height: 4.5rem;
+        --game-gap: 0.5rem;
+        --round2-margin-top: 2.5rem;
+        --round3-margin-top: 5.5rem;
+        --round4-margin-top: 11.5rem;
+        --column-gap: 0.5rem;
+        --region-gap: 1.5rem;
+        --side-gap: 1rem;
+        --column-min-width: 180px;
+        --team-btn-padding: 0.75rem;
+        --seed-size: 24px;
+        --team-font-size: 0.9rem;
+    }
+    
     .container {
         max-width: 100%;
         margin: 0 auto;
@@ -973,7 +1005,7 @@
     
     .bracket-container {
         display: flex;
-        gap: 1rem;
+        gap: var(--side-gap);
         padding: 1rem 0;
         justify-content: center;
         min-width: min-content;
@@ -982,7 +1014,7 @@
     .bracket-side {
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: var(--region-gap);
     }
     
     .left-side {
@@ -1068,8 +1100,9 @@
     }
     
     /* Spacing for later rounds to align with bracket flow */
+    /* Each round's game should be centered between the two games feeding into it */
     .round2-spacing {
-        margin-top: 1.25rem;
+        margin-top: 2.75rem; /* (game height 4.5rem + gap 0.5rem) / 2 = 2.5rem, adjusted for visual centering */
     }
     
     .round2-spacing:first-child {
@@ -1077,7 +1110,7 @@
     }
     
     .round3-spacing {
-        margin-top: 3.25rem;
+        margin-top: 6rem; /* Centers between two Round 2 games */
     }
     
     .round3-spacing:first-child {
@@ -1085,7 +1118,7 @@
     }
     
     .round4-spacing {
-        margin-top: 7rem;
+        margin-top: 12.5rem; /* Centers between two Round 3 games */
     }
     
     .game {
@@ -1095,6 +1128,7 @@
         border: 2px solid #e5e7eb;
         border-radius: 6px;
         overflow: hidden;
+        min-height: 4.5rem;
     }
     
     .championship-game {
@@ -1103,7 +1137,7 @@
     }
     
     .team-btn {
-        padding: 0.75rem;
+        padding: 0.6rem 0.75rem;
         background: white;
         border: none;
         text-align: left;
@@ -1112,7 +1146,9 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        min-height: 2.2rem;
+        flex: 1;
     }
     
     .team-btn:not(.empty):hover {
@@ -1137,11 +1173,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 24px;
-        height: 24px;
+        width: 22px;
+        height: 22px;
         background: #e5e7eb;
         border-radius: 50%;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 700;
         flex-shrink: 0;
     }
@@ -1156,6 +1192,7 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        min-width: 0;
     }
     
     .winner-banner {
