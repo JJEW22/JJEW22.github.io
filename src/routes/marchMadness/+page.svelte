@@ -1,6 +1,49 @@
 <script>
     import { onMount } from 'svelte';
     
+    // Variables to store element heights for dynamic spacing
+    let gameHeight = 0;
+    let firstGameRef; // Will hold reference to first game
+    const baseGameGap = 8; // pixels (0.5rem ≈ 8px)
+    
+    // Reactive calculations for spacing based on actual rendered heights
+    // For centering: each later-round game must be centered between the two games feeding into it
+    
+    // Round 2: First game needs offset to center between R1 games 0 and 1
+    // Center point is at: (gameHeight / 2) + (gameHeight + gap) / 2 = gameHeight + gap/2
+    // So offset from top = center point - (gameHeight / 2) = (gameHeight + gap) / 2
+    $: round2FirstOffset = gameHeight > 0 
+        ? (gameHeight + baseGameGap) / 2 
+        : 40;
+    // Gap between R2 games: need to skip one full R1 game pair (2 games + 1 gap), minus the height of R2 game
+    // Total span of 2 R1 games = 2*gameHeight + gap
+    // R2 game-to-game spacing = 2*gameHeight + 2*gap (center to center) - gameHeight = gameHeight + 2*gap
+    // But column has auto-gap, so additional margin needed = gameHeight + gap
+    $: round2Gap = gameHeight > 0 
+        ? gameHeight + baseGameGap
+        : 80;
+    
+    // Round 3: First game centered between R2 games 0 and 1
+    $: round3FirstOffset = gameHeight > 0 
+        ? round2FirstOffset + (gameHeight + baseGameGap) 
+        : 120;
+    $: round3Gap = gameHeight > 0 
+        ? 3 * gameHeight + 3 * baseGameGap
+        : 248;
+    
+    // Round 4: First game centered between R3 games 0 and 1
+    $: round4FirstOffset = gameHeight > 0
+        ? round3FirstOffset + (gameHeight + baseGameGap)
+        : 200;
+    
+    // Debug logging
+    $: if (gameHeight > 0) {
+        console.log('Game height:', gameHeight, 'px');
+        console.log('Round 2 first offset:', round2FirstOffset, 'px, gap:', round2Gap, 'px');
+        console.log('Round 3 first offset:', round3FirstOffset, 'px, gap:', round3Gap, 'px');
+        console.log('Round 4 first offset:', round4FirstOffset, 'px');
+    }
+    
     // Spacing constants - adjust these to fine-tune bracket alignment
     const SPACING = {
         gameHeight: '4.5rem',          // Height of each game box
@@ -273,9 +316,10 @@
                 <button class="reset-btn" on:click={resetBracket}>Reset Bracket</button>
             </div>
         
-        <div class="bracket-container">
-            <!-- Left Side of Bracket -->
-            <div class="bracket-side left-side">
+        <div class="bracket-scroll-container">
+            <div class="bracket-wrapper">
+            <!-- Top Bracket Row -->
+            <div class="bracket-row top-bracket">
                 <!-- Top Left Region -->
                 <div class="bracket-region top-left">
                     <h3 class="region-title">{regionPositions.topLeft}</h3>
@@ -283,39 +327,68 @@
                     <!-- Round 1 - Games 0-7 (topLeft region) -->
                     <div class="bracket-column">
                         {#each bracket.round1.slice(0, 8) as game, i}
-                            <div class="game">
-                                {#if game.team1}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team1}
-                                        on:click={() => selectWinner(1, i, game.team1)}
-                                    >
-                                        <span class="seed">{game.team1.seed}</span>
-                                        <span class="team-name">{game.team1.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                                {#if game.team2}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team2}
-                                        on:click={() => selectWinner(1, i, game.team2)}
-                                    >
-                                        <span class="seed">{game.team2.seed}</span>
-                                        <span class="team-name">{game.team2.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                            </div>
+                            {#if i === 0}
+                                <div class="game" bind:clientHeight={gameHeight}>
+                                    {#if game.team1}
+                                        <button 
+                                            class="team-btn"
+                                            class:selected={game.winner === game.team1}
+                                            on:click={() => selectWinner(1, i, game.team1)}
+                                        >
+                                            <span class="seed">{game.team1.seed}</span>
+                                            <span class="team-name">{game.team1.name}</span>
+                                        </button>
+                                    {:else}
+                                        <div class="team-btn empty">TBD</div>
+                                    {/if}
+                                    {#if game.team2}
+                                        <button 
+                                            class="team-btn"
+                                            class:selected={game.winner === game.team2}
+                                            on:click={() => selectWinner(1, i, game.team2)}
+                                        >
+                                            <span class="seed">{game.team2.seed}</span>
+                                            <span class="team-name">{game.team2.name}</span>
+                                        </button>
+                                    {:else}
+                                        <div class="team-btn empty">TBD</div>
+                                    {/if}
+                                </div>
+                            {:else}
+                                <div class="game">
+                                    {#if game.team1}
+                                        <button 
+                                            class="team-btn"
+                                            class:selected={game.winner === game.team1}
+                                            on:click={() => selectWinner(1, i, game.team1)}
+                                        >
+                                            <span class="seed">{game.team1.seed}</span>
+                                            <span class="team-name">{game.team1.name}</span>
+                                        </button>
+                                    {:else}
+                                        <div class="team-btn empty">TBD</div>
+                                    {/if}
+                                    {#if game.team2}
+                                        <button 
+                                            class="team-btn"
+                                            class:selected={game.winner === game.team2}
+                                            on:click={() => selectWinner(1, i, game.team2)}
+                                        >
+                                            <span class="seed">{game.team2.seed}</span>
+                                            <span class="team-name">{game.team2.name}</span>
+                                        </button>
+                                    {:else}
+                                        <div class="team-btn empty">TBD</div>
+                                    {/if}
+                                </div>
+                            {/if}
                         {/each}
                     </div>
                     
                     <!-- Round 2 - Games 0-3 -->
                     <div class="bracket-column">
                         {#each bracket.round2.slice(0, 4) as game, i}
-                            <div class="game round2-spacing">
+                            <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                                 {#if game.team1}
                                     <button 
                                         class="team-btn"
@@ -348,7 +421,7 @@
                     <!-- Round 3 (Sweet 16) - Games 0-1 -->
                     <div class="bracket-column">
                         {#each bracket.round3.slice(0, 2) as game, i}
-                            <div class="game round3-spacing">
+                            <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                                 {#if game.team1}
                                     <button 
                                         class="team-btn"
@@ -380,7 +453,7 @@
                     
                     <!-- Round 4 (Elite 8) - Game 0 -->
                     <div class="bracket-column">
-                        <div class="game round4-spacing">
+                        <div class="game" style="margin-top: {round4FirstOffset}px">
                             {#if bracket.round4[0] && bracket.round4[0].team1}
                                 <button 
                                     class="team-btn"
@@ -410,247 +483,13 @@
                     </div>
                 </div>
                 
-                <!-- Bottom Left Region -->
-                <div class="bracket-region bottom-left">
-                    <h3 class="region-title">{regionPositions.bottomLeft}</h3>
-                    
-                    <!-- Round 1 - Games 8-15 (bottomLeft region) -->
-                    <div class="bracket-column">
-                        {#each bracket.round1.slice(8, 16) as game, i}
-                            <div class="game">
-                                {#if game.team1}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team1}
-                                        on:click={() => selectWinner(1, i + 8, game.team1)}
-                                    >
-                                        <span class="seed">{game.team1.seed}</span>
-                                        <span class="team-name">{game.team1.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                                {#if game.team2}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team2}
-                                        on:click={() => selectWinner(1, i + 8, game.team2)}
-                                    >
-                                        <span class="seed">{game.team2.seed}</span>
-                                        <span class="team-name">{game.team2.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                    
-                    <!-- Round 2 - Games 4-7 -->
-                    <div class="bracket-column">
-                        {#each bracket.round2.slice(4, 8) as game, i}
-                            <div class="game round2-spacing">
-                                {#if game.team1}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team1}
-                                        on:click={() => selectWinner(2, i + 4, game.team1)}
-                                    >
-                                        <span class="seed">{game.team1.seed}</span>
-                                        <span class="team-name">{game.team1.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                                
-                                {#if game.team2}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team2}
-                                        on:click={() => selectWinner(2, i + 4, game.team2)}
-                                    >
-                                        <span class="seed">{game.team2.seed}</span>
-                                        <span class="team-name">{game.team2.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                    
-                    <!-- Round 3 (Sweet 16) - Games 2-3 -->
-                    <div class="bracket-column">
-                        {#each bracket.round3.slice(2, 4) as game, i}
-                            <div class="game round3-spacing">
-                                {#if game.team1}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team1}
-                                        on:click={() => selectWinner(3, i + 2, game.team1)}
-                                    >
-                                        <span class="seed">{game.team1.seed}</span>
-                                        <span class="team-name">{game.team1.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                                
-                                {#if game.team2}
-                                    <button 
-                                        class="team-btn"
-                                        class:selected={game.winner === game.team2}
-                                        on:click={() => selectWinner(3, i + 2, game.team2)}
-                                    >
-                                        <span class="seed">{game.team2.seed}</span>
-                                        <span class="team-name">{game.team2.name}</span>
-                                    </button>
-                                {:else}
-                                    <div class="team-btn empty">TBD</div>
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                    
-                    <!-- Round 4 (Elite 8) - Game 1 -->
-                    <div class="bracket-column">
-                        <div class="game round4-spacing">
-                            {#if bracket.round4[1] && bracket.round4[1].team1}
-                                <button 
-                                    class="team-btn"
-                                    class:selected={bracket.round4[1].winner === bracket.round4[1].team1}
-                                    on:click={() => selectWinner(4, 1, bracket.round4[1].team1)}
-                                >
-                                    <span class="seed">{bracket.round4[1].team1.seed}</span>
-                                    <span class="team-name">{bracket.round4[1].team1.name}</span>
-                                </button>
-                            {:else}
-                                <div class="team-btn empty">TBD</div>
-                            {/if}
-                            
-                            {#if bracket.round4[1] && bracket.round4[1].team2}
-                                <button 
-                                    class="team-btn"
-                                    class:selected={bracket.round4[1].winner === bracket.round4[1].team2}
-                                    on:click={() => selectWinner(4, 1, bracket.round4[1].team2)}
-                                >
-                                    <span class="seed">{bracket.round4[1].team2.seed}</span>
-                                    <span class="team-name">{bracket.round4[1].team2.name}</span>
-                                </button>
-                            {:else}
-                                <div class="team-btn empty">TBD</div>
-                            {/if}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Center - Final Four and Championship -->
-            <div class="bracket-center">
-                <div class="final-four-section">
-                    <h3>Final Four</h3>
-                    
-                    <!-- Left Semifinal -->
-                    <div class="game semifinal-game">
-                        {#if bracket.round5[0] && bracket.round5[0].team1}
-                            <button 
-                                class="team-btn"
-                                class:selected={bracket.round5[0].winner === bracket.round5[0].team1}
-                                on:click={() => selectWinner(5, 0, bracket.round5[0].team1)}
-                            >
-                                <span class="seed">{bracket.round5[0].team1.seed}</span>
-                                <span class="team-name">{bracket.round5[0].team1.name}</span>
-                            </button>
-                        {:else}
-                            <div class="team-btn empty">TBD</div>
-                        {/if}
-                        
-                        {#if bracket.round5[0] && bracket.round5[0].team2}
-                            <button 
-                                class="team-btn"
-                                class:selected={bracket.round5[0].winner === bracket.round5[0].team2}
-                                on:click={() => selectWinner(5, 0, bracket.round5[0].team2)}
-                            >
-                                <span class="seed">{bracket.round5[0].team2.seed}</span>
-                                <span class="team-name">{bracket.round5[0].team2.name}</span>
-                            </button>
-                        {:else}
-                            <div class="team-btn empty">TBD</div>
-                        {/if}
-                    </div>
-                    
-                    <!-- Right Semifinal -->
-                    <div class="game semifinal-game">
-                        {#if bracket.round5[1] && bracket.round5[1].team1}
-                            <button 
-                                class="team-btn"
-                                class:selected={bracket.round5[1].winner === bracket.round5[1].team1}
-                                on:click={() => selectWinner(5, 1, bracket.round5[1].team1)}
-                            >
-                                <span class="seed">{bracket.round5[1].team1.seed}</span>
-                                <span class="team-name">{bracket.round5[1].team1.name}</span>
-                            </button>
-                        {:else}
-                            <div class="team-btn empty">TBD</div>
-                        {/if}
-                        
-                        {#if bracket.round5[1] && bracket.round5[1].team2}
-                            <button 
-                                class="team-btn"
-                                class:selected={bracket.round5[1].winner === bracket.round5[1].team2}
-                                on:click={() => selectWinner(5, 1, bracket.round5[1].team2)}
-                            >
-                                <span class="seed">{bracket.round5[1].team2.seed}</span>
-                                <span class="team-name">{bracket.round5[1].team2.name}</span>
-                            </button>
-                        {:else}
-                            <div class="team-btn empty">TBD</div>
-                        {/if}
-                    </div>
-                </div>
-                
-                <!-- Championship -->
-                <div class="championship-section">
-                    <h3>Championship</h3>
-                    <div class="game championship-game">
-                        {#if bracket.round6[0] && bracket.round6[0].team1}
-                            <button 
-                                class="team-btn"
-                                class:selected={bracket.round6[0].winner === bracket.round6[0].team1}
-                                on:click={() => selectWinner(6, 0, bracket.round6[0].team1)}
-                            >
-                                <span class="seed">{bracket.round6[0].team1.seed}</span>
-                                <span class="team-name">{bracket.round6[0].team1.name}</span>
-                            </button>
-                        {:else}
-                            <div class="team-btn empty">TBD</div>
-                        {/if}
-                        
-                        {#if bracket.round6[0] && bracket.round6[0].team2}
-                            <button 
-                                class="team-btn"
-                                class:selected={bracket.round6[0].winner === bracket.round6[0].team2}
-                                on:click={() => selectWinner(6, 0, bracket.round6[0].team2)}
-                            >
-                                <span class="seed">{bracket.round6[0].team2.seed}</span>
-                                <span class="team-name">{bracket.round6[0].team2.name}</span>
-                            </button>
-                        {:else}
-                            <div class="team-btn empty">TBD</div>
-                        {/if}
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Right Side of Bracket -->
-            <div class="bracket-side right-side">
                 <!-- Top Right Region -->
                 <div class="bracket-region top-right">
                     <h3 class="region-title">{regionPositions.topRight}</h3>
                     
                     <!-- Round 4 (Elite 8) - Game 2 -->
                     <div class="bracket-column">
-                        <div class="game round4-spacing">
+                        <div class="game" style="margin-top: {round4FirstOffset}px">
                             {#if bracket.round4[2] && bracket.round4[2].team1}
                                 <button 
                                     class="team-btn"
@@ -682,7 +521,7 @@
                     <!-- Round 3 (Sweet 16) - Games 4-5 -->
                     <div class="bracket-column">
                         {#each bracket.round3.slice(4, 6) as game, i}
-                            <div class="game round3-spacing">
+                            <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                                 {#if game.team1}
                                     <button 
                                         class="team-btn"
@@ -715,7 +554,7 @@
                     <!-- Round 2 - Games 8-11 -->
                     <div class="bracket-column">
                         {#each bracket.round2.slice(8, 12) as game, i}
-                            <div class="game round2-spacing">
+                            <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                                 {#if game.team1}
                                     <button 
                                         class="team-btn"
@@ -777,6 +616,255 @@
                         {/each}
                     </div>
                 </div>
+            </div>
+            
+            <!-- Final Four Row -->
+            <div class="final-four-row">
+                <!-- Left Semifinal -->
+                <div class="semifinal-section">
+                    <h3>Final Four</h3>
+                    <div class="game semifinal-game">
+                        {#if bracket.round5[0] && bracket.round5[0].team1}
+                            <button 
+                                class="team-btn"
+                                class:selected={bracket.round5[0].winner === bracket.round5[0].team1}
+                                on:click={() => selectWinner(5, 0, bracket.round5[0].team1)}
+                            >
+                                <span class="seed">{bracket.round5[0].team1.seed}</span>
+                                <span class="team-name">{bracket.round5[0].team1.name}</span>
+                            </button>
+                        {:else}
+                            <div class="team-btn empty">TBD</div>
+                        {/if}
+                        
+                        {#if bracket.round5[0] && bracket.round5[0].team2}
+                            <button 
+                                class="team-btn"
+                                class:selected={bracket.round5[0].winner === bracket.round5[0].team2}
+                                on:click={() => selectWinner(5, 0, bracket.round5[0].team2)}
+                            >
+                                <span class="seed">{bracket.round5[0].team2.seed}</span>
+                                <span class="team-name">{bracket.round5[0].team2.name}</span>
+                            </button>
+                        {:else}
+                            <div class="team-btn empty">TBD</div>
+                        {/if}
+                    </div>
+                </div>
+                
+                <!-- Championship -->
+                <div class="championship-section">
+                    <h3>Championship</h3>
+                    <div class="game championship-game">
+                        {#if bracket.round6[0] && bracket.round6[0].team1}
+                            <button 
+                                class="team-btn"
+                                class:selected={bracket.round6[0].winner === bracket.round6[0].team1}
+                                on:click={() => selectWinner(6, 0, bracket.round6[0].team1)}
+                            >
+                                <span class="seed">{bracket.round6[0].team1.seed}</span>
+                                <span class="team-name">{bracket.round6[0].team1.name}</span>
+                            </button>
+                        {:else}
+                            <div class="team-btn empty">TBD</div>
+                        {/if}
+                        
+                        {#if bracket.round6[0] && bracket.round6[0].team2}
+                            <button 
+                                class="team-btn"
+                                class:selected={bracket.round6[0].winner === bracket.round6[0].team2}
+                                on:click={() => selectWinner(6, 0, bracket.round6[0].team2)}
+                            >
+                                <span class="seed">{bracket.round6[0].team2.seed}</span>
+                                <span class="team-name">{bracket.round6[0].team2.name}</span>
+                            </button>
+                        {:else}
+                            <div class="team-btn empty">TBD</div>
+                        {/if}
+                    </div>
+                    
+                    <!-- Champion -->
+                    <h3 class="champion-label">🏆 Champion 🏆</h3>
+                    <div class="game champion-game">
+                        {#if bracket.winner}
+                            <div class="team-btn champion-display">
+                                <span class="seed">{bracket.winner.seed}</span>
+                                <span class="team-name">{bracket.winner.name}</span>
+                            </div>
+                        {:else}
+                            <div class="team-btn empty">TBD</div>
+                        {/if}
+                    </div>
+                </div>
+                
+                <!-- Right Semifinal -->
+                <div class="semifinal-section">
+                    <h3>Final Four</h3>
+                    <div class="game semifinal-game">
+                        {#if bracket.round5[1] && bracket.round5[1].team1}
+                            <button 
+                                class="team-btn"
+                                class:selected={bracket.round5[1].winner === bracket.round5[1].team1}
+                                on:click={() => selectWinner(5, 1, bracket.round5[1].team1)}
+                            >
+                                <span class="seed">{bracket.round5[1].team1.seed}</span>
+                                <span class="team-name">{bracket.round5[1].team1.name}</span>
+                            </button>
+                        {:else}
+                            <div class="team-btn empty">TBD</div>
+                        {/if}
+                        
+                        {#if bracket.round5[1] && bracket.round5[1].team2}
+                            <button 
+                                class="team-btn"
+                                class:selected={bracket.round5[1].winner === bracket.round5[1].team2}
+                                on:click={() => selectWinner(5, 1, bracket.round5[1].team2)}
+                            >
+                                <span class="seed">{bracket.round5[1].team2.seed}</span>
+                                <span class="team-name">{bracket.round5[1].team2.name}</span>
+                            </button>
+                        {:else}
+                            <div class="team-btn empty">TBD</div>
+                        {/if}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bottom Bracket Row -->
+            <div class="bracket-row bottom-bracket">
+                <!-- Bottom Left Region -->
+                <div class="bracket-region bottom-left">
+                    <h3 class="region-title">{regionPositions.bottomLeft}</h3>
+                    
+                    <!-- Round 1 - Games 8-15 (bottomLeft region) -->
+                    <div class="bracket-column">
+                        {#each bracket.round1.slice(8, 16) as game, i}
+                            <div class="game">
+                                {#if game.team1}
+                                    <button 
+                                        class="team-btn"
+                                        class:selected={game.winner === game.team1}
+                                        on:click={() => selectWinner(1, i + 8, game.team1)}
+                                    >
+                                        <span class="seed">{game.team1.seed}</span>
+                                        <span class="team-name">{game.team1.name}</span>
+                                    </button>
+                                {:else}
+                                    <div class="team-btn empty">TBD</div>
+                                {/if}
+                                {#if game.team2}
+                                    <button 
+                                        class="team-btn"
+                                        class:selected={game.winner === game.team2}
+                                        on:click={() => selectWinner(1, i + 8, game.team2)}
+                                    >
+                                        <span class="seed">{game.team2.seed}</span>
+                                        <span class="team-name">{game.team2.name}</span>
+                                    </button>
+                                {:else}
+                                    <div class="team-btn empty">TBD</div>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                    
+                    <!-- Round 2 - Games 4-7 -->
+                    <div class="bracket-column">
+                        {#each bracket.round2.slice(4, 8) as game, i}
+                            <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                                {#if game.team1}
+                                    <button 
+                                        class="team-btn"
+                                        class:selected={game.winner === game.team1}
+                                        on:click={() => selectWinner(2, i + 4, game.team1)}
+                                    >
+                                        <span class="seed">{game.team1.seed}</span>
+                                        <span class="team-name">{game.team1.name}</span>
+                                    </button>
+                                {:else}
+                                    <div class="team-btn empty">TBD</div>
+                                {/if}
+                                
+                                {#if game.team2}
+                                    <button 
+                                        class="team-btn"
+                                        class:selected={game.winner === game.team2}
+                                        on:click={() => selectWinner(2, i + 4, game.team2)}
+                                    >
+                                        <span class="seed">{game.team2.seed}</span>
+                                        <span class="team-name">{game.team2.name}</span>
+                                    </button>
+                                {:else}
+                                    <div class="team-btn empty">TBD</div>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                    
+                    <!-- Round 3 (Sweet 16) - Games 2-3 -->
+                    <div class="bracket-column">
+                        {#each bracket.round3.slice(2, 4) as game, i}
+                            <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                                {#if game.team1}
+                                    <button 
+                                        class="team-btn"
+                                        class:selected={game.winner === game.team1}
+                                        on:click={() => selectWinner(3, i + 2, game.team1)}
+                                    >
+                                        <span class="seed">{game.team1.seed}</span>
+                                        <span class="team-name">{game.team1.name}</span>
+                                    </button>
+                                {:else}
+                                    <div class="team-btn empty">TBD</div>
+                                {/if}
+                                
+                                {#if game.team2}
+                                    <button 
+                                        class="team-btn"
+                                        class:selected={game.winner === game.team2}
+                                        on:click={() => selectWinner(3, i + 2, game.team2)}
+                                    >
+                                        <span class="seed">{game.team2.seed}</span>
+                                        <span class="team-name">{game.team2.name}</span>
+                                    </button>
+                                {:else}
+                                    <div class="team-btn empty">TBD</div>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                    
+                    <!-- Round 4 (Elite 8) - Game 1 -->
+                    <div class="bracket-column">
+                        <div class="game" style="margin-top: {round4FirstOffset}px">
+                            {#if bracket.round4[1] && bracket.round4[1].team1}
+                                <button 
+                                    class="team-btn"
+                                    class:selected={bracket.round4[1].winner === bracket.round4[1].team1}
+                                    on:click={() => selectWinner(4, 1, bracket.round4[1].team1)}
+                                >
+                                    <span class="seed">{bracket.round4[1].team1.seed}</span>
+                                    <span class="team-name">{bracket.round4[1].team1.name}</span>
+                                </button>
+                            {:else}
+                                <div class="team-btn empty">TBD</div>
+                            {/if}
+                            
+                            {#if bracket.round4[1] && bracket.round4[1].team2}
+                                <button 
+                                    class="team-btn"
+                                    class:selected={bracket.round4[1].winner === bracket.round4[1].team2}
+                                    on:click={() => selectWinner(4, 1, bracket.round4[1].team2)}
+                                >
+                                    <span class="seed">{bracket.round4[1].team2.seed}</span>
+                                    <span class="team-name">{bracket.round4[1].team2.name}</span>
+                                </button>
+                            {:else}
+                                <div class="team-btn empty">TBD</div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Bottom Right Region -->
                 <div class="bracket-region bottom-right">
@@ -784,7 +872,7 @@
                     
                     <!-- Round 4 (Elite 8) - Game 3 -->
                     <div class="bracket-column">
-                        <div class="game round4-spacing">
+                        <div class="game" style="margin-top: {round4FirstOffset}px">
                             {#if bracket.round4[3] && bracket.round4[3].team1}
                                 <button 
                                     class="team-btn"
@@ -816,7 +904,7 @@
                     <!-- Round 3 (Sweet 16) - Games 6-7 -->
                     <div class="bracket-column">
                         {#each bracket.round3.slice(6, 8) as game, i}
-                            <div class="game round3-spacing">
+                            <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                                 {#if game.team1}
                                     <button 
                                         class="team-btn"
@@ -849,7 +937,7 @@
                     <!-- Round 2 - Games 12-15 -->
                     <div class="bracket-column">
                         {#each bracket.round2.slice(12, 16) as game, i}
-                            <div class="game round2-spacing">
+                            <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                                 {#if game.team1}
                                     <button 
                                         class="team-btn"
@@ -913,17 +1001,7 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Winner Display -->
-        {#if bracket.winner}
-            <div class="winner-banner">
-                <h2>🏆 Champion 🏆</h2>
-                <div class="champion-name">
-                    <span class="seed">{bracket.winner.seed}</span>
-                    {bracket.winner.name}
-                </div>
-            </div>
-        {/if}
+        </div>
         {/if}
     </main>
 </div>
@@ -1003,6 +1081,37 @@
         background: #b91c1c;
     }
     
+    .bracket-scroll-container {
+        overflow: auto;
+        max-height: calc(100vh - 200px);
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fafafa;
+        padding: 1rem;
+    }
+    
+    .bracket-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+        min-width: max-content;
+        width: max-content;
+        margin: 0 auto;
+    }
+    
+    .bracket-row {
+        display: flex;
+        gap: var(--side-gap);
+        justify-content: center;
+        min-width: min-content;
+    }
+    
+    .top-bracket,
+    .bottom-bracket {
+        gap: 2rem;
+    }
+    
     .bracket-container {
         display: flex;
         gap: var(--side-gap);
@@ -1031,7 +1140,81 @@
     }
     
     .right-side {
-        order: 3;
+        order: 2;
+    }
+    
+    /* Final Four horizontal row */
+    .final-four-row {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 3rem;
+        padding: 1.5rem 2rem;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        margin: 0 auto;
+    }
+    
+    .semifinal-section,
+    .championship-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .semifinal-section h3,
+    .championship-section h3 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 0;
+    }
+    
+    .semifinal-game,
+    .championship-game {
+        width: var(--column-min-width);
+    }
+    
+    .championship-section {
+        padding: 0 1rem;
+    }
+    
+    .championship-section h3 {
+        color: #d97706;
+    }
+    
+    .champion-label {
+        margin-top: 0.5rem;
+        color: #d97706 !important;
+    }
+    
+    .champion-game {
+        width: var(--column-min-width);
+        border-color: #fbbf24;
+        border-width: 3px;
+        height: auto;
+        min-height: 2.5rem;
+    }
+    
+    .champion-game .team-btn {
+        height: auto;
+        min-height: 2.5rem;
+    }
+    
+    .team-btn.champion-display {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: white;
+        font-weight: 600;
+        cursor: default;
+    }
+    
+    .champion-display .seed {
+        background: white;
+        color: #f59e0b;
     }
     
     .bracket-region {
@@ -1064,20 +1247,8 @@
     .bracket-column {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-        min-width: 180px;
-    }
-    
-    .final-four-section,
-    .championship-section {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
-    }
-    
-    .semifinal-game {
-        margin: 2rem 0;
+        gap: var(--game-gap);
+        width: var(--column-min-width);
     }
     
     .round {
@@ -1128,7 +1299,9 @@
         border: 2px solid #e5e7eb;
         border-radius: 6px;
         overflow: hidden;
-        min-height: 4.5rem;
+        height: 4.5rem;
+        width: 100%;
+        box-sizing: border-box;
     }
     
     .championship-game {
@@ -1147,8 +1320,9 @@
         align-items: center;
         gap: 0.5rem;
         font-size: 0.85rem;
-        min-height: 2.2rem;
+        height: 50%;
         flex: 1;
+        box-sizing: border-box;
     }
     
     .team-btn:not(.empty):hover {
@@ -1193,40 +1367,6 @@
         overflow: hidden;
         text-overflow: ellipsis;
         min-width: 0;
-    }
-    
-    .winner-banner {
-        margin-top: 3rem;
-        padding: 2rem;
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        border-radius: 12px;
-        text-align: center;
-        box-shadow: 0 8px 16px rgba(245, 158, 11, 0.3);
-    }
-    
-    .winner-banner h2 {
-        margin: 0 0 1rem 0;
-        color: white;
-        font-size: 2rem;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    .champion-name {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 1rem;
-    }
-    
-    .champion-name .seed {
-        width: 40px;
-        height: 40px;
-        font-size: 1.25rem;
-        background: white;
-        color: #f59e0b;
     }
     
     .loading {
