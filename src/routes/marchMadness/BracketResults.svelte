@@ -12,6 +12,7 @@
         computeStakeInGame,
         letterToNumber
     } from './bracketStructure.js';
+    import BracketCreate from './BracketCreate.svelte';
     
     // Configuration
     const YEAR = '2026';
@@ -480,50 +481,17 @@
                                 <option value={name}>{name}</option>
                             {/each}
                         </select>
-                    </div>
-                    
+                    </div> 
+                    {#key selectedParticipant}
                     {#if selectedParticipant && participantBrackets[selectedParticipant]}
-                        <div class="bracket-display">
-                            <h3>{selectedParticipant}'s Bracket</h3>
-                            
-                            {#each [1, 2, 3, 4, 5, 6] as round}
-                                <div class="round-section">
-                                    <h4>{getRoundName(round)}</h4>
-                                    <div class="games-grid">
-                                        {#each participantBrackets[selectedParticipant][`round${round}`] as game, i}
-                                            {#if game}
-                                                <div class="game-card" class:correct={resultsBracket[`round${round}`][i]?.winner?.name === game.winner?.name} class:incorrect={resultsBracket[`round${round}`][i]?.winner && game.winner && resultsBracket[`round${round}`][i]?.winner?.name !== game.winner?.name}>
-                                                    <div class="game-teams">
-                                                        <span class="team" class:picked={game.winner?.name === game.team1?.name}>
-                                                            {game.team1?.seed || '?'} {game.team1?.name || 'TBD'}
-                                                        </span>
-                                                        <span class="vs">vs</span>
-                                                        <span class="team" class:picked={game.winner?.name === game.team2?.name}>
-                                                            {game.team2?.seed || '?'} {game.team2?.name || 'TBD'}
-                                                        </span>
-                                                    </div>
-                                                    <div class="game-pick">
-                                                        Pick: <strong>{game.winner?.name || 'None'}</strong>
-                                                    </div>
-                                                </div>
-                                            {/if}
-                                        {/each}
-                                    </div>
-                                </div>
-                            {/each}
-                            
-                            {#if participantBrackets[selectedParticipant].winner}
-                                <div class="champion-pick">
-                                    <h4>🏆 Champion Pick</h4>
-                                    <div class="champion-name">
-                                        {participantBrackets[selectedParticipant].winner.name}
-                                    </div>
-                                </div>
-                            {/if}
-                        </div>
+                        <BracketCreate 
+                            bracketPath={`${BRACKETS_PATH}/${selectedParticipant}-bracket-march-madness-2026.xlsx`}
+                            readOnly={true}
+                        />
                     {:else}
                         <p class="no-selection">Select a participant to view their bracket.</p>
                     {/if}
+                    {/key}
                 </div>
                 
             {:else if activeTab === 'stakes'}

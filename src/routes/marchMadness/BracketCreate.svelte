@@ -1,6 +1,10 @@
 <script>
     import { onMount } from 'svelte';
     
+    // Props
+    export let bracketPath = null;  // Optional path to load a bracket from
+    export let readOnly = false;    // If true, disable picking (for viewing)
+    
     // Variables to store element heights for dynamic spacing
     let gameHeight = 0;
     let firstGameRef; // Will hold reference to first game
@@ -68,7 +72,8 @@
         bottomRight: 'Midwest'
     };
     
-    // Teams will be loaded from CSV
+    // Teams data
+    let teams = {};  // Map of team name -> team data
     let initialTeams = [];
     let loading = true;
     let error = null;
@@ -88,6 +93,11 @@
         await loadTeamsFromCSV();
         if (initialTeams.length > 0) {
             initializeBracket();
+            
+            // If a bracket path is provided, load and apply that bracket
+            if (bracketPath) {
+                await loadBracketFromPath(bracketPath);
+            }
         }
     });
     
@@ -108,11 +118,13 @@
             initialTeams = dataLines.map(line => {
                 // Handle CSV parsing (basic - assumes no commas in team names)
                 const [team, seed, region] = line.split(',').map(s => s.trim());
-                return {
+                const teamObj = {
                     name: team,
                     seed: parseInt(seed),
                     region: region
                 };
+                teams[team] = teamObj;
+                return teamObj;
             });
             
             console.log('Loaded teams:', initialTeams);
@@ -122,6 +134,212 @@
             console.error('Error loading teams:', err);
             loading = false;
         }
+    }
+    
+    async function loadBracketFromPath(path) {
+        try {
+            if (path.endsWith('.xlsx')) {
+                await loadBracketFromExcel(path);
+            } else if (path.endsWith('.csv')) {
+                await loadBracketFromCSV(path);
+            } else {
+                throw new Error('Unsupported file format. Use .xlsx or .csv');
+            }
+        } catch (err) {
+            console.error('Error loading bracket:', err);
+            error = `Failed to load bracket: ${err.message}`;
+        }
+    }
+    
+    async function loadBracketFromExcel(path) {
+        const ExcelJSModule = await import('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/+esm');
+        const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+        
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`Failed to fetch bracket: ${response.status}`);
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+        
+        const sheet = workbook.getWorksheet('madness');
+        if (!sheet) throw new Error('Could not find "madness" sheet');
+        
+        // Extract winners from the Excel file
+        // East Region (left side, top)
+        extractRegionWinners(sheet, 'East', 0, {
+            r2Rows: [8, 12, 16, 20, 24, 28, 32, 36],
+            s16Rows: [10, 18, 26, 34],
+            e8Rows: [14, 30],
+            f4Row: 22,
+            r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
+        });
+        
+        // West Region (left side, bottom)
+        extractRegionWinners(sheet, 'West', 8, {
+            r2Rows: [43, 47, 51, 55, 59, 63, 67, 71],
+            s16Rows: [45, 53, 61, 69],
+            e8Rows: [49, 65],
+            f4Row: 57,
+            r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
+        });
+        
+        // South Region (right side, top)
+        extractRegionWinners(sheet, 'South', 16, {
+            r2Rows: [8, 12, 16, 20, 24, 28, 32, 36],
+            s16Rows: [10, 18, 26, 34],
+            e8Rows: [14, 30],
+            f4Row: 22,
+            r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
+        });
+        
+        // Midwest Region (right side, bottom)
+        extractRegionWinners(sheet, 'Midwest', 24, {
+            r2Rows: [43, 47, 51, 55, 59, 63, 67, 71],
+            s16Rows: [45, 53, 61, 69],
+            e8Rows: [49, 65],
+            f4Row: 57,
+            r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
+        });
+        
+        // Championship
+        const champ1 = getCellValue(sheet, 'O', 39);
+        const champ2 = getCellValue(sheet, 'W', 39);
+        const champion = getCellValue(sheet, 'R', 44);
+        
+        if (champ1) {
+            const team = findTeam(champ1);
+            bracket.round5[0].winner = team;
+            bracket.round6[0].team1 = team;
+        }
+        if (champ2) {
+            const team = findTeam(champ2);
+            bracket.round5[1].winner = team;
+            bracket.round6[0].team2 = team;
+        }
+        if (champion) {
+            bracket.round6[0].winner = findTeam(champion);
+            bracket.winner = findTeam(champion);
+        }
+        
+        // Trigger reactivity
+        bracket = bracket;
+    }
+    
+    function extractRegionWinners(sheet, region, startIndex, config) {
+        const { r2Rows, s16Rows, e8Rows, f4Row, r2Col, s16Col, e8Col, f4Col } = config;
+        
+        // Round 1 winners (read from Round 2 cells)
+        for (let i = 0; i < 8; i++) {
+            const row = r2Rows[i];
+            const winnerName = getCellValue(sheet, r2Col, row);
+            if (winnerName) {
+                const winner = findTeam(winnerName);
+                if (winner) {
+                    bracket.round1[startIndex + i].winner = winner;
+                    // Also populate Round 2 teams
+                    const r2GameIndex = Math.floor((startIndex + i) / 2);
+                    if ((startIndex + i) % 2 === 0) {
+                        bracket.round2[r2GameIndex].team1 = winner;
+                    } else {
+                        bracket.round2[r2GameIndex].team2 = winner;
+                    }
+                }
+            }
+        }
+        
+        // Round 2 winners (read from Sweet 16 cells)
+        for (let i = 0; i < 4; i++) {
+            const row = s16Rows[i];
+            const winnerName = getCellValue(sheet, s16Col, row);
+            if (winnerName) {
+                const winner = findTeam(winnerName);
+                if (winner) {
+                    const r2GameIndex = Math.floor(startIndex / 2) + i;
+                    bracket.round2[r2GameIndex].winner = winner;
+                    // Also populate Round 3 teams
+                    const r3GameIndex = Math.floor(startIndex / 4) + Math.floor(i / 2);
+                    if (i % 2 === 0) {
+                        bracket.round3[r3GameIndex].team1 = winner;
+                    } else {
+                        bracket.round3[r3GameIndex].team2 = winner;
+                    }
+                }
+            }
+        }
+        
+        // Sweet 16 winners (read from Elite 8 cells)
+        for (let i = 0; i < 2; i++) {
+            const row = e8Rows[i];
+            const winnerName = getCellValue(sheet, e8Col, row);
+            if (winnerName) {
+                const winner = findTeam(winnerName);
+                if (winner) {
+                    const s16GameIndex = Math.floor(startIndex / 4) + i;
+                    bracket.round3[s16GameIndex].winner = winner;
+                    // Also populate Round 4 teams
+                    const e8GameIndex = Math.floor(startIndex / 8);
+                    if (i === 0) {
+                        bracket.round4[e8GameIndex].team1 = winner;
+                    } else {
+                        bracket.round4[e8GameIndex].team2 = winner;
+                    }
+                }
+            }
+        }
+        
+        // Elite 8 winner (read from Final Four cell)
+        const f4WinnerName = getCellValue(sheet, f4Col, f4Row);
+        if (f4WinnerName) {
+            const winner = findTeam(f4WinnerName);
+            if (winner) {
+                const e8GameIndex = Math.floor(startIndex / 8);
+                bracket.round4[e8GameIndex].winner = winner;
+                // Also populate Final Four teams
+                // East (0) and West (1) go to semifinal 0
+                // South (2) and Midwest (3) go to semifinal 1
+                const semifinalIndex = e8GameIndex < 2 ? 0 : 1;
+                const teamSlot = e8GameIndex % 2 === 0 ? 'team1' : 'team2';
+                bracket.round5[semifinalIndex][teamSlot] = winner;
+            }
+        }
+    }
+    
+    function getCellValue(sheet, col, row) {
+        const cell = sheet.getCell(`${col}${row}`);
+        let value = cell.value;
+        
+        // Handle formula results
+        if (value && typeof value === 'object' && value.result) {
+            value = value.result;
+        }
+        
+        if (typeof value === 'string') {
+            return value.trim();
+        }
+        return value;
+    }
+    
+    function findTeam(name) {
+        if (!name) return null;
+        const teamName = String(name).trim();
+        if (teams[teamName]) {
+            return teams[teamName];
+        }
+        // Try partial match
+        for (const [key, team] of Object.entries(teams)) {
+            if (key.toLowerCase().includes(teamName.toLowerCase()) || 
+                teamName.toLowerCase().includes(key.toLowerCase())) {
+                return team;
+            }
+        }
+        // Return a basic team object if not found
+        return { name: teamName, seed: 0 };
+    }
+    
+    async function loadBracketFromCSV(path) {
+        // CSV loading would go here - implement based on your CSV format
+        console.log('CSV bracket loading not yet implemented');
     }
     
     function initializeBracket() {
@@ -233,6 +451,9 @@
     }
     
     function selectWinner(round, gameIndex, team) {
+        // Don't allow changes in readOnly mode
+        if (readOnly) return;
+        
         const game = bracket[`round${round}`][gameIndex];
         game.winner = team;
         
@@ -522,12 +743,14 @@
                 <p>{error}</p>
             </div>
         {:else}
+            {#if !readOnly}
             <div class="controls">
                 <button class="save-btn" on:click={saveBracket}>💾 Save Bracket</button>
                 <button class="reset-btn" on:click={resetBracket}>Reset Bracket</button>
             </div>
+            {/if}
         
-        <div class="bracket-scroll-container">
+        <div class="bracket-scroll-container" class:read-only={readOnly}>
             <div class="bracket-wrapper">
             <!-- Top Bracket Row -->
             <div class="bracket-row top-bracket">
@@ -1518,6 +1741,15 @@
     
     .team-btn:not(.empty, .champion-display):hover {
         background: #f3f4f6;
+    }
+    
+    /* Read-only mode styles */
+    .read-only .team-btn {
+        cursor: default;
+    }
+    
+    .read-only .team-btn:not(.empty, .champion-display):hover {
+        background: white;
     }
     
     .team-btn.selected {
