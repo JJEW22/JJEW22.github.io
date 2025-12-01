@@ -412,17 +412,54 @@ export function computeStakeInGame(resultsBracket, picksBracket, round, gameInde
     
     if (!pickedWinner) return { team1: 0, team2: 0, hasPick: false };
     
-    // Calculate stake: points user gets if their picked team wins this game
-    // plus points from future games where they have this team advancing
-    let stake = SCORE_FOR_ROUND[round];
-    
-    // Add future round stakes (simplified - would need bracket traversal for full calculation)
-    // For now, just return the immediate stake
     const pickIsTeam1 = pickedWinner === team1Name;
+    const pickIsTeam2 = pickedWinner === team2Name;
+    
+    // If user picked neither team (their pick was eliminated earlier), they have no stake
+    if (!pickIsTeam1 && !pickIsTeam2) {
+        return { team1: 0, team2: 0, hasPick: false, pickedTeam: pickedWinner };
+    }
+    
+    // Calculate total stake: sum of points for this round + all future rounds
+    // where the user has this team advancing
+    const teamToCheck = pickIsTeam1 ? team1Name : team2Name;
+    let totalStake = 0;
+    
+    // Add points for current round
+    totalStake += SCORE_FOR_ROUND[round];
+    
+    // Check future rounds to see how far the user has this team advancing
+    for (let futureRound = round + 1; futureRound <= 6; futureRound++) {
+        const futureRoundKey = `round${futureRound}`;
+        const futureGames = picksBracket[futureRoundKey];
+        
+        if (!futureGames) break;
+        
+        // Check if the team appears as a winner in any game of this future round
+        let teamAdvances = false;
+        for (const game of futureGames) {
+            if (game && game.winner && game.winner.name === teamToCheck) {
+                teamAdvances = true;
+                break;
+            }
+        }
+        
+        if (teamAdvances) {
+            totalStake += SCORE_FOR_ROUND[futureRound];
+        } else {
+            // Team doesn't advance past this round in user's bracket
+            break;
+        }
+    }
+    
+    // Also check if user has this team as the overall winner
+    if (picksBracket.winner && picksBracket.winner.name === teamToCheck) {
+        // Winner points are included in round 6, so no extra addition needed
+    }
     
     return {
-        team1: pickIsTeam1 ? stake : 0,
-        team2: pickIsTeam1 ? 0 : stake,
+        team1: pickIsTeam1 ? totalStake : 0,
+        team2: pickIsTeam2 ? totalStake : 0,
         hasPick: true,
         pickedTeam: pickedWinner
     };

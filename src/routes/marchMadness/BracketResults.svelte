@@ -12,6 +12,7 @@
         computeStakeInGame,
         letterToNumber
     } from './bracketStructure.js';
+    import { loadBracketFromPath } from './bracketIO.js';
     import BracketView from './BracketView.svelte';
     
     // Configuration
@@ -70,19 +71,12 @@
     }
     
     async function loadResults() {
-        // Try to load results from CSV or Excel
-        // For now, initialize empty and let it be populated
-        resultsBracket = initializeBracketWithTeams(teamsList);
-        
-        // Try to load actual results
+        // Try to load results from Excel (which includes parentGames references)
         try {
-            const csvResponse = await fetch(`${RESULTS_FILE}.csv`);
-            if (csvResponse.ok) {
-                const csvText = await csvResponse.text();
-                parseResultsCSV(csvText);
-            }
+            resultsBracket = await loadBracketFromPath(`${RESULTS_FILE}.xlsx`, teams, teamsList);
         } catch (e) {
             console.log('No results file found, using empty bracket');
+            resultsBracket = initializeBracketWithTeams(teamsList);
         }
     }
     
@@ -337,7 +331,14 @@
             if (!games) continue;
             
             games.forEach((game, index) => {
-                if (game && game.team1 && game.team2 && !game.winner) {
+                // Skip if game already has a winner
+                if (!game || game.winner) return;
+                
+                // Check if this game is "next" (parents decided or no parents for Round 1)
+                const isNext = !game.parentGames || 
+                    game.parentGames.every(parent => parent && parent.winner);
+                
+                if (isNext && game.team1 && game.team2) {
                     upcomingGames.push({
                         round,
                         index,
@@ -377,6 +378,21 @@
     function selectParticipant(name) {
         selectedParticipant = name;
         activeTab = 'brackets';
+    }
+    
+    function handleNextGameClick(event) {
+        const { gameKey } = event.detail;
+        activeTab = 'stakes';
+        
+        // Scroll to the specific game after a short delay for DOM update
+        setTimeout(() => {
+            const gameElement = document.getElementById(`stake-game-${gameKey}`);
+            if (gameElement) {
+                gameElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                gameElement.classList.add('highlighted');
+                setTimeout(() => gameElement.classList.remove('highlighted'), 2000);
+            }
+        }, 100);
     }
     
     function getWinnerDisplay(game) {
@@ -488,6 +504,8 @@
                         <BracketView 
                             bracketPath={`${BRACKETS_PATH}/${selectedParticipant}-bracket-march-madness-2026.xlsx`}
                             resultsPath={`${RESULTS_FILE}.xlsx`}
+                            {stakeData}
+                            on:nextGameClick={handleNextGameClick}
                         />
                     {:else}
                         <p class="no-selection">Select a participant to view their bracket.</p>
@@ -503,7 +521,7 @@
                         <p class="no-data">No upcoming games found. The tournament may be complete or results haven't been entered.</p>
                     {:else}
                         {#each upcomingGames as gameInfo}
-                            <div class="stake-game">
+                            <div class="stake-game" id="stake-game-r{gameInfo.round}-{gameInfo.index}">
                                 <h3>{getRoundName(gameInfo.round)}: {gameInfo.team1.name} vs {gameInfo.team2.name}</h3>
                                 
                                 <div class="stake-columns">
@@ -767,6 +785,13 @@
         border-radius: 12px;
         padding: 1.5rem;
         margin-bottom: 1.5rem;
+        transition: box-shadow 0.3s, border-color 0.3s;
+        border: 2px solid transparent;
+    }
+    
+    .stake-game.highlighted {
+        border-color: #f59e0b;
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
     }
     
     .stake-game h3 {

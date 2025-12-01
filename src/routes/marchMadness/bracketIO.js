@@ -100,6 +100,7 @@ export function initializeBracket(teamsList) {
         regionPositions.bottomRight
     ];
     
+    // Round 1 - no parent games
     orderedRegions.forEach(regionName => {
         const regionTeams = regions[regionName];
         
@@ -113,43 +114,64 @@ export function initializeBracket(teamsList) {
                     team2: team2,
                     winner: null,
                     region: regionName,
+                    parentGames: null,  // Round 1 has no parents
                     gameId: `r1-${regionName}-${seed1}v${seed2}`
                 });
             }
         });
     });
     
-    // Initialize subsequent rounds with empty games
+    // Round 2 - parents are pairs of Round 1 games
     bracket.round2 = Array(16).fill(null).map((_, i) => ({
         team1: null,
         team2: null,
         winner: null,
+        parentGames: [bracket.round1[i * 2], bracket.round1[i * 2 + 1]],
         gameId: `r2-${i}`
     }));
     
+    // Round 3 (Sweet 16) - parents are pairs of Round 2 games
     bracket.round3 = Array(8).fill(null).map((_, i) => ({
         team1: null,
         team2: null,
         winner: null,
+        parentGames: [bracket.round2[i * 2], bracket.round2[i * 2 + 1]],
         gameId: `r3-${i}`
     }));
     
+    // Round 4 (Elite 8) - parents are pairs of Round 3 games
     bracket.round4 = Array(4).fill(null).map((_, i) => ({
         team1: null,
         team2: null,
         winner: null,
+        parentGames: [bracket.round3[i * 2], bracket.round3[i * 2 + 1]],
         gameId: `r4-${i}`
     }));
     
+    // Round 5 (Final Four) - parents are pairs of Round 4 games
     bracket.round5 = [
-        { team1: null, team2: null, winner: null, gameId: 'semifinal-left' },
-        { team1: null, team2: null, winner: null, gameId: 'semifinal-right' }
+        { 
+            team1: null, 
+            team2: null, 
+            winner: null, 
+            parentGames: [bracket.round4[0], bracket.round4[1]],
+            gameId: 'semifinal-left' 
+        },
+        { 
+            team1: null, 
+            team2: null, 
+            winner: null, 
+            parentGames: [bracket.round4[2], bracket.round4[3]],
+            gameId: 'semifinal-right' 
+        }
     ];
     
+    // Round 6 (Championship) - parents are the two semifinals
     bracket.round6 = [{
         team1: null,
         team2: null,
         winner: null,
+        parentGames: [bracket.round5[0], bracket.round5[1]],
         gameId: 'championship'
     }];
     

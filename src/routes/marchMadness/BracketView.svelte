@@ -1,5 +1,5 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, createEventDispatcher } from 'svelte';
     import BracketDisplay from './BracketDisplay.svelte';
     import { 
         loadTeamsFromCSV, 
@@ -8,9 +8,12 @@
         getEliminatedTeams
     } from './bracketIO.js';
     
+    const dispatch = createEventDispatcher();
+    
     // Props
     export let bracketPath = null;      // Path to the bracket to view
     export let resultsPath = null;      // Path to the results bracket
+    export let stakeData = null;        // Stake data for tooltips
     
     // State
     let teams = {};
@@ -55,6 +58,10 @@
             loading = false;
         }
     });
+    
+    function handleNextGameClick(event) {
+        dispatch('nextGameClick', event.detail);
+    }
 </script>
 
 {#if loading}
@@ -69,7 +76,9 @@
         {bracket}
         {resultsBracket}
         {eliminatedTeams}
+        {stakeData}
         interactive={false}
+        on:nextGameClick={handleNextGameClick}
     />
 {/if}
 

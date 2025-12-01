@@ -7,12 +7,18 @@
     export let resultsBracket = null;      // Optional results for comparison
     export let eliminatedTeams = new Set(); // Set of eliminated team names
     export let interactive = false;         // Whether picks can be made
+    export let stakeData = null;           // Optional stake data for tooltips {gameKey: {participant: {team1: pts, team2: pts}}}
     
     const dispatch = createEventDispatcher();
     
     // Variables for dynamic spacing
     let gameHeight = 0;
     const baseGameGap = 8;
+    
+    // Tooltip state
+    let hoveredGame = null;
+    let tooltipX = 0;
+    let tooltipY = 0;
     
     // Reactive spacing calculations
     $: round2FirstOffset = gameHeight > 0 ? (gameHeight + baseGameGap) / 2 : 40;
@@ -21,6 +27,99 @@
     $: round3Gap = gameHeight > 0 ? 3 * gameHeight + 3 * baseGameGap : 248;
     $: round4FirstOffset = gameHeight > 0 ? round3FirstOffset + (gameHeight + baseGameGap) : 200;
     
+    /**
+     * Check if a game is "next up" - parents are decided but this game has no winner yet
+     * @param {Object} resultsGame - The game from the results bracket
+     */
+    function isNextGame(resultsGame) {
+        if (!resultsGame) return false;
+        
+        // Already has a winner - not "next"
+        if (resultsGame.winner) return false;
+        
+        // Round 1 (no parents): next if unplayed
+        if (!resultsGame.parentGames) return true;
+        
+        // Otherwise: next if both parent games have winners
+        return resultsGame.parentGames.every(parent => parent && parent.winner);
+    }
+    
+    /**
+     * Get the results game corresponding to a user's bracket game
+     */
+    function getResultsGame(round, gameIndex) {
+        if (!resultsBracket) return null;
+        const roundKey = `round${round}`;
+        return resultsBracket[roundKey]?.[gameIndex];
+    }
+    
+    /**
+     * Generate a game key for stake data lookup
+     */
+    function getGameKey(round, gameIndex) {
+        return `r${round}-${gameIndex}`;
+    }
+    
+    /**
+     * Handle mouse enter on a next-game
+     */
+    function handleGameMouseEnter(event, round, gameIndex) {
+        const resultsGame = getResultsGame(round, gameIndex);
+        if (!isNextGame(resultsGame) || !stakeData) return;
+        
+        const gameKey = getGameKey(round, gameIndex);
+        if (!stakeData[gameKey]) return;
+        
+        const rect = event.currentTarget.getBoundingClientRect();
+        tooltipX = rect.left + rect.width / 2;
+        tooltipY = rect.top;
+        hoveredGame = { round, gameIndex, gameKey, resultsGame };
+    }
+    
+    /**
+     * Handle mouse leave on a next-game
+     */
+    function handleGameMouseLeave() {
+        hoveredGame = null;
+    }
+    
+    /**
+     * Handle click on a next-game - emit event to parent
+     */
+    function handleNextGameClick(round, gameIndex) {
+        const resultsGame = getResultsGame(round, gameIndex);
+        if (!isNextGame(resultsGame)) return;
+        
+        dispatch('nextGameClick', { 
+            round, 
+            gameIndex, 
+            gameKey: getGameKey(round, gameIndex),
+            resultsGame 
+        });
+    }
+    
+    /**
+     * Get tooltip content for a game
+     */
+    function getTooltipStakes(gameKey) {
+        if (!stakeData || !stakeData[gameKey]) return null;
+        
+        const stakes = stakeData[gameKey];
+        const team1Supporters = [];
+        const team2Supporters = [];
+        
+        for (const [name, data] of Object.entries(stakes)) {
+            if (data.team1 > 0) team1Supporters.push({ name, points: data.team1 });
+            if (data.team2 > 0) team2Supporters.push({ name, points: data.team2 });
+        }
+        
+        // Sort by points descending
+        team1Supporters.sort((a, b) => b.points - a.points);
+        team2Supporters.sort((a, b) => b.points - a.points);
+        
+        return { team1Supporters, team2Supporters };
+    }
+
     /**
      * Get the status of a pick for coloring
      * @returns {'correct'|'incorrect'|'pending'|'none'}
@@ -88,7 +187,15 @@
                 <div class="bracket-column">
                     {#each bracket.round1.slice(0, 8) as game, i}
                         {#if i === 0}
-                            <div class="game" bind:clientHeight={gameHeight}>
+                            <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(1, i))} 
+                                class:clickable={isNextGame(getResultsGame(1, i))}
+                                bind:clientHeight={gameHeight}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 1, i)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(1, i)}
+                            >
                                 {#if game.team1}
                                     <button 
                                         class="team-btn {getSelectionClass(game, game.team1, 1, i)}"
@@ -113,7 +220,13 @@
                                 {/if}
                             </div>
                         {:else}
-                            <div class="game">
+                            <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(1, i))}
+                                class:clickable={isNextGame(getResultsGame(1, i))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 1, i)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(1, i)}>
                                 {#if game.team1}
                                     <button 
                                         class="team-btn {getSelectionClass(game, game.team1, 1, i)}"
@@ -144,7 +257,13 @@
                 <!-- Round 2 - Games 0-3 -->
                 <div class="bracket-column">
                     {#each bracket.round2.slice(0, 4) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(2, i))}
+                                class:clickable={isNextGame(getResultsGame(2, i))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 2, i)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(2, i)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i)}"
@@ -174,7 +293,13 @@
                 <!-- Sweet 16 - Games 0-1 -->
                 <div class="bracket-column">
                     {#each bracket.round3.slice(0, 2) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(3, i))}
+                                class:clickable={isNextGame(getResultsGame(3, i))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 3, i)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(3, i)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i)}"
@@ -203,7 +328,13 @@
                 
                 <!-- Elite 8 - Game 0 -->
                 <div class="bracket-column">
-                    <div class="game" style="margin-top: {round4FirstOffset}px">
+                    <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(4, 0))}
+                                class:clickable={isNextGame(getResultsGame(4, 0))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 4, 0)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(4, 0)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[0]?.team1}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[0], bracket.round4[0].team1, 4, 0)}"
@@ -236,7 +367,13 @@
                 
                 <!-- Elite 8 - Game 2 -->
                 <div class="bracket-column">
-                    <div class="game" style="margin-top: {round4FirstOffset}px">
+                    <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(4, 2))}
+                                class:clickable={isNextGame(getResultsGame(4, 2))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 4, 2)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(4, 2)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[2]?.team1}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[2], bracket.round4[2].team1, 4, 2)}"
@@ -265,7 +402,13 @@
                 <!-- Sweet 16 - Games 4-5 -->
                 <div class="bracket-column">
                     {#each bracket.round3.slice(4, 6) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(3, i + 4))}
+                                class:clickable={isNextGame(getResultsGame(3, i + 4))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 4)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(3, i + 4)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i + 4)}"
@@ -295,7 +438,13 @@
                 <!-- Round 2 - Games 8-11 -->
                 <div class="bracket-column">
                     {#each bracket.round2.slice(8, 12) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(2, i + 8))}
+                                class:clickable={isNextGame(getResultsGame(2, i + 8))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 8)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(2, i + 8)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i + 8)}"
@@ -325,7 +474,13 @@
                 <!-- Round 1 - Games 16-23 -->
                 <div class="bracket-column">
                     {#each bracket.round1.slice(16, 24) as game, i}
-                        <div class="game">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(1, i + 16))}
+                                class:clickable={isNextGame(getResultsGame(1, i + 16))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 16)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(1, i + 16)}>
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 1, i + 16)}"
@@ -359,7 +514,13 @@
             <!-- Left Semifinal -->
             <div class="semifinal-section">
                 <h3>Final Four</h3>
-                <div class="game semifinal-game">
+                <div 
+                                class="game semifinal-game" 
+                                class:next-game={isNextGame(getResultsGame(5, 0))}
+                                class:clickable={isNextGame(getResultsGame(5, 0))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 5, 0)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(5, 0)}>
                     {#if bracket.round5[0]?.team1}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round5[0], bracket.round5[0].team1, 5, 0)}"
@@ -388,7 +549,13 @@
             <!-- Championship -->
             <div class="championship-section">
                 <h3>Championship</h3>
-                <div class="game championship-game">
+                <div 
+                                class="game championship-game" 
+                                class:next-game={isNextGame(getResultsGame(6, 0))}
+                                class:clickable={isNextGame(getResultsGame(6, 0))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 6, 0)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(6, 0)}>
                     {#if bracket.round6[0]?.team1}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round6[0], bracket.round6[0].team1, 6, 0)}"
@@ -430,7 +597,13 @@
             <!-- Right Semifinal -->
             <div class="semifinal-section">
                 <h3>Final Four</h3>
-                <div class="game semifinal-game">
+                <div 
+                                class="game semifinal-game" 
+                                class:next-game={isNextGame(getResultsGame(5, 1))}
+                                class:clickable={isNextGame(getResultsGame(5, 1))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 5, 1)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(5, 1)}>
                     {#if bracket.round5[1]?.team1}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round5[1], bracket.round5[1].team1, 5, 1)}"
@@ -466,7 +639,13 @@
                 <!-- Round 1 - Games 8-15 -->
                 <div class="bracket-column">
                     {#each bracket.round1.slice(8, 16) as game, i}
-                        <div class="game">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(1, i + 8))}
+                                class:clickable={isNextGame(getResultsGame(1, i + 8))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 8)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(1, i + 8)}>
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 1, i + 8)}"
@@ -496,7 +675,13 @@
                 <!-- Round 2 - Games 4-7 -->
                 <div class="bracket-column">
                     {#each bracket.round2.slice(4, 8) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(2, i + 4))}
+                                class:clickable={isNextGame(getResultsGame(2, i + 4))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 4)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(2, i + 4)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i + 4)}"
@@ -526,7 +711,13 @@
                 <!-- Sweet 16 - Games 2-3 -->
                 <div class="bracket-column">
                     {#each bracket.round3.slice(2, 4) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(3, i + 2))}
+                                class:clickable={isNextGame(getResultsGame(3, i + 2))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 2)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(3, i + 2)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i + 2)}"
@@ -555,7 +746,13 @@
                 
                 <!-- Elite 8 - Game 1 -->
                 <div class="bracket-column">
-                    <div class="game" style="margin-top: {round4FirstOffset}px">
+                    <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(4, 1))}
+                                class:clickable={isNextGame(getResultsGame(4, 1))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 4, 1)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(4, 1)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[1]?.team1}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[1], bracket.round4[1].team1, 4, 1)}"
@@ -588,7 +785,13 @@
                 
                 <!-- Elite 8 - Game 3 -->
                 <div class="bracket-column">
-                    <div class="game" style="margin-top: {round4FirstOffset}px">
+                    <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(4, 3))}
+                                class:clickable={isNextGame(getResultsGame(4, 3))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 4, 3)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(4, 3)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[3]?.team1}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[3], bracket.round4[3].team1, 4, 3)}"
@@ -617,7 +820,13 @@
                 <!-- Sweet 16 - Games 6-7 -->
                 <div class="bracket-column">
                     {#each bracket.round3.slice(6, 8) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(3, i + 6))}
+                                class:clickable={isNextGame(getResultsGame(3, i + 6))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 6)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(3, i + 6)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i + 6)}"
@@ -647,7 +856,13 @@
                 <!-- Round 2 - Games 12-15 -->
                 <div class="bracket-column">
                     {#each bracket.round2.slice(12, 16) as game, i}
-                        <div class="game" style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(2, i + 12))}
+                                class:clickable={isNextGame(getResultsGame(2, i + 12))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 12)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(2, i + 12)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i + 12)}"
@@ -677,7 +892,13 @@
                 <!-- Round 1 - Games 24-31 -->
                 <div class="bracket-column">
                     {#each bracket.round1.slice(24, 32) as game, i}
-                        <div class="game">
+                        <div 
+                                class="game" 
+                                class:next-game={isNextGame(getResultsGame(1, i + 24))}
+                                class:clickable={isNextGame(getResultsGame(1, i + 24))}
+                                on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 24)}
+                                on:mouseleave={handleGameMouseLeave}
+                                on:click={() => handleNextGameClick(1, i + 24)}>
                             {#if game.team1}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 1, i + 24)}"
@@ -707,6 +928,56 @@
         </div>
     </div>
 </div>
+
+<!-- Tooltip for next-game hover -->
+{#if hoveredGame && stakeData}
+    {@const stakes = getTooltipStakes(hoveredGame.gameKey)}
+    {#if stakes}
+        <div 
+            class="game-tooltip" 
+            style="left: {tooltipX}px; top: {tooltipY}px;"
+        >
+            <div class="tooltip-header">
+                <span class="tooltip-team">{hoveredGame.resultsGame?.team1?.name || 'TBD'}</span>
+                <span class="tooltip-vs">vs</span>
+                <span class="tooltip-team">{hoveredGame.resultsGame?.team2?.name || 'TBD'}</span>
+            </div>
+            <div class="tooltip-content">
+                <div class="tooltip-column">
+                    <div class="tooltip-column-header">{hoveredGame.resultsGame?.team1?.name || 'Team 1'}</div>
+                    {#each stakes.team1Supporters.slice(0, 5) as supporter}
+                        <div class="tooltip-row">
+                            <span class="supporter-name">{supporter.name}</span>
+                            <span class="supporter-points">+{supporter.points}</span>
+                        </div>
+                    {/each}
+                    {#if stakes.team1Supporters.length === 0}
+                        <div class="tooltip-row empty">No stakes</div>
+                    {/if}
+                    {#if stakes.team1Supporters.length > 5}
+                        <div class="tooltip-row more">+{stakes.team1Supporters.length - 5} more</div>
+                    {/if}
+                </div>
+                <div class="tooltip-column">
+                    <div class="tooltip-column-header">{hoveredGame.resultsGame?.team2?.name || 'Team 2'}</div>
+                    {#each stakes.team2Supporters.slice(0, 5) as supporter}
+                        <div class="tooltip-row">
+                            <span class="supporter-name">{supporter.name}</span>
+                            <span class="supporter-points">+{supporter.points}</span>
+                        </div>
+                    {/each}
+                    {#if stakes.team2Supporters.length === 0}
+                        <div class="tooltip-row empty">No stakes</div>
+                    {/if}
+                    {#if stakes.team2Supporters.length > 5}
+                        <div class="tooltip-row more">+{stakes.team2Supporters.length - 5} more</div>
+                    {/if}
+                </div>
+            </div>
+            <div class="tooltip-footer">Click for full details</div>
+        </div>
+    {/if}
+{/if}
 
 <style>
     :root {
@@ -869,6 +1140,109 @@
         box-sizing: border-box;
     }
     
+    .game.next-game {
+        border-color: #f59e0b;
+        border-width: 3px;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+    }
+    
+    .game.clickable {
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    
+    .game.clickable:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+    }
+    
+    /* Tooltip styles */
+    .game-tooltip {
+        position: fixed;
+        transform: translate(-50%, -100%) translateY(-10px);
+        background: white;
+        border: 2px solid #f59e0b;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        min-width: 280px;
+        pointer-events: none;
+    }
+    
+    .tooltip-header {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        border-radius: 6px 6px 0 0;
+        font-weight: 600;
+        color: white;
+        font-size: 0.85rem;
+    }
+    
+    .tooltip-vs {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.75rem;
+    }
+    
+    .tooltip-content {
+        display: flex;
+        gap: 1rem;
+        padding: 0.75rem;
+    }
+    
+    .tooltip-column {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .tooltip-column-header {
+        font-weight: 600;
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .tooltip-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        padding: 0.2rem 0;
+    }
+    
+    .tooltip-row.empty {
+        color: #9ca3af;
+        font-style: italic;
+    }
+    
+    .tooltip-row.more {
+        color: #64748b;
+        font-style: italic;
+    }
+    
+    .supporter-name {
+        color: #374151;
+    }
+    
+    .supporter-points {
+        color: #059669;
+        font-weight: 600;
+    }
+    
+    .tooltip-footer {
+        padding: 0.5rem;
+        text-align: center;
+        font-size: 0.7rem;
+        color: #9ca3af;
+        border-top: 1px solid #e5e7eb;
+    }
+    
     .championship-game {
         border-color: #fbbf24;
         border-width: 3px;
@@ -894,13 +1268,14 @@
         background: #f3f4f6;
     }
     
-    /* Read-only mode */
+    /* Read-only mode - no hover effect, no pointer cursor */
     .read-only .team-btn {
         cursor: default;
+        pointer-events: none;
     }
     
-    .read-only .team-btn:not(.empty, .champion-display):hover {
-        background: white;
+    .read-only .team-btn.selected {
+        pointer-events: none;
     }
     
     /* Selection states with result colors */
