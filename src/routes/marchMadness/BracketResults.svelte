@@ -12,7 +12,7 @@
         computeStakeInGame,
         letterToNumber
     } from './bracketStructure.js';
-    import BracketCreate from './BracketCreate.svelte';
+    import BracketView from './BracketView.svelte';
     
     // Configuration
     const YEAR = '2026';
@@ -375,7 +375,8 @@
     }
     
     function selectParticipant(name) {
-        selectedParticipant = selectedParticipant === name ? null : name;
+        selectedParticipant = name;
+        activeTab = 'brackets';
     }
     
     function getWinnerDisplay(game) {
@@ -484,9 +485,9 @@
                     </div> 
                     {#key selectedParticipant}
                     {#if selectedParticipant && participantBrackets[selectedParticipant]}
-                        <BracketCreate 
+                        <BracketView 
                             bracketPath={`${BRACKETS_PATH}/${selectedParticipant}-bracket-march-madness-2026.xlsx`}
-                            readOnly={true}
+                            resultsPath={`${RESULTS_FILE}.xlsx`}
                         />
                     {:else}
                         <p class="no-selection">Select a participant to view their bracket.</p>

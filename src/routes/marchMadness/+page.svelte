@@ -1,6 +1,7 @@
 <script>
     import BracketCreate from './BracketCreate.svelte';
     import BracketResults from './BracketResults.svelte';
+    import '../../app.css';
 
     const bracketMode = 'results'
 </script>
