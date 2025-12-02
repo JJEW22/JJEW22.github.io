@@ -37,6 +37,7 @@
     let currentRound = 1;  // Current round for stake calculations
     let upcomingGames = [];  // Games that haven't been decided yet
     let stakeData = {};  // Stake in each upcoming game per participant
+    let winProbabilities = {};  // Map of name -> win probability
     
     onMount(async () => {
         try {
@@ -44,6 +45,7 @@
             await loadResults();
             await loadParticipants();
             await loadAllBrackets();
+            await loadWinProbabilities();
             calculateStandings();
             findUpcomingGames();
             calculateStakes();
@@ -99,6 +101,21 @@
             }
         } catch (e) {
             participants = ['player1', 'player2'];
+        }
+    }
+    
+    async function loadWinProbabilities() {
+        try {
+            const response = await fetch(`/marchMadness/${YEAR}/winProbabilities.json`);
+            if (response.ok) {
+                winProbabilities = await response.json();
+            } else {
+                // No probabilities file - leave empty
+                winProbabilities = {};
+            }
+        } catch (e) {
+            console.log('No win probabilities file found');
+            winProbabilities = {};
         }
     }
     
@@ -306,8 +323,9 @@
                 name,
                 score: scoreResult.totalScore,
                 correctPicks: scoreResult.correctPicks,
+                seedBonus: scoreResult.seedBonus,
                 possibleRemaining,
-                maxPossible: scoreResult.totalScore + possibleRemaining,
+                winProbability: winProbabilities[name] ?? null,
                 roundBreakdown: scoreResult.roundBreakdown
             });
         }
@@ -453,8 +471,9 @@
                                 <th>Name</th>
                                 <th>Score</th>
                                 <th>Correct</th>
+                                <th>Underdog</th>
                                 <th>Possible</th>
-                                <th>Max</th>
+                                <th>Win %</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -474,8 +493,15 @@
                                     </td>
                                     <td class="score">{entry.score}</td>
                                     <td class="correct">{entry.correctPicks}</td>
+                                    <td class="underdog">{entry.seedBonus}</td>
                                     <td class="possible">+{entry.possibleRemaining}</td>
-                                    <td class="max">{entry.maxPossible}</td>
+                                    <td class="win-prob">
+                                        {#if entry.winProbability !== null}
+                                            {(entry.winProbability * 100).toFixed(1)}%
+                                        {:else}
+                                            -
+                                        {/if}
+                                    </td>
                                 </tr>
                             {/each}
                         </tbody>

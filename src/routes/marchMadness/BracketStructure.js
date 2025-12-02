@@ -295,6 +295,7 @@ export function computeScore(resultsBracket, picksBracket, teamsData, options = 
     
     let totalScore = 0;
     let correctPicks = 0;
+    let seedBonus = 0;  // Track seed bonus separately
     let roundBreakdown = [0, 0, 0, 0, 0, 0, 0]; // Index by round
     
     // Iterate through all rounds
@@ -331,6 +332,7 @@ export function computeScore(resultsBracket, picksBracket, teamsData, options = 
                     if (winnerSeed > expectedWinnerSeed) {
                         const upsetBonus = (winnerSeed - expectedWinnerSeed) * SEED_FACTOR[round];
                         totalScore += upsetBonus;
+                        seedBonus += upsetBonus;
                         roundBreakdown[round] += upsetBonus;
                     }
                 }
@@ -341,6 +343,7 @@ export function computeScore(resultsBracket, picksBracket, teamsData, options = 
     return {
         totalScore,
         correctPicks,
+        seedBonus,
         roundBreakdown
     };
 }
