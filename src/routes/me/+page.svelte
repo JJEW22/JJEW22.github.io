@@ -14,7 +14,7 @@
         {
             title: "Snow Predictions",
             description: "Track and compete on first snow predictions with friends",
-            link: "/snowPredictions",
+            link: "/snow",
             image: 'none',
             display: true  // Show this project
         },
