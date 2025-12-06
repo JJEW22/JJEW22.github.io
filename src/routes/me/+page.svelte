@@ -2,20 +2,36 @@
     import '../../app.css';
     import { onMount } from 'svelte';
 
-     // Projects data
+     // Projects data - each project now has a "display" parameter
     const projects = [
         {
             title: "JP Flicks",
             description: "Website for hosting Boston's premier Crokinole league. We play weekly, reach out if you are interested!",
             link: "/jpFlicks",
-            image: 'none', // Optional: add image URL
+            image: 'none',
+            display: true  // Show this project
         },
         {
-            title: "Snow Prediction",
-            description: "Website for tracking who's gonna win this years cheesecake bet for predicting the first snow",
+            title: "Snow Predictions",
+            description: "Track and compete on first snow predictions with friends",
             link: "/snow",
-            image: 'none', // Optional: add image URL
+            image: 'none',
+            display: true  // Show this project
         },
+        {
+            title: "March Madness Bracket",
+            description: "Create and manage March Madness tournament brackets",
+            link: "/marchMadness",
+            image: 'none',
+            display: false  // Hide this project (not ready yet)
+        },
+    ];
+
+// Filter to only show projects where display is true
+const displayedProjects = projects.filter(project => project.display);
+
+// Then in your template, use displayedProjects instead of projects:
+// {#each displayedProjects as project, index}
         // {
         //     title: "Project Two",
         //     description: "A brief description of your second project. What problem does it solve? What technologies did you use?",
@@ -30,28 +46,6 @@
         //     image: "none", // Will try to fetch from the page
         //     tags: ["Python", "Data Science"]
         // },
-        // {
-        //     title: "Project Four",
-        //     description: "Another exciting project you've worked on. Highlight the key features or achievements.",
-        //     link: "#",
-        //     image: null , // Direct image URL
-        //     tags: ["JavaScript", "API"]
-        // },
-        // {
-        //     title: "Project Five",
-        //     description: "Your fifth project description. What makes this project unique or interesting?",
-        //     link: "#",
-        //     image: null,
-        //     tags: ["Docker", "DevOps"]
-        // },
-        // {
-        //     title: "Project Six",
-        //     description: "Last project example. You can add as many projects as you want to this array.",
-        //     link: "#",
-        //     image: null,
-        //     tags: ["Full Stack"]
-        // }
-    ];
 
 
 // Store resolved images - make it reactive by reassigning
@@ -167,7 +161,7 @@ function getProjectImage(project, index) {
         </section>
         
         <div class="projects-grid">
-            {#each projects as project, index}
+            {#each displayedProjects as project, index}
                 <a href={project.link} class="project-card">
                     {#if getProjectImage(project, index)}
                         <div class="card-image" style="background-image: url({getProjectImage(project, index)})"></div>
