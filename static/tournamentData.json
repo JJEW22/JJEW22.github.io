@@ -1,0 +1,159 @@
+{
+    "tournamentName": "Crokinole Championship 2025",
+    "date": "December 14, 2025",
+    "location": "Community Center",
+    
+    "format": {
+        "groupStage": true,
+        "knockoutStage": true,
+        "groupAdvancement": 2
+    },
+    
+    "groups": [
+        {
+            "name": "Group A",
+            "teams": ["Alice", "Bob", "Charlie", "Dana"],
+            "matches": [
+                { "team1": "Alice", "team2": "Bob", "score1": 6, "score2": 4, "completed": true },
+                { "team1": "Charlie", "team2": "Dana", "score1": 5, "score2": 5, "completed": true },
+                { "team1": "Alice", "team2": "Charlie", "score1": null, "score2": null, "completed": false },
+                { "team1": "Bob", "team2": "Dana", "score1": null, "score2": null, "completed": false },
+                { "team1": "Alice", "team2": "Dana", "score1": null, "score2": null, "completed": false },
+                { "team1": "Bob", "team2": "Charlie", "score1": null, "score2": null, "completed": false }
+            ]
+        },
+        {
+            "name": "Group B",
+            "teams": ["Eve", "Frank", "Grace", "Henry"],
+            "matches": [
+                { "team1": "Eve", "team2": "Frank", "score1": 7, "score2": 3, "completed": true },
+                { "team1": "Grace", "team2": "Henry", "score1": 4, "score2": 6, "completed": true },
+                { "team1": "Eve", "team2": "Grace", "score1": null, "score2": null, "completed": false },
+                { "team1": "Frank", "team2": "Henry", "score1": null, "score2": null, "completed": false },
+                { "team1": "Eve", "team2": "Henry", "score1": null, "score2": null, "completed": false },
+                { "team1": "Frank", "team2": "Grace", "score1": null, "score2": null, "completed": false }
+            ]
+        }
+    ],
+    
+    "bracket": {
+        "name": "Championship",
+        "thirdPlaceMatch": {
+            "id": "third",
+            "team1": { "name": "TBD", "source": "sf1-loser", "seed": null },
+            "team2": { "name": "TBD", "source": "sf2-loser", "seed": null },
+            "score1": null,
+            "score2": null,
+            "winner": null
+        },
+        "rounds": [
+            {
+                "name": "Semifinals",
+                "matches": [
+                    {
+                        "id": "sf1",
+                        "team1": { "name": "Group A Winner", "source": "Group A", "seed": 1 },
+                        "team2": { "name": "Group B Runner-up", "source": "Group B", "seed": 2 },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    },
+                    {
+                        "id": "sf2",
+                        "team1": { "name": "Group B Winner", "source": "Group B", "seed": 1 },
+                        "team2": { "name": "Group A Runner-up", "source": "Group A", "seed": 2 },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    }
+                ]
+            },
+            {
+                "name": "Final",
+                "matches": [
+                    {
+                        "id": "final",
+                        "team1": { "name": "TBD", "source": "sf1", "seed": null },
+                        "team2": { "name": "TBD", "source": "sf2", "seed": null },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    }
+                ]
+            }
+        ]
+    },
+    
+    "schedule": [
+        {
+            "time": "10:00 AM",
+            "stage": "Group Stage",
+            "matches": [
+                { "board": 1, "team1": "Alice", "team2": "Bob", "group": "Group A" },
+                { "board": 2, "team1": "Eve", "team2": "Frank", "group": "Group B" }
+            ]
+        },
+        {
+            "time": "10:30 AM",
+            "stage": "Group Stage",
+            "matches": [
+                { "board": 1, "team1": "Charlie", "team2": "Dana", "group": "Group A" },
+                { "board": 2, "team1": "Grace", "team2": "Henry", "group": "Group B" }
+            ]
+        },
+        {
+            "time": "11:00 AM",
+            "stage": "Group Stage",
+            "matches": [
+                { "board": 1, "team1": "Alice", "team2": "Charlie", "group": "Group A" },
+                { "board": 2, "team1": "Eve", "team2": "Grace", "group": "Group B" }
+            ]
+        },
+        {
+            "time": "11:30 AM",
+            "stage": "Group Stage",
+            "matches": [
+                { "board": 1, "team1": "Bob", "team2": "Dana", "group": "Group A" },
+                { "board": 2, "team1": "Frank", "team2": "Henry", "group": "Group B" }
+            ]
+        },
+        {
+            "time": "12:00 PM",
+            "stage": "Group Stage",
+            "matches": [
+                { "board": 1, "team1": "Alice", "team2": "Dana", "group": "Group A" },
+                { "board": 2, "team1": "Eve", "team2": "Henry", "group": "Group B" }
+            ]
+        },
+        {
+            "time": "12:30 PM",
+            "stage": "Group Stage",
+            "matches": [
+                { "board": 1, "team1": "Bob", "team2": "Charlie", "group": "Group A" },
+                { "board": 2, "team1": "Frank", "team2": "Grace", "group": "Group B" }
+            ]
+        },
+        {
+            "time": "1:30 PM",
+            "stage": "Semifinals",
+            "matches": [
+                { "board": 1, "team1": "A1", "team2": "B2", "matchId": "sf1" },
+                { "board": 2, "team1": "B1", "team2": "A2", "matchId": "sf2" }
+            ]
+        },
+        {
+            "time": "2:15 PM",
+            "stage": "3rd Place",
+            "matches": [
+                { "board": 1, "team1": "SF1 Loser", "team2": "SF2 Loser", "matchId": "third" }
+            ]
+        },
+        {
+            "time": "2:30 PM",
+            "stage": "Final",
+            "matches": [
+                { "board": 1, "team1": "SF1 Winner", "team2": "SF2 Winner", "matchId": "final" }
+            ]
+        }
+    ]
+}
