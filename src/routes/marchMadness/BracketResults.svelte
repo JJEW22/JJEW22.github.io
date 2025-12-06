@@ -11,7 +11,7 @@
         computePossibleRemaining,
         computeStakeInGame,
         letterToNumber
-    } from './BracketStructure.js';
+    } from './bracketStructure.js';
     import { loadBracketFromPath } from './bracketIO.js';
     import BracketView from './BracketView.svelte';
     
@@ -73,9 +73,9 @@
     }
     
     async function loadResults() {
-        // Try to load results from Excel (which includes parentGames references)
+        // Try to load results (loadBracketFromPath tries JSON first, then Excel)
         try {
-            resultsBracket = await loadBracketFromPath(`${RESULTS_FILE}.xlsx`, teams, teamsList);
+            resultsBracket = await loadBracketFromPath(RESULTS_FILE, teams, teamsList);
         } catch (e) {
             console.log('No results file found, using empty bracket');
             resultsBracket = initializeBracketWithTeams(teamsList);
@@ -133,7 +133,20 @@
     }
     
     async function loadBracketForParticipant(name) {
-        // Try CSV first, then Excel
+        // Try JSON first (preferred format)
+        try {
+            const jsonResponse = await fetch(`${BRACKETS_PATH}/${name}-bracket-march-madness-${YEAR}.json`);
+            if (jsonResponse.ok) {
+                const bracket = await jsonResponse.json();
+                // Add parentGames references for UI navigation
+                addParentGameReferences(bracket);
+                return bracket;
+            }
+        } catch (e) {
+            console.log(`No JSON bracket for ${name}`);
+        }
+        
+        // Try CSV
         try {
             const csvResponse = await fetch(`${BRACKETS_PATH}/${name}-bracket-march-madness-${YEAR}.csv`);
             if (csvResponse.ok) {
@@ -156,6 +169,42 @@
         }
         
         return null;
+    }
+    
+    // Add parentGames references for UI navigation between rounds
+    function addParentGameReferences(bracket) {
+        if (bracket.round2) {
+            bracket.round2.forEach((game, i) => {
+                if (game && bracket.round1) {
+                    game.parentGames = [bracket.round1[i * 2], bracket.round1[i * 2 + 1]];
+                }
+            });
+        }
+        if (bracket.round3) {
+            bracket.round3.forEach((game, i) => {
+                if (game && bracket.round2) {
+                    game.parentGames = [bracket.round2[i * 2], bracket.round2[i * 2 + 1]];
+                }
+            });
+        }
+        if (bracket.round4) {
+            bracket.round4.forEach((game, i) => {
+                if (game && bracket.round3) {
+                    game.parentGames = [bracket.round3[i * 2], bracket.round3[i * 2 + 1]];
+                }
+            });
+        }
+        if (bracket.round5 && bracket.round4) {
+            if (bracket.round5[0]) {
+                bracket.round5[0].parentGames = [bracket.round4[0], bracket.round4[1]];
+            }
+            if (bracket.round5[1]) {
+                bracket.round5[1].parentGames = [bracket.round4[2], bracket.round4[3]];
+            }
+        }
+        if (bracket.round6 && bracket.round6[0] && bracket.round5) {
+            bracket.round6[0].parentGames = [bracket.round5[0], bracket.round5[1]];
+        }
     }
     
     function parseBracketCSV(csvText) {
