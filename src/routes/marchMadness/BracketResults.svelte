@@ -11,7 +11,7 @@
         computePossibleRemaining,
         computeStakeInGame,
         letterToNumber
-    } from './bracketStructure.js';
+    } from './BracketStructure.js';
     import { loadBracketFromPath } from './bracketIO.js';
     import BracketView from './BracketView.svelte';
     
