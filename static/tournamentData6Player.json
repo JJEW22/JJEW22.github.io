@@ -1,0 +1,115 @@
+{
+    "tournamentName": "Crokinole 6-Player Championship",
+    "date": "December 14, 2025",
+    "location": "Community Center",
+    
+    "format": {
+        "groupStage": false,
+        "knockoutStage": true,
+        "groupAdvancement": 0
+    },
+    
+    "groups": [],
+    
+    "bracket": {
+        "name": "Main Draw",
+        "thirdPlaceMatch": {
+            "id": "third",
+            "team1": { "name": "TBD", "source": "sf1-loser", "seed": null },
+            "team2": { "name": "TBD", "source": "sf2-loser", "seed": null },
+            "score1": null,
+            "score2": null,
+            "winner": null
+        },
+        "rounds": [
+            {
+                "name": "Quarterfinals",
+                "matches": [
+                    {
+                        "id": "qf1",
+                        "team1": { "name": "Charlie", "seed": 3 },
+                        "team2": { "name": "Frank", "seed": 6 },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    },
+                    {
+                        "id": "qf2",
+                        "team1": { "name": "Dana", "seed": 4 },
+                        "team2": { "name": "Eve", "seed": 5 },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    }
+                ]
+            },
+            {
+                "name": "Semifinals",
+                "matches": [
+                    {
+                        "id": "sf1",
+                        "team1": { "name": "Alice", "seed": 1, "note": "BYE" },
+                        "team2": { "name": "TBD", "source": "qf1", "seed": null },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    },
+                    {
+                        "id": "sf2",
+                        "team1": { "name": "Bob", "seed": 2, "note": "BYE" },
+                        "team2": { "name": "TBD", "source": "qf2", "seed": null },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    }
+                ]
+            },
+            {
+                "name": "Final",
+                "matches": [
+                    {
+                        "id": "final",
+                        "team1": { "name": "TBD", "source": "sf1", "seed": null },
+                        "team2": { "name": "TBD", "source": "sf2", "seed": null },
+                        "score1": null,
+                        "score2": null,
+                        "winner": null
+                    }
+                ]
+            }
+        ]
+    },
+    
+    "schedule": [
+        {
+            "time": "10:00 AM",
+            "stage": "Quarterfinals",
+            "matches": [
+                { "board": 1, "team1": "Charlie (3)", "team2": "Frank (6)", "matchId": "qf1" },
+                { "board": 2, "team1": "Dana (4)", "team2": "Eve (5)", "matchId": "qf2" }
+            ]
+        },
+        {
+            "time": "10:45 AM",
+            "stage": "Semifinals",
+            "matches": [
+                { "board": 1, "team1": "Alice (1)", "team2": "QF1 Winner", "matchId": "sf1" },
+                { "board": 2, "team1": "Bob (2)", "team2": "QF2 Winner", "matchId": "sf2" }
+            ]
+        },
+        {
+            "time": "11:30 AM",
+            "stage": "3rd Place",
+            "matches": [
+                { "board": 1, "team1": "SF1 Loser", "team2": "SF2 Loser", "matchId": "third" }
+            ]
+        },
+        {
+            "time": "12:00 PM",
+            "stage": "Final",
+            "matches": [
+                { "board": 1, "team1": "SF1 Winner", "team2": "SF2 Winner", "matchId": "final" }
+            ]
+        }
+    ]
+}
