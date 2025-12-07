@@ -14,6 +14,7 @@
     export let bracketPath = null;      // Path to the bracket to view
     export let resultsPath = null;      // Path to the results bracket
     export let stakeData = null;        // Stake data for tooltips
+    export let scenario = null;         // Winning scenario to display
     
     // State
     let teams = {};
@@ -77,6 +78,7 @@
         {resultsBracket}
         {eliminatedTeams}
         {stakeData}
+        {scenario}
         interactive={false}
         on:nextGameClick={handleNextGameClick}
     />

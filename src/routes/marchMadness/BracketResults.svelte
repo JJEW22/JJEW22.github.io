@@ -34,10 +34,12 @@
     let resultsBracket = null;
     let standings = [];
     let selectedParticipant = null;
+    let selectedScenario = null;  // Index of selected winning scenario
     let currentRound = 1;  // Current round for stake calculations
     let upcomingGames = [];  // Games that haven't been decided yet
     let stakeData = {};  // Stake in each upcoming game per participant
     let winProbabilities = {};  // Map of name -> win probability
+    let winningScenarios = {};  // Map of name -> array of winning scenarios
     
     onMount(async () => {
         try {
@@ -108,14 +110,25 @@
         try {
             const response = await fetch(`/marchMadness/${YEAR}/winProbabilities.json`);
             if (response.ok) {
-                winProbabilities = await response.json();
+                const data = await response.json();
+                // Handle both old format (just probabilities) and new format (with winning_scenarios)
+                if (data.probabilities) {
+                    winProbabilities = data.probabilities;
+                    winningScenarios = data.winning_scenarios || {};
+                } else {
+                    // Old format - just probabilities object
+                    winProbabilities = data;
+                    winningScenarios = {};
+                }
             } else {
                 // No probabilities file - leave empty
                 winProbabilities = {};
+                winningScenarios = {};
             }
         } catch (e) {
             console.log('No win probabilities file found');
             winProbabilities = {};
+            winningScenarios = {};
         }
     }
     
@@ -444,8 +457,35 @@
     
     function selectParticipant(name) {
         selectedParticipant = name;
+        selectedScenario = null;  // Reset scenario when changing participant
         activeTab = 'brackets';
     }
+    
+    // Reset scenario when participant changes via dropdown
+    $: if (selectedParticipant) {
+        // Only reset if the new participant doesn't have the selected scenario
+        const scenarios = winningScenarios[selectedParticipant] || [];
+        if (selectedScenario !== null && selectedScenario >= scenarios.length) {
+            selectedScenario = null;
+        }
+    }
+    
+    /**
+     * Get the championship winner from a scenario
+     */
+    function getScenarioChampion(scenario) {
+        if (!scenario || !scenario.games) return 'Unknown';
+        // Find the round 6 (championship) game
+        const finalGame = scenario.games.find(g => g.round === 6);
+        return finalGame ? finalGame.winner : 'Unknown';
+    }
+    
+    /**
+     * Get the currently selected scenario object
+     */
+    $: currentScenario = (selectedParticipant && selectedScenario !== null && winningScenarios[selectedParticipant]) 
+        ? winningScenarios[selectedParticipant][selectedScenario] 
+        : null;
     
     function handleNextGameClick(event) {
         const { gameKey } = event.detail;
@@ -567,19 +607,64 @@
                     
                     <div class="participant-selector">
                         <label for="participant-select">Select Participant:</label>
-                        <select id="participant-select" bind:value={selectedParticipant}>
+                        <select id="participant-select" bind:value={selectedParticipant} on:change={() => selectedScenario = null}>
                             <option value={null}>-- Choose --</option>
                             {#each Object.keys(participantBrackets) as name}
                                 <option value={name}>{name}</option>
                             {/each}
                         </select>
-                    </div> 
-                    {#key selectedParticipant}
+                        
+                        {#if selectedParticipant}
+                            <label for="scenario-select">Winning Scenario:</label>
+                            {#if winningScenarios[selectedParticipant]?.length > 0}
+                                <select id="scenario-select" bind:value={selectedScenario}>
+                                    <option value={null}>-- None --</option>
+                                    {#each winningScenarios[selectedParticipant] as scenario, i}
+                                        <option value={i}>Scenario {i + 1} - {getScenarioChampion(scenario)} wins</option>
+                                    {/each}
+                                </select>
+                            {:else}
+                                <select id="scenario-select" disabled class="no-scenarios">
+                                    <option>No winning outcomes</option>
+                                </select>
+                            {/if}
+                        {/if}
+                    </div>
+                    
+                    <div class="bracket-legend">
+                        <div class="legend-section">
+                            <span class="legend-title">Decided Games:</span>
+                            <div class="scenario-legend-item">
+                                <div class="legend-color correct"></div>
+                                <span>Correctly picked</span>
+                            </div>
+                            <div class="scenario-legend-item">
+                                <div class="legend-color incorrect"></div>
+                                <span>Incorrectly picked</span>
+                            </div>
+                        </div>
+                        {#if currentScenario}
+                            <div class="legend-section">
+                                <span class="legend-title">Scenario Games:</span>
+                                <div class="scenario-legend-item">
+                                    <div class="legend-color match"></div>
+                                    <span>Winner - bracket's pick matches</span>
+                                </div>
+                                <div class="scenario-legend-item">
+                                    <div class="legend-color mismatch"></div>
+                                    <span>Winner - differs from bracket (bracket's pick)</span>
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+                    
+                    {#key `${selectedParticipant}-${selectedScenario}`}
                     {#if selectedParticipant && participantBrackets[selectedParticipant]}
                         <BracketView 
-                            bracketPath={`${BRACKETS_PATH}/${selectedParticipant}-bracket-march-madness-2026.xlsx`}
-                            resultsPath={`${RESULTS_FILE}.xlsx`}
+                            bracketPath={`${BRACKETS_PATH}/${selectedParticipant}-bracket-march-madness-${YEAR}.json`}
+                            resultsPath={RESULTS_FILE}
                             {stakeData}
+                            scenario={currentScenario}
                             on:nextGameClick={handleNextGameClick}
                         />
                     {:else}
@@ -760,6 +845,15 @@
     /* Brackets View */
     .participant-selector {
         margin-bottom: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .participant-selector label {
+        font-weight: 500;
+        color: #374151;
     }
     
     .participant-selector select {
@@ -767,8 +861,65 @@
         font-size: 1rem;
         border: 1px solid #d1d5db;
         border-radius: 6px;
-        margin-left: 0.5rem;
     }
+    
+    .participant-selector select:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .participant-selector select.no-scenarios {
+        background-color: #f3f4f6;
+        color: #9ca3af;
+        cursor: not-allowed;
+        font-style: italic;
+    }
+    
+    .participant-selector select:disabled {
+        opacity: 0.7;
+    }
+    
+    /* Bracket legend */
+    .bracket-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background: #f9fafb;
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+    
+    .legend-section {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .legend-title {
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .scenario-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    
+    .legend-color {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 3px;
+    }
+    
+    .legend-color.correct { background: #059669; }
+    .legend-color.incorrect { background: #dc2626; }
+    .legend-color.match { background: #80276C; }
+    .legend-color.mismatch { background: #f97316; }
     
     .round-section {
         margin-bottom: 1.5rem;

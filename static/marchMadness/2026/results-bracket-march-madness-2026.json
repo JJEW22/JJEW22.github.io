@@ -953,11 +953,7 @@
         "seed": 5,
         "region": "West"
       },
-      "winner": {
-        "name": "Florida",
-        "seed": 1,
-        "region": "West"
-      },
+      "winner": null,
       "gameId": "r3-2",
       "region": ""
     },
@@ -991,11 +987,7 @@
         "seed": 5,
         "region": "South"
       },
-      "winner": {
-        "name": "Auburn",
-        "seed": 1,
-        "region": "South"
-      },
+      "winner": null,
       "gameId": "r3-4",
       "region": ""
     },
@@ -1066,36 +1058,20 @@
       "region": ""
     },
     {
-      "team1": {
-        "name": "Florida",
-        "seed": 1,
-        "region": "West"
-      },
+      "team1": null,
       "team2": {
         "name": "Illinois",
         "seed": 6,
         "region": "West"
       },
-      "winner": {
-        "name": "Florida",
-        "seed": 1,
-        "region": "West"
-      },
+      "winner": null,
       "gameId": "r4-1",
       "region": ""
     },
     {
-      "team1": {
-        "name": "Auburn",
-        "seed": 1,
-        "region": "South"
-      },
+      "team1": null,
       "team2": null,
-      "winner": {
-        "name": "Auburn",
-        "seed": 1,
-        "region": "South"
-      },
+      "winner": null,
       "gameId": "r4-2",
       "region": ""
     },
@@ -1118,25 +1094,13 @@
         "seed": 1,
         "region": "East"
       },
-      "team2": {
-        "name": "Florida",
-        "seed": 1,
-        "region": "West"
-      },
-      "winner": {
-        "name": "Duke",
-        "seed": 1,
-        "region": "East"
-      },
+      "team2": null,
+      "winner": null,
       "gameId": "r5-0",
       "region": ""
     },
     {
-      "team1": {
-        "name": "Auburn",
-        "seed": 1,
-        "region": "South"
-      },
+      "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r5-1",
@@ -1145,11 +1109,7 @@
   ],
   "round6": [
     {
-      "team1": {
-        "name": "Duke",
-        "seed": 1,
-        "region": "East"
-      },
+      "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r6-0",

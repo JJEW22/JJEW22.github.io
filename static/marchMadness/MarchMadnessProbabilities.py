@@ -21,6 +21,13 @@ SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6]
 # Round keys in order
 ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
 
+# Progress reporting interval (print progress every N simulations)
+PROGRESS_INTERVAL = 1000
+
+# Winning scenarios storage settings
+MAX_WINNING_OUTCOMES_PER_PARTICIPANT = 10
+REPLACEMENT_PROBABILITY = 0.1
+
 
 def load_bracket(filepath: str) -> dict:
     """Load a bracket from a JSON file."""
@@ -140,8 +147,8 @@ def compute_score(results_bracket: dict, picks_bracket: dict, teams_data: dict,
 
 def find_remaining_games(results_bracket: dict) -> List[Tuple[str, int]]:
     """
-    Find all games that haven't been decided yet.
-    Returns list of (round_key, game_index) tuples.
+    Find all games that haven't been decided yet (including future rounds).
+    Returns list of (round_key, game_index) tuples in round order.
     """
     remaining = []
     
@@ -150,15 +157,27 @@ def find_remaining_games(results_bracket: dict) -> List[Tuple[str, int]]:
         
         for i, game in enumerate(results_round):
             if game and not get_winner_name(game):
-                # Game exists but no winner yet
-                # Check if both teams are determined
-                team1 = get_team_name(game.get('team1'))
-                team2 = get_team_name(game.get('team2'))
-                
-                if team1 and team2 and team1 != 'TBD' and team2 != 'TBD':
-                    remaining.append((round_key, i))
+                # Game exists but no winner yet - include it regardless of whether teams are determined
+                remaining.append((round_key, i))
     
     return remaining
+
+
+def get_feeder_games(round_key: str, game_index: int) -> Optional[Tuple[str, int, int]]:
+    """
+    Get the two feeder games that feed into this game.
+    Returns (prev_round_key, feeder_game_1_index, feeder_game_2_index) or None for round 1.
+    """
+    round_num = ROUND_KEYS.index(round_key) + 1
+    
+    if round_num == 1:
+        return None  # Round 1 has no feeder games
+    
+    prev_round_key = ROUND_KEYS[round_num - 2]  # Previous round
+    feeder_1 = game_index * 2
+    feeder_2 = game_index * 2 + 1
+    
+    return (prev_round_key, feeder_1, feeder_2)
 
 
 def get_parent_game_info(round_key: str, game_index: int) -> Optional[Tuple[str, int, int]]:
@@ -183,6 +202,8 @@ def create_hypothetical_bracket(results_bracket: dict, remaining_games: List[Tup
     """
     Create a hypothetical completed bracket by simulating game outcomes.
     outcome_string: binary string where '1' means team1 wins, '0' means team2 wins.
+    
+    Games are processed in round order, so earlier round results propagate to later rounds.
     """
     import copy
     hypothetical = copy.deepcopy(results_bracket)
@@ -190,14 +211,23 @@ def create_hypothetical_bracket(results_bracket: dict, remaining_games: List[Tup
     for i, (round_key, game_index) in enumerate(remaining_games):
         game = hypothetical[round_key][game_index]
         
+        # Get the teams - they should be populated from previous rounds by now
+        team1 = game.get('team1')
+        team2 = game.get('team2')
+        
+        # Skip if teams aren't determined yet (shouldn't happen if processed in order)
+        if not team1 or not team2:
+            continue
+        
+        # Determine winner based on outcome string
         if outcome_string[i] == '1':
-            winner = game.get('team1')
+            winner = team1
         else:
-            winner = game.get('team2')
+            winner = team2
         
         game['winner'] = winner
         
-        # Propagate winner to parent game
+        # Propagate winner to next round's game
         parent_info = get_parent_game_info(round_key, game_index)
         if parent_info:
             parent_round, parent_index, slot = parent_info
@@ -225,6 +255,87 @@ def create_hypothetical_bracket(results_bracket: dict, remaining_games: List[Tup
 def generate_random_outcome(num_games: int) -> str:
     """Generate a random outcome string."""
     return ''.join(str(random.randint(0, 1)) for _ in range(num_games))
+
+
+def decode_outcome_to_games(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
+                            outcome_string: str) -> List[dict]:
+    """
+    Decode an outcome string into a list of game results.
+    Returns list of dicts with round, game index, and winner info.
+    """
+    import copy
+    hypothetical = copy.deepcopy(results_bracket)
+    game_results = []
+    
+    for i, (round_key, game_index) in enumerate(remaining_games):
+        game = hypothetical[round_key][game_index]
+        
+        team1 = game.get('team1')
+        team2 = game.get('team2')
+        
+        if not team1 or not team2:
+            continue
+        
+        if outcome_string[i] == '1':
+            winner = team1
+            loser = team2
+        else:
+            winner = team2
+            loser = team1
+        
+        game['winner'] = winner
+        
+        # Record this game result
+        round_num = ROUND_KEYS.index(round_key) + 1
+        game_results.append({
+            'round': round_num,
+            'roundKey': round_key,
+            'gameIndex': game_index,
+            'team1': get_team_name(team1),
+            'team2': get_team_name(team2),
+            'winner': get_team_name(winner),
+            'loser': get_team_name(loser),
+            'team1Seed': team1.get('seed') if team1 else None,
+            'team2Seed': team2.get('seed') if team2 else None,
+            'winnerSeed': winner.get('seed') if winner else None
+        })
+        
+        # Propagate winner to next round
+        parent_info = get_parent_game_info(round_key, game_index)
+        if parent_info:
+            parent_round, parent_index, slot = parent_info
+            
+            if parent_round in hypothetical and parent_index < len(hypothetical[parent_round]):
+                parent_game = hypothetical[parent_round][parent_index]
+                if slot == 0:
+                    parent_game['team1'] = winner
+                else:
+                    parent_game['team2'] = winner
+    
+    return game_results
+
+
+def store_winning_outcome(winning_outcomes: Dict[str, List], name: str, 
+                          outcome_string: str, game_results: List[dict]):
+    """
+    Store a winning outcome for a participant.
+    If storage is full, randomly decide whether to replace an existing one.
+    """
+    scenario = {
+        'outcome': outcome_string,
+        'games': game_results
+    }
+    
+    if name not in winning_outcomes:
+        winning_outcomes[name] = []
+    
+    if len(winning_outcomes[name]) < MAX_WINNING_OUTCOMES_PER_PARTICIPANT:
+        # Still have room, just add it
+        winning_outcomes[name].append(scenario)
+    elif random.random() < REPLACEMENT_PROBABILITY:
+        # Storage full, but randomly decided to replace
+        replace_index = random.randint(0, len(winning_outcomes[name]) - 1)
+        winning_outcomes[name][replace_index] = scenario
 
 
 def calculate_win_probabilities(
@@ -305,7 +416,8 @@ def calculate_win_probabilities(
         
         sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
         winner = sorted_scores[0][0]
-        return {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
+        probabilities = {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
+        return probabilities, {}  # Empty winning_outcomes since tournament is over
     
     # Determine simulation approach
     total_possible = 2 ** num_remaining
@@ -324,10 +436,18 @@ def calculate_win_probabilities(
     # Simulate outcomes
     number_of_wins = {name: 0 for name in name_to_bracket.keys()}
     places = {name: [] for name in name_to_bracket.keys()}
+    winning_outcomes = {}  # Store winning scenarios per participant
+    
+    # Calculate progress intervals
+    total_intervals = num_simulations // PROGRESS_INTERVAL if num_simulations >= PROGRESS_INTERVAL else 1
+    
+    print(f"Progress: ", end='', flush=True)
     
     for i in range(num_simulations):
-        if (i + 1) % 10000 == 0:
-            print(f"  Processed {i + 1:,}/{num_simulations:,} outcomes...")
+        # Progress reporting
+        if PROGRESS_INTERVAL > 0 and (i + 1) % PROGRESS_INTERVAL == 0:
+            current_interval = (i + 1) // PROGRESS_INTERVAL
+            print(f"\rProgress: {current_interval}/{total_intervals}", end='', flush=True)
         
         # Generate outcome
         if use_monte_carlo:
@@ -349,11 +469,17 @@ def calculate_win_probabilities(
         # Sort by score
         sorted_scores = sorted(all_scores, key=lambda x: x[1], reverse=True)
         
-        # Record places
+        # Record places and check for winner
         for place, (name, score) in enumerate(sorted_scores):
             places[name].append(place + 1)
             if place == 0:
                 number_of_wins[name] += 1
+                # Store this winning outcome for the winner
+                game_results = decode_outcome_to_games(results_bracket, remaining_games, outcome)
+                store_winning_outcome(winning_outcomes, name, outcome, game_results)
+    
+    # Clear progress line
+    print(f"\rProgress: {total_intervals}/{total_intervals} - Complete!          ")
     
     # Calculate probabilities
     win_probabilities = {}
@@ -367,9 +493,10 @@ def calculate_win_probabilities(
         prob = number_of_wins[name] / num_simulations
         avg_place = sum(places[name]) / len(places[name])
         win_probabilities[name] = prob
-        print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}")
+        num_scenarios = len(winning_outcomes.get(name, []))
+        print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}, {num_scenarios} winning scenarios stored")
     
-    return win_probabilities
+    return win_probabilities, winning_outcomes
 
 
 def main():
@@ -403,8 +530,13 @@ def main():
         participants = []
         if os.path.exists(args.brackets_dir):
             for f in os.listdir(args.brackets_dir):
-                if f.endswith('.json') and f != 'results.json':
-                    name = f.replace('.json', '').replace('-bracket', '')
+                if f.endswith('.json') and f != 'results.json' and not f.startswith('win'):
+                    # Extract participant name as first word (split by - or _)
+                    name_without_ext = f.replace('.json', '')
+                    # Split by - or _ and take first part as participant name
+                    import re
+                    parts = re.split(r'[-_]', name_without_ext)
+                    name = parts[0]
                     participants.append(name)
         
         if not participants:
@@ -415,18 +547,23 @@ def main():
     print(f"Participants: {participants}")
     
     # Calculate probabilities
-    probabilities = calculate_win_probabilities(
+    probabilities, winning_outcomes = calculate_win_probabilities(
         results_path=args.results,
         brackets_dir=args.brackets_dir,
-        participants=participants,  
+        participants=participants,
         teams_file=args.teams or '',
         apply_seed_bonus=not args.no_seed_bonus,
         max_simulations=args.max_simulations
     )
     
-    # Save to JSON
+    # Save to JSON (include both probabilities and winning scenarios)
+    output_data = {
+        'probabilities': probabilities,
+        'winning_scenarios': winning_outcomes
+    }
+    
     with open(args.output, 'w') as f:
-        json.dump(probabilities, f, indent=2)
+        json.dump(output_data, f, indent=2)
     
     print(f"\nWin probabilities saved to {args.output}")
 

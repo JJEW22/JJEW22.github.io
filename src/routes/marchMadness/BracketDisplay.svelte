@@ -8,6 +8,7 @@
     export let eliminatedTeams = new Set(); // Set of eliminated team names
     export let interactive = false;         // Whether picks can be made
     export let stakeData = null;           // Optional stake data for tooltips {gameKey: {participant: {team1: pts, team2: pts}}}
+    export let scenario = null;            // Optional winning scenario to display
     
     const dispatch = createEventDispatcher();
     
@@ -19,6 +20,38 @@
     let hoveredGame = null;
     let tooltipX = 0;
     let tooltipY = 0;
+    
+    // Build a lookup map for scenario games: "round-gameIndex" -> scenarioGame
+    $: scenarioGamesMap = buildScenarioGamesMap(scenario);
+    
+    function buildScenarioGamesMap(scenario) {
+        const map = {};
+        if (scenario && scenario.games) {
+            for (const game of scenario.games) {
+                const key = `${game.round}-${game.gameIndex}`;
+                map[key] = game;
+            }
+        }
+        return map;
+    }
+    
+    /**
+     * Get the scenario game for a given round and game index
+     */
+    function getScenarioGame(round, gameIndex) {
+        const key = `${round}-${gameIndex}`;
+        return scenarioGamesMap[key] || null;
+    }
+    
+    /**
+     * Check if a game is undecided in the results
+     */
+    function isGameUndecided(round, gameIndex) {
+        if (!resultsBracket) return true;
+        const roundKey = `round${round}`;
+        const resultsGame = resultsBracket[roundKey]?.[gameIndex];
+        return !resultsGame || !resultsGame.winner;
+    }
     
     // Reactive spacing calculations
     $: round2FirstOffset = gameHeight > 0 ? (gameHeight + baseGameGap) / 2 : 40;
@@ -157,14 +190,106 @@
      * Get CSS class for a selected team based on pick status
      */
     function getSelectionClass(game, team, round, gameIndex) {
-        if (game.winner !== team) return '';
+        if (!team) return '';
         
+        // Compare by name since objects may be different references
+        const isUserPick = game.winner && game.winner.name === team.name;
         const status = getPickStatus(game, round, gameIndex);
-        switch (status) {
-            case 'correct': return 'selected correct';
-            case 'incorrect': return 'selected incorrect';
-            case 'pending': return 'selected pending';
-            default: return 'selected';
+        
+        // For decided games, use normal coloring
+        if (status === 'correct' || status === 'incorrect') {
+            return isUserPick ? `selected ${status}` : '';
+        }
+        
+        // For undecided games, check if there's a scenario
+        if (scenario && isGameUndecided(round, gameIndex)) {
+            const scenarioGame = getScenarioGame(round, gameIndex);
+            if (scenarioGame) {
+                // Determine what team the SCENARIO says is in this slot
+                const isTeam1Slot = game.team1 && game.team1.name === team.name;
+                const isTeam2Slot = game.team2 && game.team2.name === team.name;
+                
+                let scenarioTeamInSlot;
+                if (isTeam1Slot) {
+                    scenarioTeamInSlot = scenarioGame.team1;
+                } else if (isTeam2Slot) {
+                    scenarioTeamInSlot = scenarioGame.team2;
+                }
+                
+                // Is this slot's scenario team the winner?
+                const isScenarioWinner = scenarioTeamInSlot === scenarioGame.winner;
+                
+                // Did the user's original pick for this slot match the scenario?
+                const userMatchesScenario = team.name === scenarioTeamInSlot;
+                
+                if (isScenarioWinner) {
+                    // This slot contains the scenario's winner
+                    if (userMatchesScenario && isUserPick) {
+                        return 'selected scenario-match';  // User picked this team AND it wins in scenario
+                    } else if (!userMatchesScenario || !isUserPick) {
+                        return 'selected scenario-mismatch';  // Scenario winner but user picked differently
+                    }
+                } else {
+                    // This slot contains the scenario's loser - no highlight
+                    return '';
+                }
+            }
+        }
+        
+        // Default pending state
+        if (isUserPick) {
+            return status === 'pending' ? 'selected pending' : 'selected';
+        }
+        
+        return '';
+    }
+    
+    /**
+     * Get display info for a team in the context of a scenario
+     * For undecided games, shows the scenario's bracket merged with user's bracket
+     * Returns { name, seed, userPick } where userPick is shown as subtitle if different
+     */
+    function getTeamDisplayInfo(game, team, round, gameIndex) {
+        if (!team) return null;
+        
+        // If no scenario or game is decided, just show the team normally
+        if (!scenario || !isGameUndecided(round, gameIndex)) {
+            return { name: team.name, seed: team.seed, userPick: null };
+        }
+        
+        const scenarioGame = getScenarioGame(round, gameIndex);
+        if (!scenarioGame) {
+            return { name: team.name, seed: team.seed, userPick: null };
+        }
+        
+        // Determine if this is team1 or team2 slot based on the team passed in
+        const isTeam1Slot = game.team1 && game.team1.name === team.name;
+        const isTeam2Slot = game.team2 && game.team2.name === team.name;
+        
+        // Get what the scenario says should be in this slot
+        let scenarioTeamName, scenarioTeamSeed;
+        if (isTeam1Slot) {
+            scenarioTeamName = scenarioGame.team1;
+            scenarioTeamSeed = scenarioGame.team1Seed;
+        } else if (isTeam2Slot) {
+            scenarioTeamName = scenarioGame.team2;
+            scenarioTeamSeed = scenarioGame.team2Seed;
+        } else {
+            // Fallback - shouldn't happen
+            return { name: team.name, seed: team.seed, userPick: null };
+        }
+        
+        // Compare user's team in this slot vs scenario's team
+        if (team.name === scenarioTeamName) {
+            // User's prediction matches scenario - show normally
+            return { name: team.name, seed: team.seed, userPick: null };
+        } else {
+            // User had a different team - show scenario's team with user's pick as subtitle
+            return {
+                name: scenarioTeamName,
+                seed: scenarioTeamSeed,
+                userPick: team.name
+            };
         }
     }
     
@@ -197,23 +322,35 @@
                                 on:click={() => handleNextGameClick(1, i)}
                             >
                                 {#if game.team1}
+                                    {@const info1 = getTeamDisplayInfo(game, game.team1, 1, i)}
                                     <button 
                                         class="team-btn {getSelectionClass(game, game.team1, 1, i)}"
                                         on:click={() => handleTeamClick(1, i, game.team1)}
+
                                     >
-                                        <span class="seed">{game.team1.seed}</span>
-                                        <span class="team-name">{game.team1.name}</span>
+                                        <span class="seed">{info1.seed}</span>
+                                        <span class="team-name">{info1.name}</span>
+                                        {#if info1.userPick}
+                                            <span class="user-pick">({info1.userPick})</span>
+
+                                        {/if}
                                     </button>
                                 {:else}
                                     <div class="team-btn empty">TBD</div>
                                 {/if}
                                 {#if game.team2}
+                                    {@const info2 = getTeamDisplayInfo(game, game.team2, 1, i)}
                                     <button 
                                         class="team-btn {getSelectionClass(game, game.team2, 1, i)}"
                                         on:click={() => handleTeamClick(1, i, game.team2)}
+
                                     >
-                                        <span class="seed">{game.team2.seed}</span>
-                                        <span class="team-name">{game.team2.name}</span>
+                                        <span class="seed">{info2.seed}</span>
+                                        <span class="team-name">{info2.name}</span>
+                                        {#if info2.userPick}
+                                            <span class="user-pick">({info2.userPick})</span>
+
+                                        {/if}
                                     </button>
                                 {:else}
                                     <div class="team-btn empty">TBD</div>
@@ -228,23 +365,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(1, i)}>
                                 {#if game.team1}
+                                    {@const info3 = getTeamDisplayInfo(game, game.team1, 1, i)}
                                     <button 
                                         class="team-btn {getSelectionClass(game, game.team1, 1, i)}"
                                         on:click={() => handleTeamClick(1, i, game.team1)}
+
                                     >
-                                        <span class="seed">{game.team1.seed}</span>
-                                        <span class="team-name">{game.team1.name}</span>
+                                        <span class="seed">{info3.seed}</span>
+                                        <span class="team-name">{info3.name}</span>
+                                        {#if info3.userPick}
+                                            <span class="user-pick">({info3.userPick})</span>
+
+                                        {/if}
                                     </button>
                                 {:else}
                                     <div class="team-btn empty">TBD</div>
                                 {/if}
                                 {#if game.team2}
+                                    {@const info4 = getTeamDisplayInfo(game, game.team2, 1, i)}
                                     <button 
                                         class="team-btn {getSelectionClass(game, game.team2, 1, i)}"
                                         on:click={() => handleTeamClick(1, i, game.team2)}
+
                                     >
-                                        <span class="seed">{game.team2.seed}</span>
-                                        <span class="team-name">{game.team2.name}</span>
+                                        <span class="seed">{info4.seed}</span>
+                                        <span class="team-name">{info4.name}</span>
+                                        {#if info4.userPick}
+                                            <span class="user-pick">({info4.userPick})</span>
+
+                                        {/if}
                                     </button>
                                 {:else}
                                     <div class="team-btn empty">TBD</div>
@@ -265,23 +414,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(2, i)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
+                                {@const info5 = getTeamDisplayInfo(game, game.team1, 2, i)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i)}"
                                     on:click={() => handleTeamClick(2, i, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info5.seed}</span>
+                                    <span class="team-name">{info5.name}</span>
+                                    {#if info5.userPick}
+                                        <span class="user-pick">({info5.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info6 = getTeamDisplayInfo(game, game.team2, 2, i)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 2, i)}"
                                     on:click={() => handleTeamClick(2, i, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info6.seed}</span>
+                                    <span class="team-name">{info6.name}</span>
+                                    {#if info6.userPick}
+                                        <span class="user-pick">({info6.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -301,23 +462,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(3, i)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
+                                {@const info7 = getTeamDisplayInfo(game, game.team1, 3, i)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i)}"
                                     on:click={() => handleTeamClick(3, i, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info7.seed}</span>
+                                    <span class="team-name">{info7.name}</span>
+                                    {#if info7.userPick}
+                                        <span class="user-pick">({info7.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info8 = getTeamDisplayInfo(game, game.team2, 3, i)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 3, i)}"
                                     on:click={() => handleTeamClick(3, i, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info8.seed}</span>
+                                    <span class="team-name">{info8.name}</span>
+                                    {#if info8.userPick}
+                                        <span class="user-pick">({info8.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -336,23 +509,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(4, 0)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[0]?.team1}
+                            {@const info9 = getTeamDisplayInfo(bracket.round4[0], bracket.round4[0].team1, 4, 0)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[0], bracket.round4[0].team1, 4, 0)}"
                                 on:click={() => handleTeamClick(4, 0, bracket.round4[0].team1)}
+
                             >
-                                <span class="seed">{bracket.round4[0].team1.seed}</span>
-                                <span class="team-name">{bracket.round4[0].team1.name}</span>
+                                <span class="seed">{info9.seed}</span>
+                                <span class="team-name">{info9.name}</span>
+                                {#if info9.userPick}
+                                    <span class="user-pick">({info9.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
                         {/if}
                         {#if bracket.round4[0]?.team2}
+                            {@const info10 = getTeamDisplayInfo(bracket.round4[0], bracket.round4[0].team2, 4, 0)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[0], bracket.round4[0].team2, 4, 0)}"
                                 on:click={() => handleTeamClick(4, 0, bracket.round4[0].team2)}
+
                             >
-                                <span class="seed">{bracket.round4[0].team2.seed}</span>
-                                <span class="team-name">{bracket.round4[0].team2.name}</span>
+                                <span class="seed">{info10.seed}</span>
+                                <span class="team-name">{info10.name}</span>
+                                {#if info10.userPick}
+                                    <span class="user-pick">({info10.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
@@ -375,23 +560,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(4, 2)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[2]?.team1}
+                            {@const info11 = getTeamDisplayInfo(bracket.round4[2], bracket.round4[2].team1, 4, 2)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[2], bracket.round4[2].team1, 4, 2)}"
                                 on:click={() => handleTeamClick(4, 2, bracket.round4[2].team1)}
+
                             >
-                                <span class="seed">{bracket.round4[2].team1.seed}</span>
-                                <span class="team-name">{bracket.round4[2].team1.name}</span>
+                                <span class="seed">{info11.seed}</span>
+                                <span class="team-name">{info11.name}</span>
+                                {#if info11.userPick}
+                                    <span class="user-pick">({info11.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
                         {/if}
                         {#if bracket.round4[2]?.team2}
+                            {@const info12 = getTeamDisplayInfo(bracket.round4[2], bracket.round4[2].team2, 4, 2)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[2], bracket.round4[2].team2, 4, 2)}"
                                 on:click={() => handleTeamClick(4, 2, bracket.round4[2].team2)}
+
                             >
-                                <span class="seed">{bracket.round4[2].team2.seed}</span>
-                                <span class="team-name">{bracket.round4[2].team2.name}</span>
+                                <span class="seed">{info12.seed}</span>
+                                <span class="team-name">{info12.name}</span>
+                                {#if info12.userPick}
+                                    <span class="user-pick">({info12.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
@@ -410,23 +607,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(3, i + 4)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
+                                {@const info13 = getTeamDisplayInfo(game, game.team1, 3, i + 4)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i + 4)}"
                                     on:click={() => handleTeamClick(3, i + 4, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info13.seed}</span>
+                                    <span class="team-name">{info13.name}</span>
+                                    {#if info13.userPick}
+                                        <span class="user-pick">({info13.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info14 = getTeamDisplayInfo(game, game.team2, 3, i + 4)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 3, i + 4)}"
                                     on:click={() => handleTeamClick(3, i + 4, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info14.seed}</span>
+                                    <span class="team-name">{info14.name}</span>
+                                    {#if info14.userPick}
+                                        <span class="user-pick">({info14.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -446,23 +655,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(2, i + 8)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
+                                {@const info15 = getTeamDisplayInfo(game, game.team1, 2, i + 8)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i + 8)}"
                                     on:click={() => handleTeamClick(2, i + 8, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info15.seed}</span>
+                                    <span class="team-name">{info15.name}</span>
+                                    {#if info15.userPick}
+                                        <span class="user-pick">({info15.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info16 = getTeamDisplayInfo(game, game.team2, 2, i + 8)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 2, i + 8)}"
                                     on:click={() => handleTeamClick(2, i + 8, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info16.seed}</span>
+                                    <span class="team-name">{info16.name}</span>
+                                    {#if info16.userPick}
+                                        <span class="user-pick">({info16.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -482,23 +703,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(1, i + 16)}>
                             {#if game.team1}
+                                {@const info17 = getTeamDisplayInfo(game, game.team1, 1, i + 16)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 1, i + 16)}"
                                     on:click={() => handleTeamClick(1, i + 16, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info17.seed}</span>
+                                    <span class="team-name">{info17.name}</span>
+                                    {#if info17.userPick}
+                                        <span class="user-pick">({info17.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info18 = getTeamDisplayInfo(game, game.team2, 1, i + 16)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 1, i + 16)}"
                                     on:click={() => handleTeamClick(1, i + 16, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info18.seed}</span>
+                                    <span class="team-name">{info18.name}</span>
+                                    {#if info18.userPick}
+                                        <span class="user-pick">({info18.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -522,23 +755,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(5, 0)}>
                     {#if bracket.round5[0]?.team1}
+                        {@const info19 = getTeamDisplayInfo(bracket.round5[0], bracket.round5[0].team1, 5, 0)}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round5[0], bracket.round5[0].team1, 5, 0)}"
                             on:click={() => handleTeamClick(5, 0, bracket.round5[0].team1)}
+
                         >
-                            <span class="seed">{bracket.round5[0].team1.seed}</span>
-                            <span class="team-name">{bracket.round5[0].team1.name}</span>
+                            <span class="seed">{info19.seed}</span>
+                            <span class="team-name">{info19.name}</span>
+                            {#if info19.userPick}
+                                <span class="user-pick">({info19.userPick})</span>
+
+                            {/if}
                         </button>
                     {:else}
                         <div class="team-btn empty">TBD</div>
                     {/if}
                     {#if bracket.round5[0]?.team2}
+                        {@const info20 = getTeamDisplayInfo(bracket.round5[0], bracket.round5[0].team2, 5, 0)}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round5[0], bracket.round5[0].team2, 5, 0)}"
                             on:click={() => handleTeamClick(5, 0, bracket.round5[0].team2)}
+
                         >
-                            <span class="seed">{bracket.round5[0].team2.seed}</span>
-                            <span class="team-name">{bracket.round5[0].team2.name}</span>
+                            <span class="seed">{info20.seed}</span>
+                            <span class="team-name">{info20.name}</span>
+                            {#if info20.userPick}
+                                <span class="user-pick">({info20.userPick})</span>
+
+                            {/if}
                         </button>
                     {:else}
                         <div class="team-btn empty">TBD</div>
@@ -557,23 +802,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(6, 0)}>
                     {#if bracket.round6[0]?.team1}
+                        {@const info21 = getTeamDisplayInfo(bracket.round6[0], bracket.round6[0].team1, 6, 0)}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round6[0], bracket.round6[0].team1, 6, 0)}"
                             on:click={() => handleTeamClick(6, 0, bracket.round6[0].team1)}
+
                         >
-                            <span class="seed">{bracket.round6[0].team1.seed}</span>
-                            <span class="team-name">{bracket.round6[0].team1.name}</span>
+                            <span class="seed">{info21.seed}</span>
+                            <span class="team-name">{info21.name}</span>
+                            {#if info21.userPick}
+                                <span class="user-pick">({info21.userPick})</span>
+
+                            {/if}
                         </button>
                     {:else}
                         <div class="team-btn empty">TBD</div>
                     {/if}
                     {#if bracket.round6[0]?.team2}
+                        {@const info22 = getTeamDisplayInfo(bracket.round6[0], bracket.round6[0].team2, 6, 0)}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round6[0], bracket.round6[0].team2, 6, 0)}"
                             on:click={() => handleTeamClick(6, 0, bracket.round6[0].team2)}
+
                         >
-                            <span class="seed">{bracket.round6[0].team2.seed}</span>
-                            <span class="team-name">{bracket.round6[0].team2.name}</span>
+                            <span class="seed">{info22.seed}</span>
+                            <span class="team-name">{info22.name}</span>
+                            {#if info22.userPick}
+                                <span class="user-pick">({info22.userPick})</span>
+
+                            {/if}
                         </button>
                     {:else}
                         <div class="team-btn empty">TBD</div>
@@ -584,9 +841,13 @@
                 <h3 class="champion-label">🏆 Champion 🏆</h3>
                 <div class="game champion-game">
                     {#if bracket.winner}
-                        <div class="team-btn champion-display {getPickStatus({winner: bracket.winner}, 6, 0) === 'correct' ? 'correct' : getPickStatus({winner: bracket.winner}, 6, 0) === 'incorrect' ? 'incorrect' : ''}">
-                            <span class="seed">{bracket.winner.seed}</span>
-                            <span class="team-name">{bracket.winner.name}</span>
+                        {@const champInfo = getTeamDisplayInfo({winner: bracket.winner, team1: bracket.winner, team2: null}, bracket.winner, 6, 0)}
+                        <div class="team-btn champion-display {getPickStatus({winner: bracket.winner}, 6, 0) === 'correct' ? 'correct' : getPickStatus({winner: bracket.winner}, 6, 0) === 'incorrect' ? 'incorrect' : ''} {scenario && isGameUndecided(6, 0) ? (champInfo.userPick ? 'scenario-mismatch' : 'scenario-match') : ''}">
+                            <span class="seed">{champInfo.seed}</span>
+                            <span class="team-name">{champInfo.name}</span>
+                            {#if champInfo.userPick}
+                                <span class="user-pick">({champInfo.userPick})</span>
+                            {/if}
                         </div>
                     {:else}
                         <div class="team-btn empty">TBD</div>
@@ -605,23 +866,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(5, 1)}>
                     {#if bracket.round5[1]?.team1}
+                        {@const info23 = getTeamDisplayInfo(bracket.round5[1], bracket.round5[1].team1, 5, 1)}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round5[1], bracket.round5[1].team1, 5, 1)}"
                             on:click={() => handleTeamClick(5, 1, bracket.round5[1].team1)}
+
                         >
-                            <span class="seed">{bracket.round5[1].team1.seed}</span>
-                            <span class="team-name">{bracket.round5[1].team1.name}</span>
+                            <span class="seed">{info23.seed}</span>
+                            <span class="team-name">{info23.name}</span>
+                            {#if info23.userPick}
+                                <span class="user-pick">({info23.userPick})</span>
+
+                            {/if}
                         </button>
                     {:else}
                         <div class="team-btn empty">TBD</div>
                     {/if}
                     {#if bracket.round5[1]?.team2}
+                        {@const info24 = getTeamDisplayInfo(bracket.round5[1], bracket.round5[1].team2, 5, 1)}
                         <button 
                             class="team-btn {getSelectionClass(bracket.round5[1], bracket.round5[1].team2, 5, 1)}"
                             on:click={() => handleTeamClick(5, 1, bracket.round5[1].team2)}
+
                         >
-                            <span class="seed">{bracket.round5[1].team2.seed}</span>
-                            <span class="team-name">{bracket.round5[1].team2.name}</span>
+                            <span class="seed">{info24.seed}</span>
+                            <span class="team-name">{info24.name}</span>
+                            {#if info24.userPick}
+                                <span class="user-pick">({info24.userPick})</span>
+
+                            {/if}
                         </button>
                     {:else}
                         <div class="team-btn empty">TBD</div>
@@ -647,23 +920,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(1, i + 8)}>
                             {#if game.team1}
+                                {@const info25 = getTeamDisplayInfo(game, game.team1, 1, i + 8)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 1, i + 8)}"
                                     on:click={() => handleTeamClick(1, i + 8, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info25.seed}</span>
+                                    <span class="team-name">{info25.name}</span>
+                                    {#if info25.userPick}
+                                        <span class="user-pick">({info25.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info26 = getTeamDisplayInfo(game, game.team2, 1, i + 8)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 1, i + 8)}"
                                     on:click={() => handleTeamClick(1, i + 8, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info26.seed}</span>
+                                    <span class="team-name">{info26.name}</span>
+                                    {#if info26.userPick}
+                                        <span class="user-pick">({info26.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -683,23 +968,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(2, i + 4)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
+                                {@const info27 = getTeamDisplayInfo(game, game.team1, 2, i + 4)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i + 4)}"
                                     on:click={() => handleTeamClick(2, i + 4, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info27.seed}</span>
+                                    <span class="team-name">{info27.name}</span>
+                                    {#if info27.userPick}
+                                        <span class="user-pick">({info27.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info28 = getTeamDisplayInfo(game, game.team2, 2, i + 4)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 2, i + 4)}"
                                     on:click={() => handleTeamClick(2, i + 4, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info28.seed}</span>
+                                    <span class="team-name">{info28.name}</span>
+                                    {#if info28.userPick}
+                                        <span class="user-pick">({info28.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -719,23 +1016,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(3, i + 2)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
+                                {@const info29 = getTeamDisplayInfo(game, game.team1, 3, i + 2)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i + 2)}"
                                     on:click={() => handleTeamClick(3, i + 2, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info29.seed}</span>
+                                    <span class="team-name">{info29.name}</span>
+                                    {#if info29.userPick}
+                                        <span class="user-pick">({info29.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info30 = getTeamDisplayInfo(game, game.team2, 3, i + 2)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 3, i + 2)}"
                                     on:click={() => handleTeamClick(3, i + 2, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info30.seed}</span>
+                                    <span class="team-name">{info30.name}</span>
+                                    {#if info30.userPick}
+                                        <span class="user-pick">({info30.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -754,23 +1063,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(4, 1)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[1]?.team1}
+                            {@const info31 = getTeamDisplayInfo(bracket.round4[1], bracket.round4[1].team1, 4, 1)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[1], bracket.round4[1].team1, 4, 1)}"
                                 on:click={() => handleTeamClick(4, 1, bracket.round4[1].team1)}
+
                             >
-                                <span class="seed">{bracket.round4[1].team1.seed}</span>
-                                <span class="team-name">{bracket.round4[1].team1.name}</span>
+                                <span class="seed">{info31.seed}</span>
+                                <span class="team-name">{info31.name}</span>
+                                {#if info31.userPick}
+                                    <span class="user-pick">({info31.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
                         {/if}
                         {#if bracket.round4[1]?.team2}
+                            {@const info32 = getTeamDisplayInfo(bracket.round4[1], bracket.round4[1].team2, 4, 1)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[1], bracket.round4[1].team2, 4, 1)}"
                                 on:click={() => handleTeamClick(4, 1, bracket.round4[1].team2)}
+
                             >
-                                <span class="seed">{bracket.round4[1].team2.seed}</span>
-                                <span class="team-name">{bracket.round4[1].team2.name}</span>
+                                <span class="seed">{info32.seed}</span>
+                                <span class="team-name">{info32.name}</span>
+                                {#if info32.userPick}
+                                    <span class="user-pick">({info32.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
@@ -793,23 +1114,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(4, 3)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[3]?.team1}
+                            {@const info33 = getTeamDisplayInfo(bracket.round4[3], bracket.round4[3].team1, 4, 3)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[3], bracket.round4[3].team1, 4, 3)}"
                                 on:click={() => handleTeamClick(4, 3, bracket.round4[3].team1)}
+
                             >
-                                <span class="seed">{bracket.round4[3].team1.seed}</span>
-                                <span class="team-name">{bracket.round4[3].team1.name}</span>
+                                <span class="seed">{info33.seed}</span>
+                                <span class="team-name">{info33.name}</span>
+                                {#if info33.userPick}
+                                    <span class="user-pick">({info33.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
                         {/if}
                         {#if bracket.round4[3]?.team2}
+                            {@const info34 = getTeamDisplayInfo(bracket.round4[3], bracket.round4[3].team2, 4, 3)}
                             <button 
                                 class="team-btn {getSelectionClass(bracket.round4[3], bracket.round4[3].team2, 4, 3)}"
                                 on:click={() => handleTeamClick(4, 3, bracket.round4[3].team2)}
+
                             >
-                                <span class="seed">{bracket.round4[3].team2.seed}</span>
-                                <span class="team-name">{bracket.round4[3].team2.name}</span>
+                                <span class="seed">{info34.seed}</span>
+                                <span class="team-name">{info34.name}</span>
+                                {#if info34.userPick}
+                                    <span class="user-pick">({info34.userPick})</span>
+
+                                {/if}
                             </button>
                         {:else}
                             <div class="team-btn empty">TBD</div>
@@ -828,23 +1161,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(3, i + 6)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
+                                {@const info35 = getTeamDisplayInfo(game, game.team1, 3, i + 6)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 3, i + 6)}"
                                     on:click={() => handleTeamClick(3, i + 6, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info35.seed}</span>
+                                    <span class="team-name">{info35.name}</span>
+                                    {#if info35.userPick}
+                                        <span class="user-pick">({info35.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info36 = getTeamDisplayInfo(game, game.team2, 3, i + 6)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 3, i + 6)}"
                                     on:click={() => handleTeamClick(3, i + 6, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info36.seed}</span>
+                                    <span class="team-name">{info36.name}</span>
+                                    {#if info36.userPick}
+                                        <span class="user-pick">({info36.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -864,23 +1209,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(2, i + 12)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
+                                {@const info37 = getTeamDisplayInfo(game, game.team1, 2, i + 12)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 2, i + 12)}"
                                     on:click={() => handleTeamClick(2, i + 12, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info37.seed}</span>
+                                    <span class="team-name">{info37.name}</span>
+                                    {#if info37.userPick}
+                                        <span class="user-pick">({info37.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info38 = getTeamDisplayInfo(game, game.team2, 2, i + 12)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 2, i + 12)}"
                                     on:click={() => handleTeamClick(2, i + 12, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info38.seed}</span>
+                                    <span class="team-name">{info38.name}</span>
+                                    {#if info38.userPick}
+                                        <span class="user-pick">({info38.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -900,23 +1257,35 @@
                                 on:mouseleave={handleGameMouseLeave}
                                 on:click={() => handleNextGameClick(1, i + 24)}>
                             {#if game.team1}
+                                {@const info39 = getTeamDisplayInfo(game, game.team1, 1, i + 24)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team1, 1, i + 24)}"
                                     on:click={() => handleTeamClick(1, i + 24, game.team1)}
+
                                 >
-                                    <span class="seed">{game.team1.seed}</span>
-                                    <span class="team-name">{game.team1.name}</span>
+                                    <span class="seed">{info39.seed}</span>
+                                    <span class="team-name">{info39.name}</span>
+                                    {#if info39.userPick}
+                                        <span class="user-pick">({info39.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
                             {/if}
                             {#if game.team2}
+                                {@const info40 = getTeamDisplayInfo(game, game.team2, 1, i + 24)}
                                 <button 
                                     class="team-btn {getSelectionClass(game, game.team2, 1, i + 24)}"
                                     on:click={() => handleTeamClick(1, i + 24, game.team2)}
+
                                 >
-                                    <span class="seed">{game.team2.seed}</span>
-                                    <span class="team-name">{game.team2.name}</span>
+                                    <span class="seed">{info40.seed}</span>
+                                    <span class="team-name">{info40.name}</span>
+                                    {#if info40.userPick}
+                                        <span class="user-pick">({info40.userPick})</span>
+
+                                    {/if}
                                 </button>
                             {:else}
                                 <div class="team-btn empty">TBD</div>
@@ -986,7 +1355,7 @@
         --column-gap: 0.5rem;
         --region-gap: 1.5rem;
         --side-gap: 1rem;
-        --column-min-width: 180px;
+        --column-min-width: 198px;
     }
     
     .bracket-scroll-container {
@@ -1300,6 +1669,23 @@
         color: white;
     }
     
+    /* Scenario colors for undecided games */
+    .team-btn.selected.scenario-match {
+        background: #80276C;  /* Purple - user picked this AND scenario needs it */
+        color: white;
+    }
+    
+    .team-btn.selected.scenario-mismatch {
+        background: #f97316;  /* Orange - user picked this but scenario needs other team */
+        color: white;
+    }
+    
+    .team-btn.scenario-needed {
+        background: #fef3c7;  /* Light yellow - scenario needs this but user didn't pick */
+        color: #92400e;
+        border: 2px dashed #f59e0b;
+    }
+    
     .team-btn.selected .seed {
         background: white;
         color: #0066cc;
@@ -1311,6 +1697,37 @@
     
     .team-btn.selected.incorrect .seed {
         color: #dc2626;
+    }
+    
+    .team-btn.selected.scenario-match .seed {
+        color: #80276C;
+    }
+    
+    .team-btn.selected.scenario-mismatch .seed {
+        color: #f97316;
+    }
+    
+    .team-btn.scenario-needed .seed {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    /* User pick subtitle for scenario display */
+    .team-btn .user-pick {
+        display: block;
+        font-size: 0.65rem;
+        opacity: 0.85;
+        margin-top: 1px;
+        font-style: italic;
+    }
+    
+    .team-btn.selected.scenario-mismatch .user-pick {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .team-btn.scenario-needed .user-pick {
+        color: #92400e;
+        opacity: 0.75;
     }
     
     .team-btn.empty {
@@ -1338,6 +1755,14 @@
         background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     }
     
+    .team-btn.champion-display.scenario-match {
+        background: linear-gradient(135deg, #9b3d85 0%, #80276C 100%);
+    }
+    
+    .team-btn.champion-display.scenario-mismatch {
+        background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+    }
+    
     .champion-display .seed {
         background: white;
         color: #f59e0b;
@@ -1349,6 +1774,18 @@
     
     .champion-display.incorrect .seed {
         color: #dc2626;
+    }
+    
+    .champion-display.scenario-match .seed {
+        color: #80276C;
+    }
+    
+    .champion-display.scenario-mismatch .seed {
+        color: #f97316;
+    }
+    
+    .champion-display .user-pick {
+        color: rgba(255, 255, 255, 0.9);
     }
     
     .seed {
@@ -1368,7 +1805,7 @@
         flex: 1;
         white-space: nowrap;
         overflow: hidden;
-        text-overflow: ellipsis;
+        text-overflow: clip;
         min-width: 0;
     }
     
