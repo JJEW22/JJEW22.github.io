@@ -40,6 +40,7 @@
     let stakeData = {};  // Stake in each upcoming game per participant
     let winProbabilities = {};  // Map of name -> win probability
     let winningScenarios = {};  // Map of name -> array of winning scenarios
+    let nextGamePreferences = {};  // Map of game key -> preferences per participant
     
     onMount(async () => {
         try {
@@ -115,20 +116,24 @@
                 if (data.probabilities) {
                     winProbabilities = data.probabilities;
                     winningScenarios = data.winning_scenarios || {};
+                    nextGamePreferences = data.next_game_preferences || {};
                 } else {
                     // Old format - just probabilities object
                     winProbabilities = data;
                     winningScenarios = {};
+                    nextGamePreferences = {};
                 }
             } else {
                 // No probabilities file - leave empty
                 winProbabilities = {};
                 winningScenarios = {};
+                nextGamePreferences = {};
             }
         } catch (e) {
             console.log('No win probabilities file found');
             winProbabilities = {};
             winningScenarios = {};
+            nextGamePreferences = {};
         }
     }
     
@@ -512,6 +517,26 @@
         const names = ['', 'Round of 64', 'Round of 32', 'Sweet 16', 'Elite 8', 'Final Four', 'Championship'];
         return names[round] || `Round ${round}`;
     }
+    
+    /**
+     * Get the winning outcome preference for a participant in a specific game
+     * Returns { team1: percent, team2: percent } or null if no winning scenarios
+     */
+    function getPreference(gameKey, participantName) {
+        const gamePrefs = nextGamePreferences[gameKey];
+        if (!gamePrefs || !gamePrefs.preferences) return null;
+        return gamePrefs.preferences[participantName] || null;
+    }
+    
+    /**
+     * Format preference as tuple string (Team1: X%, Team2: Y%)
+     */
+    function formatPreferenceTuple(pref, team1Name, team2Name) {
+        if (!pref) return 'N/A';
+        const t1Pct = (pref.team1 * 100).toFixed(0);
+        const t2Pct = (pref.team2 * 100).toFixed(0);
+        return `${team1Name}: ${t1Pct}%, ${team2Name}: ${t2Pct}%`;
+    }
 </script>
 
 <div class="results-container">
@@ -685,18 +710,21 @@
                         <p class="no-data">No upcoming games found. The tournament may be complete or results haven't been entered.</p>
                     {:else}
                         {#each upcomingGames as gameInfo}
-                            <div class="stake-game" id="stake-game-r{gameInfo.round}-{gameInfo.index}">
+                            {@const gameKey = `r${gameInfo.round}-${gameInfo.index}`}
+                            <div class="stake-game" id="stake-game-{gameKey}">
                                 <h3>{getRoundName(gameInfo.round)}: {gameInfo.team1.name} vs {gameInfo.team2.name}</h3>
                                 
                                 <div class="stake-columns">
                                     <div class="stake-column">
                                         <h4>{gameInfo.team1.name} ({gameInfo.team1.seed})</h4>
                                         <ul class="stake-list">
-                                            {#each Object.entries(stakeData[`r${gameInfo.round}-${gameInfo.index}`] || {}) as [name, stake]}
+                                            {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
                                                 {#if stake && stake.team1 > 0}
+                                                    {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team1}</span>
+                                                        <span class="stake-pref">({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
                                                     </li>
                                                 {/if}
                                             {/each}
@@ -706,11 +734,13 @@
                                     <div class="stake-column">
                                         <h4>{gameInfo.team2.name} ({gameInfo.team2.seed})</h4>
                                         <ul class="stake-list">
-                                            {#each Object.entries(stakeData[`r${gameInfo.round}-${gameInfo.index}`] || {}) as [name, stake]}
+                                            {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
                                                 {#if stake && stake.team2 > 0}
+                                                    {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team2}</span>
+                                                        <span class="stake-pref">({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
                                                     </li>
                                                 {/if}
                                             {/each}
@@ -720,10 +750,12 @@
                                     <div class="stake-column no-stake">
                                         <h4>No Stake</h4>
                                         <ul class="stake-list">
-                                            {#each Object.entries(stakeData[`r${gameInfo.round}-${gameInfo.index}`] || {}) as [name, stake]}
+                                            {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
                                                 {#if !stake || (!stake.team1 && !stake.team2)}
+                                                    {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
+                                                        <span class="stake-pref">({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
                                                     </li>
                                                 {/if}
                                             {/each}
@@ -1062,13 +1094,25 @@
     .stake-list li {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         padding: 0.25rem 0;
         font-size: 0.9rem;
+        gap: 0.5rem;
+    }
+    
+    .stake-name {
+        flex: 1;
     }
     
     .stake-points {
         font-weight: 600;
         color: #059669;
+    }
+    
+    .stake-pref {
+        font-size: 0.8rem;
+        color: #6b7280;
+        font-style: italic;
     }
     
     h2 {

@@ -587,6 +587,132 @@ def process_winning_outcomes(
     return processed
 
 
+def find_next_games(results_bracket: dict) -> List[Tuple[str, int, dict, dict]]:
+    """
+    Find games that are "next up" - both parent games have been decided.
+    Returns list of (round_key, game_index, team1, team2) tuples.
+    """
+    next_games = []
+    
+    for round_key in ROUND_KEYS:
+        round_num = ROUND_KEYS.index(round_key) + 1
+        results_round = results_bracket.get(round_key, [])
+        
+        for i, game in enumerate(results_round):
+            if not game:
+                continue
+            
+            # Skip if already has a winner
+            if get_winner_name(game):
+                continue
+            
+            team1 = game.get('team1')
+            team2 = game.get('team2')
+            
+            # Both teams must be determined
+            if not team1 or not team2:
+                continue
+            
+            # For round 1, all games with teams are "next"
+            if round_num == 1:
+                next_games.append((round_key, i, team1, team2))
+                continue
+            
+            # For later rounds, check if both feeder games have winners
+            feeder_info = get_feeder_games(round_key, i)
+            if feeder_info:
+                prev_round_key, f1_idx, f2_idx = feeder_info
+                prev_round = results_bracket.get(prev_round_key, [])
+                
+                f1_game = prev_round[f1_idx] if f1_idx < len(prev_round) else None
+                f2_game = prev_round[f2_idx] if f2_idx < len(prev_round) else None
+                
+                if f1_game and f2_game and get_winner_name(f1_game) and get_winner_name(f2_game):
+                    next_games.append((round_key, i, team1, team2))
+    
+    return next_games
+
+
+def compute_next_game_preferences(
+    raw_winning_outcomes: Dict[str, Dict[str, float]],
+    remaining_games: List[Tuple[str, int]],
+    next_games: List[Tuple[str, int, dict, dict]],
+    results_bracket: dict
+) -> Dict[str, dict]:
+    """
+    Compute what percentage of each participant's winning outcomes require each result
+    for each "next up" game.
+    
+    Args:
+        raw_winning_outcomes: Dict of {participant: {outcome_string: probability}}
+        remaining_games: List of (round_key, game_index) tuples for all remaining games
+        next_games: List of (round_key, game_index, team1, team2) for next games
+        results_bracket: The results bracket
+        
+    Returns:
+        Dict mapping game keys to preference data:
+        {
+            "r3-2": {
+                "team1": "Florida",
+                "team2": "Clemson", 
+                "preferences": {
+                    "alice": {"team1": 0.65, "team2": 0.35},
+                    "bob": null
+                }
+            }
+        }
+    """
+    # Build a mapping from (round_key, game_index) to position in outcome string
+    game_to_position = {(rk, gi): pos for pos, (rk, gi) in enumerate(remaining_games)}
+    
+    preferences = {}
+    
+    for round_key, game_index, team1, team2 in next_games:
+        game_key = f"r{ROUND_KEYS.index(round_key) + 1}-{game_index}"
+        
+        # Check if this game is in remaining games
+        if (round_key, game_index) not in game_to_position:
+            continue
+        
+        position = game_to_position[(round_key, game_index)]
+        
+        game_prefs = {
+            "team1": get_team_name(team1),
+            "team2": get_team_name(team2),
+            "team1Seed": team1.get('seed') if team1 else None,
+            "team2Seed": team2.get('seed') if team2 else None,
+            "preferences": {}
+        }
+        
+        for name, outcomes in raw_winning_outcomes.items():
+            if not outcomes:
+                game_prefs["preferences"][name] = None
+                continue
+            
+            team1_prob = 0.0  # outcome char '0' means team1 wins
+            team2_prob = 0.0  # outcome char '1' means team2 wins
+            
+            for outcome_str, prob in outcomes.items():
+                if position < len(outcome_str):
+                    if outcome_str[position] == '0':
+                        team1_prob += prob
+                    else:  # '1'
+                        team2_prob += prob
+            
+            total = team1_prob + team2_prob
+            if total > 0:
+                game_prefs["preferences"][name] = {
+                    "team1": team1_prob / total,
+                    "team2": team2_prob / total
+                }
+            else:
+                game_prefs["preferences"][name] = None
+        
+        preferences[game_key] = game_prefs
+    
+    return preferences
+
+
 def calculate_win_probabilities(
     results_path: str,
     brackets_dir: str,
@@ -668,7 +794,7 @@ def calculate_win_probabilities(
         sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
         winner = sorted_scores[0][0]
         probabilities = {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
-        return probabilities, {}  # Empty winning_outcomes since tournament is over
+        return probabilities, {}, {}  # Empty winning_outcomes and next_game_prefs since tournament is over
     
     # Determine simulation approach
     total_possible = 2 ** num_remaining
@@ -754,6 +880,17 @@ def calculate_win_probabilities(
         num_raw = len(raw_winning_outcomes.get(name, {}))
         print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}, {num_raw} raw winning outcomes")
     
+    # Compute next game preferences (before merging)
+    print("\nComputing next game preferences...")
+    next_games = find_next_games(results_bracket)
+    print(f"  Found {len(next_games)} next games")
+    next_game_prefs = compute_next_game_preferences(
+        raw_winning_outcomes,
+        remaining_games,
+        next_games,
+        results_bracket
+    )
+    
     # Process winning outcomes: merge similar ones and keep top N
     print("\nProcessing winning scenarios...")
     processed_outcomes = process_winning_outcomes(
@@ -763,7 +900,7 @@ def calculate_win_probabilities(
         max_scenarios
     )
     
-    return win_probabilities, processed_outcomes
+    return win_probabilities, processed_outcomes, next_game_prefs
 
 
 def main():
@@ -816,7 +953,7 @@ def main():
     print(f"Participants: {participants}")
     
     # Calculate probabilities
-    probabilities, winning_outcomes = calculate_win_probabilities(
+    probabilities, winning_outcomes, next_game_prefs = calculate_win_probabilities(
         results_path=args.results,
         brackets_dir=args.brackets_dir,
         participants=participants,
@@ -826,10 +963,11 @@ def main():
         max_scenarios=args.max_scenarios
     )
     
-    # Save to JSON (include both probabilities and winning scenarios)
+    # Save to JSON (include probabilities, winning scenarios, and next game preferences)
     output_data = {
         'probabilities': probabilities,
-        'winning_scenarios': winning_outcomes
+        'winning_scenarios': winning_outcomes,
+        'next_game_preferences': next_game_prefs
     }
     
     with open(args.output, 'w') as f:
