@@ -620,7 +620,7 @@
                                 <select id="scenario-select" bind:value={selectedScenario}>
                                     <option value={null}>-- None --</option>
                                     {#each winningScenarios[selectedParticipant] as scenario, i}
-                                        <option value={i}>Scenario {i + 1} - {getScenarioChampion(scenario)} wins</option>
+                                        <option value={i}>Scenario {i + 1} - {getScenarioChampion(scenario)} wins ({(scenario.probability * 100).toFixed(1)}%)</option>
                                     {/each}
                                 </select>
                             {:else}
@@ -653,6 +653,10 @@
                                 <div class="scenario-legend-item">
                                     <div class="legend-color mismatch"></div>
                                     <span>Winner - differs from bracket (bracket's pick)</span>
+                                </div>
+                                <div class="scenario-legend-item">
+                                    <div class="legend-color either"></div>
+                                    <span>Either team can win</span>
                                 </div>
                             </div>
                         {/if}
@@ -920,6 +924,7 @@
     .legend-color.incorrect { background: #dc2626; }
     .legend-color.match { background: #80276C; }
     .legend-color.mismatch { background: #f97316; }
+    .legend-color.either { background: #0891b2; }
     
     .round-section {
         margin-bottom: 1.5rem;

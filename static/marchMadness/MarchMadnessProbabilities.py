@@ -6,6 +6,7 @@ This script simulates all possible outcomes for remaining games and calculates
 the probability of each participant winning the competition.
 
 Uses JSON bracket files instead of Excel.
+Supports merging similar winning outcomes and showing top N most probable scenarios.
 """
 
 import json
@@ -24,9 +25,8 @@ ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
 # Progress reporting interval (print progress every N simulations)
 PROGRESS_INTERVAL = 1000
 
-# Winning scenarios storage settings
-MAX_WINNING_OUTCOMES_PER_PARTICIPANT = 10
-REPLACEMENT_PROBABILITY = 0.1
+# Default number of top winning scenarios to keep per participant
+DEFAULT_MAX_WINNING_SCENARIOS = 10
 
 
 def load_bracket(filepath: str) -> dict:
@@ -315,27 +315,276 @@ def decode_outcome_to_games(results_bracket: dict, remaining_games: List[Tuple[s
     return game_results
 
 
-def store_winning_outcome(winning_outcomes: Dict[str, List], name: str, 
-                          outcome_string: str, game_results: List[dict]):
+def can_merge_outcomes(outcome1: str, outcome2: str) -> Optional[int]:
     """
-    Store a winning outcome for a participant.
-    If storage is full, randomly decide whether to replace an existing one.
+    Check if two outcome strings can be merged (differ by exactly 1 position).
+    Returns the differing position index if mergeable, None otherwise.
+    Both outcomes can contain 'X' for "either" positions.
     """
-    scenario = {
-        'outcome': outcome_string,
-        'games': game_results
-    }
+    if len(outcome1) != len(outcome2):
+        return None
     
-    if name not in winning_outcomes:
-        winning_outcomes[name] = []
+    diff_positions = []
+    for i, (c1, c2) in enumerate(zip(outcome1, outcome2)):
+        if c1 != c2:
+            # Can only merge if both are concrete values (0 or 1), not X
+            if c1 == 'X' or c2 == 'X':
+                return None
+            diff_positions.append(i)
+            if len(diff_positions) > 1:
+                return None  # Early exit if more than 1 difference
     
-    if len(winning_outcomes[name]) < MAX_WINNING_OUTCOMES_PER_PARTICIPANT:
-        # Still have room, just add it
-        winning_outcomes[name].append(scenario)
-    elif random.random() < REPLACEMENT_PROBABILITY:
-        # Storage full, but randomly decided to replace
-        replace_index = random.randint(0, len(winning_outcomes[name]) - 1)
-        winning_outcomes[name][replace_index] = scenario
+    if len(diff_positions) == 1:
+        return diff_positions[0]
+    return None
+
+
+def merge_two_outcomes(outcome1: str, outcome2: str, diff_pos: int) -> str:
+    """
+    Merge two outcomes that differ at exactly one position.
+    Returns new outcome with 'X' at the differing position.
+    """
+    result = list(outcome1)
+    result[diff_pos] = 'X'
+    return ''.join(result)
+
+
+def get_merge_key(outcome: str, pos: int) -> str:
+    """
+    Get a key for grouping outcomes that could potentially merge at position pos.
+    Returns the outcome with position pos replaced with 'X'.
+    """
+    result = list(outcome)
+    result[pos] = 'X'
+    return ''.join(result)
+
+
+def merge_winning_outcomes(outcomes_with_probs: Dict[str, float]) -> Dict[str, float]:
+    """
+    Iteratively merge winning outcomes that differ by exactly 1 position.
+    Uses greedy approach: always merge the pair with highest combined probability.
+    
+    Optimized to use grouping by potential merge keys for faster matching.
+    
+    Args:
+        outcomes_with_probs: Dict mapping outcome strings to their probabilities
+        
+    Returns:
+        Dict of merged outcomes with combined probabilities
+    """
+    outcomes = dict(outcomes_with_probs)
+    
+    if len(outcomes) <= 1:
+        return outcomes
+    
+    merge_count = 0
+    num_positions = len(next(iter(outcomes)))
+    
+    while True:
+        # Find the best merge using grouping
+        best_merge = None
+        best_combined_prob = -1
+        
+        # For each position, group outcomes by what they'd look like with X at that position
+        for pos in range(num_positions):
+            groups = {}
+            for outcome, prob in outcomes.items():
+                # Skip if this position is already X
+                if outcome[pos] == 'X':
+                    continue
+                key = get_merge_key(outcome, pos)
+                if key not in groups:
+                    groups[key] = []
+                groups[key].append((outcome, prob))
+            
+            # Check groups with exactly 2 members (potential merges)
+            for key, members in groups.items():
+                if len(members) == 2:
+                    out1, prob1 = members[0]
+                    out2, prob2 = members[1]
+                    # Verify they actually differ by exactly 1 position
+                    if can_merge_outcomes(out1, out2) is not None:
+                        combined_prob = prob1 + prob2
+                        if combined_prob > best_combined_prob:
+                            best_combined_prob = combined_prob
+                            best_merge = (out1, out2, pos)
+        
+        # If no merges possible, we're done
+        if best_merge is None:
+            break
+        
+        # Perform the best merge
+        out1, out2, pos = best_merge
+        merged = merge_two_outcomes(out1, out2, pos)
+        
+        # Remove old outcomes, add merged one
+        prob1 = outcomes.pop(out1)
+        prob2 = outcomes.pop(out2)
+        
+        # If merged outcome already exists, add to it
+        if merged in outcomes:
+            outcomes[merged] += prob1 + prob2
+        else:
+            outcomes[merged] = prob1 + prob2
+        
+        merge_count += 1
+        
+        # Progress update for large merges
+        if merge_count % 500 == 0:
+            print(f"    ... merged {merge_count} pairs, {len(outcomes)} outcomes remaining")
+    
+    if merge_count > 0:
+        print(f"    Merged {merge_count} outcome pairs")
+    
+    return outcomes
+
+
+def get_top_scenarios(outcomes_with_probs: Dict[str, float], max_scenarios: int) -> List[Tuple[str, float]]:
+    """
+    Get the top N most probable scenarios.
+    
+    Returns:
+        List of (outcome_string, probability) tuples, sorted by probability descending
+    """
+    sorted_outcomes = sorted(outcomes_with_probs.items(), key=lambda x: x[1], reverse=True)
+    return sorted_outcomes[:max_scenarios]
+
+
+def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
+                                    outcome_string: str) -> List[dict]:
+    """
+    Decode a potentially merged outcome string (containing 'X' for either) into a list of game results.
+    Returns list of dicts with round, game index, and winner info.
+    For positions with 'X', winner is set to 'either' and both teams are valid.
+    """
+    import copy
+    hypothetical = copy.deepcopy(results_bracket)
+    game_results = []
+    
+    for i, (round_key, game_index) in enumerate(remaining_games):
+        game = hypothetical[round_key][game_index]
+        
+        team1 = game.get('team1')
+        team2 = game.get('team2')
+        
+        if not team1 or not team2:
+            continue
+        
+        outcome_char = outcome_string[i]
+        
+        if outcome_char == 'X':
+            # Either team can win - this game doesn't matter for the outcome
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_team_name(team1),
+                'team2': get_team_name(team2),
+                'winner': 'either',
+                'either': True,
+                'team1Seed': team1.get('seed') if team1 else None,
+                'team2Seed': team2.get('seed') if team2 else None,
+            })
+            
+            # For propagation, we need to pick one - use team1 arbitrarily
+            # (doesn't matter since this path merges anyway)
+            winner = team1
+        elif outcome_char == '0':
+            winner = team1
+            loser = team2
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_team_name(team1),
+                'team2': get_team_name(team2),
+                'winner': get_team_name(winner),
+                'loser': get_team_name(loser),
+                'either': False,
+                'team1Seed': team1.get('seed') if team1 else None,
+                'team2Seed': team2.get('seed') if team2 else None,
+                'winnerSeed': winner.get('seed') if winner else None
+            })
+        else:  # '1'
+            winner = team2
+            loser = team1
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_team_name(team1),
+                'team2': get_team_name(team2),
+                'winner': get_team_name(winner),
+                'loser': get_team_name(loser),
+                'either': False,
+                'team1Seed': team1.get('seed') if team1 else None,
+                'team2Seed': team2.get('seed') if team2 else None,
+                'winnerSeed': winner.get('seed') if winner else None
+            })
+        
+        # Propagate winner to next round
+        parent_info = get_parent_game_info(round_key, game_index)
+        if parent_info:
+            parent_round, parent_index, slot = parent_info
+            
+            if parent_round in hypothetical and parent_index < len(hypothetical[parent_round]):
+                parent_game = hypothetical[parent_round][parent_index]
+                if slot == 0:
+                    parent_game['team1'] = winner
+                else:
+                    parent_game['team2'] = winner
+    
+    return game_results
+
+
+def process_winning_outcomes(
+    raw_outcomes: Dict[str, Dict[str, float]],  # name -> {outcome: probability}
+    results_bracket: dict,
+    remaining_games: List[Tuple[str, int]],
+    max_scenarios: int
+) -> Dict[str, List[dict]]:
+    """
+    Process raw winning outcomes: merge similar ones and keep top N.
+    
+    Args:
+        raw_outcomes: Dict mapping participant name to {outcome_string: probability}
+        results_bracket: The results bracket for decoding games
+        remaining_games: List of remaining games
+        max_scenarios: Maximum scenarios to keep per participant
+        
+    Returns:
+        Dict mapping participant name to list of scenario dicts with probability
+    """
+    processed = {}
+    
+    for name, outcomes in raw_outcomes.items():
+        if not outcomes:
+            processed[name] = []
+            continue
+        
+        print(f"  Processing {name}: {len(outcomes)} raw winning outcomes")
+        
+        # Merge similar outcomes
+        merged = merge_winning_outcomes(outcomes)
+        print(f"    After merging: {len(merged)} outcomes")
+        
+        # Get top scenarios
+        top = get_top_scenarios(merged, max_scenarios)
+        print(f"    Keeping top {len(top)} scenarios")
+        
+        # Decode each scenario to game results
+        scenarios = []
+        for outcome_str, probability in top:
+            games = decode_merged_outcome_to_games(results_bracket, remaining_games, outcome_str)
+            scenarios.append({
+                'outcome': outcome_str,
+                'probability': probability,
+                'games': games
+            })
+        
+        processed[name] = scenarios
+    
+    return processed
 
 
 def calculate_win_probabilities(
@@ -345,8 +594,9 @@ def calculate_win_probabilities(
     teams_file: str,
     apply_seed_bonus: bool = True,
     max_simulations: Optional[int] = None,
-    bonus_stars: Optional[Dict[str, int]] = None
-) -> Dict[str, float]:
+    bonus_stars: Optional[Dict[str, int]] = None,
+    max_scenarios: int = DEFAULT_MAX_WINNING_SCENARIOS
+) -> Tuple[Dict[str, float], Dict[str, List]]:
     """
     Calculate win probabilities for all participants.
     
@@ -358,9 +608,10 @@ def calculate_win_probabilities(
         apply_seed_bonus: Whether to apply upset bonus points
         max_simulations: Max number of simulations (uses Monte Carlo if exceeded)
         bonus_stars: Optional dict of {name: bonus_points}
+        max_scenarios: Maximum number of winning scenarios to keep per participant
     
     Returns:
-        Dict of {participant_name: win_probability}
+        Tuple of (win_probabilities dict, winning_scenarios dict)
     """
     # Load results bracket
     results_bracket = load_bracket(results_path)
@@ -398,7 +649,7 @@ def calculate_win_probabilities(
     
     if not name_to_bracket:
         print("Error: No brackets found")
-        return {}
+        return {}, {}
     
     # Find remaining games
     remaining_games = find_remaining_games(results_bracket)
@@ -433,10 +684,14 @@ def calculate_win_probabilities(
             print(f"Total outcomes ({total_possible:,}) <= max_simulations ({max_simulations:,})")
         print(f"Simulating all {num_simulations:,} possible outcomes...")
     
+    # Calculate base probability per outcome
+    base_probability = 1.0 / total_possible
+    
     # Simulate outcomes
     number_of_wins = {name: 0 for name in name_to_bracket.keys()}
     places = {name: [] for name in name_to_bracket.keys()}
-    winning_outcomes = {}  # Store winning scenarios per participant
+    # Store ALL winning outcomes with their probabilities
+    raw_winning_outcomes = {name: {} for name in name_to_bracket.keys()}  # name -> {outcome: probability}
     
     # Calculate progress intervals
     total_intervals = num_simulations // PROGRESS_INTERVAL if num_simulations >= PROGRESS_INTERVAL else 1
@@ -474,9 +729,12 @@ def calculate_win_probabilities(
             places[name].append(place + 1)
             if place == 0:
                 number_of_wins[name] += 1
-                # Store this winning outcome for the winner
-                game_results = decode_outcome_to_games(results_bracket, remaining_games, outcome)
-                store_winning_outcome(winning_outcomes, name, outcome, game_results)
+                # Store this winning outcome with its probability
+                if outcome not in raw_winning_outcomes[name]:
+                    raw_winning_outcomes[name][outcome] = base_probability
+                else:
+                    # For Monte Carlo, might see same outcome multiple times
+                    raw_winning_outcomes[name][outcome] += base_probability
     
     # Clear progress line
     print(f"\rProgress: {total_intervals}/{total_intervals} - Complete!          ")
@@ -493,10 +751,19 @@ def calculate_win_probabilities(
         prob = number_of_wins[name] / num_simulations
         avg_place = sum(places[name]) / len(places[name])
         win_probabilities[name] = prob
-        num_scenarios = len(winning_outcomes.get(name, []))
-        print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}, {num_scenarios} winning scenarios stored")
+        num_raw = len(raw_winning_outcomes.get(name, {}))
+        print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}, {num_raw} raw winning outcomes")
     
-    return win_probabilities, winning_outcomes
+    # Process winning outcomes: merge similar ones and keep top N
+    print("\nProcessing winning scenarios...")
+    processed_outcomes = process_winning_outcomes(
+        raw_winning_outcomes, 
+        results_bracket, 
+        remaining_games, 
+        max_scenarios
+    )
+    
+    return win_probabilities, processed_outcomes
 
 
 def main():
@@ -510,6 +777,8 @@ def main():
     parser.add_argument('--no-seed-bonus', action='store_true', help='Disable upset bonus')
     parser.add_argument('--max-simulations', type=int, default=100000,
                        help='Maximum simulations. Uses Monte Carlo if total outcomes exceeds this. Default: 100000')
+    parser.add_argument('--max-scenarios', type=int, default=DEFAULT_MAX_WINNING_SCENARIOS,
+                       help=f'Maximum winning scenarios to keep per participant. Default: {DEFAULT_MAX_WINNING_SCENARIOS}')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducible results')
     
     args = parser.parse_args()
@@ -553,7 +822,8 @@ def main():
         participants=participants,
         teams_file=args.teams or '',
         apply_seed_bonus=not args.no_seed_bonus,
-        max_simulations=args.max_simulations
+        max_simulations=args.max_simulations,
+        max_scenarios=args.max_scenarios
     )
     
     # Save to JSON (include both probabilities and winning scenarios)

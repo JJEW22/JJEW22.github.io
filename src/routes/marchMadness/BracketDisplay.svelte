@@ -205,6 +205,12 @@
         if (scenario && isGameUndecided(round, gameIndex)) {
             const scenarioGame = getScenarioGame(round, gameIndex);
             if (scenarioGame) {
+                // Check if this is an "either" game (outcome doesn't matter)
+                if (scenarioGame.either) {
+                    // Both teams can win - highlight both with "either" style
+                    return 'selected scenario-either';
+                }
+                
                 // Determine what team the SCENARIO says is in this slot
                 const isTeam1Slot = game.team1 && game.team1.name === team.name;
                 const isTeam2Slot = game.team2 && game.team2.name === team.name;
@@ -1680,6 +1686,11 @@
         color: white;
     }
     
+    .team-btn.selected.scenario-either {
+        background: #0891b2;  /* Cyan - either team can win in this scenario */
+        color: white;
+    }
+    
     .team-btn.scenario-needed {
         background: #fef3c7;  /* Light yellow - scenario needs this but user didn't pick */
         color: #92400e;
@@ -1705,6 +1716,10 @@
     
     .team-btn.selected.scenario-mismatch .seed {
         color: #f97316;
+    }
+    
+    .team-btn.selected.scenario-either .seed {
+        color: #0891b2;
     }
     
     .team-btn.scenario-needed .seed {
@@ -1763,6 +1778,10 @@
         background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
     }
     
+    .team-btn.champion-display.scenario-either {
+        background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+    }
+    
     .champion-display .seed {
         background: white;
         color: #f59e0b;
@@ -1782,6 +1801,10 @@
     
     .champion-display.scenario-mismatch .seed {
         color: #f97316;
+    }
+    
+    .champion-display.scenario-either .seed {
+        color: #0891b2;
     }
     
     .champion-display .user-pick {
