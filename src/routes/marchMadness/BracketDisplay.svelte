@@ -222,11 +222,16 @@
                     scenarioTeamInSlot = scenarioGame.team2;
                 }
                 
+                // Check if scenario team is a combined "either" team (contains "/")
+                const scenarioTeamNames = scenarioTeamInSlot ? scenarioTeamInSlot.split('/') : [];
+                const userPickIsInEither = scenarioTeamNames.length > 1 && scenarioTeamNames.includes(team.name);
+                
                 // Is this slot's scenario team the winner?
                 const isScenarioWinner = scenarioTeamInSlot === scenarioGame.winner;
                 
                 // Did the user's original pick for this slot match the scenario?
-                const userMatchesScenario = team.name === scenarioTeamInSlot;
+                // Either exact match or user's pick is one of the combined either teams
+                const userMatchesScenario = team.name === scenarioTeamInSlot || userPickIsInEither;
                 
                 if (isScenarioWinner) {
                     // This slot contains the scenario's winner
@@ -273,22 +278,37 @@
         const isTeam2Slot = game.team2 && game.team2.name === team.name;
         
         // Get what the scenario says should be in this slot
-        let scenarioTeamName, scenarioTeamSeed;
+        let scenarioTeamName, scenarioTeamSeed, isEitherTeam, eitherTeams;
         if (isTeam1Slot) {
             scenarioTeamName = scenarioGame.team1;
             scenarioTeamSeed = scenarioGame.team1Seed;
+            isEitherTeam = scenarioGame.team1IsEither;
         } else if (isTeam2Slot) {
             scenarioTeamName = scenarioGame.team2;
             scenarioTeamSeed = scenarioGame.team2Seed;
+            isEitherTeam = scenarioGame.team2IsEither;
         } else {
             // Fallback - shouldn't happen
             return { name: team.name, seed: team.seed, userPick: null };
         }
         
+        // Check if the scenario team name contains "/" (combined either teams)
+        const scenarioTeamNames = scenarioTeamName ? scenarioTeamName.split('/') : [];
+        
+        // Check if user's pick is one of the either teams
+        const userPickIsInEither = scenarioTeamNames.includes(team.name);
+        
         // Compare user's team in this slot vs scenario's team
         if (team.name === scenarioTeamName) {
-            // User's prediction matches scenario - show normally
+            // User's prediction matches scenario exactly - show normally
             return { name: team.name, seed: team.seed, userPick: null };
+        } else if (userPickIsInEither) {
+            // User's pick is one of the combined either teams - show combined name, no parenthetical
+            return { 
+                name: scenarioTeamName, 
+                seed: scenarioTeamSeed, 
+                userPick: null 
+            };
         } else {
             // User had a different team - show scenario's team with user's pick as subtitle
             return {

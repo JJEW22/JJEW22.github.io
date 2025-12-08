@@ -359,12 +359,159 @@ def get_merge_key(outcome: str, pos: int) -> str:
     return ''.join(result)
 
 
+import heapq
+
+class MergeCandidateTracker:
+    """
+    Efficiently tracks merge candidates using incremental group maintenance.
+    
+    Maintains:
+    - groups[pos][key] = set of outcomes that share this merge key at position pos
+    - A max-heap of merge candidates (negative prob for max-heap behavior)
+    - probabilities[outcome] = probability of each outcome
+    """
+    
+    def __init__(self, outcomes_with_probs: Dict[str, float]):
+        self.probabilities = dict(outcomes_with_probs)
+        self.num_positions = len(next(iter(outcomes_with_probs))) if outcomes_with_probs else 0
+        
+        # groups[pos][key] = set of outcomes with that merge key at position pos
+        self.groups: List[Dict[str, set]] = [{} for _ in range(self.num_positions)]
+        
+        # Priority queue: (-combined_prob, outcome1, outcome2, position)
+        # Using negative prob because heapq is a min-heap
+        self.heap = []
+        
+        # Track valid candidates (some in heap may be stale)
+        self.valid_outcomes = set(outcomes_with_probs.keys())
+        
+        # Build initial groups
+        self._build_initial_groups()
+    
+    def _build_initial_groups(self):
+        """Build initial groups for all positions. O(N * L)"""
+        for outcome in self.probabilities:
+            self._add_outcome_to_groups(outcome)
+        
+        # Find all initial merge candidates
+        self._find_all_merge_candidates()
+    
+    def _add_outcome_to_groups(self, outcome: str):
+        """Add an outcome to all relevant position groups. O(L)"""
+        for pos in range(self.num_positions):
+            if outcome[pos] == 'X':
+                continue  # Skip positions that are already merged
+            key = get_merge_key(outcome, pos)
+            if key not in self.groups[pos]:
+                self.groups[pos][key] = set()
+            self.groups[pos][key].add(outcome)
+    
+    def _remove_outcome_from_groups(self, outcome: str):
+        """Remove an outcome from all position groups. O(L)"""
+        for pos in range(self.num_positions):
+            if outcome[pos] == 'X':
+                continue
+            key = get_merge_key(outcome, pos)
+            if key in self.groups[pos]:
+                self.groups[pos][key].discard(outcome)
+                # Clean up empty groups
+                if not self.groups[pos][key]:
+                    del self.groups[pos][key]
+    
+    def _find_all_merge_candidates(self):
+        """Find all merge candidates from current groups. O(N * L) total."""
+        for pos in range(self.num_positions):
+            for key, members in self.groups[pos].items():
+                if len(members) == 2:
+                    self._add_candidate_from_group(pos, members)
+    
+    def _add_candidate_from_group(self, pos: int, members: set):
+        """Add a merge candidate to the heap if valid."""
+        if len(members) != 2:
+            return
+        members_list = sorted(members)  # Sort for deterministic ordering
+        out1, out2 = members_list[0], members_list[1]
+        
+        # Verify both are still valid
+        if out1 not in self.valid_outcomes or out2 not in self.valid_outcomes:
+            return
+        
+        combined_prob = self.probabilities[out1] + self.probabilities[out2]
+        # Use negative for max-heap behavior
+        # Tiebreaker: prefer lower positions (add pos as secondary sort key)
+        # Then prefer lower out1 (lexicographic order) for determinism
+        heapq.heappush(self.heap, (-combined_prob, pos, out1, out2))
+    
+    def _check_and_add_candidates_for_outcome(self, outcome: str):
+        """Check if this outcome forms any new merge candidates. O(L)"""
+        for pos in range(self.num_positions):
+            if outcome[pos] == 'X':
+                continue
+            key = get_merge_key(outcome, pos)
+            if key in self.groups[pos] and len(self.groups[pos][key]) == 2:
+                self._add_candidate_from_group(pos, self.groups[pos][key])
+    
+    def get_best_merge(self) -> Optional[Tuple[str, str, int, float]]:
+        """
+        Get the best (highest probability) merge candidate.
+        Returns (outcome1, outcome2, position, combined_prob) or None if no merges available.
+        Handles stale entries in the heap. O(log N) amortized.
+        """
+        while self.heap:
+            neg_prob, pos, out1, out2 = heapq.heappop(self.heap)
+            
+            # Check if this candidate is still valid (not stale)
+            if out1 in self.valid_outcomes and out2 in self.valid_outcomes:
+                # Verify they're still in the same group (extra safety check)
+                key = get_merge_key(out1, pos)
+                if key in self.groups[pos] and out1 in self.groups[pos][key] and out2 in self.groups[pos][key]:
+                    return (out1, out2, pos, -neg_prob)
+        
+        return None
+    
+    def perform_merge(self, out1: str, out2: str, pos: int) -> str:
+        """
+        Perform a merge and update all data structures. O(L)
+        Returns the merged outcome.
+        """
+        # Create merged outcome
+        merged = merge_two_outcomes(out1, out2, pos)
+        
+        # Calculate new probability
+        prob1 = self.probabilities.pop(out1)
+        prob2 = self.probabilities.pop(out2)
+        new_prob = prob1 + prob2
+        
+        # Remove old outcomes from tracking
+        self.valid_outcomes.discard(out1)
+        self.valid_outcomes.discard(out2)
+        
+        # Remove old outcomes from groups
+        self._remove_outcome_from_groups(out1)
+        self._remove_outcome_from_groups(out2)
+        
+        # Add merged outcome (or combine if it already exists)
+        if merged in self.probabilities:
+            self.probabilities[merged] += new_prob
+        else:
+            self.probabilities[merged] = new_prob
+            self.valid_outcomes.add(merged)
+            self._add_outcome_to_groups(merged)
+            self._check_and_add_candidates_for_outcome(merged)
+        
+        return merged
+    
+    def get_results(self) -> Dict[str, float]:
+        """Get the final outcomes with probabilities."""
+        return self.probabilities
+
+
 def merge_winning_outcomes(outcomes_with_probs: Dict[str, float]) -> Dict[str, float]:
     """
     Iteratively merge winning outcomes that differ by exactly 1 position.
     Uses greedy approach: always merge the pair with highest combined probability.
     
-    Optimized to use grouping by potential merge keys for faster matching.
+    Optimized O(N * L) algorithm using incremental group maintenance and priority queue.
     
     Args:
         outcomes_with_probs: Dict mapping outcome strings to their probabilities
@@ -372,71 +519,30 @@ def merge_winning_outcomes(outcomes_with_probs: Dict[str, float]) -> Dict[str, f
     Returns:
         Dict of merged outcomes with combined probabilities
     """
-    outcomes = dict(outcomes_with_probs)
+    if len(outcomes_with_probs) <= 1:
+        return dict(outcomes_with_probs)
     
-    if len(outcomes) <= 1:
-        return outcomes
-    
+    tracker = MergeCandidateTracker(outcomes_with_probs)
     merge_count = 0
-    num_positions = len(next(iter(outcomes)))
     
     while True:
-        # Find the best merge using grouping
-        best_merge = None
-        best_combined_prob = -1
-        
-        # For each position, group outcomes by what they'd look like with X at that position
-        for pos in range(num_positions):
-            groups = {}
-            for outcome, prob in outcomes.items():
-                # Skip if this position is already X
-                if outcome[pos] == 'X':
-                    continue
-                key = get_merge_key(outcome, pos)
-                if key not in groups:
-                    groups[key] = []
-                groups[key].append((outcome, prob))
-            
-            # Check groups with exactly 2 members (potential merges)
-            for key, members in groups.items():
-                if len(members) == 2:
-                    out1, prob1 = members[0]
-                    out2, prob2 = members[1]
-                    # Verify they actually differ by exactly 1 position
-                    if can_merge_outcomes(out1, out2) is not None:
-                        combined_prob = prob1 + prob2
-                        if combined_prob > best_combined_prob:
-                            best_combined_prob = combined_prob
-                            best_merge = (out1, out2, pos)
-        
-        # If no merges possible, we're done
-        if best_merge is None:
+        best = tracker.get_best_merge()
+        if best is None:
             break
         
-        # Perform the best merge
-        out1, out2, pos = best_merge
-        merged = merge_two_outcomes(out1, out2, pos)
-        
-        # Remove old outcomes, add merged one
-        prob1 = outcomes.pop(out1)
-        prob2 = outcomes.pop(out2)
-        
-        # If merged outcome already exists, add to it
-        if merged in outcomes:
-            outcomes[merged] += prob1 + prob2
-        else:
-            outcomes[merged] = prob1 + prob2
-        
+        out1, out2, pos, combined_prob = best
+        tracker.perform_merge(out1, out2, pos)
         merge_count += 1
         
         # Progress update for large merges
         if merge_count % 500 == 0:
-            print(f"    ... merged {merge_count} pairs, {len(outcomes)} outcomes remaining")
+            remaining = len(tracker.valid_outcomes)
+            print(f"    ... merged {merge_count} pairs, {remaining} outcomes remaining")
     
     if merge_count > 0:
         print(f"    Merged {merge_count} outcome pairs")
     
-    return outcomes
+    return tracker.get_results()
 
 
 def get_top_scenarios(outcomes_with_probs: Dict[str, float], max_scenarios: int) -> List[Tuple[str, float]]:
@@ -456,10 +562,29 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
     Decode a potentially merged outcome string (containing 'X' for either) into a list of game results.
     Returns list of dicts with round, game index, and winner info.
     For positions with 'X', winner is set to 'either' and both teams are valid.
+    When an 'either' game propagates to later rounds, both team names are combined with '/'.
     """
     import copy
     hypothetical = copy.deepcopy(results_bracket)
     game_results = []
+    
+    def get_combined_name(team):
+        """Get team name, handling combined 'either' teams."""
+        if isinstance(team, dict):
+            if team.get('either_teams'):
+                # This is a combined either team
+                return team.get('name', '')
+            return get_team_name(team)
+        return str(team) if team else None
+    
+    def get_combined_seed(team):
+        """Get team seed, handling combined 'either' teams."""
+        if isinstance(team, dict):
+            if team.get('either_teams'):
+                # Return seeds as combined string
+                return team.get('seed', '')
+            return team.get('seed')
+        return None
     
     for i, (round_key, game_index) in enumerate(remaining_games):
         game = hypothetical[round_key][game_index]
@@ -472,23 +597,42 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
         
         outcome_char = outcome_string[i]
         
+        # Check if either team came from an "either" game (combined teams)
+        team1_is_either = isinstance(team1, dict) and team1.get('either_teams')
+        team2_is_either = isinstance(team2, dict) and team2.get('either_teams')
+        
         if outcome_char == 'X':
             # Either team can win - this game doesn't matter for the outcome
             game_results.append({
                 'round': ROUND_KEYS.index(round_key) + 1,
                 'roundKey': round_key,
                 'gameIndex': game_index,
-                'team1': get_team_name(team1),
-                'team2': get_team_name(team2),
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
                 'winner': 'either',
                 'either': True,
-                'team1Seed': team1.get('seed') if team1 else None,
-                'team2Seed': team2.get('seed') if team2 else None,
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
             })
             
-            # For propagation, we need to pick one - use team1 arbitrarily
-            # (doesn't matter since this path merges anyway)
-            winner = team1
+            # For propagation, create a combined team representing both possibilities
+            # Combine all possible teams from both sides
+            team1_names = team1.get('either_teams', [get_team_name(team1)]) if isinstance(team1, dict) else [get_team_name(team1)]
+            team2_names = team2.get('either_teams', [get_team_name(team2)]) if isinstance(team2, dict) else [get_team_name(team2)]
+            all_teams = team1_names + team2_names
+            
+            team1_seeds = team1.get('either_seeds', [team1.get('seed')]) if isinstance(team1, dict) else [team1.get('seed') if isinstance(team1, dict) else None]
+            team2_seeds = team2.get('either_seeds', [team2.get('seed')]) if isinstance(team2, dict) else [team2.get('seed') if isinstance(team2, dict) else None]
+            all_seeds = team1_seeds + team2_seeds
+            
+            winner = {
+                'name': '/'.join(all_teams),
+                'seed': '/'.join(str(s) for s in all_seeds if s),
+                'either_teams': all_teams,
+                'either_seeds': all_seeds
+            }
         elif outcome_char == '0':
             winner = team1
             loser = team2
@@ -496,14 +640,19 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
                 'round': ROUND_KEYS.index(round_key) + 1,
                 'roundKey': round_key,
                 'gameIndex': game_index,
-                'team1': get_team_name(team1),
-                'team2': get_team_name(team2),
-                'winner': get_team_name(winner),
-                'loser': get_team_name(loser),
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
+                'winner': get_combined_name(winner),
+                'loser': get_combined_name(loser),
                 'either': False,
-                'team1Seed': team1.get('seed') if team1 else None,
-                'team2Seed': team2.get('seed') if team2 else None,
-                'winnerSeed': winner.get('seed') if winner else None
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'winnerSeed': get_combined_seed(winner),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
+                'winnerIsEither': team1_is_either,
+                # Include the list of teams if winner came from either
+                'winnerEitherTeams': team1.get('either_teams') if team1_is_either else None
             })
         else:  # '1'
             winner = team2
@@ -512,14 +661,19 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
                 'round': ROUND_KEYS.index(round_key) + 1,
                 'roundKey': round_key,
                 'gameIndex': game_index,
-                'team1': get_team_name(team1),
-                'team2': get_team_name(team2),
-                'winner': get_team_name(winner),
-                'loser': get_team_name(loser),
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
+                'winner': get_combined_name(winner),
+                'loser': get_combined_name(loser),
                 'either': False,
-                'team1Seed': team1.get('seed') if team1 else None,
-                'team2Seed': team2.get('seed') if team2 else None,
-                'winnerSeed': winner.get('seed') if winner else None
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'winnerSeed': get_combined_seed(winner),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
+                'winnerIsEither': team2_is_either,
+                # Include the list of teams if winner came from either
+                'winnerEitherTeams': team2.get('either_teams') if team2_is_either else None
             })
         
         # Propagate winner to next round
