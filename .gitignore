@@ -1,6 +1,9 @@
 test-results
 node_modules
 
+# secrets
+secrets.json
+
 # Output
 .output
 .vercel

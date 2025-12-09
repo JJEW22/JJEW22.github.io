@@ -29,6 +29,55 @@ PROGRESS_INTERVAL = 1000
 DEFAULT_MAX_WINNING_SCENARIOS = 10
 
 
+def american_odds_to_probability(odds: float, remove_vig: bool = False) -> float:
+    """
+    Convert American betting odds to implied probability.
+    
+    American odds work differently for favorites and underdogs:
+    - Negative odds (favorites): The number is how much you bet to win $100
+    - Positive odds (underdogs): The number is how much you win on a $100 bet
+    
+    Args:
+        odds: American odds value (e.g., -150, +200)
+        remove_vig: If True, this is just one side and vig removal should be done
+                    separately by normalizing all probabilities to sum to 1
+    
+    Returns:
+        Implied probability as a decimal (0.0 to 1.0)
+    
+    Examples:
+        -150 -> 0.60 (60% implied probability)
+        +200 -> 0.333 (33.3% implied probability)
+        -110 -> 0.524 (52.4% implied probability)
+        +100 -> 0.50 (50% implied probability)
+    """
+    if odds < 0:
+        # Favorite: probability = |odds| / (|odds| + 100)
+        return abs(odds) / (abs(odds) + 100)
+    else:
+        # Underdog: probability = 100 / (odds + 100)
+        return 100 / (odds + 100)
+
+
+def normalize_probabilities(probs: dict) -> dict:
+    """
+    Normalize probabilities to sum to 1.0 (removes the vig/juice).
+    
+    Sportsbooks build in a margin, so raw implied probabilities sum to > 100%.
+    This function normalizes them to get "true" probabilities.
+    
+    Args:
+        probs: Dict mapping team/outcome name to implied probability
+        
+    Returns:
+        Dict with normalized probabilities summing to 1.0
+    """
+    total = sum(probs.values())
+    if total == 0:
+        return probs
+    return {k: v / total for k, v in probs.items()}
+
+
 def load_bracket(filepath: str) -> dict:
     """Load a bracket from a JSON file."""
     with open(filepath, 'r') as f:
