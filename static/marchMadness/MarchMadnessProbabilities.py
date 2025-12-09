@@ -35,8 +35,145 @@ def load_bracket(filepath: str) -> dict:
         return json.load(f)
 
 
-def load_teams(filepath: str) -> Dict[str, dict]:
-    """Load teams from a JSON or CSV file and return a dict mapping name to team data."""
+# Probability column names for each round
+# These represent probability of reaching/winning that round
+PROB_COLUMNS = ['prob_r32', 'prob_r16', 'prob_r8', 'prob_r4', 'prob_r2', 'prob_win']
+
+# Expected sum for each probability column (how many teams reach that round)
+EXPECTED_SUMS = {
+    'prob_r32': 32.0,   # 32 teams reach round of 32
+    'prob_r16': 16.0,   # 16 teams reach round of 16 (sweet 16)
+    'prob_r8': 8.0,     # 8 teams reach elite 8
+    'prob_r4': 4.0,     # 4 teams reach final 4
+    'prob_r2': 2.0,     # 2 teams reach championship
+    'prob_win': 1.0     # 1 winner
+}
+
+# Floating point tolerance for validation
+PROB_TOLERANCE = 0.001
+
+
+def validate_team_probabilities(teams: Dict[str, dict], results_bracket: dict = None) -> List[str]:
+    """
+    Validate team probability data.
+    
+    Checks:
+    1. No probability is negative or greater than 1
+    2. Sum of probabilities for each round equals expected value
+    3. For decided games, winner has prob ~1 and loser has prob ~0 for next round
+    4. Probabilities are monotonically decreasing (prob_r32 >= prob_r16 >= ... >= prob_win)
+    
+    Args:
+        teams: Dict mapping team name to team data (including probabilities)
+        results_bracket: Optional results bracket to check decided games
+        
+    Returns:
+        List of warning/error messages (empty if all valid)
+    """
+    errors = []
+    
+    # Check if probability columns exist
+    sample_team = next(iter(teams.values())) if teams else {}
+    has_probs = any(col in sample_team for col in PROB_COLUMNS)
+    
+    if not has_probs:
+        return []  # No probability columns, skip validation
+    
+    # Check 1: No value < 0 or > 1
+    for team_name, team_data in teams.items():
+        for col in PROB_COLUMNS:
+            if col in team_data:
+                prob = team_data[col]
+                if prob < 0:
+                    errors.append(f"Negative probability for {team_name}.{col}: {prob}")
+                if prob > 1 + PROB_TOLERANCE:
+                    errors.append(f"Probability > 1 for {team_name}.{col}: {prob}")
+    
+    # Check 2: Sums equal expected values
+    for col in PROB_COLUMNS:
+        total = sum(team_data.get(col, 0) for team_data in teams.values())
+        expected = EXPECTED_SUMS[col]
+        if abs(total - expected) > PROB_TOLERANCE:
+            errors.append(f"Sum of {col} is {total:.4f}, expected {expected:.4f}")
+    
+    # Check 3: Decided games have correct probabilities
+    if results_bracket:
+        for round_idx, round_key in enumerate(ROUND_KEYS):
+            if round_key not in results_bracket:
+                continue
+            
+            # The probability column for "reaching the next round"
+            # round1 winners reach round2, which is prob_r32
+            # round2 winners reach round3, which is prob_r16
+            # etc.
+            if round_idx >= len(PROB_COLUMNS):
+                continue
+            prob_col = PROB_COLUMNS[round_idx]
+            
+            for game in results_bracket[round_key]:
+                if not game:
+                    continue
+                winner_name = get_winner_name(game)
+                if not winner_name:
+                    continue  # Game not decided
+                
+                # Get both teams
+                team1_name = get_team_name(game.get('team1'))
+                team2_name = get_team_name(game.get('team2'))
+                
+                if not team1_name or not team2_name:
+                    continue
+                
+                loser_name = team2_name if winner_name == team1_name else team1_name
+                
+                # Check winner has prob ~1 and loser has prob ~0 for this round
+                if winner_name in teams:
+                    winner_prob = teams[winner_name].get(prob_col, 0)
+                    if winner_prob < 1 - PROB_TOLERANCE:
+                        errors.append(
+                            f"Decided game: {winner_name} won in {round_key} but {prob_col}={winner_prob:.4f} (expected ~1.0)"
+                        )
+                
+                if loser_name in teams:
+                    loser_prob = teams[loser_name].get(prob_col, 0)
+                    if loser_prob > PROB_TOLERANCE:
+                        errors.append(
+                            f"Decided game: {loser_name} lost in {round_key} but {prob_col}={loser_prob:.4f} (expected ~0.0)"
+                        )
+    
+    # Check 4: Probabilities should be monotonically decreasing for each team
+    # prob_r32 >= prob_r16 >= prob_r8 >= prob_r4 >= prob_r2 >= prob_win
+    for team_name, team_data in teams.items():
+        prev_prob = None
+        prev_col = None
+        for col in PROB_COLUMNS:
+            if col in team_data:
+                prob = team_data[col]
+                if prev_prob is not None and prob > prev_prob + PROB_TOLERANCE:
+                    errors.append(
+                        f"Non-monotonic probability for {team_name}: {prev_col}={prev_prob:.4f} < {col}={prob:.4f}"
+                    )
+                prev_prob = prob
+                prev_col = col
+    
+    return errors
+
+
+def load_teams(filepath: str, results_bracket: dict = None, validate: bool = True) -> Dict[str, dict]:
+    """
+    Load teams from a JSON or CSV file and return a dict mapping name to team data.
+    
+    For CSV files, also loads probability columns (prob_r32, prob_r16, prob_r8, prob_r4, prob_r2, prob_win)
+    if present.
+    
+    Args:
+        filepath: Path to teams file (JSON or CSV)
+        results_bracket: Optional results bracket for validation of decided games
+        validate: Whether to validate probability data
+        
+    Returns:
+        Dict mapping team name to team data
+    """
     teams = {}
     
     if filepath.endswith('.json'):
@@ -46,13 +183,46 @@ def load_teams(filepath: str) -> Dict[str, dict]:
                 teams[team['name']] = team
     elif filepath.endswith('.csv'):
         import csv
-        with open(filepath, 'r') as f:
+        with open(filepath, 'r', encoding='utf-8-sig') as f:  # utf-8-sig handles BOM automatically
             reader = csv.DictReader(f)
+            
+            # Debug: print column names found
+            print(f"CSV columns found: {reader.fieldnames}")
+            
             for row in reader:
-                name = row.get('Team') or row.get('name')
-                seed = int(row.get('Seed') or row.get('seed', 0))
+                # Handle various column name possibilities
+                name = row.get('TEAM') or row.get('\ufeffTEAM') or row.get('Team') or row.get('name')
+                
+                # Skip empty rows or rows without a team name
+                if not name or not name.strip():
+                    continue
+                
+                name = name.strip()  # Remove any whitespace
+                
+                seed_str = row.get('SEED') or row.get('Seed') or row.get('seed', '0')
+                seed = int(seed_str) if seed_str and seed_str.strip() else 0
                 region = row.get('Region') or row.get('region', '')
-                teams[name] = {'name': name, 'seed': seed, 'region': region}
+                
+                team_data = {'name': name, 'seed': seed, 'region': region}
+                
+                # Load probability columns if present
+                for col in PROB_COLUMNS:
+                    if col in row and row[col]:
+                        try:
+                            team_data[col] = float(row[col])
+                        except ValueError:
+                            pass  # Skip invalid values
+                
+                teams[name] = team_data
+    
+    # Validate probabilities
+    if validate and teams:
+        errors = validate_team_probabilities(teams, results_bracket)
+        if errors:
+            print("\nProbability validation warnings:")
+            for error in errors:
+                print(f"  - {error}")
+            print()
     
     return teams
 
@@ -89,6 +259,147 @@ def get_team_seed(team, teams_data: dict) -> int:
         return team.get('seed', 0)
     
     return 0
+
+
+# Track which teams we've warned about missing probability data
+_warned_missing_prob_teams = set()
+
+
+def get_team_probability(team_name: str, prob_column: str, teams_data: dict) -> float:
+    """
+    Get a team's probability for reaching a specific round.
+    
+    Args:
+        team_name: Name of the team
+        prob_column: Column name (e.g., 'prob_r32', 'prob_r16', etc.)
+        teams_data: Dict mapping team name to team data
+        
+    Returns:
+        Probability value, or default (1/2)^R if not available
+    """
+    global _warned_missing_prob_teams
+    
+    # Map prob_column to number of rounds needed from R64
+    rounds_needed = {
+        'prob_r32': 1,
+        'prob_r16': 2,
+        'prob_r8': 3,
+        'prob_r4': 4,
+        'prob_r2': 5,
+        'prob_win': 6
+    }
+    
+    # Check if team exists and has probability data
+    if team_name in teams_data:
+        team_data = teams_data[team_name]
+        if prob_column in team_data:
+            return team_data[prob_column]
+    
+    # Default: (1/2)^R
+    r = rounds_needed.get(prob_column, 1)
+    default_prob = (0.5) ** r
+    
+    # Warn once per team
+    warn_key = (team_name, prob_column)
+    if warn_key not in _warned_missing_prob_teams:
+        _warned_missing_prob_teams.add(warn_key)
+        print(f"  Warning: No {prob_column} data for '{team_name}', using default {default_prob:.6f}")
+    
+    return default_prob
+
+
+def calculate_outcome_probability(hypothetical_bracket: dict, teams_data: dict) -> float:
+    """
+    Calculate the probability of a specific bracket outcome.
+    
+    The probability is computed as:
+    P(bracket) = P_win(winner) × P_r2(finalist) × ∏P_r4(F4 losers) × ∏P_r8(E8 losers) × ...
+    
+    For each round, we multiply by the probability of teams that "exit" at that round
+    (i.e., reached that round but went no further).
+    
+    Args:
+        hypothetical_bracket: A completed bracket with all winners determined
+        teams_data: Dict mapping team name to team data with probabilities
+        
+    Returns:
+        Probability of this specific outcome
+    """
+    probability = 1.0
+    
+    # The winner (exits at championship with a win)
+    winner_name = get_team_name(hypothetical_bracket.get('winner'))
+    if winner_name:
+        prob = get_team_probability(winner_name, 'prob_win', teams_data)
+        probability *= prob
+    
+    # Championship loser (reached championship but didn't win) - use prob_r2
+    final_game = hypothetical_bracket.get('round6', [{}])[0]
+    if final_game:
+        final_winner = get_team_name(final_game.get('winner'))
+        team1 = get_team_name(final_game.get('team1'))
+        team2 = get_team_name(final_game.get('team2'))
+        finalist_loser = team2 if final_winner == team1 else team1
+        if finalist_loser:
+            prob = get_team_probability(finalist_loser, 'prob_r2', teams_data)
+            probability *= prob
+    
+    # Final Four losers (reached F4 but not championship) - use prob_r4
+    # Round 5 has 2 games, losers are F4 exits
+    for game in hypothetical_bracket.get('round5', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r4', teams_data)
+            probability *= prob
+    
+    # Elite 8 losers (reached E8 but not F4) - use prob_r8
+    # Round 4 has 4 games
+    for game in hypothetical_bracket.get('round4', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r8', teams_data)
+            probability *= prob
+    
+    # Sweet 16 losers (reached S16 but not E8) - use prob_r16
+    # Round 3 has 8 games
+    for game in hypothetical_bracket.get('round3', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r16', teams_data)
+            probability *= prob
+    
+    # Round of 32 losers (reached R32 but not S16) - use prob_r32
+    # Round 2 has 16 games
+    for game in hypothetical_bracket.get('round2', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r32', teams_data)
+            probability *= prob
+    
+    # Round of 64 losers don't contribute (they didn't "reach" any tracked round)
+    # Their elimination is implicit in the probabilities of teams that did advance
+    
+    return probability
 
 
 def compute_score(results_bracket: dict, picks_bracket: dict, teams_data: dict,
@@ -896,8 +1207,8 @@ def calculate_win_probabilities(
     # Load results bracket
     results_bracket = load_bracket(results_path)
     
-    # Load teams data
-    teams_data = load_teams(teams_file) if teams_file and os.path.exists(teams_file) else {}
+    # Load teams data (with validation against results)
+    teams_data = load_teams(teams_file, results_bracket) if teams_file and os.path.exists(teams_file) else {}
     
     # Load all participant brackets
     name_to_bracket = {}
@@ -964,11 +1275,20 @@ def calculate_win_probabilities(
             print(f"Total outcomes ({total_possible:,}) <= max_simulations ({max_simulations:,})")
         print(f"Simulating all {num_simulations:,} possible outcomes...")
     
-    # Calculate base probability per outcome
+    # Check if we have probability data
+    sample_team = next(iter(teams_data.values())) if teams_data else {}
+    has_prob_data = any(col in sample_team for col in PROB_COLUMNS)
+    if has_prob_data:
+        print("Using team probability data for outcome weighting")
+    else:
+        print("No probability data found, using uniform (50/50) probabilities")
+    
+    # Calculate base probability per outcome (used for uniform case)
     base_probability = 1.0 / total_possible
     
     # Simulate outcomes
-    number_of_wins = {name: 0 for name in name_to_bracket.keys()}
+    total_probability_sum = 0.0  # Track sum of all outcome probabilities
+    win_probability_sum = {name: 0.0 for name in name_to_bracket.keys()}  # Sum of probabilities where each person wins
     places = {name: [] for name in name_to_bracket.keys()}
     # Store ALL winning outcomes with their probabilities
     raw_winning_outcomes = {name: {} for name in name_to_bracket.keys()}  # name -> {outcome: probability}
@@ -993,6 +1313,14 @@ def calculate_win_probabilities(
         # Create hypothetical results
         hypothetical = create_hypothetical_bracket(results_bracket, remaining_games, outcome)
         
+        # Calculate probability of this specific outcome
+        if has_prob_data:
+            outcome_probability = calculate_outcome_probability(hypothetical, teams_data)
+        else:
+            outcome_probability = base_probability
+        
+        total_probability_sum += outcome_probability
+        
         # Compute score for each participant
         all_scores = []
         for name, bracket in name_to_bracket.items():
@@ -1008,31 +1336,44 @@ def calculate_win_probabilities(
         for place, (name, score) in enumerate(sorted_scores):
             places[name].append(place + 1)
             if place == 0:
-                number_of_wins[name] += 1
+                win_probability_sum[name] += outcome_probability
                 # Store this winning outcome with its probability
                 if outcome not in raw_winning_outcomes[name]:
-                    raw_winning_outcomes[name][outcome] = base_probability
+                    raw_winning_outcomes[name][outcome] = outcome_probability
                 else:
                     # For Monte Carlo, might see same outcome multiple times
-                    raw_winning_outcomes[name][outcome] += base_probability
+                    raw_winning_outcomes[name][outcome] += outcome_probability
     
     # Clear progress line
     print(f"\rProgress: {total_intervals}/{total_intervals} - Complete!          ")
     
-    # Calculate probabilities
+    # Normalize probabilities (they should sum to 1, but might not due to floating point)
+    if total_probability_sum > 0:
+        normalization_factor = 1.0 / total_probability_sum
+    else:
+        normalization_factor = 1.0
+    
+    # Calculate win probabilities
     win_probabilities = {}
     
     print("\nResults:")
     print("-" * 50)
     if use_monte_carlo:
         print(f"(Estimated from {num_simulations:,} Monte Carlo samples)")
+    if has_prob_data:
+        print(f"(Weighted by team probability data, total prob sum: {total_probability_sum:.6f})")
     
-    for name in sorted(name_to_bracket.keys(), key=lambda n: number_of_wins[n], reverse=True):
-        prob = number_of_wins[name] / num_simulations
-        avg_place = sum(places[name]) / len(places[name])
+    for name in sorted(name_to_bracket.keys(), key=lambda n: win_probability_sum[n], reverse=True):
+        prob = win_probability_sum[name] * normalization_factor
+        avg_place = sum(places[name]) / len(places[name]) if places[name] else 0
         win_probabilities[name] = prob
         num_raw = len(raw_winning_outcomes.get(name, {}))
         print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}, {num_raw} raw winning outcomes")
+    
+    # Normalize raw_winning_outcomes probabilities too
+    for name in raw_winning_outcomes:
+        for outcome in raw_winning_outcomes[name]:
+            raw_winning_outcomes[name][outcome] *= normalization_factor
     
     # Compute next game preferences (before merging)
     print("\nComputing next game preferences...")

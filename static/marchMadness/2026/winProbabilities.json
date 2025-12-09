@@ -1,7 +1,7 @@
 {
   "probabilities": {
-    "alice": 0.97607421875,
-    "dana": 0.02392578125,
+    "alice": 0.9694809858901146,
+    "dana": 0.03051901410988545,
     "bob": 0.0,
     "charlie": 0.0,
     "eve": 0.0
@@ -9,8 +9,8 @@
   "winning_scenarios": {
     "alice": [
       {
-        "outcome": "X10XXXXXXXXX",
-        "probability": 0.25,
+        "outcome": "X1X1X1X11XXX",
+        "probability": 0.04540980937214824,
         "games": [
           {
             "round": 1,
@@ -51,16 +51,12 @@
             "gameIndex": 2,
             "team1": "Florida",
             "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 1,
             "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "team2IsEither": null
           },
           {
             "round": 3,
@@ -68,12 +64,16 @@
             "gameIndex": 4,
             "team1": "Auburn",
             "team2": "Michigan",
-            "winner": "either",
-            "either": true,
+            "winner": "Michigan",
+            "loser": "Auburn",
+            "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
+            "winnerSeed": 5,
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 3,
@@ -94,41 +94,55 @@
             "gameIndex": 6,
             "team1": "Houston",
             "team2": "Memphis",
-            "winner": "either",
-            "either": true,
+            "winner": "Memphis",
+            "loser": "Houston",
+            "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
+            "winnerSeed": 5,
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 1,
-            "team1": "Florida",
+            "team1": "Florida/Clemson",
             "team2": "Illinois",
             "winner": "either",
             "either": true,
-            "team1Seed": 1,
+            "team1Seed": "1/5",
             "team2Seed": 6,
-            "team1IsEither": null,
+            "team1IsEither": [
+              "Florida",
+              "Clemson"
+            ],
             "team2IsEither": null
           },
           {
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 2,
-            "team1": "Auburn/Michigan",
+            "team1": "Michigan",
             "team2": "Ole Miss/Michigan St.",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
+            "winner": "Ole Miss/Michigan St.",
+            "loser": "Michigan",
+            "either": false,
+            "team1Seed": 5,
             "team2Seed": "6/2",
-            "team1IsEither": [
-              "Auburn",
-              "Michigan"
-            ],
+            "winnerSeed": "6/2",
+            "team1IsEither": null,
             "team2IsEither": [
+              "Ole Miss",
+              "Michigan St."
+            ],
+            "winnerIsEither": [
+              "Ole Miss",
+              "Michigan St."
+            ],
+            "winnerEitherTeams": [
               "Ole Miss",
               "Michigan St."
             ]
@@ -137,31 +151,33 @@
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 3,
-            "team1": "Houston/Memphis",
+            "team1": "Memphis",
             "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
+            "winner": "Missouri",
+            "loser": "Memphis",
+            "either": false,
+            "team1Seed": 5,
             "team2Seed": 6,
-            "team1IsEither": [
-              "Houston",
-              "Memphis"
-            ],
-            "team2IsEither": null
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 0,
             "team1": "Duke",
-            "team2": "Florida/Illinois",
+            "team2": "Florida/Clemson/Illinois",
             "winner": "either",
             "either": true,
             "team1Seed": 1,
-            "team2Seed": "1/6",
+            "team2Seed": "1/5/6",
             "team1IsEither": null,
             "team2IsEither": [
               "Florida",
+              "Clemson",
               "Illinois"
             ]
           },
@@ -169,54 +185,45 @@
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 1,
-            "team1": "Auburn/Michigan/Ole Miss/Michigan St.",
-            "team2": "Houston/Memphis/Missouri",
+            "team1": "Ole Miss/Michigan St.",
+            "team2": "Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/5/6/2",
-            "team2Seed": "1/5/6",
+            "team1Seed": "6/2",
+            "team2Seed": 6,
             "team1IsEither": [
-              "Auburn",
-              "Michigan",
               "Ole Miss",
               "Michigan St."
             ],
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ]
+            "team2IsEither": null
           },
           {
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Florida/Illinois",
-            "team2": "Auburn/Michigan/Ole Miss/Michigan St./Houston/Memphis/Missouri",
+            "team1": "Duke/Florida/Clemson/Illinois",
+            "team2": "Ole Miss/Michigan St./Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/1/6",
-            "team2Seed": "1/5/6/2/1/5/6",
+            "team1Seed": "1/1/5/6",
+            "team2Seed": "6/2/6",
             "team1IsEither": [
               "Duke",
               "Florida",
+              "Clemson",
               "Illinois"
             ],
             "team2IsEither": [
-              "Auburn",
-              "Michigan",
               "Ole Miss",
               "Michigan St.",
-              "Houston",
-              "Memphis",
               "Missouri"
             ]
           }
         ]
       },
       {
-        "outcome": "X00X1XXXXXXX",
-        "probability": 0.125,
+        "outcome": "X01X011X1XXX",
+        "probability": 0.042708874942049974,
         "games": [
           {
             "round": 1,
@@ -263,12 +270,12 @@
             "gameIndex": 2,
             "team1": "Florida",
             "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
+            "winner": "Clemson",
+            "loser": "Florida",
             "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 1,
+            "winnerSeed": 5,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
@@ -293,25 +300,19 @@
             "gameIndex": 5,
             "team1": "Ole Miss",
             "team2": "Marquette/New Mexico",
-            "winner": "Marquette/New Mexico",
-            "loser": "Ole Miss",
+            "winner": "Ole Miss",
+            "loser": "Marquette/New Mexico",
             "either": false,
             "team1Seed": 6,
             "team2Seed": "7/10",
-            "winnerSeed": "7/10",
+            "winnerSeed": 6,
             "team1IsEither": null,
             "team2IsEither": [
               "Marquette",
               "New Mexico"
             ],
-            "winnerIsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico"
-            ]
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 3,
@@ -319,18 +320,72 @@
             "gameIndex": 6,
             "team1": "Houston",
             "team2": "Memphis",
-            "winner": "either",
-            "either": true,
+            "winner": "Memphis",
+            "loser": "Houston",
+            "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
+            "winnerSeed": 5,
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 1,
-            "team1": "Florida",
+            "team1": "Clemson",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Auburn/Michigan",
+            "team2": "Ole Miss",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "team1IsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Memphis",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Memphis",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
             "team2": "Illinois",
             "winner": "either",
             "either": true,
@@ -340,108 +395,48 @@
             "team2IsEither": null
           },
           {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Auburn/Michigan",
-            "team2": "Marquette/New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
-            "team2Seed": "7/10",
-            "team1IsEither": [
-              "Auburn",
-              "Michigan"
-            ],
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Houston/Memphis",
-            "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
-            "team2Seed": 6,
-            "team1IsEither": [
-              "Houston",
-              "Memphis"
-            ],
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Florida/Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Florida",
-              "Illinois"
-            ]
-          },
-          {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 1,
-            "team1": "Auburn/Michigan/Marquette/New Mexico",
-            "team2": "Houston/Memphis/Missouri",
+            "team1": "Auburn/Michigan/Ole Miss",
+            "team2": "Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/5/7/10",
-            "team2Seed": "1/5/6",
+            "team1Seed": "1/5/6",
+            "team2Seed": 6,
             "team1IsEither": [
               "Auburn",
               "Michigan",
-              "Marquette",
-              "New Mexico"
+              "Ole Miss"
             ],
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ]
+            "team2IsEither": null
           },
           {
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Florida/Illinois",
-            "team2": "Auburn/Michigan/Marquette/New Mexico/Houston/Memphis/Missouri",
+            "team1": "Duke/Illinois",
+            "team2": "Auburn/Michigan/Ole Miss/Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/1/6",
-            "team2Seed": "1/5/7/10/1/5/6",
+            "team1Seed": "1/6",
+            "team2Seed": "1/5/6/6",
             "team1IsEither": [
               "Duke",
-              "Florida",
               "Illinois"
             ],
             "team2IsEither": [
               "Auburn",
               "Michigan",
-              "Marquette",
-              "New Mexico",
-              "Houston",
-              "Memphis",
+              "Ole Miss",
               "Missouri"
             ]
           }
         ]
       },
       {
-        "outcome": "X110XXXXXXXX",
-        "probability": 0.125,
+        "outcome": "X0X01X1XX0XX",
+        "probability": 0.03556461172910245,
         "games": [
           {
             "round": 1,
@@ -462,19 +457,25 @@
             "gameIndex": 11,
             "team1": "Marquette/New Mexico",
             "team2": "Michigan St.",
-            "winner": "Michigan St.",
-            "loser": "Marquette/New Mexico",
+            "winner": "Marquette/New Mexico",
+            "loser": "Michigan St.",
             "either": false,
             "team1Seed": "7/10",
             "team2Seed": 2,
-            "winnerSeed": 2,
+            "winnerSeed": "7/10",
             "team1IsEither": [
               "Marquette",
               "New Mexico"
             ],
             "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
           },
           {
             "round": 3,
@@ -482,16 +483,12 @@
             "gameIndex": 2,
             "team1": "Florida",
             "team2": "Clemson",
-            "winner": "Clemson",
-            "loser": "Florida",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 5,
             "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "team2IsEither": null
           },
           {
             "round": 3,
@@ -515,13 +512,26 @@
             "roundKey": "round3",
             "gameIndex": 5,
             "team1": "Ole Miss",
-            "team2": "Michigan St.",
-            "winner": "either",
-            "either": true,
+            "team2": "Marquette/New Mexico",
+            "winner": "Marquette/New Mexico",
+            "loser": "Ole Miss",
+            "either": false,
             "team1Seed": 6,
-            "team2Seed": 2,
+            "team2Seed": "7/10",
+            "winnerSeed": "7/10",
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
           },
           {
             "round": 3,
@@ -540,29 +550,36 @@
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 1,
-            "team1": "Clemson",
+            "team1": "Florida/Clemson",
             "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 5,
+            "winner": "Illinois",
+            "loser": "Florida/Clemson",
+            "either": false,
+            "team1Seed": "1/5",
             "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
+            "winnerSeed": 6,
+            "team1IsEither": [
+              "Florida",
+              "Clemson"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 2,
             "team1": "Auburn",
-            "team2": "Ole Miss/Michigan St.",
+            "team2": "Marquette/New Mexico",
             "winner": "either",
             "either": true,
             "team1Seed": 1,
-            "team2Seed": "6/2",
+            "team2Seed": "7/10",
             "team1IsEither": null,
             "team2IsEither": [
-              "Ole Miss",
-              "Michigan St."
+              "Marquette",
+              "New Mexico"
             ]
           },
           {
@@ -586,31 +603,32 @@
             "roundKey": "round5",
             "gameIndex": 0,
             "team1": "Duke",
-            "team2": "Clemson/Illinois",
-            "winner": "either",
-            "either": true,
+            "team2": "Illinois",
+            "winner": "Duke",
+            "loser": "Illinois",
+            "either": false,
             "team1Seed": 1,
-            "team2Seed": "5/6",
+            "team2Seed": 6,
+            "winnerSeed": 1,
             "team1IsEither": null,
-            "team2IsEither": [
-              "Clemson",
-              "Illinois"
-            ]
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 1,
-            "team1": "Auburn/Ole Miss/Michigan St.",
+            "team1": "Auburn/Marquette/New Mexico",
             "team2": "Houston/Memphis/Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/6/2",
+            "team1Seed": "1/7/10",
             "team2Seed": "1/5/6",
             "team1IsEither": [
               "Auburn",
-              "Ole Miss",
-              "Michigan St."
+              "Marquette",
+              "New Mexico"
             ],
             "team2IsEither": [
               "Houston",
@@ -622,21 +640,17 @@
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Clemson/Illinois",
-            "team2": "Auburn/Ole Miss/Michigan St./Houston/Memphis/Missouri",
+            "team1": "Duke",
+            "team2": "Auburn/Marquette/New Mexico/Houston/Memphis/Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/5/6",
-            "team2Seed": "1/6/2/1/5/6",
-            "team1IsEither": [
-              "Duke",
-              "Clemson",
-              "Illinois"
-            ],
+            "team1Seed": 1,
+            "team2Seed": "1/7/10/1/5/6",
+            "team1IsEither": null,
             "team2IsEither": [
               "Auburn",
-              "Ole Miss",
-              "Michigan St.",
+              "Marquette",
+              "New Mexico",
               "Houston",
               "Memphis",
               "Missouri"
@@ -645,8 +659,8 @@
         ]
       },
       {
-        "outcome": "X01X10XXXXXX",
-        "probability": 0.0625,
+        "outcome": "X0110X1X0XXX",
+        "probability": 0.02802481128395503,
         "games": [
           {
             "round": 1,
@@ -686,224 +700,6 @@
               "Marquette",
               "New Mexico"
             ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Clemson",
-            "loser": "Florida",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette/New Mexico",
-            "winner": "Marquette/New Mexico",
-            "loser": "Ole Miss",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": "7/10",
-            "winnerSeed": "7/10",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerIsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "Houston",
-            "loser": "Memphis",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Clemson",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Auburn/Michigan",
-            "team2": "Marquette/New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
-            "team2Seed": "7/10",
-            "team1IsEither": [
-              "Auburn",
-              "Michigan"
-            ],
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Houston",
-            "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Clemson/Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "5/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Clemson",
-              "Illinois"
-            ]
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Auburn/Michigan/Marquette/New Mexico",
-            "team2": "Houston/Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5/7/10",
-            "team2Seed": "1/6",
-            "team1IsEither": [
-              "Auburn",
-              "Michigan",
-              "Marquette",
-              "New Mexico"
-            ],
-            "team2IsEither": [
-              "Houston",
-              "Missouri"
-            ]
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Clemson/Illinois",
-            "team2": "Auburn/Michigan/Marquette/New Mexico/Houston/Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5/6",
-            "team2Seed": "1/5/7/10/1/6",
-            "team1IsEither": [
-              "Duke",
-              "Clemson",
-              "Illinois"
-            ],
-            "team2IsEither": [
-              "Auburn",
-              "Michigan",
-              "Marquette",
-              "New Mexico",
-              "Houston",
-              "Missouri"
-            ]
-          }
-        ]
-      },
-      {
-        "outcome": "X111X0XXXXXX",
-        "probability": 0.0625,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette/New Mexico",
-            "team2": "Michigan St.",
-            "winner": "Michigan St.",
-            "loser": "Marquette/New Mexico",
-            "either": false,
-            "team1Seed": "7/10",
-            "team2Seed": 2,
-            "winnerSeed": 2,
-            "team1IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
           },
           {
             "round": 3,
@@ -944,13 +740,20 @@
             "roundKey": "round3",
             "gameIndex": 5,
             "team1": "Ole Miss",
-            "team2": "Michigan St.",
-            "winner": "either",
-            "either": true,
+            "team2": "Marquette/New Mexico",
+            "winner": "Ole Miss",
+            "loser": "Marquette/New Mexico",
+            "either": false,
             "team1Seed": 6,
-            "team2Seed": 2,
+            "team2Seed": "7/10",
+            "winnerSeed": 6,
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 3,
@@ -958,12 +761,25 @@
             "gameIndex": 6,
             "team1": "Houston",
             "team2": "Memphis",
-            "winner": "Houston",
-            "loser": "Memphis",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Clemson",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
@@ -972,109 +788,100 @@
           {
             "round": 4,
             "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Clemson",
-            "team2": "Illinois",
+            "gameIndex": 2,
+            "team1": "Michigan",
+            "team2": "Ole Miss",
             "winner": "either",
             "either": true,
             "team1Seed": 5,
             "team2Seed": 6,
             "team1IsEither": null,
             "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Michigan",
-            "team2": "Ole Miss/Michigan St.",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 5,
-            "team2Seed": "6/2",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Ole Miss",
-              "Michigan St."
-            ]
           },
           {
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 3,
-            "team1": "Houston",
+            "team1": "Houston/Memphis",
             "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
+            "winner": "Houston/Memphis",
+            "loser": "Missouri",
+            "either": false,
+            "team1Seed": "1/5",
             "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "winnerEitherTeams": [
+              "Houston",
+              "Memphis"
+            ]
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 0,
             "team1": "Duke",
-            "team2": "Clemson/Illinois",
+            "team2": "Illinois",
             "winner": "either",
             "either": true,
             "team1Seed": 1,
-            "team2Seed": "5/6",
+            "team2Seed": 6,
             "team1IsEither": null,
-            "team2IsEither": [
-              "Clemson",
-              "Illinois"
-            ]
+            "team2IsEither": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 1,
-            "team1": "Michigan/Ole Miss/Michigan St.",
-            "team2": "Houston/Missouri",
+            "team1": "Michigan/Ole Miss",
+            "team2": "Houston/Memphis",
             "winner": "either",
             "either": true,
-            "team1Seed": "5/6/2",
-            "team2Seed": "1/6",
+            "team1Seed": "5/6",
+            "team2Seed": "1/5",
             "team1IsEither": [
               "Michigan",
-              "Ole Miss",
-              "Michigan St."
+              "Ole Miss"
             ],
             "team2IsEither": [
               "Houston",
-              "Missouri"
+              "Memphis"
             ]
           },
           {
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Clemson/Illinois",
-            "team2": "Michigan/Ole Miss/Michigan St./Houston/Missouri",
+            "team1": "Duke/Illinois",
+            "team2": "Michigan/Ole Miss/Houston/Memphis",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/5/6",
-            "team2Seed": "5/6/2/1/6",
+            "team1Seed": "1/6",
+            "team2Seed": "5/6/1/5",
             "team1IsEither": [
               "Duke",
-              "Clemson",
               "Illinois"
             ],
             "team2IsEither": [
               "Michigan",
               "Ole Miss",
-              "Michigan St.",
               "Houston",
-              "Missouri"
+              "Memphis"
             ]
           }
         ]
       },
       {
-        "outcome": "X0000XX1XXXX",
-        "probability": 0.03125,
+        "outcome": "X0X111X11XXX",
+        "probability": 0.026719164275957517,
         "games": [
           {
             "round": 1,
@@ -1121,12 +928,459 @@
             "gameIndex": 2,
             "team1": "Florida",
             "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "Michigan",
+            "loser": "Auburn",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Marquette/New Mexico",
+            "winner": "Marquette/New Mexico",
+            "loser": "Ole Miss",
+            "either": false,
+            "team1Seed": 6,
+            "team2Seed": "7/10",
+            "winnerSeed": "7/10",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "Memphis",
+            "loser": "Houston",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Florida/Clemson",
+            "team2": "Illinois",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "team1IsEither": [
+              "Florida",
+              "Clemson"
+            ],
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Michigan",
+            "team2": "Marquette/New Mexico",
+            "winner": "Marquette/New Mexico",
+            "loser": "Michigan",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": "7/10",
+            "winnerSeed": "7/10",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Memphis",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Memphis",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Florida/Clemson/Illinois",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": "1/5/6",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Florida",
+              "Clemson",
+              "Illinois"
+            ]
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Marquette/New Mexico",
+            "team2": "Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "7/10",
+            "team2Seed": 6,
+            "team1IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "team2IsEither": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke/Florida/Clemson/Illinois",
+            "team2": "Marquette/New Mexico/Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/1/5/6",
+            "team2Seed": "7/10/6",
+            "team1IsEither": [
+              "Duke",
+              "Florida",
+              "Clemson",
+              "Illinois"
+            ],
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico",
+              "Missouri"
+            ]
+          }
+        ]
+      },
+      {
+        "outcome": "11XXX00X1XXX",
+        "probability": 0.023212502352373952,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "New Mexico",
+            "loser": "Marquette",
+            "either": false,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "winnerSeed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Michigan St.",
+            "loser": "New Mexico",
+            "either": false,
+            "team1Seed": 10,
+            "team2Seed": 2,
+            "winnerSeed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Michigan St.",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 6,
+            "team2Seed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "Houston",
+            "loser": "Memphis",
             "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
             "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Florida/Clemson",
+            "team2": "Illinois",
+            "winner": "Florida/Clemson",
+            "loser": "Illinois",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Florida",
+              "Clemson"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Florida",
+              "Clemson"
+            ],
+            "winnerEitherTeams": [
+              "Florida",
+              "Clemson"
+            ]
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Auburn/Michigan",
+            "team2": "Ole Miss/Michigan St.",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/5",
+            "team2Seed": "6/2",
+            "team1IsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "team2IsEither": [
+              "Ole Miss",
+              "Michigan St."
+            ]
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Houston",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Florida/Clemson",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": "1/5",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Florida",
+              "Clemson"
+            ]
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Auburn/Michigan/Ole Miss/Michigan St.",
+            "team2": "Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/5/6/2",
+            "team2Seed": 6,
+            "team1IsEither": [
+              "Auburn",
+              "Michigan",
+              "Ole Miss",
+              "Michigan St."
+            ],
+            "team2IsEither": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke/Florida/Clemson",
+            "team2": "Auburn/Michigan/Ole Miss/Michigan St./Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/1/5",
+            "team2Seed": "1/5/6/2/6",
+            "team1IsEither": [
+              "Duke",
+              "Florida",
+              "Clemson"
+            ],
+            "team2IsEither": [
+              "Auburn",
+              "Michigan",
+              "Ole Miss",
+              "Michigan St.",
+              "Missouri"
+            ]
+          }
+        ]
+      },
+      {
+        "outcome": "X0111X10XXXX",
+        "probability": 0.02056333960005696,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "Marquette/New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Marquette/New Mexico",
+            "loser": "Michigan St.",
+            "either": false,
+            "team1Seed": "7/10",
+            "team2Seed": 2,
+            "winnerSeed": "7/10",
+            "team1IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "Clemson",
+            "loser": "Florida",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
@@ -1138,12 +1392,661 @@
             "gameIndex": 4,
             "team1": "Auburn",
             "team2": "Michigan",
-            "winner": "Auburn",
-            "loser": "Michigan",
+            "winner": "Michigan",
+            "loser": "Auburn",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Marquette/New Mexico",
+            "winner": "Marquette/New Mexico",
+            "loser": "Ole Miss",
+            "either": false,
+            "team1Seed": 6,
+            "team2Seed": "7/10",
+            "winnerSeed": "7/10",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Clemson",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Michigan",
+            "team2": "Marquette/New Mexico",
+            "winner": "Michigan",
+            "loser": "Marquette/New Mexico",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": "7/10",
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston/Memphis",
+            "team2": "Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "team1IsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "team2IsEither": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Illinois",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Michigan",
+            "team2": "Houston/Memphis/Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 5,
+            "team2Seed": "1/5/6",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Houston",
+              "Memphis",
+              "Missouri"
+            ]
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke/Illinois",
+            "team2": "Michigan/Houston/Memphis/Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/6",
+            "team2Seed": "5/1/5/6",
+            "team1IsEither": [
+              "Duke",
+              "Illinois"
+            ],
+            "team2IsEither": [
+              "Michigan",
+              "Houston",
+              "Memphis",
+              "Missouri"
+            ]
+          }
+        ]
+      },
+      {
+        "outcome": "111XX01X1XXX",
+        "probability": 0.02003316897470435,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "New Mexico",
+            "loser": "Marquette",
+            "either": false,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "winnerSeed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Michigan St.",
+            "loser": "New Mexico",
+            "either": false,
+            "team1Seed": 10,
+            "team2Seed": 2,
+            "winnerSeed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "Clemson",
+            "loser": "Florida",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Michigan St.",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 6,
+            "team2Seed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "Houston",
+            "loser": "Memphis",
             "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
             "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Clemson",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Auburn/Michigan",
+            "team2": "Ole Miss/Michigan St.",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/5",
+            "team2Seed": "6/2",
+            "team1IsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "team2IsEither": [
+              "Ole Miss",
+              "Michigan St."
+            ]
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Houston",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Illinois",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Auburn/Michigan/Ole Miss/Michigan St.",
+            "team2": "Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/5/6/2",
+            "team2Seed": 6,
+            "team1IsEither": [
+              "Auburn",
+              "Michigan",
+              "Ole Miss",
+              "Michigan St."
+            ],
+            "team2IsEither": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke/Illinois",
+            "team2": "Auburn/Michigan/Ole Miss/Michigan St./Missouri",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/6",
+            "team2Seed": "1/5/6/2/6",
+            "team1IsEither": [
+              "Duke",
+              "Illinois"
+            ],
+            "team2IsEither": [
+              "Auburn",
+              "Michigan",
+              "Ole Miss",
+              "Michigan St.",
+              "Missouri"
+            ]
+          }
+        ]
+      },
+      {
+        "outcome": "11X1XX110XXX",
+        "probability": 0.018167294709404928,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "New Mexico",
+            "loser": "Marquette",
+            "either": false,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "winnerSeed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Michigan St.",
+            "loser": "New Mexico",
+            "either": false,
+            "team1Seed": 10,
+            "team2Seed": 2,
+            "winnerSeed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "Michigan",
+            "loser": "Auburn",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Michigan St.",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 6,
+            "team2Seed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Florida/Clemson",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Florida/Clemson",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": [
+              "Florida",
+              "Clemson"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Michigan",
+            "team2": "Ole Miss/Michigan St.",
+            "winner": "Ole Miss/Michigan St.",
+            "loser": "Michigan",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": "6/2",
+            "winnerSeed": "6/2",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Ole Miss",
+              "Michigan St."
+            ],
+            "winnerIsEither": [
+              "Ole Miss",
+              "Michigan St."
+            ],
+            "winnerEitherTeams": [
+              "Ole Miss",
+              "Michigan St."
+            ]
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston/Memphis",
+            "team2": "Missouri",
+            "winner": "Houston/Memphis",
+            "loser": "Missouri",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "winnerEitherTeams": [
+              "Houston",
+              "Memphis"
+            ]
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Illinois",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Ole Miss/Michigan St.",
+            "team2": "Houston/Memphis",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "6/2",
+            "team2Seed": "1/5",
+            "team1IsEither": [
+              "Ole Miss",
+              "Michigan St."
+            ],
+            "team2IsEither": [
+              "Houston",
+              "Memphis"
+            ]
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke/Illinois",
+            "team2": "Ole Miss/Michigan St./Houston/Memphis",
+            "winner": "either",
+            "either": true,
+            "team1Seed": "1/6",
+            "team2Seed": "6/2/1/5",
+            "team1IsEither": [
+              "Duke",
+              "Illinois"
+            ],
+            "team2IsEither": [
+              "Ole Miss",
+              "Michigan St.",
+              "Houston",
+              "Memphis"
+            ]
+          }
+        ]
+      },
+      {
+        "outcome": "X011001X1XXX",
+        "probability": 0.01701653582541274,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "Marquette/New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Marquette/New Mexico",
+            "loser": "Michigan St.",
+            "either": false,
+            "team1Seed": "7/10",
+            "team2Seed": 2,
+            "winnerSeed": "7/10",
+            "team1IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "Clemson",
+            "loser": "Florida",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "Michigan",
+            "loser": "Auburn",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
@@ -1175,36 +2078,27 @@
             "gameIndex": 6,
             "team1": "Houston",
             "team2": "Memphis",
-            "winner": "either",
-            "either": true,
+            "winner": "Houston",
+            "loser": "Memphis",
+            "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
+            "winnerSeed": 1,
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 1,
-            "team1": "Florida",
+            "team1": "Clemson",
             "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Auburn",
-            "team2": "Ole Miss",
-            "winner": "Ole Miss",
-            "loser": "Auburn",
+            "winner": "Illinois",
+            "loser": "Clemson",
             "either": false,
-            "team1Seed": 1,
+            "team1Seed": 5,
             "team2Seed": 6,
             "winnerSeed": 6,
             "team1IsEither": null,
@@ -1215,79 +2109,91 @@
           {
             "round": 4,
             "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Houston/Memphis",
-            "team2": "Missouri",
+            "gameIndex": 2,
+            "team1": "Michigan",
+            "team2": "Ole Miss",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/5",
+            "team1Seed": 5,
             "team2Seed": 6,
-            "team1IsEither": [
-              "Houston",
-              "Memphis"
-            ],
+            "team1IsEither": null,
             "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Houston",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 0,
             "team1": "Duke",
-            "team2": "Florida/Illinois",
+            "team2": "Illinois",
             "winner": "either",
             "either": true,
             "team1Seed": 1,
-            "team2Seed": "1/6",
+            "team2Seed": 6,
             "team1IsEither": null,
-            "team2IsEither": [
-              "Florida",
-              "Illinois"
-            ]
+            "team2IsEither": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 1,
-            "team1": "Ole Miss",
-            "team2": "Houston/Memphis/Missouri",
+            "team1": "Michigan/Ole Miss",
+            "team2": "Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": 6,
-            "team2Seed": "1/5/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ]
+            "team1Seed": "5/6",
+            "team2Seed": 6,
+            "team1IsEither": [
+              "Michigan",
+              "Ole Miss"
+            ],
+            "team2IsEither": null
           },
           {
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Florida/Illinois",
-            "team2": "Ole Miss/Houston/Memphis/Missouri",
+            "team1": "Duke/Illinois",
+            "team2": "Michigan/Ole Miss/Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": "1/1/6",
-            "team2Seed": "6/1/5/6",
+            "team1Seed": "1/6",
+            "team2Seed": "5/6/6",
             "team1IsEither": [
               "Duke",
-              "Florida",
               "Illinois"
             ],
             "team2IsEither": [
+              "Michigan",
               "Ole Miss",
-              "Houston",
-              "Memphis",
               "Missouri"
             ]
           }
         ]
-      },
+      }
+    ],
+    "bob": [],
+    "charlie": [],
+    "dana": [
       {
-        "outcome": "X0X100X1XXXX",
-        "probability": 0.03125,
+        "outcome": "X0X10000XX10",
+        "probability": 0.004717908570805673,
         "games": [
           {
             "round": 1,
@@ -1401,1112 +2307,25 @@
             "gameIndex": 1,
             "team1": "Florida/Clemson",
             "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
-            "team2Seed": 6,
-            "team1IsEither": [
-              "Florida",
-              "Clemson"
-            ],
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Michigan",
-            "team2": "Ole Miss",
-            "winner": "Ole Miss",
-            "loser": "Michigan",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Houston",
-            "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Florida/Clemson/Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "1/5/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Florida",
-              "Clemson",
-              "Illinois"
-            ]
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Ole Miss",
-            "team2": "Houston/Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 6,
-            "team2Seed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Houston",
-              "Missouri"
-            ]
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Florida/Clemson/Illinois",
-            "team2": "Ole Miss/Houston/Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/1/5/6",
-            "team2Seed": "6/1/6",
-            "team1IsEither": [
-              "Duke",
-              "Florida",
-              "Clemson",
-              "Illinois"
-            ],
-            "team2IsEither": [
-              "Ole Miss",
-              "Houston",
-              "Missouri"
-            ]
-          }
-        ]
-      },
-      {
-        "outcome": "XX11110XXXXX",
-        "probability": 0.03125,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette/New Mexico",
-            "team2": "Michigan St.",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "7/10",
-            "team2Seed": 2,
-            "team1IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "team2IsEither": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Clemson",
-            "loser": "Florida",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Michigan",
-            "loser": "Auburn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette/New Mexico/Michigan St.",
-            "winner": "Marquette/New Mexico/Michigan St.",
-            "loser": "Ole Miss",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": "7/10/2",
-            "winnerSeed": "7/10/2",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico",
-              "Michigan St."
-            ],
-            "winnerIsEither": [
-              "Marquette",
-              "New Mexico",
-              "Michigan St."
-            ],
-            "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico",
-              "Michigan St."
-            ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "Memphis",
-            "loser": "Houston",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Clemson",
-            "team2": "Illinois",
-            "winner": "Clemson",
+            "winner": "Florida/Clemson",
             "loser": "Illinois",
             "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Michigan",
-            "team2": "Marquette/New Mexico/Michigan St.",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 5,
-            "team2Seed": "7/10/2",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico",
-              "Michigan St."
-            ]
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Memphis",
-            "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Clemson",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Michigan/Marquette/New Mexico/Michigan St.",
-            "team2": "Memphis/Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "5/7/10/2",
-            "team2Seed": "5/6",
-            "team1IsEither": [
-              "Michigan",
-              "Marquette",
-              "New Mexico",
-              "Michigan St."
-            ],
-            "team2IsEither": [
-              "Memphis",
-              "Missouri"
-            ]
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Clemson",
-            "team2": "Michigan/Marquette/New Mexico/Michigan St./Memphis/Missouri",
-            "winner": "either",
-            "either": true,
             "team1Seed": "1/5",
-            "team2Seed": "5/7/10/2/5/6",
+            "team2Seed": 6,
+            "winnerSeed": "1/5",
             "team1IsEither": [
-              "Duke",
+              "Florida",
               "Clemson"
             ],
-            "team2IsEither": [
-              "Michigan",
-              "Marquette",
-              "New Mexico",
-              "Michigan St.",
-              "Memphis",
-              "Missouri"
-            ]
-          }
-        ]
-      },
-      {
-        "outcome": "X0000XX0XX0X",
-        "probability": 0.015625,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette/New Mexico",
-            "team2": "Michigan St.",
-            "winner": "Marquette/New Mexico",
-            "loser": "Michigan St.",
-            "either": false,
-            "team1Seed": "7/10",
-            "team2Seed": 2,
-            "winnerSeed": "7/10",
-            "team1IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
             "team2IsEither": null,
             "winnerIsEither": [
-              "Marquette",
-              "New Mexico"
+              "Florida",
+              "Clemson"
             ],
             "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Auburn",
-            "loser": "Michigan",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette/New Mexico",
-            "winner": "Ole Miss",
-            "loser": "Marquette/New Mexico",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": "7/10",
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Florida",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Auburn",
-            "team2": "Ole Miss",
-            "winner": "Auburn",
-            "loser": "Ole Miss",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Houston/Memphis",
-            "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
-            "team2Seed": 6,
-            "team1IsEither": [
-              "Houston",
-              "Memphis"
-            ],
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Florida/Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
               "Florida",
-              "Illinois"
+              "Clemson"
             ]
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Auburn",
-            "team2": "Houston/Memphis/Missouri",
-            "winner": "Auburn",
-            "loser": "Houston/Memphis/Missouri",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": "1/5/6",
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Florida/Illinois",
-            "team2": "Auburn",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/1/6",
-            "team2Seed": 1,
-            "team1IsEither": [
-              "Duke",
-              "Florida",
-              "Illinois"
-            ],
-            "team2IsEither": null
-          }
-        ]
-      },
-      {
-        "outcome": "X01000X1XXXX",
-        "probability": 0.015625,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette/New Mexico",
-            "team2": "Michigan St.",
-            "winner": "Marquette/New Mexico",
-            "loser": "Michigan St.",
-            "either": false,
-            "team1Seed": "7/10",
-            "team2Seed": 2,
-            "winnerSeed": "7/10",
-            "team1IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Clemson",
-            "loser": "Florida",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Auburn",
-            "loser": "Michigan",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette/New Mexico",
-            "winner": "Ole Miss",
-            "loser": "Marquette/New Mexico",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": "7/10",
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "Houston",
-            "loser": "Memphis",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Clemson",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Auburn",
-            "team2": "Ole Miss",
-            "winner": "Ole Miss",
-            "loser": "Auburn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Houston",
-            "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Clemson/Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "5/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Clemson",
-              "Illinois"
-            ]
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Ole Miss",
-            "team2": "Houston/Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 6,
-            "team2Seed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Houston",
-              "Missouri"
-            ]
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Clemson/Illinois",
-            "team2": "Ole Miss/Houston/Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5/6",
-            "team2Seed": "6/1/6",
-            "team1IsEither": [
-              "Duke",
-              "Clemson",
-              "Illinois"
-            ],
-            "team2IsEither": [
-              "Ole Miss",
-              "Houston",
-              "Missouri"
-            ]
-          }
-        ]
-      }
-    ],
-    "bob": [],
-    "charlie": [],
-    "dana": [
-      {
-        "outcome": "X0000XX0XX10",
-        "probability": 0.0078125,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette/New Mexico",
-            "team2": "Michigan St.",
-            "winner": "Marquette/New Mexico",
-            "loser": "Michigan St.",
-            "either": false,
-            "team1Seed": "7/10",
-            "team2Seed": 2,
-            "winnerSeed": "7/10",
-            "team1IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Auburn",
-            "loser": "Michigan",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette/New Mexico",
-            "winner": "Ole Miss",
-            "loser": "Marquette/New Mexico",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": "7/10",
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Florida",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Auburn",
-            "team2": "Ole Miss",
-            "winner": "Auburn",
-            "loser": "Ole Miss",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Houston/Memphis",
-            "team2": "Missouri",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/5",
-            "team2Seed": 6,
-            "team1IsEither": [
-              "Houston",
-              "Memphis"
-            ],
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Florida/Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Florida",
-              "Illinois"
-            ]
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Auburn",
-            "team2": "Houston/Memphis/Missouri",
-            "winner": "Houston/Memphis/Missouri",
-            "loser": "Auburn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": "1/5/6",
-            "winnerSeed": "1/5/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ],
-            "winnerIsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ],
-            "winnerEitherTeams": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ]
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Florida/Illinois",
-            "team2": "Houston/Memphis/Missouri",
-            "winner": "Duke/Florida/Illinois",
-            "loser": "Houston/Memphis/Missouri",
-            "either": false,
-            "team1Seed": "1/1/6",
-            "team2Seed": "1/5/6",
-            "winnerSeed": "1/1/6",
-            "team1IsEither": [
-              "Duke",
-              "Florida",
-              "Illinois"
-            ],
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ],
-            "winnerIsEither": [
-              "Duke",
-              "Florida",
-              "Illinois"
-            ],
-            "winnerEitherTeams": [
-              "Duke",
-              "Florida",
-              "Illinois"
-            ]
-          }
-        ]
-      },
-      {
-        "outcome": "X00100X0XX10",
-        "probability": 0.00390625,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette/New Mexico",
-            "team2": "Michigan St.",
-            "winner": "Marquette/New Mexico",
-            "loser": "Michigan St.",
-            "either": false,
-            "team1Seed": "7/10",
-            "team2Seed": 2,
-            "winnerSeed": "7/10",
-            "team1IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Michigan",
-            "loser": "Auburn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette/New Mexico",
-            "winner": "Ole Miss",
-            "loser": "Marquette/New Mexico",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": "7/10",
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "Houston",
-            "loser": "Memphis",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Florida",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
           },
           {
             "round": 4,
@@ -2543,15 +2362,15 @@
             "roundKey": "round5",
             "gameIndex": 0,
             "team1": "Duke",
-            "team2": "Florida/Illinois",
+            "team2": "Florida/Clemson",
             "winner": "either",
             "either": true,
             "team1Seed": 1,
-            "team2Seed": "1/6",
+            "team2Seed": "1/5",
             "team1IsEither": null,
             "team2IsEither": [
               "Florida",
-              "Illinois"
+              "Clemson"
             ]
           },
           {
@@ -2584,18 +2403,18 @@
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Florida/Illinois",
+            "team1": "Duke/Florida/Clemson",
             "team2": "Houston/Missouri",
-            "winner": "Duke/Florida/Illinois",
+            "winner": "Duke/Florida/Clemson",
             "loser": "Houston/Missouri",
             "either": false,
-            "team1Seed": "1/1/6",
+            "team1Seed": "1/1/5",
             "team2Seed": "1/6",
-            "winnerSeed": "1/1/6",
+            "winnerSeed": "1/1/5",
             "team1IsEither": [
               "Duke",
               "Florida",
-              "Illinois"
+              "Clemson"
             ],
             "team2IsEither": [
               "Houston",
@@ -2604,19 +2423,19 @@
             "winnerIsEither": [
               "Duke",
               "Florida",
-              "Illinois"
+              "Clemson"
             ],
             "winnerEitherTeams": [
               "Duke",
               "Florida",
-              "Illinois"
+              "Clemson"
             ]
           }
         ]
       },
       {
-        "outcome": "X0100X00XX10",
-        "probability": 0.00390625,
+        "outcome": "X0X00X001010",
+        "probability": 0.0028529127629138822,
         "games": [
           {
             "round": 1,
@@ -2663,16 +2482,12 @@
             "gameIndex": 2,
             "team1": "Florida",
             "team2": "Clemson",
-            "winner": "Clemson",
-            "loser": "Florida",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 5,
             "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "team2IsEither": null
           },
           {
             "round": 3,
@@ -2728,18 +2543,27 @@
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 1,
-            "team1": "Clemson",
+            "team1": "Florida/Clemson",
             "team2": "Illinois",
-            "winner": "Clemson",
+            "winner": "Florida/Clemson",
             "loser": "Illinois",
             "either": false,
-            "team1Seed": 5,
+            "team1Seed": "1/5",
             "team2Seed": 6,
-            "winnerSeed": 5,
-            "team1IsEither": null,
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Florida",
+              "Clemson"
+            ],
             "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "winnerIsEither": [
+              "Florida",
+              "Clemson"
+            ],
+            "winnerEitherTeams": [
+              "Florida",
+              "Clemson"
+            ]
           },
           {
             "round": 4,
@@ -2764,318 +2588,322 @@
             "gameIndex": 3,
             "team1": "Houston/Memphis",
             "team2": "Missouri",
-            "winner": "either",
-            "either": true,
+            "winner": "Missouri",
+            "loser": "Houston/Memphis",
+            "either": false,
             "team1Seed": "1/5",
             "team2Seed": 6,
+            "winnerSeed": 6,
             "team1IsEither": [
               "Houston",
               "Memphis"
             ],
-            "team2IsEither": null
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 0,
             "team1": "Duke",
-            "team2": "Clemson",
-            "winner": "either",
-            "either": true,
+            "team2": "Florida/Clemson",
+            "winner": "Duke",
+            "loser": "Florida/Clemson",
+            "either": false,
             "team1Seed": 1,
-            "team2Seed": 5,
+            "team2Seed": "1/5",
+            "winnerSeed": 1,
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": [
+              "Florida",
+              "Clemson"
+            ],
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 1,
             "team1": "Auburn",
-            "team2": "Houston/Memphis/Missouri",
-            "winner": "Houston/Memphis/Missouri",
+            "team2": "Missouri",
+            "winner": "Missouri",
             "loser": "Auburn",
             "either": false,
             "team1Seed": 1,
-            "team2Seed": "1/5/6",
-            "winnerSeed": "1/5/6",
+            "team2Seed": 6,
+            "winnerSeed": 6,
             "team1IsEither": null,
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ],
-            "winnerIsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ],
-            "winnerEitherTeams": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ]
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Clemson",
-            "team2": "Houston/Memphis/Missouri",
-            "winner": "Duke/Clemson",
-            "loser": "Houston/Memphis/Missouri",
-            "either": false,
-            "team1Seed": "1/5",
-            "team2Seed": "1/5/6",
-            "winnerSeed": "1/5",
-            "team1IsEither": [
-              "Duke",
-              "Clemson"
-            ],
-            "team2IsEither": [
-              "Houston",
-              "Memphis",
-              "Missouri"
-            ],
-            "winnerIsEither": [
-              "Duke",
-              "Clemson"
-            ],
-            "winnerEitherTeams": [
-              "Duke",
-              "Clemson"
-            ]
-          }
-        ]
-      },
-      {
-        "outcome": "X00101X00X10",
-        "probability": 0.001953125,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette/New Mexico",
-            "team2": "Michigan St.",
-            "winner": "Marquette/New Mexico",
-            "loser": "Michigan St.",
-            "either": false,
-            "team1Seed": "7/10",
-            "team2Seed": 2,
-            "winnerSeed": "7/10",
-            "team1IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerEitherTeams": [
-              "Marquette",
-              "New Mexico"
-            ]
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Michigan",
-            "loser": "Auburn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette/New Mexico",
-            "winner": "Ole Miss",
-            "loser": "Marquette/New Mexico",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": "7/10",
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Marquette",
-              "New Mexico"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "Memphis",
-            "loser": "Houston",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Florida",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Michigan",
-            "team2": "Ole Miss",
-            "winner": "Michigan",
-            "loser": "Ole Miss",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Memphis",
+            "team1": "Duke",
             "team2": "Missouri",
-            "winner": "Memphis",
+            "winner": "Duke",
             "loser": "Missouri",
             "either": false,
-            "team1Seed": 5,
+            "team1Seed": 1,
             "team2Seed": 6,
-            "winnerSeed": 5,
+            "winnerSeed": 1,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
             "winnerEitherTeams": null
+          }
+        ]
+      },
+      {
+        "outcome": "X00X0X100010",
+        "probability": 0.002758183581495403,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "Marquette/New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Marquette/New Mexico",
+            "loser": "Michigan St.",
+            "either": false,
+            "team1Seed": "7/10",
+            "team2Seed": 2,
+            "winnerSeed": "7/10",
+            "team1IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "Florida",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Marquette/New Mexico",
+            "winner": "Ole Miss",
+            "loser": "Marquette/New Mexico",
+            "either": false,
+            "team1Seed": 6,
+            "team2Seed": "7/10",
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Florida",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Florida",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Auburn/Michigan",
+            "team2": "Ole Miss",
+            "winner": "Auburn/Michigan",
+            "loser": "Ole Miss",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "winnerEitherTeams": [
+              "Auburn",
+              "Michigan"
+            ]
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston/Memphis",
+            "team2": "Missouri",
+            "winner": "Houston/Memphis",
+            "loser": "Missouri",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "winnerEitherTeams": [
+              "Houston",
+              "Memphis"
+            ]
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 0,
             "team1": "Duke",
-            "team2": "Florida/Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Florida",
-              "Illinois"
-            ]
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Michigan",
-            "team2": "Memphis",
-            "winner": "Memphis",
-            "loser": "Michigan",
+            "team2": "Illinois",
+            "winner": "Duke",
+            "loser": "Illinois",
             "either": false,
-            "team1Seed": 5,
-            "team2Seed": 5,
-            "winnerSeed": 5,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 1,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
             "winnerEitherTeams": null
           },
           {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Auburn/Michigan",
+            "team2": "Houston/Memphis",
+            "winner": "Houston/Memphis",
+            "loser": "Auburn/Michigan",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": "1/5",
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "team2IsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "winnerIsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "winnerEitherTeams": [
+              "Houston",
+              "Memphis"
+            ]
+          },
+          {
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Florida/Illinois",
-            "team2": "Memphis",
-            "winner": "Duke/Florida/Illinois",
-            "loser": "Memphis",
+            "team1": "Duke",
+            "team2": "Houston/Memphis",
+            "winner": "Duke",
+            "loser": "Houston/Memphis",
             "either": false,
-            "team1Seed": "1/1/6",
-            "team2Seed": 5,
-            "winnerSeed": "1/1/6",
-            "team1IsEither": [
-              "Duke",
-              "Florida",
-              "Illinois"
+            "team1Seed": 1,
+            "team2Seed": "1/5",
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Houston",
+              "Memphis"
             ],
-            "team2IsEither": null,
-            "winnerIsEither": [
-              "Duke",
-              "Florida",
-              "Illinois"
-            ],
-            "winnerEitherTeams": [
-              "Duke",
-              "Florida",
-              "Illinois"
-            ]
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           }
         ]
       },
       {
-        "outcome": "X0110000XX10",
-        "probability": 0.001953125,
+        "outcome": "X0100X00X110",
+        "probability": 0.0022676288600018404,
         "games": [
           {
             "round": 1,
@@ -3139,12 +2967,12 @@
             "gameIndex": 4,
             "team1": "Auburn",
             "team2": "Michigan",
-            "winner": "Michigan",
-            "loser": "Auburn",
+            "winner": "Auburn",
+            "loser": "Michigan",
             "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 5,
+            "winnerSeed": 1,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
@@ -3176,16 +3004,12 @@
             "gameIndex": 6,
             "team1": "Houston",
             "team2": "Memphis",
-            "winner": "Houston",
-            "loser": "Memphis",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 1,
             "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "team2IsEither": null
           },
           {
             "round": 4,
@@ -3208,14 +3032,14 @@
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 2,
-            "team1": "Michigan",
+            "team1": "Auburn",
             "team2": "Ole Miss",
-            "winner": "Michigan",
+            "winner": "Auburn",
             "loser": "Ole Miss",
             "either": false,
-            "team1Seed": 5,
+            "team1Seed": 1,
             "team2Seed": 6,
-            "winnerSeed": 5,
+            "winnerSeed": 1,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
@@ -3225,13 +3049,16 @@
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 3,
-            "team1": "Houston",
+            "team1": "Houston/Memphis",
             "team2": "Missouri",
             "winner": "either",
             "either": true,
-            "team1Seed": 1,
+            "team1Seed": "1/5",
             "team2Seed": 6,
-            "team1IsEither": null,
+            "team1IsEither": [
+              "Houston",
+              "Memphis"
+            ],
             "team2IsEither": null
           },
           {
@@ -3240,36 +3067,43 @@
             "gameIndex": 0,
             "team1": "Duke",
             "team2": "Clemson",
-            "winner": "either",
-            "either": true,
+            "winner": "Clemson",
+            "loser": "Duke",
+            "either": false,
             "team1Seed": 1,
             "team2Seed": 5,
+            "winnerSeed": 5,
             "team1IsEither": null,
-            "team2IsEither": null
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           },
           {
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 1,
-            "team1": "Michigan",
-            "team2": "Houston/Missouri",
-            "winner": "Houston/Missouri",
-            "loser": "Michigan",
+            "team1": "Auburn",
+            "team2": "Houston/Memphis/Missouri",
+            "winner": "Houston/Memphis/Missouri",
+            "loser": "Auburn",
             "either": false,
-            "team1Seed": 5,
-            "team2Seed": "1/6",
-            "winnerSeed": "1/6",
+            "team1Seed": 1,
+            "team2Seed": "1/5/6",
+            "winnerSeed": "1/5/6",
             "team1IsEither": null,
             "team2IsEither": [
               "Houston",
+              "Memphis",
               "Missouri"
             ],
             "winnerIsEither": [
               "Houston",
+              "Memphis",
               "Missouri"
             ],
             "winnerEitherTeams": [
               "Houston",
+              "Memphis",
               "Missouri"
             ]
           },
@@ -3277,36 +3111,28 @@
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "Duke/Clemson",
-            "team2": "Houston/Missouri",
-            "winner": "Duke/Clemson",
-            "loser": "Houston/Missouri",
+            "team1": "Clemson",
+            "team2": "Houston/Memphis/Missouri",
+            "winner": "Clemson",
+            "loser": "Houston/Memphis/Missouri",
             "either": false,
-            "team1Seed": "1/5",
-            "team2Seed": "1/6",
-            "winnerSeed": "1/5",
-            "team1IsEither": [
-              "Duke",
-              "Clemson"
-            ],
+            "team1Seed": 5,
+            "team2Seed": "1/5/6",
+            "winnerSeed": 5,
+            "team1IsEither": null,
             "team2IsEither": [
               "Houston",
+              "Memphis",
               "Missouri"
             ],
-            "winnerIsEither": [
-              "Duke",
-              "Clemson"
-            ],
-            "winnerEitherTeams": [
-              "Duke",
-              "Clemson"
-            ]
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
           }
         ]
       },
       {
         "outcome": "000000X0XX11",
-        "probability": 0.001953125,
+        "probability": 0.002029411821278808,
         "games": [
           {
             "round": 1,
@@ -3528,8 +3354,680 @@
         ]
       },
       {
+        "outcome": "X0000X101010",
+        "probability": 0.001751615243313376,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "Marquette/New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Marquette/New Mexico",
+            "loser": "Michigan St.",
+            "either": false,
+            "team1Seed": "7/10",
+            "team2Seed": 2,
+            "winnerSeed": "7/10",
+            "team1IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "Florida",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "Auburn",
+            "loser": "Michigan",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Marquette/New Mexico",
+            "winner": "Ole Miss",
+            "loser": "Marquette/New Mexico",
+            "either": false,
+            "team1Seed": 6,
+            "team2Seed": "7/10",
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Florida",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Florida",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Auburn",
+            "team2": "Ole Miss",
+            "winner": "Auburn",
+            "loser": "Ole Miss",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston/Memphis",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Houston/Memphis",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": [
+              "Houston",
+              "Memphis"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Illinois",
+            "winner": "Duke",
+            "loser": "Illinois",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Auburn",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Auburn",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Missouri",
+            "winner": "Duke",
+            "loser": "Missouri",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          }
+        ]
+      },
+      {
+        "outcome": "X00100101X10",
+        "probability": 0.0015935899054947984,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "Marquette/New Mexico",
+            "team2": "Michigan St.",
+            "winner": "Marquette/New Mexico",
+            "loser": "Michigan St.",
+            "either": false,
+            "team1Seed": "7/10",
+            "team2Seed": 2,
+            "winnerSeed": "7/10",
+            "team1IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerEitherTeams": [
+              "Marquette",
+              "New Mexico"
+            ]
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "Florida",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "Michigan",
+            "loser": "Auburn",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Marquette/New Mexico",
+            "winner": "Ole Miss",
+            "loser": "Marquette/New Mexico",
+            "either": false,
+            "team1Seed": 6,
+            "team2Seed": "7/10",
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Marquette",
+              "New Mexico"
+            ],
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "Houston",
+            "loser": "Memphis",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Florida",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Florida",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Michigan",
+            "team2": "Ole Miss",
+            "winner": "Michigan",
+            "loser": "Ole Miss",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Houston",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Houston",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Illinois",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Michigan",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Michigan",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke/Illinois",
+            "team2": "Missouri",
+            "winner": "Duke/Illinois",
+            "loser": "Missouri",
+            "either": false,
+            "team1Seed": "1/6",
+            "team2Seed": 6,
+            "winnerSeed": "1/6",
+            "team1IsEither": [
+              "Duke",
+              "Illinois"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Duke",
+              "Illinois"
+            ],
+            "winnerEitherTeams": [
+              "Duke",
+              "Illinois"
+            ]
+          }
+        ]
+      },
+      {
+        "outcome": "000X01X01110",
+        "probability": 0.0014752603986974058,
+        "games": [
+          {
+            "round": 1,
+            "roundKey": "round1",
+            "gameIndex": 22,
+            "team1": "Marquette",
+            "team2": "New Mexico",
+            "winner": "Marquette",
+            "loser": "New Mexico",
+            "either": false,
+            "team1Seed": 7,
+            "team2Seed": 10,
+            "winnerSeed": 7,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 2,
+            "roundKey": "round2",
+            "gameIndex": 11,
+            "team1": "Marquette",
+            "team2": "Michigan St.",
+            "winner": "Marquette",
+            "loser": "Michigan St.",
+            "either": false,
+            "team1Seed": 7,
+            "team2Seed": 2,
+            "winnerSeed": 7,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 2,
+            "team1": "Florida",
+            "team2": "Clemson",
+            "winner": "Florida",
+            "loser": "Clemson",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 4,
+            "team1": "Auburn",
+            "team2": "Michigan",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 5,
+            "team1": "Ole Miss",
+            "team2": "Marquette",
+            "winner": "Ole Miss",
+            "loser": "Marquette",
+            "either": false,
+            "team1Seed": 6,
+            "team2Seed": 7,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 3,
+            "roundKey": "round3",
+            "gameIndex": 6,
+            "team1": "Houston",
+            "team2": "Memphis",
+            "winner": "Memphis",
+            "loser": "Houston",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 5,
+            "winnerSeed": 5,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 1,
+            "team1": "Florida",
+            "team2": "Illinois",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 2,
+            "team1": "Auburn/Michigan",
+            "team2": "Ole Miss",
+            "winner": "Auburn/Michigan",
+            "loser": "Ole Miss",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": "1/5",
+            "team1IsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "winnerEitherTeams": [
+              "Auburn",
+              "Michigan"
+            ]
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Memphis",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Memphis",
+            "either": false,
+            "team1Seed": 5,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Florida/Illinois",
+            "winner": "Florida/Illinois",
+            "loser": "Duke",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": "1/6",
+            "winnerSeed": "1/6",
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Florida",
+              "Illinois"
+            ],
+            "winnerIsEither": [
+              "Florida",
+              "Illinois"
+            ],
+            "winnerEitherTeams": [
+              "Florida",
+              "Illinois"
+            ]
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Auburn/Michigan",
+            "team2": "Missouri",
+            "winner": "Missouri",
+            "loser": "Auburn/Michigan",
+            "either": false,
+            "team1Seed": "1/5",
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": [
+              "Auburn",
+              "Michigan"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Florida/Illinois",
+            "team2": "Missouri",
+            "winner": "Florida/Illinois",
+            "loser": "Missouri",
+            "either": false,
+            "team1Seed": "1/6",
+            "team2Seed": 6,
+            "winnerSeed": "1/6",
+            "team1IsEither": [
+              "Florida",
+              "Illinois"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": [
+              "Florida",
+              "Illinois"
+            ],
+            "winnerEitherTeams": [
+              "Florida",
+              "Illinois"
+            ]
+          }
+        ]
+      },
+      {
         "outcome": "X0100010X110",
-        "probability": 0.0009765625,
+        "probability": 0.001465874591631432,
         "games": [
           {
             "round": 1,
@@ -3754,8 +4252,8 @@
         ]
       },
       {
-        "outcome": "X01001100110",
-        "probability": 0.00048828125,
+        "outcome": "X0X001100110",
+        "probability": 0.0013038930333635647,
         "games": [
           {
             "round": 1,
@@ -3802,16 +4300,12 @@
             "gameIndex": 2,
             "team1": "Florida",
             "team2": "Clemson",
-            "winner": "Clemson",
-            "loser": "Florida",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 1,
             "team2Seed": 5,
-            "winnerSeed": 5,
             "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "team2IsEither": null
           },
           {
             "round": 3,
@@ -3871,15 +4365,18 @@
             "round": 4,
             "roundKey": "round4",
             "gameIndex": 1,
-            "team1": "Clemson",
+            "team1": "Florida/Clemson",
             "team2": "Illinois",
             "winner": "Illinois",
-            "loser": "Clemson",
+            "loser": "Florida/Clemson",
             "either": false,
-            "team1Seed": 5,
+            "team1Seed": "1/5",
             "team2Seed": 6,
             "winnerSeed": 6,
-            "team1IsEither": null,
+            "team1IsEither": [
+              "Florida",
+              "Clemson"
+            ],
             "team2IsEither": null,
             "winnerIsEither": null,
             "winnerEitherTeams": null
@@ -3970,445 +4467,6 @@
             "winnerEitherTeams": null
           }
         ]
-      },
-      {
-        "outcome": "000101X01110",
-        "probability": 0.00048828125,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "Marquette",
-            "loser": "New Mexico",
-            "either": false,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "winnerSeed": 7,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette",
-            "team2": "Michigan St.",
-            "winner": "Marquette",
-            "loser": "Michigan St.",
-            "either": false,
-            "team1Seed": 7,
-            "team2Seed": 2,
-            "winnerSeed": 7,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Florida",
-            "loser": "Clemson",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Michigan",
-            "loser": "Auburn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette",
-            "winner": "Ole Miss",
-            "loser": "Marquette",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": 7,
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "Memphis",
-            "loser": "Houston",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Florida",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Michigan",
-            "team2": "Ole Miss",
-            "winner": "Michigan",
-            "loser": "Ole Miss",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Memphis",
-            "team2": "Missouri",
-            "winner": "Missouri",
-            "loser": "Memphis",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Florida/Illinois",
-            "winner": "Florida/Illinois",
-            "loser": "Duke",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "winnerSeed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Florida",
-              "Illinois"
-            ],
-            "winnerIsEither": [
-              "Florida",
-              "Illinois"
-            ],
-            "winnerEitherTeams": [
-              "Florida",
-              "Illinois"
-            ]
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Michigan",
-            "team2": "Missouri",
-            "winner": "Missouri",
-            "loser": "Michigan",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Florida/Illinois",
-            "team2": "Missouri",
-            "winner": "Florida/Illinois",
-            "loser": "Missouri",
-            "either": false,
-            "team1Seed": "1/6",
-            "team2Seed": 6,
-            "winnerSeed": "1/6",
-            "team1IsEither": [
-              "Florida",
-              "Illinois"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": [
-              "Florida",
-              "Illinois"
-            ],
-            "winnerEitherTeams": [
-              "Florida",
-              "Illinois"
-            ]
-          }
-        ]
-      },
-      {
-        "outcome": "001101000X10",
-        "probability": 0.00048828125,
-        "games": [
-          {
-            "round": 1,
-            "roundKey": "round1",
-            "gameIndex": 22,
-            "team1": "Marquette",
-            "team2": "New Mexico",
-            "winner": "Marquette",
-            "loser": "New Mexico",
-            "either": false,
-            "team1Seed": 7,
-            "team2Seed": 10,
-            "winnerSeed": 7,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 2,
-            "roundKey": "round2",
-            "gameIndex": 11,
-            "team1": "Marquette",
-            "team2": "Michigan St.",
-            "winner": "Marquette",
-            "loser": "Michigan St.",
-            "either": false,
-            "team1Seed": 7,
-            "team2Seed": 2,
-            "winnerSeed": 7,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 2,
-            "team1": "Florida",
-            "team2": "Clemson",
-            "winner": "Clemson",
-            "loser": "Florida",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 4,
-            "team1": "Auburn",
-            "team2": "Michigan",
-            "winner": "Michigan",
-            "loser": "Auburn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 5,
-            "team1": "Ole Miss",
-            "team2": "Marquette",
-            "winner": "Ole Miss",
-            "loser": "Marquette",
-            "either": false,
-            "team1Seed": 6,
-            "team2Seed": 7,
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 3,
-            "roundKey": "round3",
-            "gameIndex": 6,
-            "team1": "Houston",
-            "team2": "Memphis",
-            "winner": "Memphis",
-            "loser": "Houston",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 1,
-            "team1": "Clemson",
-            "team2": "Illinois",
-            "winner": "Clemson",
-            "loser": "Illinois",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 2,
-            "team1": "Michigan",
-            "team2": "Ole Miss",
-            "winner": "Michigan",
-            "loser": "Ole Miss",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Memphis",
-            "team2": "Missouri",
-            "winner": "Memphis",
-            "loser": "Missouri",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 6,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Clemson",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Michigan",
-            "team2": "Memphis",
-            "winner": "Memphis",
-            "loser": "Michigan",
-            "either": false,
-            "team1Seed": 5,
-            "team2Seed": 5,
-            "winnerSeed": 5,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Clemson",
-            "team2": "Memphis",
-            "winner": "Duke/Clemson",
-            "loser": "Memphis",
-            "either": false,
-            "team1Seed": "1/5",
-            "team2Seed": 5,
-            "winnerSeed": "1/5",
-            "team1IsEither": [
-              "Duke",
-              "Clemson"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": [
-              "Duke",
-              "Clemson"
-            ],
-            "winnerEitherTeams": [
-              "Duke",
-              "Clemson"
-            ]
-          }
-        ]
       }
     ],
     "eve": []
@@ -4421,14 +4479,14 @@
       "team2Seed": 10,
       "preferences": {
         "alice": {
-          "team1": 0.4984992496248124,
-          "team2": 0.5015007503751876
+          "team1": 0.4497062670833469,
+          "team2": 0.5502937329166532
         },
         "bob": null,
         "charlie": null,
         "dana": {
-          "team1": 0.5612244897959183,
-          "team2": 0.4387755102040816
+          "team1": 0.5312116037934598,
+          "team2": 0.4687883962065402
         },
         "eve": null
       }
@@ -4440,14 +4498,14 @@
       "team2Seed": 5,
       "preferences": {
         "alice": {
-          "team1": 0.4957478739369685,
-          "team2": 0.5042521260630315
+          "team1": 0.42920115112898555,
+          "team2": 0.5707988488710145
         },
         "bob": null,
         "charlie": null,
         "dana": {
-          "team1": 0.673469387755102,
-          "team2": 0.32653061224489793
+          "team1": 0.6660723577357204,
+          "team2": 0.33392764226427957
         },
         "eve": null
       }
@@ -4459,14 +4517,14 @@
       "team2Seed": 5,
       "preferences": {
         "alice": {
-          "team1": 0.49674837418709356,
-          "team2": 0.5032516258129065
+          "team1": 0.43527201205505367,
+          "team2": 0.5647279879449463
         },
         "bob": null,
         "charlie": null,
         "dana": {
-          "team1": 0.6326530612244898,
-          "team2": 0.3673469387755102
+          "team1": 0.6240874088182936,
+          "team2": 0.3759125911817064
         },
         "eve": null
       }
@@ -4478,14 +4536,14 @@
       "team2Seed": 5,
       "preferences": {
         "alice": {
-          "team1": 0.49724862431215605,
-          "team2": 0.5027513756878439
+          "team1": 0.4332582993659942,
+          "team2": 0.5667417006340059
         },
         "bob": null,
         "charlie": null,
         "dana": {
-          "team1": 0.6122448979591837,
-          "team2": 0.3877551020408163
+          "team1": 0.5820459229954026,
+          "team2": 0.4179540770045974
         },
         "eve": null
       }
