@@ -1,0 +1,17 @@
+[
+    {
+        "name": "Golden Boy",
+        "reason": "has the most potential points at the beginning (effectively underdog picker)",
+        "Winners": ["Jack"]
+    },
+    {
+        "name": "short end of the stick",
+        "reason": "has the lowest probability of winning at the beginning",
+        "Winners": ["Jack"]
+    },
+    {
+        "name": "nerd",
+        "reason": "awarded for finding something in the rules, if no one finds it jack wins",
+        "Winners": ["Jack"]
+    }
+]

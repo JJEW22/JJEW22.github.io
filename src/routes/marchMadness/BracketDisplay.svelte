@@ -195,20 +195,20 @@
         // Compare by name since objects may be different references
         const isUserPick = game.winner && game.winner.name === team.name;
         const status = getPickStatus(game, round, gameIndex);
+        const gameActuallyPlayed = !isGameUndecided(round, gameIndex);
         
-        // For decided games, use normal coloring
-        if (status === 'correct' || status === 'incorrect') {
+        // For games that have actually been played (have results), use correct/incorrect coloring
+        if (gameActuallyPlayed && (status === 'correct' || status === 'incorrect')) {
             return isUserPick ? `selected ${status}` : '';
         }
         
-        // For undecided games, check if there's a scenario
-        if (scenario && isGameUndecided(round, gameIndex)) {
+        // For games not yet played, check if there's a scenario
+        if (scenario && !gameActuallyPlayed) {
             const scenarioGame = getScenarioGame(round, gameIndex);
             if (scenarioGame) {
-                // Check if this is an "either" game (outcome doesn't matter)
-                if (scenarioGame.either) {
-                    // Both teams can win - highlight both with "either" style
-                    return 'selected scenario-either';
+                // Check if this is a dead path game
+                if (scenarioGame.dead) {
+                    return 'scenario-dead';
                 }
                 
                 // Determine what team the SCENARIO says is in this slot
@@ -247,8 +247,11 @@
             }
         }
         
-        // Default pending state
+        // Default: for unplayed games without scenario, show pending/incorrect based on elimination status
         if (isUserPick) {
+            if (status === 'incorrect') {
+                return 'selected incorrect';  // Doomed pick (team eliminated)
+            }
             return status === 'pending' ? 'selected pending' : 'selected';
         }
         
@@ -258,19 +261,26 @@
     /**
      * Get display info for a team in the context of a scenario
      * For undecided games, shows the scenario's bracket merged with user's bracket
-     * Returns { name, seed, userPick } where userPick is shown as subtitle if different
+     * Returns { name, seed, userPick, dead } where userPick is shown as subtitle if different
      */
     function getTeamDisplayInfo(game, team, round, gameIndex) {
         if (!team) return null;
         
-        // If no scenario or game is decided, just show the team normally
-        if (!scenario || !isGameUndecided(round, gameIndex)) {
-            return { name: team.name, seed: team.seed, userPick: null };
+        const gameActuallyPlayed = !isGameUndecided(round, gameIndex);
+        
+        // If no scenario or game has actually been played, just show the team normally
+        if (!scenario || gameActuallyPlayed) {
+            return { name: team.name, seed: team.seed, userPick: null, dead: false };
         }
         
         const scenarioGame = getScenarioGame(round, gameIndex);
         if (!scenarioGame) {
-            return { name: team.name, seed: team.seed, userPick: null };
+            return { name: team.name, seed: team.seed, userPick: null, dead: false };
+        }
+        
+        // Check if this is a dead path game
+        if (scenarioGame.dead) {
+            return { name: 'Dead', seed: null, userPick: null, dead: true };
         }
         
         // Determine if this is team1 or team2 slot based on the team passed in
@@ -289,7 +299,7 @@
             isEitherTeam = scenarioGame.team2IsEither;
         } else {
             // Fallback - shouldn't happen
-            return { name: team.name, seed: team.seed, userPick: null };
+            return { name: team.name, seed: team.seed, userPick: null, dead: false };
         }
         
         // Check if the scenario team name contains "/" (combined either teams)
@@ -301,20 +311,22 @@
         // Compare user's team in this slot vs scenario's team
         if (team.name === scenarioTeamName) {
             // User's prediction matches scenario exactly - show normally
-            return { name: team.name, seed: team.seed, userPick: null };
+            return { name: team.name, seed: team.seed, userPick: null, dead: false };
         } else if (userPickIsInEither) {
             // User's pick is one of the combined either teams - show combined name, no parenthetical
             return { 
                 name: scenarioTeamName, 
                 seed: scenarioTeamSeed, 
-                userPick: null 
+                userPick: null,
+                dead: false
             };
         } else {
             // User had a different team - show scenario's team with user's pick as subtitle
             return {
                 name: scenarioTeamName,
                 seed: scenarioTeamSeed,
-                userPick: team.name
+                userPick: team.name,
+                dead: false
             };
         }
     }
@@ -867,7 +879,8 @@
                 <h3 class="champion-label">🏆 Champion 🏆</h3>
                 <div class="game champion-game">
                     {#if bracket.winner}
-                        {@const champInfo = getTeamDisplayInfo({winner: bracket.winner, team1: bracket.winner, team2: null}, bracket.winner, 6, 0)}
+                        {@const champGame = bracket.round6?.[0] || {team1: null, team2: null, winner: bracket.winner}}
+                        {@const champInfo = getTeamDisplayInfo(champGame, bracket.winner, 6, 0)}
                         <div class="team-btn champion-display {getPickStatus({winner: bracket.winner}, 6, 0) === 'correct' ? 'correct' : getPickStatus({winner: bracket.winner}, 6, 0) === 'incorrect' ? 'incorrect' : ''} {scenario && isGameUndecided(6, 0) ? (champInfo.userPick ? 'scenario-mismatch' : 'scenario-match') : ''}">
                             <span class="seed">{champInfo.seed}</span>
                             <span class="team-name">{champInfo.name}</span>
@@ -1711,6 +1724,12 @@
         color: white;
     }
     
+    .team-btn.scenario-dead {
+        background: #9ca3af;  /* Gray - dead path, no points possible */
+        color: white;
+        font-style: italic;
+    }
+    
     .team-btn.scenario-needed {
         background: #fef3c7;  /* Light yellow - scenario needs this but user didn't pick */
         color: #92400e;
@@ -1740,6 +1759,10 @@
     
     .team-btn.selected.scenario-either .seed {
         color: #0891b2;
+    }
+    
+    .team-btn.scenario-dead .seed {
+        display: none;  /* Hide seed for dead paths */
     }
     
     .team-btn.scenario-needed .seed {
@@ -1800,6 +1823,11 @@
     
     .team-btn.champion-display.scenario-either {
         background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+    }
+    
+    .team-btn.champion-display.scenario-dead {
+        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+        font-style: italic;
     }
     
     .champion-display .seed {

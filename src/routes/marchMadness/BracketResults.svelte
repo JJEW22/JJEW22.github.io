@@ -11,7 +11,7 @@
         computePossibleRemaining,
         computeStakeInGame,
         letterToNumber
-    } from './bracketStructure.js';
+    } from './BracketStructure.js';
     import { loadBracketFromPath } from './bracketIO.js';
     import BracketView from './BracketView.svelte';
     
@@ -19,7 +19,8 @@
     const YEAR = '2026';
     const BRACKETS_PATH = `/marchMadness/${YEAR}/brackets`;
     const TEAMS_FILE = `/marchMadness/${YEAR}/ThisYearTeams${YEAR}.csv`;
-    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}`;
+    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}-early`;
+    const OPTIMAL_BRACKETS_FILE = `/marchMadness/${YEAR}/optimal-brackets.json`;
     
     // State
     let loading = true;
@@ -34,13 +35,14 @@
     let resultsBracket = null;
     let standings = [];
     let selectedParticipant = null;
-    let selectedScenario = null;  // Index of selected winning scenario
+    let selectedScenario = null;  // Index of selected winning scenario, or 'optimal' for optimal bracket
     let currentRound = 1;  // Current round for stake calculations
     let upcomingGames = [];  // Games that haven't been decided yet
     let stakeData = {};  // Stake in each upcoming game per participant
     let winProbabilities = {};  // Map of name -> win probability
     let winningScenarios = {};  // Map of name -> array of winning scenarios
     let nextGamePreferences = {};  // Map of game key -> preferences per participant
+    let optimalBrackets = {};  // Map of name -> optimal bracket for max possible score
     
     onMount(async () => {
         try {
@@ -49,6 +51,7 @@
             await loadParticipants();
             await loadAllBrackets();
             await loadWinProbabilities();
+            await loadOptimalBrackets();
             calculateStandings();
             findUpcomingGames();
             calculateStakes();
@@ -134,6 +137,21 @@
             winProbabilities = {};
             winningScenarios = {};
             nextGamePreferences = {};
+        }
+    }
+    
+    async function loadOptimalBrackets() {
+        try {
+            const response = await fetch(OPTIMAL_BRACKETS_FILE);
+            if (response.ok) {
+                optimalBrackets = await response.json();
+            } else {
+                console.log('No optimal brackets file found');
+                optimalBrackets = {};
+            }
+        } catch (e) {
+            console.log('Could not load optimal brackets:', e);
+            optimalBrackets = {};
         }
     }
     
@@ -376,6 +394,39 @@
         return { name: teamName, seed: 0 };
     }
     
+    function calculatePicksPerRound(results, participant) {
+        // Returns array of correct picks per round [r1, r2, r3, r4, r5, r6]
+        const picks = [0, 0, 0, 0, 0, 0];
+        
+        for (let round = 1; round <= 6; round++) {
+            const roundKey = `round${round}`;
+            const resultsGames = results[roundKey] || [];
+            const participantGames = participant[roundKey] || [];
+            
+            for (let i = 0; i < resultsGames.length; i++) {
+                const resultGame = resultsGames[i];
+                const participantGame = participantGames[i];
+                
+                if (resultGame?.winner && participantGame?.winner) {
+                    const resultWinner = resultGame.winner.name || resultGame.winner;
+                    const participantWinner = participantGame.winner.name || participantGame.winner;
+                    
+                    if (resultWinner === participantWinner) {
+                        picks[round - 1]++;
+                    }
+                }
+            }
+        }
+        
+        return picks;
+    }
+    
+    function formatPicksPerRound(picksPerRound) {
+        if (!picksPerRound) return '';
+        const total = picksPerRound.reduce((sum, p) => sum + p, 0);
+        return `${total} [${picksPerRound.join(',')}]`;
+    }
+    
     function calculateStandings() {
         standings = [];
         
@@ -384,16 +435,23 @@
                 applySeedBonus: true
             });
             
-            const possibleRemaining = computePossibleRemaining(resultsBracket, bracket, teams);
+            // computePossibleRemaining now returns { basePoints, bonusPoints, total }
+            const possibleRemainingResult = computePossibleRemaining(resultsBracket, bracket, teams);
+            
+            // Calculate correct picks per round
+            const picksPerRound = calculatePicksPerRound(resultsBracket, bracket);
             
             standings.push({
                 name,
                 score: scoreResult.totalScore,
                 correctPicks: scoreResult.correctPicks,
                 seedBonus: scoreResult.seedBonus,
-                possibleRemaining,
+                possibleRemaining: possibleRemainingResult.total,
+                possibleBase: possibleRemainingResult.basePoints,
+                possibleBonus: possibleRemainingResult.bonusPoints,
                 winProbability: winProbabilities[name] ?? null,
-                roundBreakdown: scoreResult.roundBreakdown
+                roundBreakdown: scoreResult.roundBreakdown,
+                picksPerRound
             });
         }
         
@@ -469,8 +527,9 @@
     // Reset scenario when participant changes via dropdown
     $: if (selectedParticipant) {
         // Only reset if the new participant doesn't have the selected scenario
+        // 'optimal' is always valid, so don't reset for that
         const scenarios = winningScenarios[selectedParticipant] || [];
-        if (selectedScenario !== null && selectedScenario >= scenarios.length) {
+        if (selectedScenario !== null && selectedScenario !== 'optimal' && selectedScenario >= scenarios.length) {
             selectedScenario = null;
         }
     }
@@ -486,11 +545,65 @@
     }
     
     /**
-     * Get the currently selected scenario object
+     * Convert an optimal bracket to the scenario format
+     * Scenario format: { games: [{ round, gameIndex, winner, team1, team2, team1Seed, team2Seed, dead }, ...], probability: number }
      */
-    $: currentScenario = (selectedParticipant && selectedScenario !== null && winningScenarios[selectedParticipant]) 
-        ? winningScenarios[selectedParticipant][selectedScenario] 
-        : null;
+    function optimalBracketToScenario(optimalBracket) {
+        if (!optimalBracket) return null;
+        
+        const games = [];
+        
+        for (let round = 1; round <= 6; round++) {
+            const roundKey = `round${round}`;
+            const roundGames = optimalBracket[roundKey] || [];
+            
+            for (let gameIndex = 0; gameIndex < roundGames.length; gameIndex++) {
+                const game = roundGames[gameIndex];
+                if (game) {
+                    const team1Name = game.team1?.name || null;
+                    const team2Name = game.team2?.name || null;
+                    const team1Seed = game.team1?.seed || null;
+                    const team2Seed = game.team2?.seed || null;
+                    const winnerName = game.winner?.name || null;
+                    
+                    games.push({
+                        round,
+                        gameIndex,
+                        winner: winnerName,
+                        team1: team1Name,
+                        team2: team2Name,
+                        team1Seed: team1Seed,
+                        team2Seed: team2Seed,
+                        dead: !winnerName && team1Name && team2Name  // Mark as dead path if no winner but teams exist
+                    });
+                }
+            }
+        }
+        
+        return {
+            games,
+            probability: 1  // Not a real probability, just for display
+        };
+    }
+    
+    /**
+     * Get the currently selected scenario object
+     * Converts optimal bracket to scenario format if 'optimal' is selected
+     */
+    $: currentScenario = (() => {
+        if (!selectedParticipant) return null;
+        if (selectedScenario === null) return null;
+        
+        if (selectedScenario === 'optimal') {
+            return optimalBracketToScenario(optimalBrackets[selectedParticipant]);
+        }
+        
+        if (winningScenarios[selectedParticipant]) {
+            return winningScenarios[selectedParticipant][selectedScenario];
+        }
+        
+        return null;
+    })();
     
     function handleNextGameClick(event) {
         const { gameKey } = event.detail;
@@ -584,7 +697,7 @@
                                 <th>Rank</th>
                                 <th>Name</th>
                                 <th>Score</th>
-                                <th>Correct</th>
+                                <th>Correct Picks</th>
                                 <th>Underdog</th>
                                 <th>Possible</th>
                                 <th>Win %</th>
@@ -606,9 +719,14 @@
                                         </button>
                                     </td>
                                     <td class="score">{entry.score}</td>
-                                    <td class="correct">{entry.correctPicks}</td>
+                                    <td class="correct picks-breakdown">{formatPicksPerRound(entry.picksPerRound)}</td>
                                     <td class="underdog">{entry.seedBonus}</td>
-                                    <td class="possible">+{entry.possibleRemaining}</td>
+                                    <td class="possible">
+                                        +{entry.possibleRemaining}
+                                        {#if entry.possibleBonus > 0}
+                                            <span class="possible-breakdown">({entry.possibleBase}+{entry.possibleBonus})</span>
+                                        {/if}
+                                    </td>
                                     <td class="win-prob">
                                         {#if entry.winProbability !== null}
                                             {(entry.winProbability * 100).toFixed(1)}%
@@ -623,6 +741,16 @@
                     
                     {#if standings.length === 0}
                         <p class="no-data">No brackets loaded yet. Add participant bracket files to see standings.</p>
+                    {/if}
+                    
+                    <!-- Results Bracket Display -->
+                    {#if resultsBracket}
+                        <div class="results-bracket-section">
+                            <h2>Tournament Results</h2>
+                            <BracketView 
+                                bracketPath={`${RESULTS_FILE}.json`}
+                            />
+                        </div>
                     {/if}
                 </div>
                 
@@ -640,19 +768,16 @@
                         </select>
                         
                         {#if selectedParticipant}
-                            <label for="scenario-select">Winning Scenario:</label>
-                            {#if winningScenarios[selectedParticipant]?.length > 0}
-                                <select id="scenario-select" bind:value={selectedScenario}>
-                                    <option value={null}>-- None --</option>
+                            <label for="scenario-select">Scenario:</label>
+                            <select id="scenario-select" bind:value={selectedScenario}>
+                                <option value={null}>-- None --</option>
+                                <option value="optimal">Optimal Bracket (Max Possible)</option>
+                                {#if winningScenarios[selectedParticipant]?.length > 0}
                                     {#each winningScenarios[selectedParticipant] as scenario, i}
                                         <option value={i}>Scenario {i + 1} - {getScenarioChampion(scenario)} wins ({(scenario.probability * 100).toFixed(1)}%)</option>
                                     {/each}
-                                </select>
-                            {:else}
-                                <select id="scenario-select" disabled class="no-scenarios">
-                                    <option>No winning outcomes</option>
-                                </select>
-                            {/if}
+                                {/if}
+                            </select>
                         {/if}
                     </div>
                     
@@ -670,7 +795,7 @@
                         </div>
                         {#if currentScenario}
                             <div class="legend-section">
-                                <span class="legend-title">Scenario Games:</span>
+                                <span class="legend-title">{selectedScenario === 'optimal' ? 'Optimal Bracket:' : 'Scenario Games:'}</span>
                                 <div class="scenario-legend-item">
                                     <div class="legend-color match"></div>
                                     <span>Winner - bracket's pick matches</span>
@@ -679,10 +804,17 @@
                                     <div class="legend-color mismatch"></div>
                                     <span>Winner - differs from bracket (bracket's pick)</span>
                                 </div>
-                                <div class="scenario-legend-item">
-                                    <div class="legend-color either"></div>
-                                    <span>Either team can win</span>
-                                </div>
+                                {#if selectedScenario === 'optimal'}
+                                    <div class="scenario-legend-item">
+                                        <div class="legend-color dead"></div>
+                                        <span>Dead path - no points possible</span>
+                                    </div>
+                                {:else}
+                                    <div class="scenario-legend-item">
+                                        <div class="legend-color either"></div>
+                                        <span>Either team can win</span>
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
                     </div>
@@ -870,12 +1002,36 @@
         font-size: 1.1rem;
     }
     
+    .picks-breakdown {
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+    
     .possible {
         color: #059669;
     }
     
+    .possible-breakdown {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-left: 0.25rem;
+    }
+    
     .max {
         color: #6b7280;
+    }
+    
+    /* Results Bracket Section */
+    .results-bracket-section {
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 2px solid #e5e7eb;
+    }
+    
+    .results-bracket-section h2 {
+        margin-bottom: 1.5rem;
+        color: #1f2937;
     }
     
     /* Brackets View */
@@ -957,6 +1113,8 @@
     .legend-color.match { background: #80276C; }
     .legend-color.mismatch { background: #f97316; }
     .legend-color.either { background: #0891b2; }
+    .legend-color.dead { background: #9ca3af; }
+    .legend-color.tbd { background: #9ca3af; }
     
     .round-section {
         margin-bottom: 1.5rem;
