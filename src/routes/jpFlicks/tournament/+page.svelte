@@ -7,7 +7,7 @@
 </svelte:head>
 
 <main>
-    <Tournament dataPath="/tournamentData6Player.json" />
+    <Tournament dataPath="/tournamentData10Player.json" />
 </main>
 
 <style>
