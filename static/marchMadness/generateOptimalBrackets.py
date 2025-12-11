@@ -400,7 +400,7 @@ def mark_team_winning_until(optimal_bracket, team, start_round, start_game_idx, 
 
 def main():
     # Load results bracket
-    results_path = BASE_PATH / f"results-bracket-march-madness-{YEAR}-early.json"
+    results_path = BASE_PATH / f"results-bracket-march-madness-{YEAR}.json"
     results_bracket = load_json(results_path)
     
     # Build teams_data from round1

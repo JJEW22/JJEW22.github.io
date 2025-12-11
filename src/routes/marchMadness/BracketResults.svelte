@@ -19,7 +19,7 @@
     const YEAR = '2026';
     const BRACKETS_PATH = `/marchMadness/${YEAR}/brackets`;
     const TEAMS_FILE = `/marchMadness/${YEAR}/ThisYearTeams${YEAR}.csv`;
-    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}-early`;
+    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}`;
     const OPTIMAL_BRACKETS_FILE = `/marchMadness/${YEAR}/optimal-brackets.json`;
     
     // State
