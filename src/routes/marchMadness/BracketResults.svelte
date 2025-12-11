@@ -19,7 +19,7 @@
     const YEAR = '2026';
     const BRACKETS_PATH = `/marchMadness/${YEAR}/brackets`;
     const TEAMS_FILE = `/marchMadness/${YEAR}/ThisYearTeams${YEAR}.csv`;
-    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}`;
+    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}-early`;
     const OPTIMAL_BRACKETS_FILE = `/marchMadness/${YEAR}/optimal-brackets.json`;
     
     // State
@@ -564,17 +564,28 @@
                     const team2Name = game.team2?.name || null;
                     const team1Seed = game.team1?.seed || null;
                     const team2Seed = game.team2?.seed || null;
-                    const winnerName = game.winner?.name || null;
+                    
+                    // Check for special markers
+                    const isDead = game.dead === true || game.winner === "dead";
+                    const isEither = game.either === true || game.winner === "either";
+                    
+                    // Get winner name (null for dead/either/TBD games)
+                    let winnerName = null;
+                    if (game.winner && game.winner !== "dead" && game.winner !== "either") {
+                        winnerName = typeof game.winner === 'string' ? game.winner : game.winner.name;
+                    }
                     
                     games.push({
                         round,
                         gameIndex,
-                        winner: winnerName,
+                        winner: isDead ? "dead" : (isEither ? "either" : winnerName),
                         team1: team1Name,
                         team2: team2Name,
                         team1Seed: team1Seed,
                         team2Seed: team2Seed,
-                        dead: !winnerName && team1Name && team2Name  // Mark as dead path if no winner but teams exist
+                        dead: isDead,
+                        either: isEither
+                        // TBD games have: winner=null, dead=false, either=false
                     });
                 }
             }

@@ -270,8 +270,10 @@ def build_optimal_bracket(results_bracket, picks_bracket, teams_data):
                 # Participant didn't pick either team
                 # Check if this is a dead path
                 if is_dead_path(optimal_bracket, picks_bracket, round_num, game_idx, alive_teams):
-                    # Dead path - pick lower seed to propagate but don't set winner
-                    # This fills in the bracket visually but marks as "either" for scoring
+                    # Dead path - mark as dead
+                    game["dead"] = True
+                    game["winner"] = "dead"  # Special marker for dead paths
+                    
                     team1_seed = team1.get("seed", 99)
                     team2_seed = team2.get("seed", 99)
                     
@@ -280,20 +282,23 @@ def build_optimal_bracket(results_bracket, picks_bracket, teams_data):
                     else:
                         propagate_team = team2
                     
-                    # Don't set winner (stays null = EITHER), but propagate team to next round
+                    # Propagate team to next round for display continuity
                     propagate_winner(optimal_bracket, round_num, game_idx, propagate_team)
                 else:
-                    # Live path - lower seed wins
+                    # Live path but participant didn't pick either team - mark as "either"
+                    game["either"] = True
+                    game["winner"] = "either"  # Special marker for either/don't care
+                    
                     team1_seed = team1.get("seed", 99)
                     team2_seed = team2.get("seed", 99)
                     
                     if team1_seed <= team2_seed:
-                        winner = team1
+                        propagate_team = team1
                     else:
-                        winner = team2
+                        propagate_team = team2
                     
-                    game["winner"] = winner
-                    propagate_winner(optimal_bracket, round_num, game_idx, winner)
+                    # Propagate lower seed to next round for display
+                    propagate_winner(optimal_bracket, round_num, game_idx, propagate_team)
     
     return optimal_bracket
 
@@ -329,6 +334,9 @@ def find_dead_path_start(optimal_bracket, picks_bracket, round_num, game_idx, te
     """
     Find the round where following a participant's pick leads to a dead path.
     Returns the round number where dead path starts, or None if path stays live.
+    
+    A path is "dead" when the participant has NO alive picks from that point forward.
+    A path is "live" if the participant has ANY alive pick (even a different team).
     """
     current_game_idx = game_idx
     
@@ -343,12 +351,13 @@ def find_dead_path_start(optimal_bracket, picks_bracket, round_num, game_idx, te
                 
                 # Check if participant still has this team winning at this round
                 if pick_winner_name == team_name:
-                    # Check if participant has any OTHER live pick in future slots
-                    # that would make this path live beyond just this team
-                    pass  # Continue checking
+                    # Participant has the same team winning, continue checking
+                    pass
                 elif pick_winner_name and pick_winner_name in alive_teams:
-                    # Participant has a different live pick here - this is where we stop
-                    return r
+                    # Participant has a DIFFERENT alive pick here
+                    # This means the path is LIVE (not dead) - they have stake in another team
+                    # Return None to indicate path stays live
+                    return None
                 else:
                     # Participant's pick for this slot is eliminated
                     # Check if this means dead path from here
@@ -400,7 +409,7 @@ def mark_team_winning_until(optimal_bracket, team, start_round, start_game_idx, 
 
 def main():
     # Load results bracket
-    results_path = BASE_PATH / f"results-bracket-march-madness-{YEAR}.json"
+    results_path = BASE_PATH / f"results-bracket-march-madness-{YEAR}-early.json"
     results_bracket = load_json(results_path)
     
     # Build teams_data from round1

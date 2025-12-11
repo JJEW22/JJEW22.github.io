@@ -3,7 +3,7 @@
     import { regionPositions } from './bracketIO.js';
     
     // Debug mode toggle - set to false to disable debug features
-    const DEBUG_MODE = false;
+    const DEBUG_MODE = true;
     
     // Props
     export let bracket;                    // The bracket data to display
@@ -340,7 +340,7 @@
             return 'scenario-dead';
         }
         
-        // 7. If either team can win, show teal
+        // 7. If either team can win (no stake), show teal
         if (isEither) {
             if (debugThis) console.log(`  -> Either flag set, returning: "selected scenario-either"`);
             return 'selected scenario-either';
@@ -357,10 +357,17 @@
             console.log(`  team.name === scenarioWinner: ${team.name === scenarioWinner}`);
         }
         
-        // 9. If no winner specified, treat as either
-        if (!scenarioWinner) {
-            if (debugThis) console.log(`  -> No scenario winner, returning: "selected scenario-either"`);
-            return 'selected scenario-either';
+        // 9. If no winner specified and not either/dead, this is TBD (participant has stake)
+        //    Show standard undecided styling (same as no scenario)
+        if (!scenarioWinner || scenarioWinner === "dead" || scenarioWinner === "either") {
+            // TBD game - use default styling based on user's pick
+            if (isUserPick) {
+                const result = status === 'pending' ? 'selected pending' : 'selected';
+                if (debugThis) console.log(`  -> TBD game, user pick, returning: "${result}"`);
+                return result;
+            }
+            if (debugThis) console.log(`  -> TBD game, not user pick, returning: ""`);
+            return '';
         }
         
         // 10. Determine which slot this team is in (team1 or team2 in the bracket)
