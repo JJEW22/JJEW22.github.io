@@ -256,12 +256,17 @@
         }
         
         tournament = tournament; // Trigger reactivity
+        // Force deep reactivity update on bracket
+        if (tournament.bracket) {
+            tournament.bracket = { ...tournament.bracket };
+        }
     }
     
     // Check and populate bracket when group stage completes
     function checkAndPopulateBracket() {
         if (isGroupStageComplete() && tournament.format.groupStage && tournament.format.knockoutStage) {
             populateBracketFromGroups();
+            tournament = tournament; // Ensure reactivity update
         }
     }
     
@@ -1089,7 +1094,6 @@
                                 <li><strong>Group Stage:</strong> All 10 players compete in a single league table, each playing 3 matches</li>
                                 <li><strong>Advancement:</strong> Top 6 players advance to the knockout stage</li>
                                 <li><strong>Knockout Stage:</strong> 1st and 2nd place receive byes to the semifinals; 3rd plays 6th and 4th plays 5th in quarterfinals</li>
-                                <li><strong>Home field advantage:</strong> the 2 byes will get to pick what board the semi final game is played on. the quarter final will be played on the opposite. The finals are always on the home board</li>
                             </ul>
                         </section>
                         
@@ -1099,24 +1103,34 @@
                                 <li><strong>Win:</strong> 3 points</li>
                                 <li><strong>Draw:</strong> 1 point</li>
                                 <li><strong>Loss:</strong> 0 points</li>
-                                <li><strong>Tiebreaker:</strong> Point differential, then total points scored, if still tied a 20s shootout will be played on the available, agreed upon, or pants coined board.</li>
+                                <li><strong>Tiebreaker:</strong> Point differential, then total points scored</li>
+                            </ul>
+                            <h4>League score</h4>
+                            For placement in this tournament you will earn half the follwing points for your team. If your partner in the league isn't in the tournament you earn the full (not half)
+                            <ul>
+                                <li><strong>1st:</strong> 5 points</li>
+                                <li><strong>2nd:</strong> 4 point</li>
+                                <li><strong>3rd:</strong> 3 points</li>
+                                <li><strong>4th:</strong> 2 points</li>
+                                <li><strong>5th&6th:</strong>1 point</li>
                             </ul>
                         </section>
                         
                         <section class="rules-section">
                             <h3>🎮 Match Rules</h3>
                             <ul>
+                                <li>Each match consists of rounds played until one player reaches the target score</li>
+                                <li>20s count as 20 points</li>
                                 <li>Standard crokinole rules apply</li>
-                                <li>If there is a tie after a knock out game, 2 more rounds will be played where each team selects their hammer. If still tied a shoot out</li>
-                                <li>20s shoot outs: each player will alternate shooting 3 discs. after each shot the disc is removed. Most 20s win. If tied each player gets 1 more</li>
                             </ul>
                         </section>
                         
                         <section class="rules-section">
                             <h3>📍 Boards</h3>
                             <ul>
-                                <li><strong>Home Board:</strong> Is the one belonging to this home</li>
-                                <li><strong>Anish Board:</strong> Is the one belonging to Anish</li>
+                                <li><strong>Home Board:</strong> Primary playing surface</li>
+                                <li><strong>Anish Board:</strong> Secondary playing surface</li>
+                                <li>Players will not play back-to-back matches on different boards</li>
                             </ul>
                         </section>
                     </div>
@@ -1538,17 +1552,30 @@
     .cell-display {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center;
         padding: 0.3rem 0.5rem;
         font-size: 0.8rem;
         height: 100%;
         box-sizing: border-box;
+        gap: 0.25rem;
     }
     
     .cell-display .team-name {
         font-weight: 500;
         color: #374151;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .cell-display .team-name:first-of-type {
+        text-align: left;
+    }
+    
+    .cell-display .team-name:last-of-type {
+        text-align: right;
     }
     
     .cell-display .team-name.winner {
