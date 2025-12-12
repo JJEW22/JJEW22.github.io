@@ -1,0 +1,527 @@
+{
+  "tournamentName": "Winter Tournament",
+  "date": "December 11, 2026",
+  "location": "Jack's House",
+  "format": {
+    "groupStage": true,
+    "knockoutStage": true,
+    "groupAdvancement": 6,
+    "description": "Champions League style - all 10 teams in one league, each plays 3 matches. Top 6 advance to knockout (1st & 2nd get byes to semifinals)."
+  },
+  "teams": [
+    {
+      "name": "TGIAJF",
+      "player1": "Tyler",
+      "player2": "Jack"
+    },
+    {
+      "name": "Shout Out to Big Bro",
+      "player1": "Ayman",
+      "player2": "Parker"
+    },
+    {
+      "name": "Couch Poopers",
+      "player1": "Nick",
+      "player2": "Dina"
+    },
+    {
+      "name": "Kat Trik",
+      "player1": "Kato",
+      "player2": "Patrik"
+    },
+    {
+      "name": "TRON",
+      "player1": "Sam",
+      "player2": "Anish"
+    },
+    {
+      "name": "Kooties",
+      "player1": "Keshav",
+      "player2": "Neha"
+    },
+    {
+      "name": "Orange Square",
+      "player1": "Vedant",
+      "player2": "Katelyn"
+    },
+    {
+      "name": "Sohn Mendes",
+      "player1": "Sandy",
+      "player2": "John"
+    },
+    {
+      "name": "Sna'awty",
+      "player1": "Na'ama",
+      "player2": "Shawty"
+    },
+    {
+      "name": "Team Jack",
+      "player1": "Haneen",
+      "player2": "Josh"
+    }
+  ],
+  "groups": [
+    {
+      "name": "League",
+      "teams": [
+        "Orange Square",
+        "Kooties",
+        "TGIAJF",
+        "Team Jack",
+        "Kat Trik",
+        "TRON",
+        "Sna'awty",
+        "Shout Out to Big Bro",
+        "Couch Poopers",
+        "Sohn Mendes"
+      ],
+      "matches": [
+        {
+          "team1": "Orange Square",
+          "team2": "Kooties",
+          "score1": 100,
+          "score2": 0,
+          "completed": true,
+          "matchNum": 1
+        },
+        {
+          "team1": "Kooties",
+          "team2": "TGIAJF",
+          "score1": 0,
+          "score2": 100,
+          "completed": true,
+          "matchNum": 2
+        },
+        {
+          "team1": "TGIAJF",
+          "team2": "Team Jack",
+          "score1": 100,
+          "score2": 0,
+          "completed": true,
+          "matchNum": 3
+        },
+        {
+          "team1": "Shout Out to Big Bro",
+          "team2": "Sna'awty",
+          "score1": 0,
+          "score2": 100,
+          "completed": true,
+          "matchNum": 4
+        },
+        {
+          "team1": "Sna'awty",
+          "team2": "TRON",
+          "score1": 75,
+          "score2": 75,
+          "completed": true,
+          "matchNum": 5
+        },
+        {
+          "team1": "TRON",
+          "team2": "Sohn Mendes",
+          "score1": 50,
+          "score2": 5,
+          "completed": true,
+          "matchNum": 6
+        },
+        {
+          "team1": "Sohn Mendes",
+          "team2": "Couch Poopers",
+          "score1": 35,
+          "score2": 65,
+          "completed": true,
+          "matchNum": 7
+        },
+        {
+          "team1": "Couch Poopers",
+          "team2": "Team Jack",
+          "score1": 95,
+          "score2": 5,
+          "completed": true,
+          "matchNum": 8
+        },
+        {
+          "team1": "Team Jack",
+          "team2": "Kat Trik",
+          "score1": 0,
+          "score2": 100,
+          "completed": true,
+          "matchNum": 9
+        },
+        {
+          "team1": "Kat Trik",
+          "team2": "Orange Square",
+          "score1": 45,
+          "score2": 20,
+          "completed": true,
+          "matchNum": 10
+        },
+        {
+          "team1": "Orange Square",
+          "team2": "TRON",
+          "score1": 90,
+          "score2": 85,
+          "completed": true,
+          "matchNum": 11
+        },
+        {
+          "team1": "Kooties",
+          "team2": "Sna'awty",
+          "score1": 0,
+          "score2": 100,
+          "completed": true,
+          "matchNum": 12
+        },
+        {
+          "team1": "TGIAJF",
+          "team2": "Shout Out to Big Bro",
+          "score1": 85,
+          "score2": 15,
+          "completed": true,
+          "matchNum": 13
+        },
+        {
+          "team1": "Kat Trik",
+          "team2": "Sohn Mendes",
+          "score1": 55,
+          "score2": 20,
+          "completed": true,
+          "matchNum": 14
+        },
+        {
+          "team1": "Shout Out to Big Bro",
+          "team2": "Couch Poopers",
+          "score1": 0,
+          "score2": 100,
+          "completed": true,
+          "matchNum": 15
+        }
+      ]
+    }
+  ],
+  "bracket": {
+    "name": "Knockout Stage",
+    "rounds": [
+      {
+        "name": "Quarterfinals",
+        "matches": [
+          {
+            "id": "QF1",
+            "team1": {
+              "name": "Sna'awty",
+              "source": "League 4th",
+              "seed": 4
+            },
+            "team2": {
+              "name": "Orange Square",
+              "source": "League 5th",
+              "seed": 5
+            },
+            "score1": 0,
+            "score2": 100,
+            "winner": "Orange Square"
+          },
+          {
+            "id": "QF2",
+            "team1": {
+              "name": "Kat Trik",
+              "source": "League 3rd",
+              "seed": 3
+            },
+            "team2": {
+              "name": "TRON",
+              "source": "League 6th",
+              "seed": 6
+            },
+            "score1": 100,
+            "score2": 0,
+            "winner": "Kat Trik"
+          }
+        ]
+      },
+      {
+        "name": "Semifinals",
+        "matches": [
+          {
+            "id": "SF1",
+            "team1": {
+              "name": "TGIAJF",
+              "source": "League 1st (BYE)",
+              "seed": 1
+            },
+            "team2": {
+              "name": "Orange Square",
+              "source": "QF1",
+              "seed": null
+            },
+            "score1": 100,
+            "score2": 0,
+            "winner": "TGIAJF"
+          },
+          {
+            "id": "SF2",
+            "team1": {
+              "name": "Couch Poopers",
+              "source": "League 2nd (BYE)",
+              "seed": 2
+            },
+            "team2": {
+              "name": "Kat Trik",
+              "source": "QF2",
+              "seed": null
+            },
+            "score1": 35,
+            "score2": 40,
+            "winner": "Kat Trik"
+          }
+        ]
+      },
+      {
+        "name": "Final",
+        "matches": [
+          {
+            "id": "F",
+            "team1": {
+              "name": "TGIAJF",
+              "source": "SF1",
+              "seed": null
+            },
+            "team2": {
+              "name": "Kat Trik",
+              "source": "SF2",
+              "seed": null
+            },
+            "score1": 100,
+            "score2": 0,
+            "winner": "TGIAJF"
+          }
+        ]
+      }
+    ],
+    "thirdPlaceMatch": {
+      "id": "third",
+      "team1": {
+        "name": "Orange Square",
+        "source": "SF1 Loser",
+        "seed": null
+      },
+      "team2": {
+        "name": "Couch Poopers",
+        "source": "SF2 Loser",
+        "seed": null
+      },
+      "score1": 100,
+      "score2": 0,
+      "winner": "Orange Square"
+    }
+  },
+  "schedule": [
+    {
+      "time": "7:00 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Team Jack",
+          "team2": "Kat Trik",
+          "group": "League",
+          "matchNum": 9
+        },
+        {
+          "board": "Anish",
+          "team1": "Shout Out to Big Bro",
+          "team2": "Sna'awty",
+          "group": "League",
+          "matchNum": 4
+        }
+      ]
+    },
+    {
+      "time": "7:20 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Orange Square",
+          "team2": "Kooties",
+          "group": "League",
+          "matchNum": 1
+        },
+        {
+          "board": "Anish",
+          "team1": "Shout Out to Big Bro",
+          "team2": "Couch Poopers",
+          "group": "League",
+          "matchNum": 15
+        }
+      ]
+    },
+    {
+      "time": "7:40 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Kooties",
+          "team2": "Sna'awty",
+          "group": "League",
+          "matchNum": 12
+        },
+        {
+          "board": "Anish",
+          "team1": "Couch Poopers",
+          "team2": "Team Jack",
+          "group": "League",
+          "matchNum": 8
+        }
+      ]
+    },
+    {
+      "time": "8:00 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "TGIAJF",
+          "team2": "Shout Out to Big Bro",
+          "group": "League",
+          "matchNum": 13
+        },
+        {
+          "board": "Anish",
+          "team1": "TRON",
+          "team2": "Sohn Mendes",
+          "group": "League",
+          "matchNum": 6
+        }
+      ]
+    },
+    {
+      "time": "8:20 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "TGIAJF",
+          "team2": "Team Jack",
+          "group": "League",
+          "matchNum": 3
+        },
+        {
+          "board": "Anish",
+          "team1": "Kat Trik",
+          "team2": "Sohn Mendes",
+          "group": "League",
+          "matchNum": 14
+        }
+      ]
+    },
+    {
+      "time": "8:40 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Sna'awty",
+          "team2": "TRON",
+          "group": "League",
+          "matchNum": 5
+        },
+        {
+          "board": "Anish",
+          "team1": "Kat Trik",
+          "team2": "Orange Square",
+          "group": "League",
+          "matchNum": 10
+        }
+      ]
+    },
+    {
+      "time": "9:00 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Sohn Mendes",
+          "team2": "Couch Poopers",
+          "group": "League",
+          "matchNum": 7
+        },
+        {
+          "board": "Anish",
+          "team1": "Kooties",
+          "team2": "TGIAJF",
+          "group": "League",
+          "matchNum": 2
+        }
+      ]
+    },
+    {
+      "time": "9:20 PM",
+      "stage": "Group Stage (Float)",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Orange Square",
+          "team2": "TRON",
+          "group": "League",
+          "matchNum": 11
+        }
+      ]
+    },
+    {
+      "time": "9:40 PM",
+      "stage": "Quarterfinals",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "3rd Place",
+          "team2": "6th Place",
+          "matchId": "QF2"
+        },
+        {
+          "board": "Anish",
+          "team1": "4th Place",
+          "team2": "5th Place",
+          "matchId": "QF1"
+        }
+      ]
+    },
+    {
+      "time": "10:00 PM",
+      "stage": "Semifinals",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "1st Place",
+          "team2": "Winner QF1",
+          "matchId": "SF1"
+        },
+        {
+          "board": "Anish",
+          "team1": "2nd Place",
+          "team2": "Winner QF2",
+          "matchId": "SF2"
+        }
+      ]
+    },
+    {
+      "time": "10:30 PM",
+      "stage": "Finals",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Winner SF1",
+          "team2": "Winner SF2",
+          "matchId": "F"
+        },
+        {
+          "board": "Anish",
+          "team1": "Loser SF1",
+          "team2": "Loser SF2",
+          "matchId": "third"
+        }
+      ]
+    }
+  ]
+}

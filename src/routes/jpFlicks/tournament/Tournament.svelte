@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     
     // Props
-    export let dataPath = '/tournamentData.json';
+    export let dataPath = '/marchMadness/2026/finalTournamentResults.json';
     export let savePath = '/tournamentResults.json';
     export let editable = true;
     
@@ -102,14 +102,28 @@
         const nextRoundIndex = roundIndex + 1;
         if (nextRoundIndex >= tournament.bracket.rounds.length) return;
         
-        // Figure out which match in the next round this feeds into
-        const nextMatchIndex = Math.floor(matchIndex / 2);
-        const nextMatch = tournament.bracket.rounds[nextRoundIndex].matches[nextMatchIndex];
+        const currentRound = tournament.bracket.rounds[roundIndex];
+        const nextRound = tournament.bracket.rounds[nextRoundIndex];
         
+        // Figure out which match in the next round this feeds into
+        let nextMatchIndex;
+        let slotInMatch; // 0 = team1, 1 = team2
+        
+        if (currentRound.matches.length === nextRound.matches.length) {
+            // 1:1 mapping (e.g., QF to SF with byes) - each match feeds into corresponding match as team2
+            nextMatchIndex = matchIndex;
+            slotInMatch = 1; // Winner goes to team2 slot (team1 has the bye)
+        } else {
+            // Standard bracket: 2 matches feed into 1
+            nextMatchIndex = Math.floor(matchIndex / 2);
+            slotInMatch = matchIndex % 2; // Even = team1, Odd = team2
+        }
+        
+        const nextMatch = nextRound.matches[nextMatchIndex];
         if (!nextMatch) return;
         
         // Determine if winner goes to team1 or team2 slot
-        if (matchIndex % 2 === 0) {
+        if (slotInMatch === 0) {
             nextMatch.team1 = { name: currentMatch.winner, source: currentMatch.id, seed: null };
         } else {
             nextMatch.team2 = { name: currentMatch.winner, source: currentMatch.id, seed: null };
@@ -1104,15 +1118,6 @@
                                 <li><strong>Draw:</strong> 1 point</li>
                                 <li><strong>Loss:</strong> 0 points</li>
                                 <li><strong>Tiebreaker:</strong> Point differential, then total points scored</li>
-                            </ul>
-                            <h4>League score</h4>
-                            For placement in this tournament you will earn half the follwing points for your team. If your partner in the league isn't in the tournament you earn the full (not half)
-                            <ul>
-                                <li><strong>1st:</strong> 5 points</li>
-                                <li><strong>2nd:</strong> 4 point</li>
-                                <li><strong>3rd:</strong> 3 points</li>
-                                <li><strong>4th:</strong> 2 points</li>
-                                <li><strong>5th&6th:</strong>1 point</li>
                             </ul>
                         </section>
                         

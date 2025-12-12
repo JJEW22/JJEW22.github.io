@@ -11,45 +11,45 @@
   "teams": [
     { "name": "TGIAJF", "player1": "Tyler", "player2": "Jack" },
     { "name": "Shout Out to Big Bro", "player1": "Ayman", "player2": "Parker" },
-    { "name": "Couch Poopers", "player1": "Aidan", "player2": "Dina" },
+    { "name": "Couch Poopers", "player1": "Nick", "player2": "Dina" },
     { "name": "Kat Trik", "player1": "Kato", "player2": "Patrik" },
     { "name": "TRON", "player1": "Sam", "player2": "Anish" },
-    { "name": "Booties", "player1": "Keshav", "player2": "Neha" },
-    { "name": "Vedant & Katelyn", "player1": "Vedant", "player2": "Katelyn" },
-    { "name": "Sandy & John", "player1": "Sandy", "player2": "John" },
-    { "name": "Na'ama & Shawty", "player1": "Na'ama", "player2": "Shawty" },
-    { "name": "Haneen & Josh", "player1": "Haneen", "player2": "Josh" }
+    { "name": "Kooties", "player1": "Keshav", "player2": "Neha" },
+    { "name": "Orange Square", "player1": "Vedant", "player2": "Katelyn" },
+    { "name": "Sohn Mendes", "player1": "Sandy", "player2": "John" },
+    { "name": "Sna'awty", "player1": "Na'ama", "player2": "Shawty" },
+    { "name": "Team Jack", "player1": "Haneen", "player2": "Josh" }
   ],
   "groups": [
     {
       "name": "League",
       "teams": [
-        "Vedant & Katelyn",
-        "Booties",
+        "Orange Square",
+        "Kooties",
         "TGIAJF",
-        "Haneen & Josh",
+        "Team Jack",
         "Kat Trik",
         "TRON",
-        "Na'ama & Shawty",
+        "Sna'awty",
         "Shout Out to Big Bro",
         "Couch Poopers",
-        "Sandy & John"
+        "Sohn Mendes"
       ],
       "matches": [
-        { "team1": "Vedant & Katelyn", "team2": "Booties", "score1": null, "score2": null, "completed": false, "matchNum": 1 },
-        { "team1": "Booties", "team2": "TGIAJF", "score1": null, "score2": null, "completed": false, "matchNum": 2 },
-        { "team1": "TGIAJF", "team2": "Haneen & Josh", "score1": null, "score2": null, "completed": false, "matchNum": 3 },
-        { "team1": "Shout Out to Big Bro", "team2": "Na'ama & Shawty", "score1": null, "score2": null, "completed": false, "matchNum": 4 },
-        { "team1": "Na'ama & Shawty", "team2": "TRON", "score1": null, "score2": null, "completed": false, "matchNum": 5 },
-        { "team1": "TRON", "team2": "Sandy & John", "score1": null, "score2": null, "completed": false, "matchNum": 6 },
-        { "team1": "Sandy & John", "team2": "Couch Poopers", "score1": null, "score2": null, "completed": false, "matchNum": 7 },
-        { "team1": "Couch Poopers", "team2": "Haneen & Josh", "score1": null, "score2": null, "completed": false, "matchNum": 8 },
-        { "team1": "Haneen & Josh", "team2": "Kat Trik", "score1": null, "score2": null, "completed": false, "matchNum": 9 },
-        { "team1": "Kat Trik", "team2": "Vedant & Katelyn", "score1": null, "score2": null, "completed": false, "matchNum": 10 },
-        { "team1": "Vedant & Katelyn", "team2": "TRON", "score1": null, "score2": null, "completed": false, "matchNum": 11 },
-        { "team1": "Booties", "team2": "Na'ama & Shawty", "score1": null, "score2": null, "completed": false, "matchNum": 12 },
+        { "team1": "Orange Square", "team2": "Kooties", "score1": null, "score2": null, "completed": false, "matchNum": 1 },
+        { "team1": "Kooties", "team2": "TGIAJF", "score1": null, "score2": null, "completed": false, "matchNum": 2 },
+        { "team1": "TGIAJF", "team2": "Team Jack", "score1": null, "score2": null, "completed": false, "matchNum": 3 },
+        { "team1": "Shout Out to Big Bro", "team2": "Sna'awty", "score1": null, "score2": null, "completed": false, "matchNum": 4 },
+        { "team1": "Sna'awty", "team2": "TRON", "score1": null, "score2": null, "completed": false, "matchNum": 5 },
+        { "team1": "TRON", "team2": "Sohn Mendes", "score1": null, "score2": null, "completed": false, "matchNum": 6 },
+        { "team1": "Sohn Mendes", "team2": "Couch Poopers", "score1": null, "score2": null, "completed": false, "matchNum": 7 },
+        { "team1": "Couch Poopers", "team2": "Team Jack", "score1": null, "score2": null, "completed": false, "matchNum": 8 },
+        { "team1": "Team Jack", "team2": "Kat Trik", "score1": null, "score2": null, "completed": false, "matchNum": 9 },
+        { "team1": "Kat Trik", "team2": "Orange Square", "score1": null, "score2": null, "completed": false, "matchNum": 10 },
+        { "team1": "Orange Square", "team2": "TRON", "score1": null, "score2": null, "completed": false, "matchNum": 11 },
+        { "team1": "Kooties", "team2": "Sna'awty", "score1": null, "score2": null, "completed": false, "matchNum": 12 },
         { "team1": "TGIAJF", "team2": "Shout Out to Big Bro", "score1": null, "score2": null, "completed": false, "matchNum": 13 },
-        { "team1": "Kat Trik", "team2": "Sandy & John", "score1": null, "score2": null, "completed": false, "matchNum": 14 },
+        { "team1": "Kat Trik", "team2": "Sohn Mendes", "score1": null, "score2": null, "completed": false, "matchNum": 14 },
         { "team1": "Shout Out to Big Bro", "team2": "Couch Poopers", "score1": null, "score2": null, "completed": false, "matchNum": 15 }
       ]
     }
@@ -127,15 +127,15 @@
       "time": "7:00 PM",
       "stage": "Group Stage",
       "matches": [
-        { "board": "Home", "team1": "Haneen & Josh", "team2": "Kat Trik", "group": "League", "matchNum": 9 },
-        { "board": "Anish", "team1": "Shout Out to Big Bro", "team2": "Na'ama & Shawty", "group": "League", "matchNum": 4 }
+        { "board": "Home", "team1": "Team Jack", "team2": "Kat Trik", "group": "League", "matchNum": 9 },
+        { "board": "Anish", "team1": "Shout Out to Big Bro", "team2": "Sna'awty", "group": "League", "matchNum": 4 }
       ]
     },
     {
       "time": "7:20 PM",
       "stage": "Group Stage",
       "matches": [
-        { "board": "Home", "team1": "Vedant & Katelyn", "team2": "Booties", "group": "League", "matchNum": 1 },
+        { "board": "Home", "team1": "Orange Square", "team2": "Kooties", "group": "League", "matchNum": 1 },
         { "board": "Anish", "team1": "Shout Out to Big Bro", "team2": "Couch Poopers", "group": "League", "matchNum": 15 }
       ]
     },
@@ -143,8 +143,8 @@
       "time": "7:40 PM",
       "stage": "Group Stage",
       "matches": [
-        { "board": "Home", "team1": "Booties", "team2": "Na'ama & Shawty", "group": "League", "matchNum": 12 },
-        { "board": "Anish", "team1": "Couch Poopers", "team2": "Haneen & Josh", "group": "League", "matchNum": 8 }
+        { "board": "Home", "team1": "Kooties", "team2": "Sna'awty", "group": "League", "matchNum": 12 },
+        { "board": "Anish", "team1": "Couch Poopers", "team2": "Team Jack", "group": "League", "matchNum": 8 }
       ]
     },
     {
@@ -152,38 +152,38 @@
       "stage": "Group Stage",
       "matches": [
         { "board": "Home", "team1": "TGIAJF", "team2": "Shout Out to Big Bro", "group": "League", "matchNum": 13 },
-        { "board": "Anish", "team1": "TRON", "team2": "Sandy & John", "group": "League", "matchNum": 6 }
+        { "board": "Anish", "team1": "TRON", "team2": "Sohn Mendes", "group": "League", "matchNum": 6 }
       ]
     },
     {
       "time": "8:20 PM",
       "stage": "Group Stage",
       "matches": [
-        { "board": "Home", "team1": "TGIAJF", "team2": "Haneen & Josh", "group": "League", "matchNum": 3 },
-        { "board": "Anish", "team1": "Kat Trik", "team2": "Sandy & John", "group": "League", "matchNum": 14 }
+        { "board": "Home", "team1": "TGIAJF", "team2": "Team Jack", "group": "League", "matchNum": 3 },
+        { "board": "Anish", "team1": "Kat Trik", "team2": "Sohn Mendes", "group": "League", "matchNum": 14 }
       ]
     },
     {
       "time": "8:40 PM",
       "stage": "Group Stage",
       "matches": [
-        { "board": "Home", "team1": "Na'ama & Shawty", "team2": "TRON", "group": "League", "matchNum": 5 },
-        { "board": "Anish", "team1": "Kat Trik", "team2": "Vedant & Katelyn", "group": "League", "matchNum": 10 }
+        { "board": "Home", "team1": "Sna'awty", "team2": "TRON", "group": "League", "matchNum": 5 },
+        { "board": "Anish", "team1": "Kat Trik", "team2": "Orange Square", "group": "League", "matchNum": 10 }
       ]
     },
     {
       "time": "9:00 PM",
       "stage": "Group Stage",
       "matches": [
-        { "board": "Home", "team1": "Sandy & John", "team2": "Couch Poopers", "group": "League", "matchNum": 7 },
-        { "board": "Anish", "team1": "Booties", "team2": "TGIAJF", "group": "League", "matchNum": 2 }
+        { "board": "Home", "team1": "Sohn Mendes", "team2": "Couch Poopers", "group": "League", "matchNum": 7 },
+        { "board": "Anish", "team1": "Kooties", "team2": "TGIAJF", "group": "League", "matchNum": 2 }
       ]
     },
     {
       "time": "9:20 PM",
       "stage": "Group Stage (Float)",
       "matches": [
-        { "board": "Home", "team1": "Vedant & Katelyn", "team2": "TRON", "group": "League", "matchNum": 11 }
+        { "board": "Home", "team1": "Orange Square", "team2": "TRON", "group": "League", "matchNum": 11 }
       ]
     },
     {
