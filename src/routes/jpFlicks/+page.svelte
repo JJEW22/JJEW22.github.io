@@ -615,6 +615,109 @@
     // Total games count
     $: shownGames = filteredGames.length;
 
+    // Filter played games for the player, organized by team
+    $: playedGames = (() => {
+        if (!playerName || !allGames.length) return [];
+        
+        const searchName = playerName.toLowerCase().trim();
+        if (!searchName) return [];
+        
+        return allGames.filter(game => {
+            if (!game.played) return false;
+            
+            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+            const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+            
+            return playerInTeam1 || playerInTeam2;
+        });
+    })();
+
+    // Group played games by the player's team with all display data pre-computed
+    $: playedGamesByTeam = (() => {
+        if (!playedGames.length) return {};
+        
+        const searchName = playerName.toLowerCase().trim();
+        const grouped = {};
+        
+        console.log('=== GROUPING PLAYED GAMES ===');
+        console.log('Search name:', searchName);
+        console.log('Total played games:', playedGames.length);
+        
+        playedGames.forEach((game, index) => {
+            console.log(`Game ${index}:`, game.team1, 'vs', game.team2);
+            console.log(`  Player1_Team1: ${game[PLAYER1_TEAM1]}, Player2_Team1: ${game[PLAYER2_TEAM1]}`);
+            console.log(`  Player1_Team2: ${game[PLAYER1_TEAM2]}, Player2_Team2: ${game[PLAYER2_TEAM2]}`);
+            
+            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+            const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+            
+            console.log(`  playerInTeam1: ${playerInTeam1}, playerInTeam2: ${playerInTeam2}`);
+            
+            // Add to team1's group if player is on team1
+            if (playerInTeam1) {
+                const playerTeam = game.team1;
+                const opponentTeam = game.team2;
+                const playerResult = game.result; // positive = team1 won
+                
+                let resultObj;
+                if (playerResult > 0) {
+                    resultObj = { text: 'W', class: 'win', diff: `+${playerResult}` };
+                } else if (playerResult < 0) {
+                    resultObj = { text: 'L', class: 'loss', diff: `${playerResult}` };
+                } else {
+                    resultObj = { text: 'D', class: 'draw', diff: '0' };
+                }
+                
+                if (!grouped[playerTeam]) {
+                    grouped[playerTeam] = [];
+                }
+                grouped[playerTeam].push({
+                    opponentTeam,
+                    result: resultObj,
+                    board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
+                });
+                console.log(`  Added to ${playerTeam} group`);
+            }
+            
+            // Add to team2's group if player is on team2
+            if (playerInTeam2) {
+                const playerTeam = game.team2;
+                const opponentTeam = game.team1;
+                const playerResult = -game.result; // flip for team2 perspective
+                
+                let resultObj;
+                if (playerResult > 0) {
+                    resultObj = { text: 'W', class: 'win', diff: `+${playerResult}` };
+                } else if (playerResult < 0) {
+                    resultObj = { text: 'L', class: 'loss', diff: `${playerResult}` };
+                } else {
+                    resultObj = { text: 'D', class: 'draw', diff: '0' };
+                }
+                
+                if (!grouped[playerTeam]) {
+                    grouped[playerTeam] = [];
+                }
+                grouped[playerTeam].push({
+                    opponentTeam,
+                    result: resultObj,
+                    board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
+                });
+                console.log(`  Added to ${playerTeam} group`);
+            }
+        });
+        
+        console.log('=== FINAL GROUPED DATA ===');
+        Object.entries(grouped).forEach(([team, games]) => {
+            console.log(`${team}: ${games.length} games`, games);
+        });
+        
+        return grouped;
+    })();
+
     function gameInGames(games, team1, team2, isHome) {
         let gameExists = false;
         // if (team1 === 'TGIAJF' || team2 === 'TGIAJF') {
@@ -1019,6 +1122,45 @@
                 No games found for "{playerName}"
             </div>
             {/if}
+        {/if}
+        
+        <!-- Played Games Section -->
+        {#if playerName && playedGames.length > 0}
+            <div class="played-games-section">
+                <h3>Completed Games ({playedGames.length})</h3>
+                
+                {#each Object.entries(playedGamesByTeam) as [teamName, games]}
+                    <div class="team-games-group">
+                        <h4>{teamName} ({games.length} {games.length === 1 ? 'game' : 'games'})</h4>
+                        <div class="games-table-wrapper">
+                            <table class="games-table played-games-table">
+                                <thead>
+                                    <tr>
+                                        <th>Result</th>
+                                        <th>Your Team</th>
+                                        <th>vs</th>
+                                        <th>Opponent</th>
+                                        <th>+/-</th>
+                                        <th>Board</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {#each games as game}
+                                        <tr>
+                                            <td class="result-cell {game.result.class}">{game.result.text}</td>
+                                            <td class="team-name">{teamName}</td>
+                                            <td class="vs">vs</td>
+                                            <td class="team-name">{game.opponentTeam}</td>
+                                            <td class="diff-cell {game.result.class}">{game.result.diff}</td>
+                                            <td>{game.board}</td>
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {/each}
+            </div>
         {/if}
     </div>
 </div>
@@ -1953,5 +2095,71 @@
         .games-table td {
             padding: 0.5rem;
         }
+    }
+    
+    /* Played Games Section Styles */
+    .played-games-section {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 2px solid #e5e7eb;
+    }
+    
+    .played-games-section h3 {
+        margin: 0 0 1.5rem 0;
+        color: #1a202c;
+        font-size: 1.25rem;
+    }
+    
+    .team-games-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .team-games-group h4 {
+        margin: 0 0 0.75rem 0;
+        color: #4a5568;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    
+    .played-games-table {
+        min-width: 400px;
+    }
+    
+    .result-cell {
+        font-weight: 700;
+        text-align: center;
+        width: 60px;
+    }
+    
+    .result-cell.win {
+        color: #059669;
+        background-color: #d1fae5;
+    }
+    
+    .result-cell.loss {
+        color: #dc2626;
+        background-color: #fee2e2;
+    }
+    
+    .result-cell.draw {
+        color: #d97706;
+        background-color: #fef3c7;
+    }
+    
+    .diff-cell {
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .diff-cell.win {
+        color: #059669;
+    }
+    
+    .diff-cell.loss {
+        color: #dc2626;
+    }
+    
+    .diff-cell.draw {
+        color: #d97706;
     }
 </style>
