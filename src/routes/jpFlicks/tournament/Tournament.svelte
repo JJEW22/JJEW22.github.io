@@ -1119,6 +1119,15 @@
                                 <li><strong>Loss:</strong> 0 points</li>
                                 <li><strong>Tiebreaker:</strong> Point differential, then total points scored</li>
                             </ul>
+                            <h4>League score</h4>
+                            For placement in this tournament you will earn half the follwing points for your team. If your partner in the league isn't in the tournament you earn the full (not half)
+                            <ul>
+                                <li><strong>1st:</strong> 5 points</li>
+                                <li><strong>2nd:</strong> 4 point</li>
+                                <li><strong>3rd:</strong> 3 points</li>
+                                <li><strong>4th:</strong> 2 points</li>
+                                <li><strong>5th&6th:</strong>1 point</li>
+                            </ul>
                         </section>
                         
                         <section class="rules-section">

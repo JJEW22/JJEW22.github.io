@@ -13,6 +13,7 @@
     let dataReady = false;
     let team_names = []; // will store the name of all teams
     let teams_info = undefined; // will store all the teams info
+    let tournamentPoints = {}; // will store tournament points per team
     $: teamsWithRanking = undefined;
 
     const WIN_SCORE = 2;
@@ -25,6 +26,9 @@
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
+
+    // Tournament points file
+    const TOURNAMENT_POINTS_FILE = '/marchMadness/2026/tournamentPoints.json'
 
     // file information
     const HOME_GAMES_PAGE_NAME = "HomeGames"
@@ -52,6 +56,7 @@
     };
     
     onMount(async () => {
+        await loadTournamentPoints();
         await loadExcelData();
         // Add smooth scrolling to all anchor links
         const links = document.querySelectorAll('a[href^="#"]');
@@ -132,6 +137,27 @@
             window.removeEventListener('scroll', handleScroll);
         };
     });
+
+    async function loadTournamentPoints() {
+        try {
+            const response = await fetch(TOURNAMENT_POINTS_FILE);
+            if (response.ok) {
+                tournamentPoints = await response.json();
+                console.log('Tournament points loaded:', tournamentPoints);
+            } else {
+                console.log('No tournament points file found, using empty object');
+                tournamentPoints = {};
+            }
+        } catch (err) {
+            console.log('Error loading tournament points, using empty object:', err);
+            tournamentPoints = {};
+        }
+    }
+
+    // Helper function to get tournament points for a team
+    function getTournamentPoints(teamName) {
+        return tournamentPoints[teamName] || 0;
+    }
 
     async function loadExcelData() {
         loading = true;
@@ -236,11 +262,15 @@
             console.log('TEAMS INFO!');
             console.log(teams_info);
 
-            let teamsWithScores = teams_info.map(team => ({
-                ...team,
-                score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins),
-                gamesPlayed: team.wins + team.ties + team.losses
-            }));
+            let teamsWithScores = teams_info.map(team => {
+                const tourneyPts = getTournamentPoints(team.teamName);
+                return {
+                    ...team,
+                    tournamentPoints: tourneyPts,
+                    score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins) + tourneyPts,
+                    gamesPlayed: team.wins + team.ties + team.losses
+                };
+            });
             
             let ranking = teamsWithScores.sort((a, b) => {
                 if (a.score !== b.score) {
@@ -1025,6 +1055,9 @@
         <th class="sortable numeric" on:click={() => sortTable('seriesWins')}>
             Series W {getSortIndicator('seriesWins')}
         </th>
+        <th class="sortable numeric" on:click={() => sortTable('tournamentPoints')}>
+            TP {getSortIndicator('tournamentPoints')}
+        </th>
         <th class="sortable numeric" on:click={() => sortTable('wins')}>
             W {getSortIndicator('wins')}
         </th>
@@ -1067,6 +1100,7 @@
             <td class="team-name">{team.teamName}</td>
             <td class="numeric">{team.gamesPlayed}</td>
             <td class="numeric">{team.seriesWins}</td>
+            <td class="numeric">{team.tournamentPoints}</td>
             <td class="numeric">{team.wins}</td>
             <td class="numeric">{team.ties}</td>
             <td class="numeric">{team.losses}</td>
@@ -1083,7 +1117,7 @@
     </div>
     
     <div class="table-legend">
-    <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>+/-:</strong> Point Differential</p>
+    <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>TP:</strong> Tournament Points | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>+/-:</strong> Point Differential</p>
 </div>
 <HallOfFame />
 </div>
