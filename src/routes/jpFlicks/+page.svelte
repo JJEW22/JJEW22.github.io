@@ -899,13 +899,13 @@
                 <li>Tieing a game awards 1 point</li>
                 <li>Losing a game awards 0 points</li>
                 <li>Winning a series (combined score of both games against a team) awards 1 bonus point</li>
-                <li>In the event of a tie in a series there will be 20s shootout</li>
+                <li>In the event of a tie in a series each team is awarded 0.5 points</li>
             </ul>
             
-            <h3 id="tournaments-section">Tournaments</h3>
+            <h3 id="tournaments-section"> <a href="/jpFlicks/tournament">Tournaments</a></h3>
             This year we have 2 tournaments! Anyone including (those not in the league) can compete so if you can only come for 1 day these are the ones to do it! 
             The exact format of the tournament will depend on the number of players but it will follow a round robin + elimination set up.
-            League points up for grabs (half awarded to each player in the team)
+            League points up for grabs (half awarded to each player in the team unless only 1 member of the team is present)
                 <div class="table-wrapper">
                     <table class="basic-table">
                 <thead>
@@ -918,27 +918,27 @@
                 <tbody>
                     <tr>
                         <td><b>1st</b></td>
+                        <td>5 pts</td>
                         <td>6 pts</td>
-                        <td>10 pts</td>
                     </tr>
                     <tr>
                         <td><b>2nd</b></td>
                         <td>4 pts</td>
-                        <td>8 pts</td>
+                        <td>5 pts</td>
                     </tr>
                     <tr>
                         <td><b>3rd</b></td>
-                        <td>2 pts</td>
-                        <td>6 pts</td>
+                        <td>3 pts</td>
+                        <td>4 pts</td>
                     </tr>
                     <tr>
                         <td><b>4th</b></td>
                         <td>2 pts</td>
-                        <td>4 pts</td>
+                        <td>3 pts</td>
                     </tr>
                     <tr>
-                        <td><b>5th-8th</b></td>
-                        <td>0 pts</td>
+                        <td><b>5th-6th</b></td>
+                        <td>1 pts</td>
                         <td>2 pts</td>
                     </tr>
                 </tbody>

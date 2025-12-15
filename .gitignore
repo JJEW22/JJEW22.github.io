@@ -1,6 +1,10 @@
 test-results
 node_modules
 
+# python
+__pychache__
+*.pyc
+
 # Output
 .output
 .vercel

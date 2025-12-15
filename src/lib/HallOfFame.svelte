@@ -40,6 +40,21 @@
       },
     },
     {
+      eventName: '2025 Winter Tournament',
+      champion: "TGIAJF",
+      members: "Jack + Tyler",
+      record: {
+        record: "6-0-0",
+        PD: "+570"
+      },
+      runnerUp: "Kat Trik",
+      runnerUpMembers: "Kato + Patrik",
+      runnerUpRecord: {
+        record: "5-0-1",
+        PD: "+165"
+      },
+    },
+    {
       eventName: 'Season 2',
       champion: "Your Team?",
       members: "You? + Partner?",
@@ -61,7 +76,14 @@
   ];
 
   function formatRecord(record) {
-    return `${record.score} ${record.record}<br>(${record.seriesRecord} ${record.PD})`
+    // Check if this is a league record (has score and seriesRecord) or tournament record
+    if (record.score !== undefined && record.seriesRecord !== undefined) {
+      // League format: Score W-D-L on first line, (seriesRecord PD) on second line
+      return `${record.score} ${record.record}<br>(${record.seriesRecord} ${record.PD})`;
+    } else {
+      // Tournament format: Just W-D-L and PD on single line
+      return `${record.record}<br>(${record.PD})`;
+    }
   }
 
   function formatTeamName(teamName, members) {
