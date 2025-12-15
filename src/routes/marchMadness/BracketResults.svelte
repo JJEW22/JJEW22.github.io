@@ -19,8 +19,26 @@
     const YEAR = '2026';
     const BRACKETS_PATH = `/marchMadness/${YEAR}/brackets`;
     const TEAMS_FILE = `/marchMadness/${YEAR}/ThisYearTeams${YEAR}.csv`;
-    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}-early`;
+    const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}`;
     const OPTIMAL_BRACKETS_FILE = `/marchMadness/${YEAR}/optimal-brackets.json`;
+    
+    /**
+     * Format a probability for display
+     * - >= 0.005%: show as percent with 2 decimal places (e.g., "1.23%")
+     * - 0: show as "0%"
+     * - < 0.005%: show in scientific notation with 2 sig figs (e.g., "2.4e-4%")
+     */
+    function formatProbability(prob) {
+        if (prob === 0) {
+            return "0%";
+        }
+        const percent = prob * 100;
+        if (percent >= 0.005) {
+            return `${percent.toFixed(2)}%`;
+        }
+        // Scientific notation with 1 decimal place (2 sig figs)
+        return `${percent.toExponential(1)}%`;
+    }
     
     // State
     let loading = true;
@@ -551,6 +569,15 @@
     function optimalBracketToScenario(optimalBracket) {
         if (!optimalBracket) return null;
         
+        // New format: already has games array directly
+        if (optimalBracket.games && Array.isArray(optimalBracket.games)) {
+            return {
+                games: optimalBracket.games,
+                probability: optimalBracket.probability || 1
+            };
+        }
+        
+        // Old format: convert from round1, round2, etc. structure
         const games = [];
         
         for (let round = 1; round <= 6; round++) {
@@ -740,7 +767,7 @@
                                     </td>
                                     <td class="win-prob">
                                         {#if entry.winProbability !== null}
-                                            {(entry.winProbability * 100).toFixed(1)}%
+                                            {formatProbability(entry.winProbability)}
                                         {:else}
                                             -
                                         {/if}
@@ -782,11 +809,17 @@
                             <label for="scenario-select">Scenario:</label>
                             <select id="scenario-select" bind:value={selectedScenario}>
                                 <option value={null}>-- None --</option>
-                                <option value="optimal">Optimal Bracket (Max Possible)</option>
+                                {#if optimalBrackets[selectedParticipant]}
+                                    <option value="optimal">Optimal Bracket (Max Possible) ({formatProbability(optimalBrackets[selectedParticipant].probability)})</option>
+                                {:else}
+                                    <option value="optimal">Optimal Bracket (Max Possible)</option>
+                                {/if}
                                 {#if winningScenarios[selectedParticipant]?.length > 0}
                                     {#each winningScenarios[selectedParticipant] as scenario, i}
-                                        <option value={i}>Scenario {i + 1} - {getScenarioChampion(scenario)} wins ({(scenario.probability * 100).toFixed(1)}%)</option>
+                                        <option value={i}>Scenario {i + 1} - {getScenarioChampion(scenario)} wins ({formatProbability(scenario.probability)})</option>
                                     {/each}
+                                {:else}
+                                    <option value={null} disabled>-- No winning scenarios --</option>
                                 {/if}
                             </select>
                         {/if}

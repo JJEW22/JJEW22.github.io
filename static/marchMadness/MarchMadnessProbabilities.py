@@ -961,7 +961,27 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
         team1_is_either = isinstance(team1, dict) and team1.get('either_teams')
         team2_is_either = isinstance(team2, dict) and team2.get('either_teams')
         
-        if outcome_char == 'X':
+        if outcome_char == 'D':
+            # Dead path - this game doesn't matter and participant has no stake
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
+                'winner': 'dead',
+                'dead': True,
+                'either': False,
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
+            })
+            
+            # For dead paths, just propagate team1 - it doesn't matter since
+            # downstream games will also be dead
+            winner = team1
+        elif outcome_char == 'X':
             # Either team can win - this game doesn't matter for the outcome
             game_results.append({
                 'round': ROUND_KEYS.index(round_key) + 1,

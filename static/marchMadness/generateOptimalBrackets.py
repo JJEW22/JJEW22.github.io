@@ -3,13 +3,20 @@
 Generate optimal brackets for all participants.
 This script pre-computes the optimal bracket for each participant and saves them as JSON files.
 
+Algorithm:
+1. Find Latest: Find participant's furthest-round pick(s) still alive, trace their paths
+2. Compute Dead Paths: Identify which bracket positions can never earn points
+3. Simulate All Possibilities: Try all combinations for remaining undecided games
+4. Merge & Compute Probability: Merge tied max scenarios and compute probability
+
 Usage:
-    python generate_optimal_brackets.py
+    python generateOptimalBrackets.py
 
 Inputs:
     - results-bracket-march-madness-{YEAR}.json
     - {participant}-bracket-march-madness-{YEAR}.json for each participant
     - participants.json (list of participant names)
+    - teams data CSV (for probabilities)
 
 Outputs:
     - optimal-brackets.json (contains optimal bracket for each participant)
@@ -17,18 +24,43 @@ Outputs:
 
 import json
 import os
+import sys
+import copy
 from pathlib import Path
+from typing import Dict, List, Set, Tuple, Optional
+
+# Import from MarchMadnessProbabilities
+from MarchMadnessProbabilities import (
+    ROUND_KEYS,
+    SCORE_FOR_ROUND,
+    SEED_FACTOR,
+    compute_score,
+    load_teams,
+    get_winner_name,
+    get_team_name,
+    merge_winning_outcomes,
+    decode_merged_outcome_to_games,
+    calculate_outcome_probability,
+    find_remaining_games,
+    get_parent_game_info,
+)
 
 YEAR = 2026
 BASE_PATH = Path("./2026")  # Adjust as needed for your setup
+
+# Maximum simulations allowed (2^20)
+MAX_SIMULATIONS = 2 ** 20
+
 
 def load_json(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
+
 def save_json(filepath, data):
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
+
 
 def get_alive_teams(results_bracket):
     """Find all teams that are still alive (in games without winners)."""
@@ -48,6 +80,7 @@ def get_alive_teams(results_bracket):
                     alive.add(team2["name"])
     return alive
 
+
 def get_picks_at_round(picks_bracket, round_num, alive_teams):
     """Get all teams the participant picked to reach a specific round that are still alive."""
     teams = []
@@ -66,6 +99,7 @@ def get_picks_at_round(picks_bracket, round_num, alive_teams):
     
     return list(set(teams))
 
+
 def get_furthest_round(picks_bracket, team_name):
     """Find the furthest round a team reaches in the participant's bracket."""
     # Check championship
@@ -80,6 +114,7 @@ def get_furthest_round(picks_bracket, team_name):
                 return round_num
     return 0
 
+
 def get_furthest_round_in_path(picks_bracket, team_name, max_round):
     """Get the furthest round a team reaches in picks, capped at max_round."""
     for round_num in range(max_round, 0, -1):
@@ -88,6 +123,7 @@ def get_furthest_round_in_path(picks_bracket, team_name, max_round):
             if game and game.get("winner") and game["winner"].get("name") == team_name:
                 return round_num
     return 1
+
 
 def propagate_winner(bracket, current_round, game_index, winner):
     """Propagate a winner to the next round's game."""
@@ -111,6 +147,7 @@ def propagate_winner(bracket, current_round, game_index, winner):
         next_game["team1"] = winner
     else:
         next_game["team2"] = winner
+
 
 def mark_team_winning(optimal_bracket, picks_bracket, team_name, target_round, teams_data, alive_teams):
     """Mark a team as winning all their games up to target_round. Returns list of opponents to process."""
@@ -178,21 +215,42 @@ def mark_team_winning(optimal_bracket, picks_bracket, team_name, target_round, t
     
     return opponents
 
-def build_optimal_bracket(results_bracket, picks_bracket, teams_data):
+
+def is_dead_path(optimal_bracket, picks_bracket, round_num, game_idx, alive_teams):
     """
-    Build the optimal bracket for maximum possible score.
+    Check if a bracket position is on a dead path.
+    A path is dead if the participant can't earn points in this slot 
+    OR any future slot in this bracket path.
+    """
+    current_game_idx = game_idx
     
-    Algorithm:
-    1. Find Latest: Find participant's furthest-round pick(s) still alive, trace their paths
-    2. Compute Dead Paths: Identify which bracket positions can never earn points
-    3. Bottom-Up Gap Filling: Fill remaining gaps with lower seed wins or "either"
+    for r in range(round_num, 7):
+        round_key = f"round{r}"
+        picks_games = picks_bracket.get(round_key, [])
+        
+        if current_game_idx < len(picks_games):
+            pick_game = picks_games[current_game_idx]
+            if pick_game and pick_game.get("winner"):
+                pick_winner_name = pick_game["winner"].get("name")
+                if pick_winner_name and pick_winner_name in alive_teams:
+                    # Participant has a live pick in this future slot
+                    return False
+        
+        # Move to next round's game index
+        current_game_idx = current_game_idx // 2
+    
+    # No live picks found in any future slot
+    return True
+
+
+def step1_find_latest(results_bracket, picks_bracket, teams_data, alive_teams):
     """
-    import copy
+    Step 1: Find Latest Algorithm
+    Find participant's furthest-round pick(s) still alive and trace their paths.
+    Returns the optimal bracket after this step.
+    """
     optimal_bracket = copy.deepcopy(results_bracket)
     
-    alive_teams = get_alive_teams(results_bracket)
-    
-    # === STEP 1: Find Latest Algorithm ===
     # Find starting teams (furthest picks that are still alive)
     starting_teams = []
     for round_num in range(6, 0, -1):
@@ -224,201 +282,428 @@ def build_optimal_bracket(results_bracket, picks_bracket, teams_data):
             if opp["team_name"] not in processed and opp["team_name"] in alive_teams:
                 to_process.append(opp)
     
-    # === STEP 2 & 3: Compute Dead Paths and Bottom-Up Gap Filling ===
-    # Process from round 1 up to round 6
-    for round_num in range(1, 7):
-        round_key = f"round{round_num}"
-        games = optimal_bracket.get(round_key, [])
-        picks_games = picks_bracket.get(round_key, [])
-        
-        for game_idx, game in enumerate(games):
-            if not game or game.get("winner"):
-                # Already decided
-                continue
-            
-            team1 = game.get("team1")
-            team2 = game.get("team2")
-            
-            if not team1 or not team2:
-                # Can't decide without both teams
-                continue
-            
-            team1_name = team1.get("name")
-            team2_name = team2.get("name")
-            
-            # Get participant's pick for this game
-            pick_game = picks_games[game_idx] if game_idx < len(picks_games) else None
-            pick_winner = pick_game.get("winner", {}).get("name") if pick_game and pick_game.get("winner") else None
-            
-            # Did participant pick one of these two teams to win?
-            participant_picked_team = None
-            if pick_winner == team1_name:
-                participant_picked_team = team1
-            elif pick_winner == team2_name:
-                participant_picked_team = team2
-            
-            if participant_picked_team:
-                # Participant picked one of these teams
-                # Check if following this pick leads to a dead path
-                dead_path_round = find_dead_path_start(optimal_bracket, picks_bracket, round_num, game_idx, participant_picked_team["name"], alive_teams)
-                
-                if dead_path_round is not None:
-                    # Have them win up until the dead path starts
-                    mark_team_winning_until(optimal_bracket, participant_picked_team, round_num, game_idx, dead_path_round, teams_data)
-                # else: leave as gap, will handle later (participant has live picks further up)
-            else:
-                # Participant didn't pick either team
-                # Check if this is a dead path
-                if is_dead_path(optimal_bracket, picks_bracket, round_num, game_idx, alive_teams):
-                    # Dead path - mark as dead
-                    game["dead"] = True
-                    game["winner"] = "dead"  # Special marker for dead paths
-                    
-                    team1_seed = team1.get("seed", 99)
-                    team2_seed = team2.get("seed", 99)
-                    
-                    if team1_seed <= team2_seed:
-                        propagate_team = team1
-                    else:
-                        propagate_team = team2
-                    
-                    # Propagate team to next round for display continuity
-                    propagate_winner(optimal_bracket, round_num, game_idx, propagate_team)
-                else:
-                    # Live path but participant didn't pick either team - mark as "either"
-                    game["either"] = True
-                    game["winner"] = "either"  # Special marker for either/don't care
-                    
-                    team1_seed = team1.get("seed", 99)
-                    team2_seed = team2.get("seed", 99)
-                    
-                    if team1_seed <= team2_seed:
-                        propagate_team = team1
-                    else:
-                        propagate_team = team2
-                    
-                    # Propagate lower seed to next round for display
-                    propagate_winner(optimal_bracket, round_num, game_idx, propagate_team)
-    
     return optimal_bracket
 
 
-def is_dead_path(optimal_bracket, picks_bracket, round_num, game_idx, alive_teams):
+def step2_mark_dead_paths(optimal_bracket, picks_bracket, alive_teams):
     """
-    Check if a bracket position is on a dead path.
-    A path is dead if the participant can't earn points in this slot 
-    OR any future slot in this bracket path.
+    Step 2: Mark dead paths.
+    For each undecided game, check if it's on a dead path.
+    A dead path means no alive picks exist from this game forward to championship.
+    Returns list of (round_key, game_idx) for dead games.
     """
-    current_game_idx = game_idx
+    dead_games = []
     
-    for r in range(round_num, 7):
-        round_key = f"round{r}"
-        picks_games = picks_bracket.get(round_key, [])
-        
-        if current_game_idx < len(picks_games):
-            pick_game = picks_games[current_game_idx]
-            if pick_game and pick_game.get("winner"):
-                pick_winner_name = pick_game["winner"].get("name")
-                if pick_winner_name and pick_winner_name in alive_teams:
-                    # Participant has a live pick in this future slot
-                    return False
-        
-        # Move to next round's game index
-        current_game_idx = current_game_idx // 2
-    
-    # No live picks found in any future slot
-    return True
-
-
-def find_dead_path_start(optimal_bracket, picks_bracket, round_num, game_idx, team_name, alive_teams):
-    """
-    Find the round where following a participant's pick leads to a dead path.
-    Returns the round number where dead path starts, or None if path stays live.
-    
-    A path is "dead" when the participant has NO alive picks from that point forward.
-    A path is "live" if the participant has ANY alive pick (even a different team).
-    """
-    current_game_idx = game_idx
-    
-    for r in range(round_num, 7):
-        round_key = f"round{r}"
-        picks_games = picks_bracket.get(round_key, [])
-        
-        if current_game_idx < len(picks_games):
-            pick_game = picks_games[current_game_idx]
-            if pick_game and pick_game.get("winner"):
-                pick_winner_name = pick_game["winner"].get("name")
-                
-                # Check if participant still has this team winning at this round
-                if pick_winner_name == team_name:
-                    # Participant has the same team winning, continue checking
-                    pass
-                elif pick_winner_name and pick_winner_name in alive_teams:
-                    # Participant has a DIFFERENT alive pick here
-                    # This means the path is LIVE (not dead) - they have stake in another team
-                    # Return None to indicate path stays live
-                    return None
-                else:
-                    # Participant's pick for this slot is eliminated
-                    # Check if this means dead path from here
-                    if is_dead_path_from_round(picks_bracket, r, current_game_idx, alive_teams):
-                        return r
-        
-        # Move to next round's game index
-        current_game_idx = current_game_idx // 2
-    
-    # Path stays live all the way (team goes to championship)
-    return None
-
-
-def is_dead_path_from_round(picks_bracket, start_round, game_idx, alive_teams):
-    """Check if path is dead starting from a specific round."""
-    current_game_idx = game_idx
-    
-    for r in range(start_round, 7):
-        round_key = f"round{r}"
-        picks_games = picks_bracket.get(round_key, [])
-        
-        if current_game_idx < len(picks_games):
-            pick_game = picks_games[current_game_idx]
-            if pick_game and pick_game.get("winner"):
-                pick_winner_name = pick_game["winner"].get("name")
-                if pick_winner_name and pick_winner_name in alive_teams:
-                    return False
-        
-        current_game_idx = current_game_idx // 2
-    
-    return True
-
-
-def mark_team_winning_until(optimal_bracket, team, start_round, start_game_idx, end_round, teams_data):
-    """Mark a team as winning from start_round until (but not including) end_round."""
-    current_game_idx = start_game_idx
-    
-    for r in range(start_round, end_round):
-        round_key = f"round{r}"
+    for round_num in range(1, 7):
+        round_key = f"round{round_num}"
         games = optimal_bracket.get(round_key, [])
         
-        if current_game_idx < len(games):
-            game = games[current_game_idx]
-            if game and not game.get("winner"):
-                game["winner"] = team
-                propagate_winner(optimal_bracket, r, current_game_idx, team)
+        for game_idx, game in enumerate(games):
+            if not game or game.get("winner"):
+                continue
+            
+            # Check if this path is dead (no alive picks forward)
+            # Don't require teams to be populated - is_dead_path only needs position
+            if is_dead_path(optimal_bracket, picks_bracket, round_num, game_idx, alive_teams):
+                dead_games.append((round_key, game_idx))
+                game["dead"] = True
+    
+    return dead_games
+
+
+def find_simulation_games(optimal_bracket, dead_games):
+    """
+    Find all games that need to be simulated.
+    These are undecided games that are NOT dead.
+    Returns list of (round_key, game_idx) in round order.
+    """
+    dead_set = set(dead_games)
+    simulation_games = []
+    
+    for round_key in ROUND_KEYS:
+        games = optimal_bracket.get(round_key, [])
         
-        current_game_idx = current_game_idx // 2
+        for game_idx, game in enumerate(games):
+            if not game:
+                continue
+            
+            # Skip decided games
+            if game.get("winner"):
+                continue
+            
+            # Skip dead games
+            if (round_key, game_idx) in dead_set:
+                continue
+            
+            # Need both teams to simulate
+            if game.get("team1") and game.get("team2"):
+                simulation_games.append((round_key, game_idx))
+    
+    return simulation_games
+
+
+def create_simulation_bracket(optimal_bracket, simulation_games, outcome_string):
+    """
+    Create a hypothetical bracket by applying simulation outcomes.
+    outcome_string: binary string where '0' means team1 wins, '1' means team2 wins.
+    """
+    hypothetical = copy.deepcopy(optimal_bracket)
+    
+    for i, (round_key, game_idx) in enumerate(simulation_games):
+        game = hypothetical[round_key][game_idx]
+        
+        team1 = game.get("team1")
+        team2 = game.get("team2")
+        
+        if not team1 or not team2:
+            continue
+        
+        # Determine winner based on outcome string
+        if outcome_string[i] == '0':
+            winner = team1
+        else:
+            winner = team2
+        
+        game["winner"] = winner
+        
+        # Propagate winner to next round
+        round_num = ROUND_KEYS.index(round_key) + 1
+        propagate_winner(hypothetical, round_num, game_idx, winner)
+    
+    return hypothetical
+
+
+def step3_simulate_all(optimal_bracket, picks_bracket, simulation_games, dead_games, teams_data):
+    """
+    Step 3: Simulate all possibilities.
+    Try all combinations for remaining undecided games and find max score.
+    Returns dict of {outcome_string: score} for all outcomes achieving max score.
+    """
+    num_sim_games = len(simulation_games)
+    
+    if num_sim_games == 0:
+        # No games to simulate - return empty outcome
+        return {"": 0}
+    
+    total_simulations = 2 ** num_sim_games
+    
+    if total_simulations > MAX_SIMULATIONS:
+        raise RuntimeError(
+            f"Too many simulations required: 2^{num_sim_games} = {total_simulations} > {MAX_SIMULATIONS}. "
+            f"Cannot compute optimal bracket."
+        )
+    
+    max_score = -1
+    max_outcomes = {}
+    
+    for i in range(total_simulations):
+        # Generate outcome string
+        outcome = format(i, f'0{num_sim_games}b')
+        
+        # Create hypothetical bracket with this outcome
+        hypothetical = create_simulation_bracket(optimal_bracket, simulation_games, outcome)
+        
+        # Calculate score
+        score, _, _ = compute_score(hypothetical, picks_bracket, teams_data, apply_seed_bonus=True)
+        
+        if score > max_score:
+            max_score = score
+            max_outcomes = {outcome: score}
+        elif score == max_score:
+            max_outcomes[outcome] = score
+    
+    return max_outcomes
+
+
+def build_full_outcome_string(simulation_games, dead_games, merged_outcome, results_bracket):
+    """
+    Build the full outcome string including D for dead games.
+    The string positions correspond to all remaining games in round order.
+    """
+    # Get all remaining games in order
+    remaining_games = find_remaining_games(results_bracket)
+    
+    # Build mapping from (round_key, game_idx) to position in remaining_games
+    sim_game_set = set(simulation_games)
+    dead_game_set = set(dead_games)
+    
+    # Map simulation games to their position in merged_outcome
+    sim_pos = 0
+    result = []
+    
+    for round_key, game_idx in remaining_games:
+        if (round_key, game_idx) in dead_game_set:
+            result.append('D')
+        elif (round_key, game_idx) in sim_game_set:
+            if sim_pos < len(merged_outcome):
+                result.append(merged_outcome[sim_pos])
+            else:
+                result.append('X')  # Fallback
+            sim_pos += 1
+        else:
+            # This game was decided in Step 1 - skip it
+            # Actually these shouldn't be in remaining_games if they have a winner
+            # But just in case, mark as decided
+            pass
+    
+    return ''.join(result)
+
+
+def step4_merge_and_probability(max_outcomes, simulation_games, dead_games, 
+                                 results_bracket, optimal_bracket, teams_data):
+    """
+    Step 4: Merge tied outcomes and compute probability.
+    Returns the merged outcome string and probability.
+    """
+    if not max_outcomes:
+        return None, 0.0
+    
+    # If only one outcome, no merging needed
+    if len(max_outcomes) == 1:
+        merged_outcome = list(max_outcomes.keys())[0]
+    else:
+        # Use merge_winning_outcomes - need to give them equal probabilities for merging
+        # (we'll compute actual probability after)
+        outcomes_with_probs = {outcome: 1.0 for outcome in max_outcomes.keys()}
+        merged_dict = merge_winning_outcomes(outcomes_with_probs)
+        
+        # Should result in one merged outcome (or multiple if they can't be merged)
+        # Take the one with highest "probability" (most merged)
+        merged_outcome = max(merged_dict.keys(), key=lambda x: merged_dict[x])
+    
+    # Build full outcome string for ALL remaining games (not just simulation games)
+    # remaining_games is based on results_bracket (original)
+    remaining_games = find_remaining_games(results_bracket)
+    
+    # We need to map each remaining game to an outcome character:
+    # - Games decided in Step 1: '0' or '1' based on which team won
+    # - Dead games: 'D'
+    # - Simulation games: character from merged_outcome
+    
+    sim_game_set = set(simulation_games)
+    dead_game_set = set(dead_games)
+    
+    full_outcome = []
+    sim_idx = 0
+    
+    for round_key, game_idx in remaining_games:
+        # Get the game from optimal_bracket (which has Step 1 decisions)
+        opt_games = optimal_bracket.get(round_key, [])
+        opt_game = opt_games[game_idx] if game_idx < len(opt_games) else None
+        
+        # Get the game from results_bracket (to know original teams)
+        res_games = results_bracket.get(round_key, [])
+        res_game = res_games[game_idx] if game_idx < len(res_games) else None
+        
+        if (round_key, game_idx) in dead_game_set:
+            # Dead game
+            full_outcome.append('D')
+        elif (round_key, game_idx) in sim_game_set:
+            # Simulation game - get character from merged_outcome
+            if sim_idx < len(merged_outcome):
+                full_outcome.append(merged_outcome[sim_idx])
+            else:
+                full_outcome.append('X')  # Fallback shouldn't happen
+            sim_idx += 1
+        elif opt_game and opt_game.get("winner"):
+            # Game was decided in Step 1 - determine if team1 or team2 won
+            winner_name = get_team_name(opt_game.get("winner"))
+            team1_name = get_team_name(res_game.get("team1")) if res_game else None
+            team2_name = get_team_name(res_game.get("team2")) if res_game else None
+            
+            if winner_name == team1_name:
+                full_outcome.append('0')  # team1 wins
+            elif winner_name == team2_name:
+                full_outcome.append('1')  # team2 wins
+            else:
+                # Winner might have been propagated from earlier round
+                # Check optimal_bracket's teams
+                opt_team1_name = get_team_name(opt_game.get("team1"))
+                opt_team2_name = get_team_name(opt_game.get("team2"))
+                if winner_name == opt_team1_name:
+                    full_outcome.append('0')
+                else:
+                    full_outcome.append('1')
+        else:
+            # This shouldn't happen - game is neither decided, dead, nor simulated
+            full_outcome.append('X')  # Fallback
+    
+    full_outcome_str = ''.join(full_outcome)
+    
+    # Calculate probability
+    # For this we need to create a hypothetical bracket and use calculate_outcome_probability
+    # But we need to handle X and D specially
+    
+    # For probability calculation:
+    # - D positions: either outcome is possible (multiply by prob of both)
+    # - X positions: already handled by calculate_outcome_probability
+    # - 0/1 positions: specific outcome
+    
+    # Actually, for probability we need to sum over all possible outcomes
+    # For X positions: sum probabilities of both outcomes
+    # For D positions: same as X (sum probabilities of both outcomes)
+    
+    probability = calculate_optimal_probability(
+        full_outcome_str, remaining_games, optimal_bracket, teams_data
+    )
+    
+    return full_outcome_str, probability
+
+
+def calculate_optimal_probability(outcome_str, remaining_games, bracket, teams_data):
+    """
+    Calculate probability of an optimal outcome.
+    For X and D positions, both outcomes are possible so we sum/account for both.
+    """
+    # For each position that is X or D, we need to consider both outcomes
+    # This means the probability is the product of individual game probabilities
+    # where X/D games contribute probability 1 (either outcome works)
+    
+    # Create a hypothetical bracket to get team matchups
+    hypothetical = copy.deepcopy(bracket)
+    
+    probability = 1.0
+    
+    for i, (round_key, game_idx) in enumerate(remaining_games):
+        if i >= len(outcome_str):
+            break
+            
+        game = hypothetical[round_key][game_idx]
+        team1 = game.get("team1")
+        team2 = game.get("team2")
+        
+        if not team1 or not team2:
+            continue
+        
+        outcome_char = outcome_str[i]
+        
+        team1_name = get_team_name(team1)
+        team2_name = get_team_name(team2)
+        
+        # Get probability column for this round
+        round_num = ROUND_KEYS.index(round_key) + 1
+        prob_columns = ['prob_r32', 'prob_r16', 'prob_r8', 'prob_r4', 'prob_r2', 'prob_win']
+        prob_col = prob_columns[round_num - 1] if round_num <= 6 else 'prob_win'
+        
+        if outcome_char in ('X', 'D'):
+            # Either outcome works - probability is 1 (we'll get one of them)
+            # Actually we need to propagate the lower seed for display
+            team1_seed = team1.get('seed', 99) if isinstance(team1, dict) else 99
+            team2_seed = team2.get('seed', 99) if isinstance(team2, dict) else 99
+            winner = team1 if team1_seed <= team2_seed else team2
+        elif outcome_char == '0':
+            # Team1 wins
+            winner = team1
+            # Probability is team1's probability of reaching next round
+            if team1_name in teams_data and prob_col in teams_data[team1_name]:
+                # Need conditional probability: P(team1 wins | both reached this round)
+                # This is complex - for now use simplified approach
+                team1_prob = teams_data[team1_name].get(prob_col, 0.5)
+                team2_prob = teams_data[team2_name].get(prob_col, 0.5) if team2_name in teams_data else 0.5
+                # Conditional probability
+                if team1_prob + team2_prob > 0:
+                    probability *= team1_prob / (team1_prob + team2_prob)
+                else:
+                    probability *= 0.5
+            else:
+                probability *= 0.5
+        else:  # '1'
+            # Team2 wins
+            winner = team2
+            if team2_name in teams_data and prob_col in teams_data[team2_name]:
+                team1_prob = teams_data[team1_name].get(prob_col, 0.5) if team1_name in teams_data else 0.5
+                team2_prob = teams_data[team2_name].get(prob_col, 0.5)
+                if team1_prob + team2_prob > 0:
+                    probability *= team2_prob / (team1_prob + team2_prob)
+                else:
+                    probability *= 0.5
+            else:
+                probability *= 0.5
+        
+        # Propagate winner to next round
+        parent_info = get_parent_game_info(round_key, game_idx)
+        if parent_info:
+            parent_round, parent_index, slot = parent_info
+            if parent_round in hypothetical and parent_index < len(hypothetical[parent_round]):
+                parent_game = hypothetical[parent_round][parent_index]
+                if slot == 0:
+                    parent_game["team1"] = winner
+                else:
+                    parent_game["team2"] = winner
+    
+    return probability
+
+
+def build_optimal_bracket(results_bracket, picks_bracket, teams_data):
+    """
+    Build the optimal bracket for maximum possible score.
+    
+    Algorithm:
+    1. Find Latest: Find participant's furthest-round pick(s) still alive, trace their paths
+    2. Compute Dead Paths: Mark games where participant can't earn points
+    3. Simulate All: Try all combinations for remaining games, keep max score outcomes
+    4. Merge & Probability: Merge tied outcomes and compute probability
+    """
+    alive_teams = get_alive_teams(results_bracket)
+    
+    # Step 1: Find Latest
+    optimal_bracket = step1_find_latest(results_bracket, picks_bracket, teams_data, alive_teams)
+    
+    # Step 2: Mark Dead Paths
+    dead_games = step2_mark_dead_paths(optimal_bracket, picks_bracket, alive_teams)
+    
+    # Step 3: Find games to simulate
+    simulation_games = find_simulation_games(optimal_bracket, dead_games)
+    
+    # Step 3: Simulate all possibilities
+    max_outcomes = step3_simulate_all(
+        optimal_bracket, picks_bracket, simulation_games, dead_games, teams_data
+    )
+    
+    # Step 4: Merge and compute probability
+    remaining_games = find_remaining_games(results_bracket)
+    
+    merged_outcome, probability = step4_merge_and_probability(
+        max_outcomes, simulation_games, dead_games,
+        results_bracket, optimal_bracket, teams_data
+    )
+    
+    # Decode merged outcome to games format
+    if merged_outcome:
+        games = decode_merged_outcome_to_games(results_bracket, remaining_games, merged_outcome)
+    else:
+        games = []
+    
+    # Get max score
+    max_score = list(max_outcomes.values())[0] if max_outcomes else 0
+    
+    # Return in same format as winning scenarios
+    return {
+        "outcome": merged_outcome,
+        "probability": probability,
+        "games": games,
+        "max_score": max_score,
+        "num_tied_outcomes": len(max_outcomes) if max_outcomes else 0
+    }
+
 
 def main():
     # Load results bracket
     results_path = BASE_PATH / f"results-bracket-march-madness-{YEAR}-early.json"
     results_bracket = load_json(results_path)
     
-    # Build teams_data from round1
-    teams_data = {}
-    for game in results_bracket.get("round1", []):
-        if game.get("team1"):
-            teams_data[game["team1"]["name"]] = game["team1"]
-        if game.get("team2"):
-            teams_data[game["team2"]["name"]] = game["team2"]
+    # Load teams data (for probabilities and seed info)
+    teams_path = BASE_PATH / "teams.csv"
+    if teams_path.exists():
+        teams_data = load_teams(str(teams_path), results_bracket, validate=False)
+    else:
+        # Build basic teams_data from round1
+        teams_data = {}
+        for game in results_bracket.get("round1", []):
+            if game.get("team1"):
+                teams_data[game["team1"]["name"]] = game["team1"]
+            if game.get("team2"):
+                teams_data[game["team2"]["name"]] = game["team2"]
     
     # Load participants
     participants_path = BASE_PATH / "participants.json"
@@ -437,14 +722,21 @@ def main():
             continue
         
         picks_bracket = load_json(bracket_path)
-        optimal = build_optimal_bracket(results_bracket, picks_bracket, teams_data)
-        optimal_brackets[name] = optimal
-        print(f"Generated optimal bracket for {name}")
+        
+        try:
+            optimal = build_optimal_bracket(results_bracket, picks_bracket, teams_data)
+            optimal_brackets[name] = optimal
+            print(f"Generated optimal bracket for {name}: max_score={optimal['max_score']}, "
+                  f"probability={optimal['probability']:.6f}, tied_outcomes={optimal['num_tied_outcomes']}")
+        except RuntimeError as e:
+            print(f"Error generating optimal bracket for {name}: {e}")
+            continue
     
     # Save all optimal brackets to a single file
     output_path = BASE_PATH / "optimal-brackets.json"
     save_json(output_path, optimal_brackets)
     print(f"\nSaved optimal brackets to {output_path}")
+
 
 if __name__ == "__main__":
     main()
