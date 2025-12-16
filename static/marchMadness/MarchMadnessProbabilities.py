@@ -26,8 +26,8 @@ ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
 # Progress reporting interval (print progress every N simulations)
 PROGRESS_INTERVAL = 1000
 
-# Default number of top winning scenarios to keep per participant
-DEFAULT_MAX_WINNING_SCENARIOS = 10
+# Default number of top scenarios to keep per participant (for both winning and losing)
+DEFAULT_MAX_SCENARIOS = 5
 
 # Seed-based probability file (relative to this script's directory)
 SEED_PROBABILITIES_FILE = "seed_probabilities.csv"
@@ -105,7 +105,6 @@ def get_seed_probability(seed: int, prob_column: str) -> Optional[float]:
         return SEED_PROBABILITIES[seed][prob_column]
     
     return None
-DEFAULT_MAX_WINNING_SCENARIOS = 10
 
 
 def american_odds_to_probability(odds: float, remove_vig: bool = False) -> float:
@@ -957,9 +956,9 @@ class MergeCandidateTracker:
         return self.probabilities
 
 
-def merge_winning_outcomes(outcomes_with_probs: Dict[str, float]) -> Dict[str, float]:
+def merge_outcomes(outcomes_with_probs: Dict[str, float]) -> Dict[str, float]:
     """
-    Iteratively merge winning outcomes that differ by exactly 1 position.
+    Iteratively merge outcomes that differ by exactly 1 position.
     Uses greedy approach: always merge the pair with highest combined probability.
     
     Optimized O(N * L) algorithm using incremental group maintenance and priority queue.
@@ -1162,20 +1161,22 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
     return game_results
 
 
-def process_winning_outcomes(
+def process_outcomes(
     raw_outcomes: Dict[str, Dict[str, float]],  # name -> {outcome: probability}
     results_bracket: dict,
     remaining_games: List[Tuple[str, int]],
-    max_scenarios: int
+    max_scenarios: int,
+    outcome_type: str = "winning"
 ) -> Dict[str, List[dict]]:
     """
-    Process raw winning outcomes: merge similar ones and keep top N.
+    Process raw outcomes: merge similar ones and keep top N.
     
     Args:
         raw_outcomes: Dict mapping participant name to {outcome_string: probability}
         results_bracket: The results bracket for decoding games
         remaining_games: List of remaining games
         max_scenarios: Maximum scenarios to keep per participant
+        outcome_type: Type of outcome for logging ("winning" or "losing")
         
     Returns:
         Dict mapping participant name to list of scenario dicts with probability
@@ -1187,10 +1188,10 @@ def process_winning_outcomes(
             processed[name] = []
             continue
         
-        print(f"  Processing {name}: {len(outcomes)} raw winning outcomes")
+        print(f"  Processing {name}: {len(outcomes)} raw {outcome_type} outcomes")
         
         # Merge similar outcomes
-        merged = merge_winning_outcomes(outcomes)
+        merged = merge_outcomes(outcomes)
         print(f"    After merging: {len(merged)} outcomes")
         
         # Get top scenarios
@@ -1346,8 +1347,8 @@ def calculate_win_probabilities(
     apply_seed_bonus: bool = True,
     max_simulations: Optional[int] = None,
     bonus_stars: Optional[Dict[str, int]] = None,
-    max_scenarios: int = DEFAULT_MAX_WINNING_SCENARIOS
-) -> Tuple[Dict[str, float], Dict[str, List]]:
+    max_scenarios: int = DEFAULT_MAX_SCENARIOS
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, List], Dict[str, List], Dict]:
     """
     Calculate win probabilities for all participants.
     
@@ -1359,10 +1360,10 @@ def calculate_win_probabilities(
         apply_seed_bonus: Whether to apply upset bonus points
         max_simulations: Max number of simulations (uses Monte Carlo if exceeded)
         bonus_stars: Optional dict of {name: bonus_points}
-        max_scenarios: Maximum number of winning scenarios to keep per participant
+        max_scenarios: Maximum number of scenarios to keep per participant (for both winning and losing)
     
     Returns:
-        Tuple of (win_probabilities dict, winning_scenarios dict)
+        Tuple of (win_probabilities, lose_probabilities, average_places, winning_scenarios, losing_scenarios, next_game_prefs)
     """
     # Load results bracket
     results_bracket = load_bracket(results_path)
@@ -1449,9 +1450,13 @@ def calculate_win_probabilities(
     # Simulate outcomes
     total_probability_sum = 0.0  # Track sum of all outcome probabilities
     win_probability_sum = {name: 0.0 for name in name_to_bracket.keys()}  # Sum of probabilities where each person wins
-    places = {name: [] for name in name_to_bracket.keys()}
-    # Store ALL winning outcomes with their probabilities
+    lose_probability_sum = {name: 0.0 for name in name_to_bracket.keys()}  # Sum of probabilities where each person loses (last place)
+    place_probability_sum = {name: 0.0 for name in name_to_bracket.keys()}  # Weighted sum of places for average calculation
+    # Store ALL winning and losing outcomes with their probabilities
     raw_winning_outcomes = {name: {} for name in name_to_bracket.keys()}  # name -> {outcome: probability}
+    raw_losing_outcomes = {name: {} for name in name_to_bracket.keys()}  # name -> {outcome: probability}
+    
+    num_participants = len(name_to_bracket)
     
     # Calculate progress intervals
     total_intervals = num_simulations // PROGRESS_INTERVAL if num_simulations >= PROGRESS_INTERVAL else 1
@@ -1492,9 +1497,13 @@ def calculate_win_probabilities(
         # Sort by score
         sorted_scores = sorted(all_scores, key=lambda x: x[1], reverse=True)
         
-        # Record places and check for winner
+        # Record places, track winner and loser
+        last_place = num_participants - 1
         for place, (name, score) in enumerate(sorted_scores):
-            places[name].append(place + 1)
+            # Track weighted place for average calculation
+            place_probability_sum[name] += (place + 1) * outcome_probability
+            
+            # Check for winner (first place)
             if place == 0:
                 win_probability_sum[name] += outcome_probability
                 # Store this winning outcome with its probability
@@ -1503,6 +1512,16 @@ def calculate_win_probabilities(
                 else:
                     # For Monte Carlo, might see same outcome multiple times
                     raw_winning_outcomes[name][outcome] += outcome_probability
+            
+            # Check for loser (last place)
+            if place == last_place:
+                lose_probability_sum[name] += outcome_probability
+                # Store this losing outcome with its probability
+                if outcome not in raw_losing_outcomes[name]:
+                    raw_losing_outcomes[name][outcome] = outcome_probability
+                else:
+                    # For Monte Carlo, might see same outcome multiple times
+                    raw_losing_outcomes[name][outcome] += outcome_probability
     
     # Clear progress line
     print(f"\rProgress: {total_intervals}/{total_intervals} - Complete!          ")
@@ -1513,27 +1532,39 @@ def calculate_win_probabilities(
     else:
         normalization_factor = 1.0
     
-    # Calculate win probabilities
+    # Calculate win/lose probabilities and average places
     win_probabilities = {}
+    lose_probabilities = {}
+    average_places = {}
     
     print("\nResults:")
-    print("-" * 50)
+    print("-" * 70)
     if use_monte_carlo:
         print(f"(Estimated from {num_simulations:,} Monte Carlo samples)")
     if has_prob_data:
         print(f"(Weighted by team probability data, total prob sum: {total_probability_sum:.6f})")
     
     for name in sorted(name_to_bracket.keys(), key=lambda n: win_probability_sum[n], reverse=True):
-        prob = win_probability_sum[name] * normalization_factor
-        avg_place = sum(places[name]) / len(places[name]) if places[name] else 0
-        win_probabilities[name] = prob
-        num_raw = len(raw_winning_outcomes.get(name, {}))
-        print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}, {num_raw} raw winning outcomes")
+        win_prob = win_probability_sum[name] * normalization_factor
+        lose_prob = lose_probability_sum[name] * normalization_factor
+        avg_place = place_probability_sum[name] * normalization_factor  # Weighted average
+        
+        win_probabilities[name] = win_prob
+        lose_probabilities[name] = lose_prob
+        average_places[name] = avg_place
+        
+        num_win_raw = len(raw_winning_outcomes.get(name, {}))
+        num_lose_raw = len(raw_losing_outcomes.get(name, {}))
+        print(f"{name}: {win_prob*100:.2f}% win, {lose_prob*100:.2f}% lose, avg place: {avg_place:.2f}, "
+              f"{num_win_raw} win/{num_lose_raw} lose outcomes")
     
-    # Normalize raw_winning_outcomes probabilities too
+    # Normalize raw outcome probabilities too
     for name in raw_winning_outcomes:
         for outcome in raw_winning_outcomes[name]:
             raw_winning_outcomes[name][outcome] *= normalization_factor
+    for name in raw_losing_outcomes:
+        for outcome in raw_losing_outcomes[name]:
+            raw_losing_outcomes[name][outcome] *= normalization_factor
     
     # Compute next game preferences (before merging)
     print("\nComputing next game preferences...")
@@ -1548,14 +1579,25 @@ def calculate_win_probabilities(
     
     # Process winning outcomes: merge similar ones and keep top N
     print("\nProcessing winning scenarios...")
-    processed_outcomes = process_winning_outcomes(
+    processed_winning = process_outcomes(
         raw_winning_outcomes, 
         results_bracket, 
         remaining_games, 
-        max_scenarios
+        max_scenarios,
+        outcome_type="winning"
     )
     
-    return win_probabilities, processed_outcomes, next_game_prefs
+    # Process losing outcomes: merge similar ones and keep top N
+    print("\nProcessing losing scenarios...")
+    processed_losing = process_outcomes(
+        raw_losing_outcomes, 
+        results_bracket, 
+        remaining_games, 
+        max_scenarios,
+        outcome_type="losing"
+    )
+    
+    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs
 
 
 def main():
@@ -1569,8 +1611,8 @@ def main():
     parser.add_argument('--no-seed-bonus', action='store_true', help='Disable upset bonus')
     parser.add_argument('--max-simulations', type=int, default=100000,
                        help='Maximum simulations. Uses Monte Carlo if total outcomes exceeds this. Default: 100000')
-    parser.add_argument('--max-scenarios', type=int, default=DEFAULT_MAX_WINNING_SCENARIOS,
-                       help=f'Maximum winning scenarios to keep per participant. Default: {DEFAULT_MAX_WINNING_SCENARIOS}')
+    parser.add_argument('--max-scenarios', type=int, default=DEFAULT_MAX_SCENARIOS,
+                       help=f'Maximum scenarios to keep per participant (for both winning and losing). Default: {DEFAULT_MAX_SCENARIOS}')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducible results')
     
     args = parser.parse_args()
@@ -1612,7 +1654,8 @@ def main():
     print(f"Participants: {participants}")
     
     # Calculate probabilities
-    probabilities, winning_outcomes, next_game_prefs = calculate_win_probabilities(
+    (win_probabilities, lose_probabilities, average_places, 
+     winning_scenarios, losing_scenarios, next_game_prefs) = calculate_win_probabilities(
         results_path=args.results,
         brackets_dir=args.brackets_dir,
         participants=participants,
@@ -1622,17 +1665,20 @@ def main():
         max_scenarios=args.max_scenarios
     )
     
-    # Save to JSON (include probabilities, winning scenarios, and next game preferences)
+    # Save to JSON (include all probabilities, scenarios, and preferences)
     output_data = {
-        'probabilities': probabilities,
-        'winning_scenarios': winning_outcomes,
+        'win_probabilities': win_probabilities,
+        'lose_probabilities': lose_probabilities,
+        'average_places': average_places,
+        'winning_scenarios': winning_scenarios,
+        'losing_scenarios': losing_scenarios,
         'next_game_preferences': next_game_prefs
     }
     
     with open(args.output, 'w') as f:
         json.dump(output_data, f, indent=2)
     
-    print(f"\nWin probabilities saved to {args.output}")
+    print(f"\nResults saved to {args.output}")
 
 
 if __name__ == '__main__':

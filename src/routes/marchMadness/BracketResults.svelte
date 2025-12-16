@@ -22,24 +22,6 @@
     const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}`;
     const OPTIMAL_BRACKETS_FILE = `/marchMadness/${YEAR}/optimal-brackets.json`;
     
-    /**
-     * Format a probability for display
-     * - >= 0.005%: show as percent with 2 decimal places (e.g., "1.23%")
-     * - 0: show as "0%"
-     * - < 0.005%: show in scientific notation with 2 sig figs (e.g., "2.4e-4%")
-     */
-    function formatProbability(prob) {
-        if (prob === 0) {
-            return "0%";
-        }
-        const percent = prob * 100;
-        if (percent >= 0.005) {
-            return `${percent.toFixed(2)}%`;
-        }
-        // Scientific notation with 1 decimal place (2 sig figs)
-        return `${percent.toExponential(1)}%`;
-    }
-    
     // State
     let loading = true;
     let error = null;
@@ -53,12 +35,15 @@
     let resultsBracket = null;
     let standings = [];
     let selectedParticipant = null;
-    let selectedScenario = null;  // Index of selected winning scenario, or 'optimal' for optimal bracket
+    let selectedScenario = null;  // Index of selected scenario, 'optimal', or 'losing-N' for losing scenarios
     let currentRound = 1;  // Current round for stake calculations
     let upcomingGames = [];  // Games that haven't been decided yet
     let stakeData = {};  // Stake in each upcoming game per participant
     let winProbabilities = {};  // Map of name -> win probability
+    let loseProbabilities = {};  // Map of name -> lose (last place) probability
+    let averagePlaces = {};  // Map of name -> average place
     let winningScenarios = {};  // Map of name -> array of winning scenarios
+    let losingScenarios = {};  // Map of name -> array of losing scenarios
     let nextGamePreferences = {};  // Map of game key -> preferences per participant
     let optimalBrackets = {};  // Map of name -> optimal bracket for max possible score
     
@@ -133,27 +118,48 @@
             const response = await fetch(`/marchMadness/${YEAR}/winProbabilities.json`);
             if (response.ok) {
                 const data = await response.json();
-                // Handle both old format (just probabilities) and new format (with winning_scenarios)
-                if (data.probabilities) {
-                    winProbabilities = data.probabilities;
+                // Handle both old format and new format with losing_scenarios
+                if (data.win_probabilities) {
+                    // New format with win/lose probabilities
+                    winProbabilities = data.win_probabilities;
+                    loseProbabilities = data.lose_probabilities || {};
+                    averagePlaces = data.average_places || {};
                     winningScenarios = data.winning_scenarios || {};
+                    losingScenarios = data.losing_scenarios || {};
+                    nextGamePreferences = data.next_game_preferences || {};
+                } else if (data.probabilities) {
+                    // Old format with just 'probabilities'
+                    winProbabilities = data.probabilities;
+                    loseProbabilities = {};
+                    averagePlaces = {};
+                    winningScenarios = data.winning_scenarios || {};
+                    losingScenarios = {};
                     nextGamePreferences = data.next_game_preferences || {};
                 } else {
-                    // Old format - just probabilities object
+                    // Very old format - just probabilities object
                     winProbabilities = data;
+                    loseProbabilities = {};
+                    averagePlaces = {};
                     winningScenarios = {};
+                    losingScenarios = {};
                     nextGamePreferences = {};
                 }
             } else {
                 // No probabilities file - leave empty
                 winProbabilities = {};
+                loseProbabilities = {};
+                averagePlaces = {};
                 winningScenarios = {};
+                losingScenarios = {};
                 nextGamePreferences = {};
             }
         } catch (e) {
             console.log('No win probabilities file found');
             winProbabilities = {};
+            loseProbabilities = {};
+            averagePlaces = {};
             winningScenarios = {};
+            losingScenarios = {};
             nextGamePreferences = {};
         }
     }
@@ -468,6 +474,8 @@
                 possibleBase: possibleRemainingResult.basePoints,
                 possibleBonus: possibleRemainingResult.bonusPoints,
                 winProbability: winProbabilities[name] ?? null,
+                loseProbability: loseProbabilities[name] ?? null,
+                averagePlace: averagePlaces[name] ?? null,
                 roundBreakdown: scoreResult.roundBreakdown,
                 picksPerRound
             });
@@ -546,9 +554,28 @@
     $: if (selectedParticipant) {
         // Only reset if the new participant doesn't have the selected scenario
         // 'optimal' is always valid, so don't reset for that
-        const scenarios = winningScenarios[selectedParticipant] || [];
-        if (selectedScenario !== null && selectedScenario !== 'optimal' && selectedScenario >= scenarios.length) {
-            selectedScenario = null;
+        if (selectedScenario !== null && selectedScenario !== 'optimal') {
+            if (typeof selectedScenario === 'string') {
+                if (selectedScenario.startsWith('winning-')) {
+                    const index = parseInt(selectedScenario.replace('winning-', ''), 10);
+                    const scenarios = winningScenarios[selectedParticipant] || [];
+                    if (index >= scenarios.length) {
+                        selectedScenario = null;
+                    }
+                } else if (selectedScenario.startsWith('losing-')) {
+                    const index = parseInt(selectedScenario.replace('losing-', ''), 10);
+                    const scenarios = losingScenarios[selectedParticipant] || [];
+                    if (index >= scenarios.length) {
+                        selectedScenario = null;
+                    }
+                }
+            } else if (typeof selectedScenario === 'number') {
+                // Legacy numeric format
+                const scenarios = winningScenarios[selectedParticipant] || [];
+                if (selectedScenario >= scenarios.length) {
+                    selectedScenario = null;
+                }
+            }
         }
     }
     
@@ -564,20 +591,11 @@
     
     /**
      * Convert an optimal bracket to the scenario format
-     * Scenario format: { games: [{ round, gameIndex, winner, team1, team2, team1Seed, team2Seed, dead }, ...], probability: number }
+     * Scenario format: { games: [{ round, gameIndex, winner }, ...], probability: number }
      */
     function optimalBracketToScenario(optimalBracket) {
         if (!optimalBracket) return null;
         
-        // New format: already has games array directly
-        if (optimalBracket.games && Array.isArray(optimalBracket.games)) {
-            return {
-                games: optimalBracket.games,
-                probability: optimalBracket.probability || 1
-            };
-        }
-        
-        // Old format: convert from round1, round2, etc. structure
         const games = [];
         
         for (let round = 1; round <= 6; round++) {
@@ -586,35 +604,14 @@
             
             for (let gameIndex = 0; gameIndex < roundGames.length; gameIndex++) {
                 const game = roundGames[gameIndex];
-                if (game) {
-                    const team1Name = game.team1?.name || null;
-                    const team2Name = game.team2?.name || null;
-                    const team1Seed = game.team1?.seed || null;
-                    const team2Seed = game.team2?.seed || null;
-                    
-                    // Check for special markers
-                    const isDead = game.dead === true || game.winner === "dead";
-                    const isEither = game.either === true || game.winner === "either";
-                    
-                    // Get winner name (null for dead/either/TBD games)
-                    let winnerName = null;
-                    if (game.winner && game.winner !== "dead" && game.winner !== "either") {
-                        winnerName = typeof game.winner === 'string' ? game.winner : game.winner.name;
-                    }
-                    
+                if (game && game.winner) {
                     games.push({
                         round,
                         gameIndex,
-                        winner: isDead ? "dead" : (isEither ? "either" : winnerName),
-                        team1: team1Name,
-                        team2: team2Name,
-                        team1Seed: team1Seed,
-                        team2Seed: team2Seed,
-                        dead: isDead,
-                        either: isEither
-                        // TBD games have: winner=null, dead=false, either=false
+                        winner: game.winner.name
                     });
                 }
+                // If no winner, we don't add it - this will be treated as "either" or TBD
             }
         }
         
@@ -627,6 +624,7 @@
     /**
      * Get the currently selected scenario object
      * Converts optimal bracket to scenario format if 'optimal' is selected
+     * Handles 'winning-N' and 'losing-N' format for scenarios
      */
     $: currentScenario = (() => {
         if (!selectedParticipant) return null;
@@ -636,12 +634,34 @@
             return optimalBracketToScenario(optimalBrackets[selectedParticipant]);
         }
         
-        if (winningScenarios[selectedParticipant]) {
+        // Handle 'winning-N' format
+        if (typeof selectedScenario === 'string' && selectedScenario.startsWith('winning-')) {
+            const index = parseInt(selectedScenario.replace('winning-', ''), 10);
+            if (winningScenarios[selectedParticipant] && winningScenarios[selectedParticipant][index]) {
+                return winningScenarios[selectedParticipant][index];
+            }
+        }
+        
+        // Handle 'losing-N' format
+        if (typeof selectedScenario === 'string' && selectedScenario.startsWith('losing-')) {
+            const index = parseInt(selectedScenario.replace('losing-', ''), 10);
+            if (losingScenarios[selectedParticipant] && losingScenarios[selectedParticipant][index]) {
+                return losingScenarios[selectedParticipant][index];
+            }
+        }
+        
+        // Legacy: handle numeric index (for backwards compatibility)
+        if (typeof selectedScenario === 'number' && winningScenarios[selectedParticipant]) {
             return winningScenarios[selectedParticipant][selectedScenario];
         }
         
         return null;
     })();
+    
+    /**
+     * Check if current scenario is a losing scenario (for styling)
+     */
+    $: isLosingScenario = typeof selectedScenario === 'string' && selectedScenario.startsWith('losing-');
     
     function handleNextGameClick(event) {
         const { gameKey } = event.detail;
@@ -739,6 +759,8 @@
                                 <th>Underdog</th>
                                 <th>Possible</th>
                                 <th>Win %</th>
+                                <th>Lose %</th>
+                                <th>Avg Place</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -767,7 +789,21 @@
                                     </td>
                                     <td class="win-prob">
                                         {#if entry.winProbability !== null}
-                                            {formatProbability(entry.winProbability)}
+                                            {(entry.winProbability * 100).toFixed(1)}%
+                                        {:else}
+                                            -
+                                        {/if}
+                                    </td>
+                                    <td class="lose-prob">
+                                        {#if entry.loseProbability !== null}
+                                            {(entry.loseProbability * 100).toFixed(1)}%
+                                        {:else}
+                                            -
+                                        {/if}
+                                    </td>
+                                    <td class="avg-place">
+                                        {#if entry.averagePlace !== null}
+                                            {entry.averagePlace.toFixed(2)}
                                         {:else}
                                             -
                                         {/if}
@@ -807,19 +843,24 @@
                         
                         {#if selectedParticipant}
                             <label for="scenario-select">Scenario:</label>
-                            <select id="scenario-select" bind:value={selectedScenario}>
+                            <select id="scenario-select" bind:value={selectedScenario} class:losing-selected={typeof selectedScenario === 'string' && selectedScenario.startsWith('losing-')}>
                                 <option value={null}>-- None --</option>
-                                {#if optimalBrackets[selectedParticipant]}
-                                    <option value="optimal">Optimal Bracket (Max Possible) ({formatProbability(optimalBrackets[selectedParticipant].probability)})</option>
-                                {:else}
-                                    <option value="optimal">Optimal Bracket (Max Possible)</option>
-                                {/if}
+                                <option value="optimal">Optimal Bracket (Max Possible)</option>
                                 {#if winningScenarios[selectedParticipant]?.length > 0}
-                                    {#each winningScenarios[selectedParticipant] as scenario, i}
-                                        <option value={i}>Scenario {i + 1} - {getScenarioChampion(scenario)} wins ({formatProbability(scenario.probability)})</option>
-                                    {/each}
+                                    <optgroup label="🏆 Winning Scenarios">
+                                        {#each winningScenarios[selectedParticipant] as scenario, i}
+                                            <option value={`winning-${i}`} class="winning-option">Win {i + 1} - {getScenarioChampion(scenario)} wins ({(scenario.probability * 100).toFixed(1)}%)</option>
+                                        {/each}
+                                    </optgroup>
                                 {:else}
-                                    <option value={null} disabled>-- No winning scenarios --</option>
+                                    <option disabled>-- No winning scenarios --</option>
+                                {/if}
+                                {#if losingScenarios[selectedParticipant]?.length > 0}
+                                    <optgroup label="💀 Losing Scenarios">
+                                        {#each losingScenarios[selectedParticipant] as scenario, i}
+                                            <option value={`losing-${i}`} class="losing-option">Lose {i + 1} - {getScenarioChampion(scenario)} wins ({(scenario.probability * 100).toFixed(1)}%)</option>
+                                        {/each}
+                                    </optgroup>
                                 {/if}
                             </select>
                         {/if}
@@ -839,7 +880,7 @@
                         </div>
                         {#if currentScenario}
                             <div class="legend-section">
-                                <span class="legend-title">{selectedScenario === 'optimal' ? 'Optimal Bracket:' : 'Scenario Games:'}</span>
+                                <span class="legend-title">{selectedScenario === 'optimal' ? 'Optimal Bracket:' : (typeof selectedScenario === 'string' && selectedScenario.startsWith('losing-') ? 'Losing Scenario:' : 'Winning Scenario:')}</span>
                                 <div class="scenario-legend-item">
                                     <div class="legend-color match"></div>
                                     <span>Winner - bracket's pick matches</span>
@@ -848,17 +889,10 @@
                                     <div class="legend-color mismatch"></div>
                                     <span>Winner - differs from bracket (bracket's pick)</span>
                                 </div>
-                                {#if selectedScenario === 'optimal'}
-                                    <div class="scenario-legend-item">
-                                        <div class="legend-color dead"></div>
-                                        <span>Dead path - no points possible</span>
-                                    </div>
-                                {:else}
-                                    <div class="scenario-legend-item">
-                                        <div class="legend-color either"></div>
-                                        <span>Either team can win</span>
-                                    </div>
-                                {/if}
+                                <div class="scenario-legend-item">
+                                    <div class="legend-color either"></div>
+                                    <span>{selectedScenario === 'optimal' ? 'TBD - not yet determined' : 'Either team can win'}</span>
+                                </div>
                             </div>
                         {/if}
                     </div>
@@ -1157,7 +1191,6 @@
     .legend-color.match { background: #80276C; }
     .legend-color.mismatch { background: #f97316; }
     .legend-color.either { background: #0891b2; }
-    .legend-color.dead { background: #9ca3af; }
     .legend-color.tbd { background: #9ca3af; }
     
     .round-section {
@@ -1339,5 +1372,39 @@
             flex: 1;
             text-align: center;
         }
+    }
+    
+    /* Losing scenario styles */
+    .losing-selected {
+        background-color: #fef2f2 !important;
+        border-color: #ef4444 !important;
+    }
+    
+    select option.losing-option {
+        background-color: #fef2f2;
+        color: #991b1b;
+    }
+    
+    select option.winning-option {
+        background-color: #f0fdf4;
+        color: #166534;
+    }
+    
+    /* Lose probability column styling */
+    .standings-table .lose-prob {
+        color: #991b1b;
+        font-weight: 500;
+    }
+    
+    /* Average place column styling */
+    .standings-table .avg-place {
+        color: #6b7280;
+        font-weight: 500;
+    }
+    
+    /* Win probability column styling (keep green) */
+    .standings-table .win-prob {
+        color: #166534;
+        font-weight: 500;
     }
 </style>
