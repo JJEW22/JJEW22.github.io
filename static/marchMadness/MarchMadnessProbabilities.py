@@ -13,6 +13,7 @@ import json
 import os
 import argparse
 import random
+import csv
 from typing import Dict, List, Optional, Set, Tuple
 
 # Constants (matching bracketStructure.js)
@@ -26,6 +27,84 @@ ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
 PROGRESS_INTERVAL = 1000
 
 # Default number of top winning scenarios to keep per participant
+DEFAULT_MAX_WINNING_SCENARIOS = 10
+
+# Seed-based probability file (relative to this script's directory)
+SEED_PROBABILITIES_FILE = "seed_probabilities.csv"
+
+# Seed-based probability data (loaded from CSV)
+# Maps seed -> {prob_column -> probability}
+SEED_PROBABILITIES = {}
+SEED_PROB_METHOD = "50/50"  # Will be updated when seed probabilities are loaded
+
+
+def load_seed_probabilities(filepath: str = None) -> bool:
+    """
+    Load seed-based probability data from CSV file.
+    
+    Args:
+        filepath: Path to the seed probabilities CSV file. 
+                  If None, uses SEED_PROBABILITIES_FILE relative to script directory.
+        
+    Returns:
+        True if loaded successfully, False otherwise
+    """
+    global SEED_PROBABILITIES, SEED_PROB_METHOD
+    
+    # Use default path if not specified
+    if filepath is None:
+        # Look for file relative to this script's directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        filepath = os.path.join(script_dir, SEED_PROBABILITIES_FILE)
+    
+    if not os.path.exists(filepath):
+        print(f"Seed probabilities file not found: {filepath}")
+        print("Using 50/50 probability method as fallback")
+        SEED_PROB_METHOD = "50/50"
+        return False
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                seed = int(row['seed'])
+                SEED_PROBABILITIES[seed] = {
+                    'prob_r32': float(row.get('prob_r32', 0.5)),
+                    'prob_r16': float(row.get('prob_r16', 0.25)),
+                    'prob_r8': float(row.get('prob_r8', 0.125)),
+                    'prob_r4': float(row.get('prob_r4', 0.0625)),
+                    'prob_r2': float(row.get('prob_r2', 0.03125)),
+                    'prob_win': float(row.get('prob_win', 0.015625)),
+                }
+        print(f"Loaded seed probabilities from {filepath}")
+        print("Using seed-based probability method")
+        SEED_PROB_METHOD = "seed-based"
+        return True
+    except Exception as e:
+        print(f"Error loading seed probabilities: {e}")
+        print("Using 50/50 probability method as fallback")
+        SEED_PROB_METHOD = "50/50"
+        return False
+
+
+def get_seed_probability(seed: int, prob_column: str) -> Optional[float]:
+    """
+    Get the probability for a seed reaching a specific round.
+    
+    Args:
+        seed: The team's seed (1-16)
+        prob_column: Column name (e.g., 'prob_r32', 'prob_r16', etc.)
+        
+    Returns:
+        Probability value from seed data, or None if not available
+    """
+    if not SEED_PROBABILITIES:
+        return None
+    
+    if seed in SEED_PROBABILITIES and prob_column in SEED_PROBABILITIES[seed]:
+        return SEED_PROBABILITIES[seed][prob_column]
+    
+    return None
 DEFAULT_MAX_WINNING_SCENARIOS = 10
 
 
@@ -324,11 +403,11 @@ def get_team_probability(team_name: str, prob_column: str, teams_data: dict) -> 
         teams_data: Dict mapping team name to team data
         
     Returns:
-        Probability value, or default (1/2)^R if not available
+        Probability value from team data, seed-based fallback, or 50/50 fallback
     """
     global _warned_missing_prob_teams
     
-    # Map prob_column to number of rounds needed from R64
+    # Map prob_column to number of rounds needed from R64 (for 50/50 fallback)
     rounds_needed = {
         'prob_r32': 1,
         'prob_r16': 2,
@@ -343,8 +422,20 @@ def get_team_probability(team_name: str, prob_column: str, teams_data: dict) -> 
         team_data = teams_data[team_name]
         if prob_column in team_data:
             return team_data[prob_column]
+        
+        # Fallback to seed-based probability if available
+        seed = team_data.get('seed')
+        if seed:
+            seed_prob = get_seed_probability(seed, prob_column)
+            if seed_prob is not None:
+                # Warn once per team
+                warn_key = (team_name, prob_column)
+                if warn_key not in _warned_missing_prob_teams:
+                    _warned_missing_prob_teams.add(warn_key)
+                    print(f"  Using seed-based probability for '{team_name}' (seed {seed}): {prob_column}={seed_prob:.6f}")
+                return seed_prob
     
-    # Default: (1/2)^R
+    # Ultimate fallback: 50/50
     r = rounds_needed.get(prob_column, 1)
     default_prob = (0.5) ** r
     
@@ -352,7 +443,7 @@ def get_team_probability(team_name: str, prob_column: str, teams_data: dict) -> 
     warn_key = (team_name, prob_column)
     if warn_key not in _warned_missing_prob_teams:
         _warned_missing_prob_teams.add(warn_key)
-        print(f"  Warning: No {prob_column} data for '{team_name}', using default {default_prob:.6f}")
+        print(f"  Warning: No data for '{team_name}', using 50/50 default {default_prob:.6f}")
     
     return default_prob
 
@@ -1489,6 +1580,10 @@ def main():
         random.seed(args.seed)
         print(f"Using random seed: {args.seed}")
     
+    # Load seed probabilities from default location
+    load_seed_probabilities()
+    print(f"Probability method: {SEED_PROB_METHOD}")
+    
     # Get participants
     if args.participants:
         participants = args.participants
@@ -1513,7 +1608,7 @@ def main():
             print("Error: No participants specified. Use --participants or --participants-file")
             return
     
-    print(f"Calculating win probabilities for {len(participants)} participants...")
+    print(f"\nCalculating win probabilities for {len(participants)} participants...")
     print(f"Participants: {participants}")
     
     # Calculate probabilities

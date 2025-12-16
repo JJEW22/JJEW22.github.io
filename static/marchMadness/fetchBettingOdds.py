@@ -1,128 +1,44 @@
 #!/usr/bin/env python3
 """
-Fetch betting odds from The Odds API and convert to probability CSV format.
+Fetch betting odds from The Odds API and save raw data to JSON.
 
 This script fetches:
 1. Championship winner futures (outrights) -> prob_win
 2. Individual game moneylines (during tournament) -> game-by-game probabilities
 
-Then calculates round-by-round probabilities for each team.
+The raw odds are saved to a JSON file that can be processed by shapeBettingOdds.py.
 
 Usage:
-    python fetch_betting_odds.py --api-key YOUR_API_KEY --output teams_with_odds.csv
+    python fetchBettingOdds.py --output raw_odds.json
     
     # Or set environment variable
     export ODDS_API_KEY=YOUR_API_KEY
-    python fetch_betting_odds.py --output teams_with_odds.csv
+    python fetchBettingOdds.py --output raw_odds.json
 
 Get a free API key at: https://the-odds-api.com/
 """
 
 import argparse
-import csv
 import json
 import os
 import sys
 from typing import Dict, List, Optional, Tuple
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
+from datetime import datetime
 
-import json
-
+# Load API key from secrets
 PATH_TO_SECRETS = '../../secrets.json'
-with open(PATH_TO_SECRETS) as f:
-    secrets = json.load(f)
-api_key = secrets['ODDS_API_KEY']
-
+api_key = None
+if os.path.exists(PATH_TO_SECRETS):
+    with open(PATH_TO_SECRETS) as f:
+        secrets = json.load(f)
+    api_key = secrets.get('ODDS_API_KEY')
 
 # API Configuration
 BASE_URL = "https://api.the-odds-api.com/v4"
 SPORT_KEY_GAMES = "basketball_ncaab"
 SPORT_KEY_FUTURES = "basketball_ncaab_championship_winner"
-
-# Probability columns
-PROB_COLUMNS = ['prob_r32', 'prob_r16', 'prob_r8', 'prob_r4', 'prob_r2', 'prob_win']
-
-# Round keys matching the bracket structure
-ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
-
-
-def load_team_status_from_results(results_path: str) -> Tuple[Dict[str, int], Dict[str, bool]]:
-    """
-    Load team status from a results bracket JSON.
-    
-    Returns:
-        Tuple of:
-        - team_current_rounds: Dict mapping team name to their current round (1-6)
-        - team_eliminated: Dict mapping team name to whether they're eliminated
-    """
-    import json
-    
-    if not os.path.exists(results_path):
-        return {}, {}
-    
-    with open(results_path, 'r') as f:
-        results = json.load(f)
-    
-    team_rounds = {}  # team -> highest round reached
-    team_eliminated = {}  # team -> True if eliminated
-    
-    def get_team_name(team):
-        if not team:
-            return None
-        if isinstance(team, dict):
-            return team.get('name')
-        return team
-    
-    def get_winner_name(game):
-        if not game or not game.get('winner'):
-            return None
-        winner = game['winner']
-        if isinstance(winner, dict):
-            return winner.get('name')
-        return winner
-    
-    for round_idx, round_key in enumerate(ROUND_KEYS):
-        round_num = round_idx + 1
-        
-        if round_key not in results:
-            continue
-        
-        for game in results[round_key]:
-            if not game:
-                continue
-            
-            team1 = get_team_name(game.get('team1'))
-            team2 = get_team_name(game.get('team2'))
-            winner = get_winner_name(game)
-            
-            # Both teams reached this round
-            for team in [team1, team2]:
-                if team:
-                    team_rounds[team] = max(team_rounds.get(team, 0), round_num)
-            
-            # If game is decided, loser is eliminated, winner advances
-            if winner:
-                loser = team2 if winner == team1 else team1
-                if loser:
-                    team_eliminated[loser] = True
-                if winner:
-                    # Winner advances to next round
-                    team_rounds[winner] = max(team_rounds.get(winner, 0), round_num + 1)
-    
-    # For teams still in tournament, their current round is the highest they've reached
-    # For eliminated teams, they're stuck at their elimination round
-    team_current_rounds = {}
-    for team, highest_round in team_rounds.items():
-        if team_eliminated.get(team, False):
-            # Eliminated teams - their "current round" doesn't matter much
-            # but we set it to where they were eliminated
-            team_current_rounds[team] = highest_round
-        else:
-            # Still in tournament - current round is where they're playing next
-            team_current_rounds[team] = highest_round
-    
-    return team_current_rounds, team_eliminated
 
 
 def american_odds_to_probability(odds: float) -> float:
@@ -301,271 +217,6 @@ def fetch_upcoming_games(api_key: str, regions: str = "us") -> List[dict]:
     return games
 
 
-def estimate_round_probabilities(prob_win: float, method: str = "geometric", 
-                                   prob_first_game: float = None,
-                                   current_round: int = 1) -> Dict[str, float]:
-    """
-    Estimate probability of reaching each round given championship probability.
-    
-    Methods:
-    - "geometric": Assume roughly equal win probability each round
-                   If prob_win = p^6, then p = prob_win^(1/6) per round
-    - "linear": Linear scaling (less accurate but simpler)
-    - "hybrid": Use first game odds + championship odds to estimate intermediate rounds
-    
-    Args:
-        prob_win: Probability of winning championship
-        method: Estimation method
-        prob_first_game: Probability of winning the next/first game (for hybrid method)
-        current_round: What round the team is currently in (1=R64, 2=R32, etc.)
-                       Used to determine how many games remain
-    
-    Returns:
-        Dict with prob_r32, prob_r16, prob_r8, prob_r4, prob_r2, prob_win
-    """
-    if prob_win <= 0:
-        return {col: 0.0 for col in PROB_COLUMNS}
-    
-    # Number of games needed to win championship from each round
-    # Round 1 (R64): need to win 6 games
-    # Round 2 (R32): need to win 5 games
-    # Round 3 (S16): need to win 4 games
-    # etc.
-    games_from_round = {1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1}
-    
-    # Map round number to probability column for "reaching next round"
-    # Winning in round 1 means reaching R32 (prob_r32)
-    # Winning in round 2 means reaching R16 (prob_r16)
-    round_to_prob_col = {
-        1: 'prob_r32',
-        2: 'prob_r16', 
-        3: 'prob_r8',
-        4: 'prob_r4',
-        5: 'prob_r2',
-        6: 'prob_win'
-    }
-    
-    if method == "hybrid" and prob_first_game is not None and prob_first_game > 0:
-        # Hybrid method: use first game odds + championship odds
-        
-        games_remaining = games_from_round.get(current_round, 6)
-        games_after_first = games_remaining - 1
-        
-        result = {}
-        
-        # Teams that have already reached certain rounds get 1.0 for those
-        for r in range(1, current_round):
-            col = round_to_prob_col.get(r)
-            if col:
-                result[col] = 1.0
-        
-        if games_after_first > 0:
-            # prob_win = prob_first_game × prob_remaining_games
-            # prob_remaining_games = prob_win / prob_first_game
-            prob_remaining = prob_win / prob_first_game
-            
-            # Assume remaining games have equal difficulty
-            # prob_remaining = p^games_after_first
-            # p = prob_remaining^(1/games_after_first)
-            if prob_remaining > 0:
-                p_per_remaining = prob_remaining ** (1 / games_after_first)
-            else:
-                p_per_remaining = 0
-            
-            # Calculate cumulative probabilities
-            # First game: prob_first_game
-            # Second game: prob_first_game × p_per_remaining
-            # Third game: prob_first_game × p_per_remaining^2
-            # etc.
-            
-            cumulative_prob = prob_first_game
-            game_num = 1
-            
-            for r in range(current_round, 7):
-                col = round_to_prob_col.get(r)
-                if col:
-                    result[col] = min(1.0, cumulative_prob)
-                
-                if game_num < games_remaining:
-                    cumulative_prob *= p_per_remaining
-                    game_num += 1
-        else:
-            # Only one game left (championship game)
-            result[round_to_prob_col[current_round]] = prob_first_game
-            result['prob_win'] = prob_win
-        
-        # Ensure prob_win is set correctly
-        result['prob_win'] = prob_win
-        
-        # Fill in any missing columns with 0
-        for col in PROB_COLUMNS:
-            if col not in result:
-                result[col] = 0.0
-        
-        return result
-    
-    elif method == "geometric":
-        # If a team wins 6 games with probability p each, prob_win = p^6
-        # So p = prob_win^(1/6)
-        
-        games_remaining = games_from_round.get(current_round, 6)
-        p_per_round = prob_win ** (1 / games_remaining)
-        
-        result = {}
-        
-        # Rounds already reached
-        for r in range(1, current_round):
-            col = round_to_prob_col.get(r)
-            if col:
-                result[col] = 1.0
-        
-        # Future rounds
-        cumulative_games = 1
-        for r in range(current_round, 7):
-            col = round_to_prob_col.get(r)
-            if col:
-                result[col] = p_per_round ** cumulative_games
-                cumulative_games += 1
-        
-        return result
-    
-    elif method == "linear":
-        # Simple linear scaling - less accurate
-        return {
-            'prob_r32': min(1.0, prob_win * 32),
-            'prob_r16': min(1.0, prob_win * 16),
-            'prob_r8': min(1.0, prob_win * 8),
-            'prob_r4': min(1.0, prob_win * 4),
-            'prob_r2': min(1.0, prob_win * 2),
-            'prob_win': prob_win,
-        }
-    
-    else:
-        raise ValueError(f"Unknown method: {method}")
-
-
-def create_probability_csv(
-    championship_probs: Dict[str, float],
-    output_path: str,
-    base_teams_csv: str = None,
-    estimation_method: str = "geometric",
-    game_odds: List[dict] = None,
-    team_current_rounds: Dict[str, int] = None,
-    team_eliminated: Dict[str, bool] = None
-):
-    """
-    Create a CSV file with team probabilities.
-    
-    Args:
-        championship_probs: Dict mapping team name to championship probability
-        output_path: Path to write CSV
-        base_teams_csv: Optional path to existing teams CSV (to preserve seed/region info)
-        estimation_method: Method for estimating round probabilities
-        game_odds: List of game dicts with team win probabilities (for hybrid method)
-        team_current_rounds: Dict mapping team name to current round (1-6)
-        team_eliminated: Dict mapping team name to whether they're eliminated
-    """
-    # Load base teams if provided
-    base_teams = {}
-    if base_teams_csv and os.path.exists(base_teams_csv):
-        print(f"\nLoading base team info from {base_teams_csv}")
-        with open(base_teams_csv, 'r', encoding='utf-8-sig') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                name = row.get('TEAM') or row.get('Team') or row.get('name')
-                if name:
-                    base_teams[name] = {
-                        'seed': row.get('SEED') or row.get('Seed') or row.get('seed', ''),
-                        'region': row.get('Region') or row.get('region', ''),
-                    }
-        print(f"  Loaded {len(base_teams)} teams from base CSV")
-    
-    # Build lookup for first game win probability from game odds
-    first_game_probs = {}
-    if game_odds:
-        for game in game_odds:
-            home_team = game.get('home_team')
-            away_team = game.get('away_team')
-            if home_team:
-                first_game_probs[home_team] = game.get('home_prob', 0.5)
-            if away_team:
-                first_game_probs[away_team] = game.get('away_prob', 0.5)
-        print(f"  Found first-game odds for {len(first_game_probs)} teams")
-    
-    # Default dicts if not provided
-    if team_current_rounds is None:
-        team_current_rounds = {}
-    if team_eliminated is None:
-        team_eliminated = {}
-    
-    # Create output data
-    output_rows = []
-    
-    for team_name, prob_win in championship_probs.items():
-        # Get base info if available
-        base_info = base_teams.get(team_name, {})
-        
-        # Check if team is eliminated
-        if team_eliminated.get(team_name, False):
-            # Eliminated team - set prob_win to 0, but keep round probs for rounds they reached
-            current_round = team_current_rounds.get(team_name, 1)
-            round_probs = {}
-            # They reached up to current_round, so those are 1.0
-            round_to_col = {1: 'prob_r32', 2: 'prob_r16', 3: 'prob_r8', 
-                          4: 'prob_r4', 5: 'prob_r2', 6: 'prob_win'}
-            for r in range(1, 7):
-                col = round_to_col.get(r)
-                if col:
-                    if r < current_round:
-                        round_probs[col] = 1.0
-                    else:
-                        round_probs[col] = 0.0
-        else:
-            # Still in tournament - estimate probabilities
-            prob_first_game = first_game_probs.get(team_name)
-            current_round = team_current_rounds.get(team_name, 1)
-            
-            round_probs = estimate_round_probabilities(
-                prob_win, 
-                estimation_method,
-                prob_first_game=prob_first_game,
-                current_round=current_round
-            )
-        
-        row = {
-            'TEAM': team_name,
-            'SEED': base_info.get('seed', ''),
-            'Region': base_info.get('region', ''),
-        }
-        row.update(round_probs)
-        output_rows.append(row)
-    
-    # Sort by prob_win descending
-    output_rows.sort(key=lambda x: x['prob_win'], reverse=True)
-    
-    # Write CSV
-    fieldnames = ['TEAM', 'SEED', 'Region'] + PROB_COLUMNS
-    with open(output_path, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in output_rows:
-            # Format probabilities
-            for col in PROB_COLUMNS:
-                row[col] = f"{row[col]:.6f}"
-            writer.writerow(row)
-    
-    print(f"\nWrote {len(output_rows)} teams to {output_path}")
-    
-    # Verify sums
-    print("\nProbability column sums (should match expected values):")
-    for col in PROB_COLUMNS:
-        total = sum(float(r[col]) for r in output_rows)
-        expected = {'prob_r32': 32, 'prob_r16': 16, 'prob_r8': 8, 
-                   'prob_r4': 4, 'prob_r2': 2, 'prob_win': 1}[col]
-        status = "✓" if abs(total - expected) < 0.5 else f"(off by {abs(total-expected):.2f})"
-        print(f"  {col}: {total:.2f} (expected {expected}) {status}")
-
-
 def list_available_sports(api_key: str):
     """List all available sports from the API."""
     url = f"{BASE_URL}/sports"
@@ -585,27 +236,21 @@ def list_available_sports(api_key: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Fetch betting odds and convert to probability CSV',
+        description='Fetch betting odds from The Odds API and save to JSON',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    # Fetch championship futures and create CSV (geometric estimation)
-    python fetch_betting_odds.py --api-key YOUR_KEY --output teams_odds.csv
+    # Fetch and save raw odds to JSON
+    python fetchBettingOdds.py --output raw_odds.json
     
-    # Use hybrid method (championship futures + game odds)
-    python fetch_betting_odds.py --api-key YOUR_KEY --method hybrid --output teams_odds.csv
-    
-    # Use with results bracket to track tournament progress
-    python fetch_betting_odds.py --api-key YOUR_KEY --results results-bracket.json --output teams_odds.csv
-    
-    # Use existing teams CSV to preserve seed/region info
-    python fetch_betting_odds.py --api-key YOUR_KEY --base-teams ThisYearTeams2026.csv --output teams_odds.csv
+    # Fetch with game odds included
+    python fetchBettingOdds.py --output raw_odds.json --include-games
     
     # List available sports
-    python fetch_betting_odds.py --api-key YOUR_KEY --list-sports
+    python fetchBettingOdds.py --list-sports
     
-    # Fetch upcoming game odds (informational)
-    python fetch_betting_odds.py --api-key YOUR_KEY --show-games
+    # Show upcoming game odds
+    python fetchBettingOdds.py --show-games
 
 Get a free API key at: https://the-odds-api.com/
         """
@@ -615,19 +260,13 @@ Get a free API key at: https://the-odds-api.com/
                        default=os.environ.get('ODDS_API_KEY'),
                        help='The Odds API key (or set ODDS_API_KEY env var)')
     parser.add_argument('--output', '-o',
-                       default='teams_betting_odds.csv',
-                       help='Output CSV path')
-    parser.add_argument('--base-teams',
-                       help='Base teams CSV (to preserve seed/region info)')
-    parser.add_argument('--results',
-                       help='Results bracket JSON (to determine current tournament state)')
+                       default='raw_betting_odds.json',
+                       help='Output JSON path for raw odds data')
     parser.add_argument('--regions',
                        default='us',
                        help='Bookmaker regions (us, us2, uk, eu, au)')
-    parser.add_argument('--method',
-                       choices=['geometric', 'linear', 'hybrid'],
-                       default='hybrid',
-                       help='Method for estimating round probabilities (default: hybrid)')
+    parser.add_argument('--include-games', action='store_true',
+                       help='Also fetch individual game odds')
     parser.add_argument('--list-sports', action='store_true',
                        help='List available sports and exit')
     parser.add_argument('--show-games', action='store_true',
@@ -636,7 +275,7 @@ Get a free API key at: https://the-odds-api.com/
     args = parser.parse_args()
     
     if not args.api_key:
-        if (api_key):
+        if api_key:
             args.api_key = api_key
         else:
             print("Error: API key required. Use --api-key or set ODDS_API_KEY environment variable.")
@@ -657,23 +296,6 @@ Get a free API key at: https://the-odds-api.com/
                 print(f"    {game['home_team']}: {game['home_prob']*100:.1f}%")
         return
     
-    # Load team status from results bracket if provided
-    team_current_rounds = {}
-    team_eliminated = {}
-    if args.results:
-        print(f"\nLoading tournament state from {args.results}")
-        team_current_rounds, team_eliminated = load_team_status_from_results(args.results)
-        if team_current_rounds:
-            # Count teams at each round
-            round_counts = {}
-            for team, round_num in team_current_rounds.items():
-                if not team_eliminated.get(team, False):
-                    round_counts[round_num] = round_counts.get(round_num, 0) + 1
-            print(f"  Teams still in tournament by round:")
-            for r in sorted(round_counts.keys()):
-                round_names = {1: 'R64', 2: 'R32', 3: 'S16', 4: 'E8', 5: 'F4', 6: 'Championship'}
-                print(f"    {round_names.get(r, f'Round {r}')}: {round_counts[r]} teams")
-    
     # Fetch championship futures
     championship_probs = fetch_championship_futures(args.api_key, args.regions)
     
@@ -682,39 +304,32 @@ Get a free API key at: https://the-odds-api.com/
         print("Try --show-games to see if game odds are available.")
         sys.exit(1)
     
-    # Fetch game odds if using hybrid method
-    game_odds = None
-    if args.method == 'hybrid':
+    # Build output data
+    output_data = {
+        'fetched_at': datetime.now().isoformat(),
+        'regions': args.regions,
+        'championship_probs': championship_probs,
+        'game_odds': None
+    }
+    
+    # Fetch game odds if requested
+    if args.include_games:
         game_odds = fetch_upcoming_games(args.api_key, args.regions)
         if game_odds:
-            print(f"\nUsing hybrid method with {len(game_odds)} game odds")
-        else:
-            print("\nNo game odds available, falling back to geometric method for teams without game odds")
+            output_data['game_odds'] = game_odds
+            print(f"\nIncluded {len(game_odds)} game odds")
     
-    # Create CSV
-    create_probability_csv(
-        championship_probs,
-        args.output,
-        args.base_teams,
-        args.method,
-        game_odds=game_odds,
-        team_current_rounds=team_current_rounds,
-        team_eliminated=team_eliminated
-    )
+    # Save to JSON
+    with open(args.output, 'w', encoding='utf-8') as f:
+        json.dump(output_data, f, indent=2)
     
-    print(f"\nDone! CSV saved to {args.output}")
+    print(f"\nRaw odds saved to {args.output}")
+    print(f"  Championship odds for {len(championship_probs)} teams")
+    if output_data['game_odds']:
+        print(f"  Game odds for {len(output_data['game_odds'])} games")
     
-    if args.method == 'hybrid':
-        print("\nHybrid method explanation:")
-        print("  - prob_win: Directly from championship futures")
-        print("  - prob_first_game: From h2h moneylines for next game")
-        print("  - Intermediate rounds: Estimated by distributing remaining probability")
-        print("    assuming equal difficulty for games after the first")
-        if args.results:
-            print("  - Current round: From results bracket (teams already advanced get 100% for past rounds)")
-    else:
-        print("\nNote: Round probabilities (prob_r32 through prob_r4) are ESTIMATES based on")
-        print("championship odds. For more accurate round-by-round probabilities, use --method hybrid")
+    print("\nNext step: Run shapeBettingOdds.py to process these odds into team probabilities")
+    print(f"  python shapeBettingOdds.py --input {args.output} --output teams_with_odds.csv")
 
 
 if __name__ == '__main__':
