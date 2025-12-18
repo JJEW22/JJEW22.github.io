@@ -43,6 +43,7 @@ from MarchMadnessProbabilities import (
     calculate_outcome_probability,
     find_remaining_games,
     get_parent_game_info,
+    load_scoring_config,
 )
 
 YEAR = 2026
@@ -689,6 +690,10 @@ def build_optimal_bracket(results_bracket, picks_bracket, teams_data):
 
 
 def main():
+    # Load scoring configuration
+    config_path = BASE_PATH / "scoring-config.json"
+    load_scoring_config(str(config_path) if config_path.exists() else None)
+    
     # Load results bracket
     results_path = BASE_PATH / f"results-bracket-march-madness-{YEAR}-early.json"
     results_bracket = load_json(results_path)

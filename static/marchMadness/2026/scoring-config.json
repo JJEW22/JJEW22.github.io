@@ -1,0 +1,19 @@
+{
+  "scoreForRound": [0, 10, 20, 30, 50, 80, 130],
+  "seedFactor": [0, 1, 2, 3, 4, 5, 6],
+  "roundNames": [
+    "",
+    "Round of 64",
+    "Round of 32", 
+    "Sweet 16",
+    "Elite 8",
+    "Final Four",
+    "Championship"
+  ],
+  "startBonus": {},
+  "description": {
+    "baseScoring": "Points are awarded for each correct pick based on the round.",
+    "upsetBonus": "Additional points are awarded for correctly picking upsets. The bonus equals (winner seed - expected winner seed) × seed factor for that round.",
+    "tiebreaker": "In case of a tie, the participant who correctly picked more games in later rounds wins."
+  }
+}

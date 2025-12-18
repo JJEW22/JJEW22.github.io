@@ -16,9 +16,85 @@ import random
 import csv
 from typing import Dict, List, Optional, Set, Tuple
 
-# Constants (matching bracketStructure.js)
-SCORE_FOR_ROUND = [0, 10, 20, 30, 50, 80, 130]
-SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6]
+# Scoring constants - MUST be loaded from config file
+SCORE_FOR_ROUND = None
+SEED_FACTOR = None
+START_BONUS = None
+
+# Flag to track if config has been loaded
+_config_loaded = False
+
+
+def load_scoring_config(config_path: str = None) -> bool:
+    """
+    Load scoring configuration from JSON file.
+    
+    Args:
+        config_path: Path to scoring-config.json. If None, tries to find it
+                     relative to the script directory or in common locations.
+    
+    Returns:
+        True if loaded successfully, False otherwise
+        
+    Raises:
+        FileNotFoundError: If config file cannot be found
+        ValueError: If config file is missing required fields
+    """
+    global SCORE_FOR_ROUND, SEED_FACTOR, START_BONUS, _config_loaded
+    
+    if _config_loaded:
+        return True
+    
+    # Try to find config file
+    search_paths = []
+    if config_path:
+        search_paths.append(config_path)
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    search_paths.extend([
+        os.path.join(script_dir, 'scoring-config.json'),
+        os.path.join(script_dir, '2026', 'scoring-config.json'),
+        os.path.join(script_dir, '..', 'static', 'marchMadness', '2026', 'scoring-config.json'),
+        'scoring-config.json',
+    ])
+    
+    for path in search_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                # Validate required fields
+                if 'scoreForRound' not in config or not isinstance(config['scoreForRound'], list):
+                    raise ValueError(f"Config file {path} missing required 'scoreForRound' array")
+                if 'seedFactor' not in config or not isinstance(config['seedFactor'], list):
+                    raise ValueError(f"Config file {path} missing required 'seedFactor' array")
+                
+                SCORE_FOR_ROUND = config['scoreForRound']
+                SEED_FACTOR = config['seedFactor']
+                START_BONUS = config.get('startBonus', {})
+                
+                _config_loaded = True
+                print(f"Loaded scoring config from {path}")
+                print(f"  SCORE_FOR_ROUND: {SCORE_FOR_ROUND}")
+                print(f"  SEED_FACTOR: {SEED_FACTOR}")
+                if START_BONUS:
+                    print(f"  START_BONUS: {START_BONUS}")
+                return True
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON in config file {path}: {e}")
+                continue
+            except ValueError as e:
+                print(f"Error: {e}")
+                continue
+    
+    # Config file is required - raise error if not found
+    searched = "\n  ".join(search_paths)
+    raise FileNotFoundError(
+        f"Could not find scoring-config.json. Searched:\n  {searched}\n"
+        f"Please ensure scoring-config.json exists with 'scoreForRound' and 'seedFactor' arrays."
+    )
+
 
 # Round keys in order
 ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
@@ -1712,8 +1788,12 @@ def main():
     parser.add_argument('--max-scenarios', type=int, default=DEFAULT_MAX_SCENARIOS,
                        help=f'Maximum scenarios to keep per participant (for both winning and losing). Default: {DEFAULT_MAX_SCENARIOS}')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducible results')
+    parser.add_argument('--config', default=None, help='Path to scoring-config.json file')
     
     args = parser.parse_args()
+    
+    # Load scoring configuration
+    load_scoring_config(args.config)
     
     # Set random seed if provided
     if args.seed is not None:
