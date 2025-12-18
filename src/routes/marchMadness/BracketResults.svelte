@@ -10,10 +10,12 @@
         computeScore,
         computePossibleRemaining,
         computeStakeInGame,
-        letterToNumber
+        letterToNumber,
+        loadScoringConfig
     } from './BracketStructure.js';
     import { loadBracketFromPath } from './bracketIO.js';
     import BracketView from './BracketView.svelte';
+    import MarchMadnessRules from './MarchMadnessRules.svelte';
     
     // Configuration
     const YEAR = '2026';
@@ -21,11 +23,12 @@
     const TEAMS_FILE = `/marchMadness/${YEAR}/ThisYearTeams${YEAR}.csv`;
     const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}`;
     const OPTIMAL_BRACKETS_FILE = `/marchMadness/${YEAR}/optimal-brackets.json`;
+    const SCORING_CONFIG_FILE = `/marchMadness/${YEAR}/scoring-config.json`;
     
     // State
     let loading = true;
     let error = null;
-    let activeTab = 'standings'; // 'standings', 'brackets', 'stakes'
+    let activeTab = 'standings'; // 'standings', 'brackets', 'stakes', 'rules'
     
     // Data
     let teams = {};  // Map of team name -> team data
@@ -49,6 +52,9 @@
     
     onMount(async () => {
         try {
+            // Load scoring config first
+            await loadScoringConfig(SCORING_CONFIG_FILE);
+            
             await loadTeams();
             await loadResults();
             await loadParticipants();
@@ -768,6 +774,13 @@
             >
                 🎯 Stakes
             </button>
+            <button 
+                class="tab" 
+                class:active={activeTab === 'rules'}
+                on:click={() => selectTab('rules')}
+            >
+                📜 Rules
+            </button>
         </div>
         
         <!-- Tab Content -->
@@ -993,6 +1006,10 @@
                             </div>
                         {/each}
                     {/if}
+                </div>
+            {:else if activeTab === 'rules'}
+                <div class="rules-view">
+                    <MarchMadnessRules configPath={SCORING_CONFIG_FILE} />
                 </div>
             {/if}
         </div>
@@ -1424,5 +1441,11 @@
     .standings-table .win-prob {
         color: #166534;
         font-weight: 500;
+    }
+    
+    /* Rules view */
+    .rules-view {
+        max-width: 800px;
+        margin: 0 auto;
     }
 </style>

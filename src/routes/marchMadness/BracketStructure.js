@@ -1,8 +1,69 @@
 // Shared bracket structure and utilities for March Madness
 
-// Scoring constants
-export const SCORE_FOR_ROUND = [0, 10, 20, 30, 50, 80, 130];
-export const SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6];
+// Default scoring constants (can be overridden by loading config)
+export let SCORE_FOR_ROUND = [0, 10, 20, 30, 50, 80, 130];
+export let SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6];
+export let ROUND_NAMES = ['', 'Round of 64', 'Round of 32', 'Sweet 16', 'Elite 8', 'Final Four', 'Championship'];
+export let START_BONUS = {};
+
+// Flag to track if config has been loaded
+let configLoaded = false;
+
+/**
+ * Load scoring configuration from JSON file.
+ * This should be called once at app initialization.
+ * @param {string} configPath - Path to the scoring-config.json file
+ * @returns {Promise<boolean>} - True if loaded successfully
+ */
+export async function loadScoringConfig(configPath = '/marchMadness/2026/scoring-config.json') {
+    if (configLoaded) {
+        return true;  // Already loaded
+    }
+    
+    try {
+        const response = await fetch(configPath);
+        if (!response.ok) {
+            console.warn(`Could not load scoring config from ${configPath}, using defaults`);
+            return false;
+        }
+        
+        const config = await response.json();
+        
+        if (config.scoreForRound && Array.isArray(config.scoreForRound)) {
+            SCORE_FOR_ROUND = config.scoreForRound;
+        }
+        if (config.seedFactor && Array.isArray(config.seedFactor)) {
+            SEED_FACTOR = config.seedFactor;
+        }
+        if (config.roundNames && Array.isArray(config.roundNames)) {
+            ROUND_NAMES = config.roundNames;
+        }
+        if (config.startBonus && typeof config.startBonus === 'object') {
+            START_BONUS = config.startBonus;
+        }
+        
+        configLoaded = true;
+        console.log('Loaded scoring config:', { SCORE_FOR_ROUND, SEED_FACTOR, ROUND_NAMES, START_BONUS });
+        return true;
+    } catch (err) {
+        console.warn('Error loading scoring config, using defaults:', err);
+        return false;
+    }
+}
+
+/**
+ * Get current scoring configuration.
+ * @returns {Object} - Current scoring configuration
+ */
+export function getScoringConfig() {
+    return {
+        scoreForRound: SCORE_FOR_ROUND,
+        seedFactor: SEED_FACTOR,
+        roundNames: ROUND_NAMES,
+        startBonus: START_BONUS,
+        configLoaded
+    };
+}
 
 // Region positioning
 export const regionPositions = {
@@ -519,244 +580,5 @@ export function numberToLetter(num) {
         const first = Math.floor(num / 26) - 1;
         const second = num % 26;
         return letters[first] + letters[second];
-    }
-}
-
-/**
- * Build the optimal bracket for maximum possible score.
- * 
- * Algorithm:
- * 1. Find the team(s) the participant picked to go furthest that are still alive
- * 2. Have them win all their games up to that point
- * 3. For each opponent the participant picked for these teams, if still alive,
- *    have them win up to the point where they meet
- * 4. Repeat until no more teams to process
- * 
- * @param {Object} resultsBracket - The actual tournament results (with some games TBD)
- * @param {Object} picksBracket - The participant's picks
- * @param {Object} teamsData - Map of team names to team data
- * @returns {Object} The optimal bracket with winners filled in (null for TBD)
- */
-export function buildOptimalBracket(resultsBracket, picksBracket, teamsData) {
-    // Deep clone the results bracket as our starting point
-    const optimalBracket = JSON.parse(JSON.stringify(resultsBracket));
-    
-    // Track which teams are still alive (not eliminated)
-    const aliveTeams = new Set();
-    
-    // First, find all teams still alive from the results bracket
-    for (let round = 1; round <= 6; round++) {
-        const roundKey = `round${round}`;
-        const games = resultsBracket[roundKey] || [];
-        
-        for (const game of games) {
-            if (!game) continue;
-            
-            if (!game.winner) {
-                // Game not decided - both teams (if present) are alive
-                if (game.team1?.name) aliveTeams.add(game.team1.name);
-                if (game.team2?.name) aliveTeams.add(game.team2.name);
-            }
-        }
-    }
-    
-    // Find the furthest round where participant has a pick that's still alive
-    // and get all such teams at that level
-    let startingTeams = [];
-    
-    for (let round = 6; round >= 1; round--) {
-        const teamsAtRound = getPicksAtRound(picksBracket, round, aliveTeams);
-        if (teamsAtRound.length > 0) {
-            startingTeams = teamsAtRound;
-            break;
-        }
-    }
-    
-    // Process teams using a stack
-    // Each item is { teamName, targetRound } - the team should win up to targetRound
-    const toProcess = [];
-    
-    // Add starting teams - they should win up to their furthest picked round
-    for (const teamName of startingTeams) {
-        const furthestRound = getFurthestRound(picksBracket, teamName);
-        toProcess.push({ teamName, targetRound: furthestRound });
-    }
-    
-    // Track which teams we've already processed to avoid duplicates
-    const processed = new Set();
-    
-    while (toProcess.length > 0) {
-        const { teamName, targetRound } = toProcess.pop();
-        
-        if (processed.has(teamName)) continue;
-        processed.add(teamName);
-        
-        // Have this team win all their games up to targetRound
-        const opponents = markTeamWinning(optimalBracket, picksBracket, teamName, targetRound, teamsData, aliveTeams);
-        
-        // Add opponents to the processing stack
-        for (const opponent of opponents) {
-            if (!processed.has(opponent.teamName) && aliveTeams.has(opponent.teamName)) {
-                toProcess.push(opponent);
-            }
-        }
-    }
-    
-    return optimalBracket;
-}
-
-/**
- * Get all teams the participant picked to reach a specific round that are still alive
- */
-function getPicksAtRound(picksBracket, round, aliveTeams) {
-    const teams = [];
-    
-    if (round === 6) {
-        // Championship winner
-        const champ = picksBracket.round6?.[0]?.winner?.name;
-        if (champ && aliveTeams.has(champ)) teams.push(champ);
-    } else if (round === 5) {
-        // Finalists (winners of round 5)
-        for (const game of picksBracket.round5 || []) {
-            if (game?.winner?.name && aliveTeams.has(game.winner.name)) {
-                teams.push(game.winner.name);
-            }
-        }
-    } else {
-        // For earlier rounds, get winners of that round
-        const roundKey = `round${round}`;
-        for (const game of picksBracket[roundKey] || []) {
-            if (game?.winner?.name && aliveTeams.has(game.winner.name)) {
-                teams.push(game.winner.name);
-            }
-        }
-    }
-    
-    return [...new Set(teams)]; // Remove duplicates
-}
-
-/**
- * Find the furthest round a team reaches in the participant's bracket
- */
-function getFurthestRound(picksBracket, teamName) {
-    // Check from championship down
-    if (picksBracket.round6?.[0]?.winner?.name === teamName) return 6;
-    
-    for (let round = 5; round >= 1; round--) {
-        const roundKey = `round${round}`;
-        for (const game of picksBracket[roundKey] || []) {
-            if (game?.winner?.name === teamName) return round;
-        }
-    }
-    
-    return 0;
-}
-
-/**
- * Mark a team as winning all their games up to targetRound in the optimal bracket.
- * Returns list of opponents that should be processed next.
- */
-function markTeamWinning(optimalBracket, picksBracket, teamName, targetRound, teamsData, aliveTeams) {
-    const opponents = [];
-    
-    // Find which games this team needs to win
-    for (let round = 1; round <= targetRound; round++) {
-        const roundKey = `round${round}`;
-        const optimalGames = optimalBracket[roundKey] || [];
-        const picksGames = picksBracket[roundKey] || [];
-        
-        for (let i = 0; i < optimalGames.length; i++) {
-            const game = optimalGames[i];
-            const pickGame = picksGames[i];
-            
-            if (!game || game.winner) continue; // Already decided
-            
-            // Check if this team is in this game (or should be)
-            const team1Name = game.team1?.name;
-            const team2Name = game.team2?.name;
-            
-            if (team1Name === teamName || team2Name === teamName) {
-                // This team is in this game - mark them as winner
-                game.winner = teamsData[teamName] || { name: teamName };
-                
-                // Find who the participant picked as opponent and add to process list
-                if (pickGame?.team1?.name && pickGame.team1.name !== teamName && aliveTeams.has(pickGame.team1.name)) {
-                    const oppFurthest = getFurthestRoundInPath(picksBracket, pickGame.team1.name, round);
-                    opponents.push({ teamName: pickGame.team1.name, targetRound: Math.min(oppFurthest, round) });
-                }
-                if (pickGame?.team2?.name && pickGame.team2.name !== teamName && aliveTeams.has(pickGame.team2.name)) {
-                    const oppFurthest = getFurthestRoundInPath(picksBracket, pickGame.team2.name, round);
-                    opponents.push({ teamName: pickGame.team2.name, targetRound: Math.min(oppFurthest, round) });
-                }
-                
-                // Propagate winner to next round
-                propagateWinner(optimalBracket, round, i, teamsData[teamName] || { name: teamName });
-                
-                break; // Found the game, move to next round
-            }
-            
-            // Check if team needs to be placed in this game (team slot is empty but team should be here)
-            if (!team1Name || !team2Name) {
-                // Check if participant's bracket has this team in this game
-                const pickTeam1 = pickGame?.team1?.name;
-                const pickTeam2 = pickGame?.team2?.name;
-                
-                if (pickTeam1 === teamName || pickTeam2 === teamName) {
-                    // Place the team and mark as winner
-                    if (!team1Name && pickTeam1 === teamName) {
-                        game.team1 = teamsData[teamName] || { name: teamName };
-                    } else if (!team2Name && pickTeam2 === teamName) {
-                        game.team2 = teamsData[teamName] || { name: teamName };
-                    }
-                    game.winner = teamsData[teamName] || { name: teamName };
-                    
-                    // Add opponent from picks
-                    const oppName = pickTeam1 === teamName ? pickTeam2 : pickTeam1;
-                    if (oppName && aliveTeams.has(oppName)) {
-                        const oppFurthest = getFurthestRoundInPath(picksBracket, oppName, round);
-                        opponents.push({ teamName: oppName, targetRound: Math.min(oppFurthest, round) });
-                    }
-                    
-                    propagateWinner(optimalBracket, round, i, teamsData[teamName] || { name: teamName });
-                    break;
-                }
-            }
-        }
-    }
-    
-    return opponents;
-}
-
-/**
- * Get the furthest round a team reaches in picks, but capped at maxRound
- */
-function getFurthestRoundInPath(picksBracket, teamName, maxRound) {
-    for (let round = maxRound; round >= 1; round--) {
-        const roundKey = `round${round}`;
-        for (const game of picksBracket[roundKey] || []) {
-            if (game?.winner?.name === teamName) return round;
-        }
-    }
-    return 1;
-}
-
-/**
- * Propagate a winner to the next round's game
- */
-function propagateWinner(bracket, currentRound, gameIndex, winner) {
-    if (currentRound >= 6) return;
-    
-    const nextRound = currentRound + 1;
-    const nextRoundKey = `round${nextRound}`;
-    const nextGameIndex = Math.floor(gameIndex / 2);
-    const isFirstTeam = gameIndex % 2 === 0;
-    
-    const nextGame = bracket[nextRoundKey]?.[nextGameIndex];
-    if (!nextGame) return;
-    
-    if (isFirstTeam) {
-        nextGame.team1 = winner;
-    } else {
-        nextGame.team2 = winner;
     }
 }
