@@ -956,15 +956,19 @@ class MergeCandidateTracker:
         return self.probabilities
 
 
-def merge_outcomes(outcomes_with_probs: Dict[str, float]) -> Dict[str, float]:
+def merge_outcomes(outcomes_with_probs: Dict[str, float], 
+                   remaining_games: List[Tuple[str, int]] = None) -> Dict[str, float]:
     """
-    Iteratively merge outcomes that differ by exactly 1 position.
-    Uses greedy approach: always merge the pair with highest combined probability.
+    Merge outcomes by processing rounds in order (earliest first).
+    Exhaustively merges all pairs that differ by exactly 1 position at each round level
+    before moving to the next round.
     
-    Optimized O(N * L) algorithm using incremental group maintenance and priority queue.
+    This approach guarantees maximal simplification due to the bracket's hierarchical structure.
     
     Args:
         outcomes_with_probs: Dict mapping outcome strings to their probabilities
+        remaining_games: List of (round_key, game_index) tuples indicating which games 
+                        each position in the outcome string represents
         
     Returns:
         Dict of merged outcomes with combined probabilities
@@ -972,27 +976,121 @@ def merge_outcomes(outcomes_with_probs: Dict[str, float]) -> Dict[str, float]:
     if len(outcomes_with_probs) <= 1:
         return dict(outcomes_with_probs)
     
-    tracker = MergeCandidateTracker(outcomes_with_probs)
-    merge_count = 0
+    current_outcomes = dict(outcomes_with_probs)
+    outcome_length = len(next(iter(current_outcomes)))
     
-    while True:
-        best = tracker.get_best_merge()
-        if best is None:
-            break
+    # If no remaining_games provided, fall back to merging all positions together
+    if remaining_games is None:
+        positions_by_round = {1: list(range(outcome_length))}
+    else:
+        # Group positions by round number
+        positions_by_round = {}
+        for pos, (round_key, game_idx) in enumerate(remaining_games):
+            round_num = int(round_key.replace('round', ''))
+            if round_num not in positions_by_round:
+                positions_by_round[round_num] = []
+            positions_by_round[round_num].append(pos)
+    
+    total_merge_count = 0
+    
+    # Process rounds in order (1, 2, 3, 4, 5, 6)
+    for round_num in sorted(positions_by_round.keys()):
+        positions = positions_by_round[round_num]
+        round_merge_count = 0
         
-        out1, out2, pos, combined_prob = best
-        tracker.perform_merge(out1, out2, pos)
-        merge_count += 1
+        # Exhaustively merge at positions in this round until no more merges possible
+        changed = True
+        while changed:
+            changed = False
+            new_outcomes = {}
+            merged_away = set()  # Track outcomes that got merged
+            
+            # Build groups for positions in this round
+            # groups[pos][key] = list of outcomes that share this merge key at position pos
+            groups = {pos: {} for pos in positions}
+            
+            for outcome in current_outcomes:
+                if outcome in merged_away:
+                    continue
+                for pos in positions:
+                    if outcome[pos] in ('X', 'D'):
+                        continue  # Skip already merged positions
+                    key = get_merge_key(outcome, pos)
+                    if key not in groups[pos]:
+                        groups[pos][key] = []
+                    groups[pos][key].append(outcome)
+            
+            # Find and perform all valid merges at this round level
+            for pos in positions:
+                for key, members in groups[pos].items():
+                    if len(members) < 2:
+                        continue
+                    
+                    # Find pairs that can actually merge (differ only at this position)
+                    # Group by their pattern excluding this position
+                    i = 0
+                    while i < len(members) - 1:
+                        out1 = members[i]
+                        if out1 in merged_away:
+                            i += 1
+                            continue
+                        
+                        # Look for a merge partner
+                        found_partner = False
+                        for j in range(i + 1, len(members)):
+                            out2 = members[j]
+                            if out2 in merged_away:
+                                continue
+                            
+                            # Check if they can merge (differ only at pos)
+                            merge_pos = can_merge_outcomes(out1, out2)
+                            if merge_pos == pos:
+                                # Perform the merge
+                                merged = merge_two_outcomes(out1, out2, pos)
+                                prob1 = current_outcomes.get(out1, 0)
+                                prob2 = current_outcomes.get(out2, 0)
+                                
+                                # Add to new outcomes (accumulate if already exists)
+                                if merged in new_outcomes:
+                                    new_outcomes[merged] += prob1 + prob2
+                                elif merged in current_outcomes and merged not in merged_away:
+                                    new_outcomes[merged] = current_outcomes[merged] + prob1 + prob2
+                                    merged_away.add(merged)  # Will be replaced
+                                else:
+                                    new_outcomes[merged] = prob1 + prob2
+                                
+                                merged_away.add(out1)
+                                merged_away.add(out2)
+                                round_merge_count += 1
+                                changed = True
+                                found_partner = True
+                                break
+                        
+                        if not found_partner:
+                            i += 1
+                        else:
+                            i += 1
+            
+            # Update current_outcomes: keep unmerged, add newly merged
+            updated_outcomes = {}
+            for outcome, prob in current_outcomes.items():
+                if outcome not in merged_away:
+                    updated_outcomes[outcome] = prob
+            for outcome, prob in new_outcomes.items():
+                if outcome in updated_outcomes:
+                    updated_outcomes[outcome] += prob
+                else:
+                    updated_outcomes[outcome] = prob
+            
+            current_outcomes = updated_outcomes
         
-        # Progress update for large merges
-        if merge_count % 500 == 0:
-            remaining = len(tracker.valid_outcomes)
-            print(f"    ... merged {merge_count} pairs, {remaining} outcomes remaining")
+        if round_merge_count > 0:
+            total_merge_count += round_merge_count
     
-    if merge_count > 0:
-        print(f"    Merged {merge_count} outcome pairs")
+    if total_merge_count > 0:
+        print(f"    Merged {total_merge_count} outcome pairs")
     
-    return tracker.get_results()
+    return current_outcomes
 
 
 def get_top_scenarios(outcomes_with_probs: Dict[str, float], max_scenarios: int) -> List[Tuple[str, float]]:
@@ -1190,8 +1288,8 @@ def process_outcomes(
         
         print(f"  Processing {name}: {len(outcomes)} raw {outcome_type} outcomes")
         
-        # Merge similar outcomes
-        merged = merge_outcomes(outcomes)
+        # Merge similar outcomes (using round-by-round approach)
+        merged = merge_outcomes(outcomes, remaining_games)
         print(f"    After merging: {len(merged)} outcomes")
         
         # Get top scenarios

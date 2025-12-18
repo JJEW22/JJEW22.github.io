@@ -596,6 +596,16 @@
     function optimalBracketToScenario(optimalBracket) {
         if (!optimalBracket) return null;
         
+        // New format: optimal bracket already has games array, probability, outcome, etc.
+        if (optimalBracket.games && Array.isArray(optimalBracket.games)) {
+            return {
+                games: optimalBracket.games,
+                probability: optimalBracket.probability || 1,
+                outcome: optimalBracket.outcome
+            };
+        }
+        
+        // Legacy format: optimal bracket has round1, round2, etc. keys
         const games = [];
         
         for (let round = 1; round <= 6; round++) {
@@ -662,6 +672,22 @@
      * Check if current scenario is a losing scenario (for styling)
      */
     $: isLosingScenario = typeof selectedScenario === 'string' && selectedScenario.startsWith('losing-');
+    
+    /**
+     * Format a probability for display.
+     * - 2 decimal places for normal values
+     * - Scientific notation for values < 0.01%
+     * - Returns "-" for null/undefined
+     */
+    function formatProbability(prob) {
+        if (prob === null || prob === undefined) return '-';
+        const pct = prob * 100;
+        if (pct < 0.01 && pct > 0) {
+            // Use scientific notation for very small probabilities
+            return pct.toExponential(1) + '%';
+        }
+        return pct.toFixed(2) + '%';
+    }
     
     function handleNextGameClick(event) {
         const { gameKey } = event.detail;
@@ -788,18 +814,10 @@
                                         {/if}
                                     </td>
                                     <td class="win-prob">
-                                        {#if entry.winProbability !== null}
-                                            {(entry.winProbability * 100).toFixed(1)}%
-                                        {:else}
-                                            -
-                                        {/if}
+                                        {formatProbability(entry.winProbability)}
                                     </td>
                                     <td class="lose-prob">
-                                        {#if entry.loseProbability !== null}
-                                            {(entry.loseProbability * 100).toFixed(1)}%
-                                        {:else}
-                                            -
-                                        {/if}
+                                        {formatProbability(entry.loseProbability)}
                                     </td>
                                     <td class="avg-place">
                                         {#if entry.averagePlace !== null}
@@ -845,11 +863,11 @@
                             <label for="scenario-select">Scenario:</label>
                             <select id="scenario-select" bind:value={selectedScenario} class:losing-selected={typeof selectedScenario === 'string' && selectedScenario.startsWith('losing-')}>
                                 <option value={null}>-- None --</option>
-                                <option value="optimal">Optimal Bracket (Max Possible)</option>
+                                <option value="optimal">⭐ Optimal Bracket (Max Possible Score)</option>
                                 {#if winningScenarios[selectedParticipant]?.length > 0}
                                     <optgroup label="🏆 Winning Scenarios">
                                         {#each winningScenarios[selectedParticipant] as scenario, i}
-                                            <option value={`winning-${i}`} class="winning-option">Win {i + 1} - {getScenarioChampion(scenario)} wins ({(scenario.probability * 100).toFixed(1)}%)</option>
+                                            <option value={`winning-${i}`} class="winning-option">Win {i + 1} - {getScenarioChampion(scenario)} wins ({formatProbability(scenario.probability)})</option>
                                         {/each}
                                     </optgroup>
                                 {:else}
@@ -858,7 +876,7 @@
                                 {#if losingScenarios[selectedParticipant]?.length > 0}
                                     <optgroup label="💀 Losing Scenarios">
                                         {#each losingScenarios[selectedParticipant] as scenario, i}
-                                            <option value={`losing-${i}`} class="losing-option">Lose {i + 1} - {getScenarioChampion(scenario)} wins ({(scenario.probability * 100).toFixed(1)}%)</option>
+                                            <option value={`losing-${i}`} class="losing-option">Lose {i + 1} - {getScenarioChampion(scenario)} wins ({formatProbability(scenario.probability)})</option>
                                         {/each}
                                     </optgroup>
                                 {/if}

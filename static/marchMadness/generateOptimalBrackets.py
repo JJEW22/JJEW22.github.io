@@ -38,7 +38,7 @@ from MarchMadnessProbabilities import (
     load_teams,
     get_winner_name,
     get_team_name,
-    merge_winning_outcomes,
+    merge_outcomes,
     decode_merged_outcome_to_games,
     calculate_outcome_probability,
     find_remaining_games,
@@ -462,10 +462,11 @@ def step4_merge_and_probability(max_outcomes, simulation_games, dead_games,
     if len(max_outcomes) == 1:
         merged_outcome = list(max_outcomes.keys())[0]
     else:
-        # Use merge_winning_outcomes - need to give them equal probabilities for merging
+        # Use merge_outcomes - need to give them equal probabilities for merging
         # (we'll compute actual probability after)
         outcomes_with_probs = {outcome: 1.0 for outcome in max_outcomes.keys()}
-        merged_dict = merge_winning_outcomes(outcomes_with_probs)
+        # Pass simulation_games for round-by-round merging
+        merged_dict = merge_outcomes(outcomes_with_probs, simulation_games)
         
         # Should result in one merged outcome (or multiple if they can't be merged)
         # Take the one with highest "probability" (most merged)
