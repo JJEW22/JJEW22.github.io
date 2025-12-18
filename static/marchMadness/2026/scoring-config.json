@@ -1,6 +1,6 @@
 {
-  "scoreForRound": [0, 10, 20, 30, 50, 80, 130],
-  "seedFactor": [0, 1, 2, 3, 4, 5, 6],
+  "scoreForRound": [0, 20, 35, 50, 80, 130, 210],
+  "seedFactor": [0, 2, 5, 8, 11, 14, 17],
   "roundNames": [
     "",
     "Round of 64",
