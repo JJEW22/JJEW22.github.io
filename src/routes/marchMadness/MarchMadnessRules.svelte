@@ -45,71 +45,67 @@
     </div>
 {:else if config}
     <div class="rules-container" class:compact>
-        <h2 class="rules-title">Scoring Rules</h2>
+        <h2 class="rules-title">Its the Rules</h2>
         
         <section class="rules-section">
             <h3>Base Points per Round</h3>
             <p class="rules-description">{config.description.baseScoring}</p>
+            <h3>Underdog Points</h3>
+            <p class="rules-description">{config.description.underdogPoints}</p>
             <table class="scoring-table">
                 <thead>
                     <tr>
                         <th>Round</th>
-                        <th>Points per Correct Pick</th>
                         <th>Games</th>
-                        <th>Max Points</th>
+                        <th>Points Correct Pick</th>
+                        <th>Seed Factor</th>
                     </tr>
                 </thead>
                 <tbody>
                     {#each config.roundNames as roundName, i}
                         {#if i > 0}
+                            {@const factor = config.seedFactor[i]}        
                             {@const gamesInRound = Math.pow(2, 6 - i)}
                             {@const maxForRound = config.scoreForRound[i] * gamesInRound}
                             <tr>
                                 <td class="round-name">{roundName}</td>
-                                <td class="points">{config.scoreForRound[i]}</td>
                                 <td class="games">{gamesInRound}</td>
-                                <td class="max-points">{maxForRound}</td>
+                                <td class="points">{config.scoreForRound[i]}</td>
+                                <td class="factor">×{factor}</td>
                             </tr>
                         {/if}
                     {/each}
-                    <tr class="total-row">
+                    <!-- <tr class="total-row">
                         <td class="round-name"><strong>Total</strong></td>
                         <td></td>
                         <td class="games"><strong>63</strong></td>
                         <td class="max-points"><strong>{maxBasePoints}</strong></td>
-                    </tr>
+                    </tr> -->
                 </tbody>
             </table>
         </section>
         
         <section class="rules-section">
-            <h3>Upset Bonus</h3>
-            <p class="rules-description">{config.description.upsetBonus}</p>
+            <h3>Star Bonuses</h3>
+            <p class="rules-description">{config.description.starBonus}</p>
             <table class="scoring-table">
                 <thead>
                     <tr>
-                        <th>Round</th>
-                        <th>Seed Factor</th>
-                        <th>Example</th>
+                        <th>Number of winners</th>
+                        <th>points</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {#each config.roundNames as roundName, i}
-                        {#if i > 0}
-                            {@const factor = config.seedFactor[i]}
-                            {@const exampleBonus = factor * 5}
-                            <tr>
-                                <td class="round-name">{roundName}</td>
-                                <td class="factor">×{factor}</td>
-                                <td class="example">
-                                    {#if factor > 0}
-                                        12 beats 5 → +{exampleBonus} pts
-                                    {:else}
-                                        No bonus
-                                    {/if}
-                                </td>
-                            </tr>
-                        {/if}
+                    {#each config.starBonus as starAmount, i}
+                        <tr>
+                            {#if i + 1 === config.starBonus.length}
+                                <td>{i + 1}+</td>
+                                <td>{starAmount}</td>
+                            {:else}
+                                <td>{i + 1}</td>
+                                <td>{starAmount}</td>
+                            {/if}
+                        </tr>
                     {/each}
                 </tbody>
             </table>

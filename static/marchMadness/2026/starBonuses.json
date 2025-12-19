@@ -1,17 +1,32 @@
 [
     {
         "name": "Golden Boy",
+        "round": 1,
         "reason": "has the most potential points at the beginning (effectively underdog picker)",
-        "Winners": ["Jack"]
+        "Winners": ["Alice"]
     },
     {
-        "name": "short end of the stick",
+        "name": "shortest stick",
+        "round": 1,
         "reason": "has the lowest probability of winning at the beginning",
-        "Winners": ["Jack"]
+        "Winners": ["Bob", "Dana"]
     },
     {
-        "name": "nerd",
-        "reason": "awarded for finding something in the rules, if no one finds it jack wins",
-        "Winners": ["Jack"]
+        "name": "nerd/loner",
+        "round": 1,
+        "reason": "awarded for finding something in the rules before the first game, if no one finds it jack wins",
+        "Winners": ["EVE"]
+    },
+    {
+        "name": "testing",
+        "round": 2,
+        "reason": "awarded for finding something in the rules before the first game, if no one finds it jack wins",
+        "Winners": ["Bob", "eve", "charlie"]
+    },
+    {
+        "name": "Joever",
+        "round": "unknown",
+        "reason": "awarded to the first person elmenated",
+        "Winners": ["EVE"]
     }
 ]
