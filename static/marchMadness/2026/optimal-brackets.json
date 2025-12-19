@@ -410,7 +410,7 @@
         "winnerEitherTeams": null
       }
     ],
-    "max_score": 1180,
+    "max_score": 2060,
     "num_tied_outcomes": 4
   },
   "bob": {
@@ -1154,7 +1154,7 @@
         ]
       }
     ],
-    "max_score": 468,
+    "max_score": 847,
     "num_tied_outcomes": 8
   },
   "dana": {
@@ -1572,7 +1572,7 @@
         "winnerEitherTeams": null
       }
     ],
-    "max_score": 897,
+    "max_score": 1610,
     "num_tied_outcomes": 8
   },
   "eve": {
@@ -1950,7 +1950,7 @@
         "team2IsEither": null
       }
     ],
-    "max_score": 469,
+    "max_score": 869,
     "num_tied_outcomes": 4
   }
 }

@@ -96,6 +96,71 @@ def load_scoring_config(config_path: str = None) -> bool:
     )
 
 
+def load_star_bonuses(star_bonuses_path: str, scoring_config_path: str = None) -> Dict[str, int]:
+    """
+    Load star bonuses from JSON file and calculate total bonus points per participant.
+    
+    Args:
+        star_bonuses_path: Path to starBonuses.json file
+        scoring_config_path: Path to scoring-config.json (for starBonus points array)
+        
+    Returns:
+        Dict mapping participant name (lowercase) to total star bonus points
+    """
+    if not os.path.exists(star_bonuses_path):
+        print(f"No star bonuses file found at {star_bonuses_path}")
+        return {}
+    
+    # Load star bonuses
+    with open(star_bonuses_path, 'r', encoding='utf-8') as f:
+        star_bonuses = json.load(f)
+    
+    # Load scoring config to get starBonus points array
+    star_bonus_points = [25, 20, 15, 10, 5]  # Default values
+    
+    if scoring_config_path and os.path.exists(scoring_config_path):
+        with open(scoring_config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            if 'starBonus' in config:
+                star_bonus_points = config['starBonus']
+    
+    # Calculate points per participant
+    participant_points = {}
+    
+    for award in star_bonuses:
+        winners = award.get('Winners', [])
+        if not winners:
+            continue
+        
+        # Check if this is a split award (name contains "/" and Winners[0] is an array)
+        is_split = award.get('name', '').find('/') != -1 and isinstance(winners[0] if winners else None, list)
+        
+        if is_split:
+            # Split award: total winners is sum of all sublists
+            total_winners = sum(len(w) if isinstance(w, list) else 0 for w in winners)
+            points_per_winner = star_bonus_points[min(total_winners - 1, len(star_bonus_points) - 1)] if total_winners > 0 else 0
+            
+            # Award points to each winner in each sublist
+            for winner_list in winners:
+                if isinstance(winner_list, list):
+                    for winner in winner_list:
+                        name_lower = winner.lower()
+                        participant_points[name_lower] = participant_points.get(name_lower, 0) + points_per_winner
+        else:
+            # Regular award
+            winner_count = len(winners)
+            points_per_winner = star_bonus_points[min(winner_count - 1, len(star_bonus_points) - 1)] if winner_count > 0 else 0
+            
+            for winner in winners:
+                name_lower = winner.lower()
+                participant_points[name_lower] = participant_points.get(name_lower, 0) + points_per_winner
+    
+    if participant_points:
+        print(f"Loaded star bonuses: {participant_points}")
+    
+    return participant_points
+
+
 # Round keys in order
 ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
 
@@ -1789,6 +1854,7 @@ def main():
                        help=f'Maximum scenarios to keep per participant (for both winning and losing). Default: {DEFAULT_MAX_SCENARIOS}')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducible results')
     parser.add_argument('--config', default=None, help='Path to scoring-config.json file')
+    parser.add_argument('--star-bonuses', default=None, help='Path to starBonuses.json file')
     
     args = parser.parse_args()
     
@@ -1803,6 +1869,17 @@ def main():
     # Load seed probabilities from default location
     load_seed_probabilities()
     print(f"Probability method: {SEED_PROB_METHOD}")
+    
+    # Load star bonuses if provided
+    bonus_stars = {}
+    if args.star_bonuses:
+        bonus_stars = load_star_bonuses(args.star_bonuses, args.config)
+    else:
+        # Try to find starBonuses.json in same directory as results
+        results_dir = os.path.dirname(args.results)
+        default_star_path = os.path.join(results_dir, 'starBonuses.json')
+        if os.path.exists(default_star_path):
+            bonus_stars = load_star_bonuses(default_star_path, args.config)
     
     # Get participants
     if args.participants:
@@ -1831,6 +1908,16 @@ def main():
     print(f"\nCalculating win probabilities for {len(participants)} participants...")
     print(f"Participants: {participants}")
     
+    # Convert bonus_stars keys to match participant names (case-insensitive lookup)
+    participant_bonuses = {}
+    for name in participants:
+        name_lower = name.lower()
+        if name_lower in bonus_stars:
+            participant_bonuses[name] = bonus_stars[name_lower]
+    
+    if participant_bonuses:
+        print(f"Star bonuses applied: {participant_bonuses}")
+    
     # Calculate probabilities
     (win_probabilities, lose_probabilities, average_places, 
      winning_scenarios, losing_scenarios, next_game_prefs) = calculate_win_probabilities(
@@ -1840,7 +1927,8 @@ def main():
         teams_file=args.teams or '',
         apply_seed_bonus=not args.no_seed_bonus,
         max_simulations=args.max_simulations,
-        max_scenarios=args.max_scenarios
+        max_scenarios=args.max_scenarios,
+        bonus_stars=participant_bonuses
     )
     
     # Save to JSON (include all probabilities, scenarios, and preferences)
