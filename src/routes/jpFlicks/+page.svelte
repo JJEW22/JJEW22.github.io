@@ -3,7 +3,9 @@
     import * as XLSX from 'xlsx';
     import Collapsible from '$lib/Collapsible.svelte';
     import HallOfFame from '$lib/HallOfFame.svelte';
-    import jpflicksImage from '$lib/assets/favicon.svg';
+    import brownJPFlicksLogo from '$lib/assets/brownJPFlicksLogo.svg';
+    import patternColorLogo from '$lib/assets/colorJPFlicksCollisionLogo-pattern.svg';
+    import patternBrownLogo from '$lib/assets/brownJPFlicksCollisionLogo-pattern.svg';
     import '../../app.css';
     
     // Data storage
@@ -15,6 +17,18 @@
     let teams_info = undefined; // will store all the teams info
     let tournamentPoints = {}; // will store tournament points per team
     $: teamsWithRanking = undefined;
+    
+    // Page background element
+    let pageBackground;
+    
+    // Set background on mount - smaller icons with more whitespace, diagonal pattern
+    $: if (pageBackground) {
+        pageBackground.style.backgroundImage = `url(${patternColorLogo}), url(${patternBrownLogo})`;
+        // Offset the second logo diagonally (not a perfect grid)
+        pageBackground.style.backgroundPosition = '0 0, 90px 60px';
+        pageBackground.style.backgroundSize = '150px 150px, 150px 150px';
+        pageBackground.style.backgroundRepeat = 'repeat';
+    }
 
     const WIN_SCORE = 2;
     const TIES_SCORE = 1;
@@ -801,9 +815,11 @@
     <title>JP Flicks</title>
     <meta name="description" content="Crokinole better than ever">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta property="og:image" content="{jpflicksImage}">
+    <meta property="og:image" content={brownJPFlicksLogo}>
+    <link rel="icon" type="image/svg+xml" href={brownJPFlicksLogo}>
 </svelte:head>
 
+<div class="page-background" bind:this={pageBackground}>
 <div class="container">
     <nav class="breadcrumb">
         <a href="/">← Back to Home</a>
@@ -1266,8 +1282,16 @@
         {/if}
     </main>
 </div>
+</div>
 
 <style>
+    /* Page background with repeating logo pattern */
+    .page-background {
+        min-height: 100vh;
+        background-color: #4a9b9b;
+        background-repeat: repeat;
+        padding: 1rem 0;
+    }
 
    /* Center tables on ALL screen sizes - more specific selector */
     .table-wrapper,
