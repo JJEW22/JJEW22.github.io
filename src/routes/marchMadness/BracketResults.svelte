@@ -24,11 +24,12 @@
     const RESULTS_FILE = `/marchMadness/${YEAR}/results-bracket-march-madness-${YEAR}`;
     const OPTIMAL_BRACKETS_FILE = `/marchMadness/${YEAR}/optimal-brackets.json`;
     const SCORING_CONFIG_FILE = `/marchMadness/${YEAR}/scoring-config.json`;
+    const STAR_BONUSES_FILE = `/marchMadness/${YEAR}/starBonuses.json`;
     
     // State
     let loading = true;
     let error = null;
-    let activeTab = 'standings'; // 'standings', 'brackets', 'stakes', 'rules'
+    let activeTab = 'standings'; // 'standings', 'brackets', 'stakes', 'stars', 'rules'
     
     // Data
     let teams = {};  // Map of team name -> team data
@@ -50,10 +51,16 @@
     let nextGamePreferences = {};  // Map of game key -> preferences per participant
     let optimalBrackets = {};  // Map of name -> optimal bracket for max possible score
     
+    // Star bonus data
+    let scoringConfig = null;  // Full scoring config including starBonus array
+    let starBonuses = [];  // Array of star bonus awards
+    let participantStarPoints = {};  // Map of name -> total star points
+    let participantAwardCount = {};  // Map of name -> number of awards won
+    
     onMount(async () => {
         try {
             // Load scoring config first
-            await loadScoringConfig(SCORING_CONFIG_FILE);
+            await loadScoringConfigData();
             
             await loadTeams();
             await loadResults();
@@ -61,6 +68,8 @@
             await loadAllBrackets();
             await loadWinProbabilities();
             await loadOptimalBrackets();
+            await loadStarBonuses();
+            calculateStarPoints();
             calculateStandings();
             findUpcomingGames();
             calculateStakes();
@@ -71,6 +80,189 @@
             loading = false;
         }
     });
+    
+    async function loadScoringConfigData() {
+        await loadScoringConfig(SCORING_CONFIG_FILE);
+        // Also fetch the full config for starBonus array
+        try {
+            const response = await fetch(SCORING_CONFIG_FILE);
+            if (response.ok) {
+                scoringConfig = await response.json();
+            }
+        } catch (e) {
+            console.warn('Could not load scoring config for star bonuses');
+        }
+    }
+    
+    async function loadStarBonuses() {
+        try {
+            const response = await fetch(STAR_BONUSES_FILE);
+            if (response.ok) {
+                starBonuses = await response.json();
+            }
+        } catch (e) {
+            console.log('No star bonuses file found');
+            starBonuses = [];
+        }
+    }
+    
+    /**
+     * Calculate star points for each participant based on awards won
+     */
+    function calculateStarPoints() {
+        participantStarPoints = {};
+        participantAwardCount = {};
+        
+        // Initialize all participants
+        participants.forEach(name => {
+            participantStarPoints[name.toLowerCase()] = 0;
+            participantAwardCount[name.toLowerCase()] = 0;
+        });
+        
+        if (!scoringConfig?.starBonus || !starBonuses.length) return;
+        
+        const starBonusPoints = scoringConfig.starBonus;
+        
+        for (const award of starBonuses) {
+            if (!award.Winners || award.Winners.length === 0) continue;
+            
+            const winnerCount = award.Winners.length;
+            // Points based on number of winners (array is 0-indexed, so winnerCount-1)
+            const pointsPerWinner = starBonusPoints[Math.min(winnerCount - 1, starBonusPoints.length - 1)] || 0;
+            
+            for (const winner of award.Winners) {
+                const normalizedName = winner.toLowerCase();
+                if (participantStarPoints[normalizedName] !== undefined) {
+                    participantStarPoints[normalizedName] += pointsPerWinner;
+                    participantAwardCount[normalizedName] += 1;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get star points for a participant (case-insensitive)
+     */
+    function getStarPoints(name) {
+        return participantStarPoints[name.toLowerCase()] || 0;
+    }
+    
+    /**
+     * Get award count for a participant (case-insensitive)
+     */
+    function getAwardCount(name) {
+        return participantAwardCount[name.toLowerCase()] || 0;
+    }
+    
+    /**
+     * Get all badges earned by a participant (case-insensitive)
+     */
+    function getEarnedBadges(name) {
+        const normalizedName = name.toLowerCase();
+        return starBonuses.filter(award => 
+            award.Winners?.some(winner => winner.toLowerCase() === normalizedName)
+        );
+    }
+    
+    /**
+     * Get points for an award based on number of winners
+     */
+    function getAwardPoints(winnerCount) {
+        if (!scoringConfig?.starBonus || winnerCount === 0) return 0;
+        const starBonusPoints = scoringConfig.starBonus;
+        return starBonusPoints[Math.min(winnerCount - 1, starBonusPoints.length - 1)] || 0;
+    }
+    
+    /**
+     * Group star bonuses by round
+     */
+    function getStarBonusesByRound() {
+        const grouped = {};
+        for (const award of starBonuses) {
+            const round = String(award.round);
+            if (!grouped[round]) {
+                grouped[round] = [];
+            }
+            grouped[round].push(award);
+        }
+        return grouped;
+    }
+    
+    /**
+     * Get sorted round keys for display
+     */
+    function getSortedRoundKeys(grouped) {
+        const keys = Object.keys(grouped);
+        return keys.sort((a, b) => {
+            // Numbers first, then "unknown"
+            const aNum = parseInt(a);
+            const bNum = parseInt(b);
+            if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+            if (!isNaN(aNum)) return -1;
+            if (!isNaN(bNum)) return 1;
+            return a.localeCompare(b);
+        });
+    }
+    
+    /**
+     * Get round display name
+     */
+    function getRoundDisplayName(round) {
+        const roundNum = parseInt(round);
+        if (!isNaN(roundNum) && scoringConfig?.roundNames?.[roundNum]) {
+            return `Round ${roundNum}: ${scoringConfig.roundNames[roundNum]}`;
+        }
+        if (round === 'unknown') return 'Unknown Round';
+        return `Round ${round}`;
+    }
+    
+    /**
+     * Generate a placeholder SVG badge for awards
+     * @param {string} name - Award name
+     * @param {boolean} earned - Whether the badge has been earned
+     */
+    function generatePlaceholderBadge(name, earned) {
+        // Generate a consistent color based on the award name
+        const colors = [
+            { primary: '#f59e0b', secondary: '#fbbf24', accent: '#d97706' }, // Gold
+            { primary: '#3b82f6', secondary: '#60a5fa', accent: '#2563eb' }, // Blue
+            { primary: '#10b981', secondary: '#34d399', accent: '#059669' }, // Green
+            { primary: '#8b5cf6', secondary: '#a78bfa', accent: '#7c3aed' }, // Purple
+            { primary: '#ef4444', secondary: '#f87171', accent: '#dc2626' }, // Red
+            { primary: '#ec4899', secondary: '#f472b6', accent: '#db2777' }, // Pink
+            { primary: '#06b6d4', secondary: '#22d3ee', accent: '#0891b2' }, // Cyan
+        ];
+        
+        // Pick color based on name hash
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = ((hash << 5) - hash) + name.charCodeAt(i);
+            hash = hash & hash;
+        }
+        const colorSet = colors[Math.abs(hash) % colors.length];
+        
+        // Get initials (up to 2 characters)
+        const initials = name.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('').slice(0, 2);
+        
+        const fillColor = earned ? colorSet.primary : '#9ca3af';
+        const strokeColor = earned ? colorSet.accent : '#6b7280';
+        const secondaryColor = earned ? colorSet.secondary : '#d1d5db';
+        
+        return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Outer ring -->
+            <circle cx="50" cy="50" r="46" fill="none" stroke="${strokeColor}" stroke-width="3"/>
+            <!-- Badge background -->
+            <circle cx="50" cy="50" r="42" fill="${fillColor}"/>
+            <!-- Inner highlight -->
+            <circle cx="50" cy="50" r="36" fill="${secondaryColor}" opacity="0.3"/>
+            <!-- Star decoration at top -->
+            <polygon points="50,8 52,14 58,14 53,18 55,24 50,20 45,24 47,18 42,14 48,14" fill="${earned ? '#fff' : '#e5e7eb'}" opacity="0.9"/>
+            <!-- Initials -->
+            <text x="50" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${earned ? '#fff' : '#6b7280'}">${initials}</text>
+            ${!earned ? `<!-- Lock overlay -->
+            <circle cx="50" cy="50" r="42" fill="rgba(0,0,0,0.3)"/>` : ''}
+        </svg>`;
+    }
     
     async function loadTeams() {
         const response = await fetch(TEAMS_FILE);
@@ -471,9 +663,15 @@
             // Calculate correct picks per round
             const picksPerRound = calculatePicksPerRound(resultsBracket, bracket);
             
+            // Get star bonus points
+            const starPoints = getStarPoints(name);
+            const totalScore = scoreResult.totalScore + starPoints;
+            
             standings.push({
                 name,
-                score: scoreResult.totalScore,
+                score: totalScore,
+                baseScore: scoreResult.totalScore,
+                starPoints: starPoints,
                 correctPicks: scoreResult.correctPicks,
                 seedBonus: scoreResult.seedBonus,
                 possibleRemaining: possibleRemainingResult.total,
@@ -776,6 +974,13 @@
             </button>
             <button 
                 class="tab" 
+                class:active={activeTab === 'stars'}
+                on:click={() => selectTab('stars')}
+            >
+                ⭐ Stars
+            </button>
+            <button 
+                class="tab" 
                 class:active={activeTab === 'rules'}
                 on:click={() => selectTab('rules')}
             >
@@ -794,6 +999,7 @@
                                 <th>Rank</th>
                                 <th>Name</th>
                                 <th>Score</th>
+                                <th>⭐ Stars</th>
                                 <th>Correct Picks</th>
                                 <th>Underdog</th>
                                 <th>Possible</th>
@@ -818,6 +1024,13 @@
                                         </button>
                                     </td>
                                     <td class="score">{entry.score}</td>
+                                    <td class="star-points">
+                                        {#if entry.starPoints > 0}
+                                            +{entry.starPoints}
+                                        {:else}
+                                            -
+                                        {/if}
+                                    </td>
                                     <td class="correct picks-breakdown">{formatPicksPerRound(entry.picksPerRound)}</td>
                                     <td class="underdog">{entry.seedBonus}</td>
                                     <td class="possible">
@@ -1006,6 +1219,119 @@
                             </div>
                         {/each}
                     {/if}
+                </div>
+            {:else if activeTab === 'stars'}
+                <div class="stars-view">
+                    <h2>⭐ Star Bonus Awards</h2>
+                    
+                    <!-- Summary Table -->
+                    <div class="stars-summary">
+                        <h3>Summary</h3>
+                        <table class="stars-summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Participant</th>
+                                    <th>Badges Earned</th>
+                                    <th>Star Points</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each participants.sort((a, b) => getStarPoints(b) - getStarPoints(a)) as name}
+                                    {@const earnedBadges = getEarnedBadges(name)}
+                                    <tr>
+                                        <td class="name">{name}</td>
+                                        <td class="badges-earned">
+                                            {#if earnedBadges.length > 0}
+                                                <div class="mini-badges">
+                                                    {#each earnedBadges as award}
+                                                        {@const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
+                                                        <div class="mini-badge" title={award.name}>
+                                                            <img 
+                                                                src="/marchMadness/{YEAR}/badges/{badgeSlug}.png" 
+                                                                alt={award.name}
+                                                                class="mini-badge-image"
+                                                                on:error={(e) => e.target.outerHTML = generatePlaceholderBadge(award.name, true)}
+                                                            />
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            {:else}
+                                                <span class="no-badges">—</span>
+                                            {/if}
+                                        </td>
+                                        <td class="points">
+                                            {#if getStarPoints(name) > 0}
+                                                +{getStarPoints(name)}
+                                            {:else}
+                                                0
+                                            {/if}
+                                        </td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Awards by Round -->
+                    <div class="awards-by-round">
+                        <h3>Awards by Round</h3>
+                        {#each getSortedRoundKeys(getStarBonusesByRound()) as roundKey}
+                            {@const roundAwards = getStarBonusesByRound()[roundKey]}
+                            <div class="round-section">
+                                <h4>{getRoundDisplayName(roundKey)}</h4>
+                                <div class="badges-grid">
+                                    {#each roundAwards as award}
+                                        {@const hasWinners = award.Winners && award.Winners.length > 0}
+                                        {@const winnerCount = award.Winners?.length || 0}
+                                        {@const awardPoints = getAwardPoints(winnerCount)}
+                                        {@const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
+                                        <div class="badge-card" class:earned={hasWinners} class:locked={!hasWinners}>
+                                            <div class="badge-image-container">
+                                                {#if hasWinners}
+                                                    <img 
+                                                        src="/marchMadness/{YEAR}/badges/{badgeSlug}.png" 
+                                                        alt={award.name}
+                                                        class="badge-image"
+                                                        on:error={(e) => e.target.src = `data:image/svg+xml,${encodeURIComponent(generatePlaceholderBadge(award.name, true))}`}
+                                                    />
+                                                {:else}
+                                                    <div class="badge-placeholder locked">
+                                                        {@html generatePlaceholderBadge(award.name, false)}
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                            
+                                            <div class="badge-info">
+                                                <div class="badge-header">
+                                                    <span class="badge-name">{award.name}</span>
+                                                    {#if hasWinners}
+                                                        <span class="badge-points">+{awardPoints}</span>
+                                                    {/if}
+                                                </div>
+                                                
+                                                {#if hasWinners}
+                                                    <div class="badge-winners">
+                                                        {award.Winners.join(', ')}
+                                                    </div>
+                                                    <div class="badge-reason">
+                                                        {award.reason}
+                                                    </div>
+                                                {:else}
+                                                    <div class="badge-locked-text">
+                                                        🔒 Not yet awarded
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/each}
+                        
+                        {#if starBonuses.length === 0}
+                            <p class="no-data">No star bonus awards configured.</p>
+                        {/if}
+                    </div>
                 </div>
             {:else if activeTab === 'rules'}
                 <div class="rules-view">
@@ -1443,9 +1769,257 @@
         font-weight: 500;
     }
     
+    /* Star points column styling */
+    .standings-table .star-points {
+        color: #b45309;
+        font-weight: 500;
+    }
+    
     /* Rules view */
     .rules-view {
         max-width: 800px;
         margin: 0 auto;
+    }
+    
+    /* Stars view */
+    .stars-view {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    
+    .stars-view h2 {
+        margin-bottom: 1.5rem;
+        color: #1f2937;
+    }
+    
+    .stars-view h3 {
+        font-size: 1.2rem;
+        color: #374151;
+        margin: 1.5rem 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    /* Stars Summary Table */
+    .stars-summary {
+        margin-bottom: 2rem;
+    }
+    
+    .stars-summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+    }
+    
+    .stars-summary-table th,
+    .stars-summary-table td {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .stars-summary-table th {
+        background: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .stars-summary-table .badges-earned {
+        padding: 0.5rem 1rem;
+    }
+    
+    .mini-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        align-items: center;
+    }
+    
+    .mini-badge {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+    }
+    
+    .mini-badge-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 50%;
+    }
+    
+    .mini-badge :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .no-badges {
+        color: #9ca3af;
+    }
+    
+    .stars-summary-table .points {
+        text-align: right;
+        font-weight: 600;
+        color: #b45309;
+    }
+    
+    /* Awards by Round */
+    .awards-by-round {
+        margin-bottom: 2rem;
+    }
+    
+    .round-section {
+        margin-bottom: 2rem;
+    }
+    
+    .round-section h4 {
+        font-size: 1rem;
+        color: #6b7280;
+        margin-bottom: 1rem;
+        font-weight: 500;
+    }
+    
+    /* Badge Grid */
+    .badges-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .badge-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: white;
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 2px solid #e5e7eb;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+    
+    .badge-card.earned {
+        border-color: #fbbf24;
+        background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+        box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2);
+    }
+    
+    .badge-card.earned:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(251, 191, 36, 0.3);
+    }
+    
+    .badge-card.locked {
+        opacity: 0.7;
+        filter: saturate(0.3);
+    }
+    
+    /* Badge Image */
+    .badge-image-container {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .badge-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 50%;
+    }
+    
+    .badge-placeholder {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .badge-placeholder :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+    
+    /* Badge Info */
+    .badge-info {
+        width: 100%;
+    }
+    
+    .badge-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .badge-name {
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 0.95rem;
+        line-height: 1.2;
+    }
+    
+    .badge-points {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+    
+    .badge-winners {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+    
+    .badge-reason {
+        font-size: 0.8rem;
+        color: #6b7280;
+        font-style: italic;
+        line-height: 1.4;
+        padding-top: 0.5rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .badge-locked-text {
+        color: #9ca3af;
+        font-size: 0.85rem;
+        padding: 0.25rem 0;
+    }
+    
+    /* Mobile responsive for stars view */
+    @media (max-width: 640px) {
+        .badges-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        
+        .badge-card {
+            padding: 1rem;
+        }
+        
+        .badge-image-container {
+            width: 60px;
+            height: 60px;
+        }
+        
+        .badge-name {
+            font-size: 0.85rem;
+        }
+        
+        .badge-reason {
+            font-size: 0.75rem;
+        }
+    }
+    
+    @media (max-width: 400px) {
+        .badges-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>

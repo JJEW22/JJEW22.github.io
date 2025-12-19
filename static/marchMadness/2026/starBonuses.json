@@ -2,7 +2,7 @@
     {
         "name": "Golden Boy",
         "round": 1,
-        "reason": "has the most potential points at the beginning (effectively underdog picker)",
+        "reason": "has the most potential",
         "Winners": ["Alice"]
     },
     {
@@ -15,13 +15,25 @@
         "name": "nerd/loner",
         "round": 1,
         "reason": "awarded for finding something in the rules before the first game, if no one finds it jack wins",
-        "Winners": ["EVE"]
+        "Winners": []
+    },
+    {
+        "name": "just cause",
+        "round": 1,
+        "reason": "Just cause I needed something to test with",
+        "Winners": ["Bob", "eve", "charlie"]
     },
     {
         "name": "testing",
         "round": 2,
-        "reason": "awarded for finding something in the rules before the first game, if no one finds it jack wins",
+        "reason": "testing",
         "Winners": ["Bob", "eve", "charlie"]
+    },
+    {
+        "name": "testing2",
+        "round": 3,
+        "reason": "another testing 1",
+        "Winners": []
     },
     {
         "name": "Joever",
