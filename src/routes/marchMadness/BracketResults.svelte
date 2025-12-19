@@ -126,15 +126,37 @@
         for (const award of starBonuses) {
             if (!award.Winners || award.Winners.length === 0) continue;
             
-            const winnerCount = award.Winners.length;
-            // Points based on number of winners (array is 0-indexed, so winnerCount-1)
-            const pointsPerWinner = starBonusPoints[Math.min(winnerCount - 1, starBonusPoints.length - 1)] || 0;
+            // Check if this is a split award (name contains "/")
+            const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners[0]);
             
-            for (const winner of award.Winners) {
-                const normalizedName = winner.toLowerCase();
-                if (participantStarPoints[normalizedName] !== undefined) {
-                    participantStarPoints[normalizedName] += pointsPerWinner;
-                    participantAwardCount[normalizedName] += 1;
+            if (isSplitAward) {
+                // Split award: Winners is array of arrays
+                // Total winner count is sum of all sublist lengths
+                const totalWinners = award.Winners.reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+                const pointsPerWinner = starBonusPoints[Math.min(totalWinners - 1, starBonusPoints.length - 1)] || 0;
+                
+                // Award points to each winner in each sublist
+                for (const winnerList of award.Winners) {
+                    if (!Array.isArray(winnerList)) continue;
+                    for (const winner of winnerList) {
+                        const normalizedName = winner.toLowerCase();
+                        if (participantStarPoints[normalizedName] !== undefined) {
+                            participantStarPoints[normalizedName] += pointsPerWinner;
+                            participantAwardCount[normalizedName] += 1;
+                        }
+                    }
+                }
+            } else {
+                // Regular award: Winners is flat array of names
+                const winnerCount = award.Winners.length;
+                const pointsPerWinner = starBonusPoints[Math.min(winnerCount - 1, starBonusPoints.length - 1)] || 0;
+                
+                for (const winner of award.Winners) {
+                    const normalizedName = winner.toLowerCase();
+                    if (participantStarPoints[normalizedName] !== undefined) {
+                        participantStarPoints[normalizedName] += pointsPerWinner;
+                        participantAwardCount[normalizedName] += 1;
+                    }
                 }
             }
         }
@@ -156,21 +178,147 @@
     
     /**
      * Get all badges earned by a participant (case-insensitive)
+     * For split awards, returns individual sub-awards the participant won
      */
     function getEarnedBadges(name) {
         const normalizedName = name.toLowerCase();
-        return starBonuses.filter(award => 
-            award.Winners?.some(winner => winner.toLowerCase() === normalizedName)
-        );
+        const earned = [];
+        
+        for (const award of starBonuses) {
+            if (!award.Winners || award.Winners.length === 0) continue;
+            
+            const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners[0]);
+            
+            if (isSplitAward) {
+                // Split award: check each sublist
+                const awardNames = award.name.split('/');
+                for (let i = 0; i < award.Winners.length; i++) {
+                    const winnerList = award.Winners[i];
+                    if (Array.isArray(winnerList) && winnerList.some(w => w.toLowerCase() === normalizedName)) {
+                        // This participant won this sub-award
+                        earned.push({
+                            name: awardNames[i] || `Award ${i + 1}`,
+                            originalAward: award,
+                            subIndex: i,
+                            isSplit: true
+                        });
+                    }
+                }
+            } else {
+                // Regular award
+                if (award.Winners.some(winner => winner.toLowerCase() === normalizedName)) {
+                    earned.push({
+                        name: award.name,
+                        originalAward: award,
+                        isSplit: false
+                    });
+                }
+            }
+        }
+        
+        return earned;
+    }
+    
+    /**
+     * Scroll to a badge card in the awards section
+     */
+    function scrollToBadge(badgeSlug) {
+        const element = document.getElementById(`badge-${badgeSlug}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add a brief highlight effect
+            element.classList.add('highlight-badge');
+            setTimeout(() => element.classList.remove('highlight-badge'), 1500);
+        }
     }
     
     /**
      * Get points for an award based on number of winners
+     * For split awards, pass the total count across all sublists
      */
     function getAwardPoints(winnerCount) {
         if (!scoringConfig?.starBonus || winnerCount === 0) return 0;
         const starBonusPoints = scoringConfig.starBonus;
         return starBonusPoints[Math.min(winnerCount - 1, starBonusPoints.length - 1)] || 0;
+    }
+    
+    /**
+     * Get total winner count for an award (handles split awards)
+     */
+    function getTotalWinnerCount(award) {
+        if (!award.Winners || award.Winners.length === 0) return 0;
+        
+        const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners[0]);
+        
+        if (isSplitAward) {
+            return award.Winners.reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+        } else {
+            return award.Winners.length;
+        }
+    }
+    
+    /**
+     * Check if an award has any winners (handles split awards)
+     */
+    function awardHasWinners(award) {
+        if (!award.Winners || award.Winners.length === 0) return false;
+        
+        const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners[0]);
+        
+        if (isSplitAward) {
+            return award.Winners.some(list => Array.isArray(list) && list.length > 0);
+        } else {
+            return award.Winners.length > 0;
+        }
+    }
+    
+    /**
+     * Prepare awards for display (keeps split awards together)
+     */
+    function prepareAwardsForDisplay(awards) {
+        return awards.map(award => {
+            const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners?.[0]);
+            
+            if (isSplitAward) {
+                const awardNames = award.name.split('/');
+                const totalWinners = getTotalWinnerCount(award);
+                const hasAnyWinners = award.Winners.some(list => Array.isArray(list) && list.length > 0);
+                
+                return {
+                    ...award,
+                    isSplit: true,
+                    splitNames: awardNames,
+                    totalWinnersForPoints: totalWinners,
+                    hasWinners: hasAnyWinners
+                };
+            } else {
+                return {
+                    ...award,
+                    isSplit: false,
+                    totalWinnersForPoints: award.Winners?.length || 0,
+                    hasWinners: award.Winners && award.Winners.length > 0
+                };
+            }
+        });
+    }
+    
+    /**
+     * Get display string for split award winners
+     */
+    function formatSplitWinners(award) {
+        if (!award.isSplit) return award.Winners?.join(', ') || '';
+        
+        const parts = [];
+        const awardNames = award.splitNames || award.name.split('/');
+        
+        for (let i = 0; i < awardNames.length; i++) {
+            const winners = award.Winners[i];
+            if (Array.isArray(winners) && winners.length > 0) {
+                parts.push(`${awardNames[i]}: ${winners.join(', ')}`);
+            }
+        }
+        
+        return parts.join(' | ');
     }
     
     /**
@@ -1243,16 +1391,20 @@
                                         <td class="badges-earned">
                                             {#if earnedBadges.length > 0}
                                                 <div class="mini-badges">
-                                                    {#each earnedBadges as award}
-                                                        {@const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
-                                                        <div class="mini-badge" title={award.name}>
+                                                    {#each earnedBadges as badge}
+                                                        {@const badgeSlug = badge.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
+                                                        <button 
+                                                            class="mini-badge" 
+                                                            title={badge.name}
+                                                            on:click={() => scrollToBadge(badgeSlug)}
+                                                        >
                                                             <img 
                                                                 src="/marchMadness/{YEAR}/badges/{badgeSlug}.png" 
-                                                                alt={award.name}
+                                                                alt={badge.name}
                                                                 class="mini-badge-image"
-                                                                on:error={(e) => e.target.outerHTML = generatePlaceholderBadge(award.name, true)}
+                                                                on:error={(e) => e.target.outerHTML = generatePlaceholderBadge(badge.name, true)}
                                                             />
-                                                        </div>
+                                                        </button>
                                                     {/each}
                                                 </div>
                                             {:else}
@@ -1277,17 +1429,47 @@
                         <h3>Awards by Round</h3>
                         {#each getSortedRoundKeys(getStarBonusesByRound()) as roundKey}
                             {@const roundAwards = getStarBonusesByRound()[roundKey]}
+                            {@const preparedAwards = prepareAwardsForDisplay(roundAwards)}
                             <div class="round-section">
                                 <h4>{getRoundDisplayName(roundKey)}</h4>
                                 <div class="badges-grid">
-                                    {#each roundAwards as award}
-                                        {@const hasWinners = award.Winners && award.Winners.length > 0}
-                                        {@const winnerCount = award.Winners?.length || 0}
-                                        {@const awardPoints = getAwardPoints(winnerCount)}
+                                    {#each preparedAwards as award}
+                                        {@const awardPoints = getAwardPoints(award.totalWinnersForPoints)}
                                         {@const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
-                                        <div class="badge-card" class:earned={hasWinners} class:locked={!hasWinners}>
-                                            <div class="badge-image-container">
-                                                {#if hasWinners}
+                                        <div 
+                                            id="badge-{badgeSlug}"
+                                            class="badge-card" 
+                                            class:earned={award.hasWinners} 
+                                            class:locked={!award.hasWinners}
+                                            class:split-award={award.isSplit}
+                                        >
+                                            <div class="badge-image-container" class:split-images={award.isSplit}>
+                                                {#if award.isSplit}
+                                                    <!-- Split award: show multiple images with slashes -->
+                                                    <div class="split-badge-row">
+                                                        {#each award.splitNames as splitName, i}
+                                                            {@const splitSlug = splitName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
+                                                            {@const splitHasWinner = Array.isArray(award.Winners[i]) && award.Winners[i].length > 0}
+                                                            {#if i > 0}
+                                                                <span class="split-separator">/</span>
+                                                            {/if}
+                                                            <div class="split-badge-item" class:earned={splitHasWinner} class:locked={!splitHasWinner}>
+                                                                {#if splitHasWinner}
+                                                                    <img 
+                                                                        src="/marchMadness/{YEAR}/badges/{splitSlug}.png" 
+                                                                        alt={splitName}
+                                                                        class="split-badge-image"
+                                                                        on:error={(e) => e.target.src = `data:image/svg+xml,${encodeURIComponent(generatePlaceholderBadge(splitName, true))}`}
+                                                                    />
+                                                                {:else}
+                                                                    <div class="split-badge-placeholder">
+                                                                        {@html generatePlaceholderBadge(splitName, false)}
+                                                                    </div>
+                                                                {/if}
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                {:else if award.hasWinners}
                                                     <img 
                                                         src="/marchMadness/{YEAR}/badges/{badgeSlug}.png" 
                                                         alt={award.name}
@@ -1304,14 +1486,18 @@
                                             <div class="badge-info">
                                                 <div class="badge-header">
                                                     <span class="badge-name">{award.name}</span>
-                                                    {#if hasWinners}
+                                                    {#if award.hasWinners}
                                                         <span class="badge-points">+{awardPoints}</span>
                                                     {/if}
                                                 </div>
                                                 
-                                                {#if hasWinners}
+                                                {#if award.hasWinners}
                                                     <div class="badge-winners">
-                                                        {award.Winners.join(', ')}
+                                                        {#if award.isSplit}
+                                                            {formatSplitWinners(award)}
+                                                        {:else}
+                                                            {award.Winners.join(', ')}
+                                                        {/if}
                                                     </div>
                                                     <div class="badge-reason">
                                                         {award.reason}
@@ -1839,6 +2025,17 @@
         width: 32px;
         height: 32px;
         flex-shrink: 0;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        border-radius: 50%;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .mini-badge:hover {
+        transform: scale(1.15);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
     
     .mini-badge-image {
@@ -1855,6 +2052,23 @@
     
     .no-badges {
         color: #9ca3af;
+    }
+    
+    /* Badge highlight animation when scrolled to */
+    .badge-card.highlight-badge {
+        animation: badge-pulse 1.5s ease-out;
+    }
+    
+    @keyframes badge-pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+        }
+        50% {
+            box-shadow: 0 0 0 15px rgba(251, 191, 36, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+        }
     }
     
     .stars-summary-table .points {
@@ -1882,8 +2096,9 @@
     /* Badge Grid */
     .badges-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         gap: 1.5rem;
+        align-items: stretch;
     }
     
     .badge-card {
@@ -1892,10 +2107,15 @@
         align-items: center;
         background: white;
         border-radius: 12px;
-        padding: 1.25rem;
+        padding: 1rem 0.75rem;
         border: 2px solid #e5e7eb;
         transition: all 0.3s ease;
         text-align: center;
+        min-height: 220px;
+    }
+    
+    .badge-card.split-award {
+        padding: 1rem 0.5rem;
     }
     
     .badge-card.earned {
@@ -1916,12 +2136,13 @@
     
     /* Badge Image */
     .badge-image-container {
-        width: 80px;
-        height: 80px;
-        margin-bottom: 0.75rem;
+        width: 70px;
+        height: 70px;
+        margin-bottom: 0.5rem;
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
     }
     
     .badge-image {
@@ -1944,6 +2165,9 @@
     /* Badge Info */
     .badge-info {
         width: 100%;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
     }
     
     .badge-header {
@@ -1959,6 +2183,54 @@
         color: #1f2937;
         font-size: 0.95rem;
         line-height: 1.2;
+    }
+    
+    /* Split award styling */
+    .badge-image-container.split-images {
+        width: 100%;
+        height: 70px;
+    }
+    
+    .split-badge-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.1rem;
+    }
+    
+    .split-separator {
+        font-size: 1.1rem;
+        font-weight: 300;
+        color: #9ca3af;
+        margin: 0;
+    }
+    
+    .split-badge-item {
+        width: 50px;
+        height: 50px;
+        flex-shrink: 0;
+    }
+    
+    .split-badge-item.locked {
+        opacity: 0.5;
+        filter: saturate(0.3);
+    }
+    
+    .split-badge-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 50%;
+    }
+    
+    .split-badge-placeholder {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .split-badge-placeholder :global(svg) {
+        width: 100%;
+        height: 100%;
     }
     
     .badge-points {
@@ -1990,6 +2262,10 @@
         color: #9ca3af;
         font-size: 0.85rem;
         padding: 0.25rem 0;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     /* Mobile responsive for stars view */
@@ -2006,6 +2282,11 @@
         .badge-image-container {
             width: 60px;
             height: 60px;
+        }
+        
+        .split-badge-item {
+            width: 32px;
+            height: 32px;
         }
         
         .badge-name {

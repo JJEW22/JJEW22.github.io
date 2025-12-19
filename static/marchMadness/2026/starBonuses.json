@@ -30,6 +30,36 @@
         "Winners": ["Bob", "eve", "charlie"]
     },
     {
+        "name": "Dom/Sub",
+        "round": 2,
+        "reason": "Awarded to the person whose winning (most) most implies someone elses losing (sub)",
+        "Winners": [[], []]
+    },
+    {
+        "name": "Best Friends",
+        "round": 2,
+        "reason": "Awarded to the people with the most similar brackets",
+        "Winners": []
+    },
+    {
+        "name": "test/ing",
+        "round": 2,
+        "reason": "testing the functionality of split awards",
+        "Winners": [["Bob"],["charlie"]]
+    },
+    {
+        "name": "testing",
+        "round": 2,
+        "reason": "testing",
+        "Winners": ["Bob", "eve", "charlie"]
+    },
+    {
+        "name": "Fortified",
+        "round": 3,
+        "reason": "Person whose probability of winning changes the least from the first round to now",
+        "Winners": []
+    },
+    {
         "name": "testing2",
         "round": 3,
         "reason": "another testing 1",
