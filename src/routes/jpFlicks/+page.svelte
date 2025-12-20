@@ -1296,7 +1296,7 @@
    /* Center tables on ALL screen sizes - more specific selector */
     .table-wrapper,
     :global(.mobile-friendly) .table-wrapper {
-        max-width: 600px;
+        max-width: 850px;
         margin: 1rem auto;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -1306,7 +1306,7 @@
     @media (max-width: 768px) {
         .table-wrapper,
         :global(.mobile-friendly) .table-wrapper {
-            max-width: 600px;
+            max-width: 850px;
             margin: 1rem auto;
             padding: 0 1rem;
             overflow-x: auto;
