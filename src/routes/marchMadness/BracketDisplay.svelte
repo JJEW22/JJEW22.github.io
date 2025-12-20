@@ -2,9 +2,6 @@
     import { createEventDispatcher } from 'svelte';
     import { regionPositions } from './bracketIO.js';
     
-    // Debug mode toggle - set to false to disable debug features
-    const DEBUG_MODE = true;
-    
     // Props
     export let bracket;                    // The bracket data to display
     export let resultsBracket = null;      // Optional results for comparison
@@ -21,7 +18,6 @@
     
     // Tooltip state
     let hoveredGame = null;
-    let pinnedGame = null;  // For click-to-pin functionality
     let tooltipX = 0;
     let tooltipY = 0;
     
@@ -82,6 +78,23 @@
     }
     
     /**
+     * Check if a game is pending - undecided but NOT next (waiting on earlier rounds)
+     * @param {Object} resultsGame - The game from the results bracket
+     */
+    function isPendingGame(resultsGame) {
+        if (!resultsGame) return false;
+        
+        // Already has a winner - not pending
+        if (resultsGame.winner) return false;
+        
+        // If it's a next game, it's not "pending" (it gets gold highlight instead)
+        if (isNextGame(resultsGame)) return false;
+        
+        // Otherwise it's pending (undecided but waiting on parents)
+        return true;
+    }
+    
+    /**
      * Get the results game corresponding to a user's bracket game
      */
     function getResultsGame(round, gameIndex) {
@@ -101,96 +114,23 @@
      * Handle mouse enter on a next-game
      */
     function handleGameMouseEnter(event, round, gameIndex) {
-        // Don't update hover if we have a pinned tooltip
-        if (pinnedGame) return;
-        
-        if (!DEBUG_MODE) {
-            // Original behavior - only show for next games with stake data
-            const resultsGame = getResultsGame(round, gameIndex);
-            if (!isNextGame(resultsGame) || !stakeData) return;
-            const gameKey = getGameKey(round, gameIndex);
-            if (!stakeData[gameKey]) return;
-        }
-        
         const resultsGame = getResultsGame(round, gameIndex);
+        if (!isNextGame(resultsGame) || !stakeData) return;
+        
         const gameKey = getGameKey(round, gameIndex);
-        const scenarioGame = getScenarioGame(round, gameIndex);
-        const bracketRoundKey = `round${round}`;
-        const bracketGame = bracket?.[bracketRoundKey]?.[gameIndex];
+        if (!stakeData[gameKey]) return;
         
         const rect = event.currentTarget.getBoundingClientRect();
         tooltipX = rect.left + rect.width / 2;
         tooltipY = rect.top;
-        
-        hoveredGame = { 
-            round, 
-            gameIndex, 
-            gameKey, 
-            resultsGame,
-            scenarioGame,
-            bracketGame,
-            isUndecided: isGameUndecided(round, gameIndex),
-            hasScenario: !!scenario
-        };
+        hoveredGame = { round, gameIndex, gameKey, resultsGame };
     }
     
     /**
-     * Handle mouse leave on a game
+     * Handle mouse leave on a next-game
      */
     function handleGameMouseLeave() {
-        // Don't clear if we have a pinned tooltip
-        if (!pinnedGame) {
-            hoveredGame = null;
-        }
-    }
-    
-    /**
-     * Handle click on a game - toggle pinned debug tooltip
-     */
-    function handleDebugClick(event, round, gameIndex) {
-        if (!DEBUG_MODE) return;
-        
-        event.stopPropagation();
-        
-        const resultsGame = getResultsGame(round, gameIndex);
-        const gameKey = getGameKey(round, gameIndex);
-        const scenarioGame = getScenarioGame(round, gameIndex);
-        const bracketRoundKey = `round${round}`;
-        const bracketGame = bracket?.[bracketRoundKey]?.[gameIndex];
-        
-        // If clicking same game, unpin
-        if (pinnedGame && pinnedGame.round === round && pinnedGame.gameIndex === gameIndex) {
-            pinnedGame = null;
-            hoveredGame = null;
-        } else {
-            // Pin this game
-            const rect = event.currentTarget.getBoundingClientRect();
-            tooltipX = rect.left + rect.width / 2;
-            tooltipY = rect.top;
-            
-            pinnedGame = { 
-                round, 
-                gameIndex, 
-                gameKey, 
-                resultsGame,
-                scenarioGame,
-                bracketGame,
-                isUndecided: isGameUndecided(round, gameIndex),
-                hasScenario: !!scenario
-            };
-            hoveredGame = pinnedGame;
-        }
-    }
-    
-    /**
-     * Combined click handler for games - handles debug mode and next game clicks
-     */
-    function handleGameClicked(event, round, gameIndex) {
-        if (DEBUG_MODE) {
-            handleDebugClick(event, round, gameIndex);
-        } else {
-            handleNextGameClick(round, gameIndex);
-        }
+        hoveredGame = null;
     }
     
     /**
@@ -269,171 +209,85 @@
     function getSelectionClass(game, team, round, gameIndex) {
         if (!team) return '';
         
+        // Compare by name since objects may be different references
         const isUserPick = game.winner && game.winner.name === team.name;
         const status = getPickStatus(game, round, gameIndex);
-        const gameActuallyPlayed = !isGameUndecided(round, gameIndex);
         
-        // Debug logging for specific games (Round 2-6 to reduce noise)
-        const debugThis = DEBUG_MODE && round >= 2 && scenario;
-        if (debugThis) {
-            console.log(`[getSelectionClass] Round ${round} Game ${gameIndex} - Team: ${team.name}`);
-            console.log(`  isUserPick: ${isUserPick}, status: ${status}, gameActuallyPlayed: ${gameActuallyPlayed}`);
-            console.log(`  scenario exists: ${!!scenario}`);
+        // For decided games, use normal coloring
+        if (status === 'correct' || status === 'incorrect') {
+            return isUserPick ? `selected ${status}` : '';
         }
         
-        // 1. If game already played, use green/red (regardless of scenario)
-        if (gameActuallyPlayed) {
-            if (status === 'correct' || status === 'incorrect') {
-                const result = isUserPick ? `selected ${status}` : '';
-                if (debugThis) console.log(`  -> Game played, returning: "${result}"`);
-                return result;
-            }
-        }
-        
-        // 2. If no scenario active, use default pending/doomed colors
-        if (!scenario) {
-            if (isUserPick) {
-                if (status === 'incorrect') {
-                    return 'selected incorrect';
-                }
-                return status === 'pending' ? 'selected pending' : 'selected';
-            }
-            return '';
-        }
-        
-        // 3. Get scenario game data
-        const scenarioGame = getScenarioGame(round, gameIndex);
-        if (debugThis) {
-            console.log(`  scenarioGame found: ${!!scenarioGame}`);
+        // For undecided games, check if there's a scenario
+        if (scenario && isGameUndecided(round, gameIndex)) {
+            const scenarioGame = getScenarioGame(round, gameIndex);
             if (scenarioGame) {
-                console.log(`  scenarioGame.winner: ${scenarioGame.winner}, either: ${scenarioGame.either}, dead: ${scenarioGame.dead}`);
+                // Check if this is an "either" game (outcome doesn't matter)
+                if (scenarioGame.either) {
+                    // Both teams can win - highlight both with "either" style
+                    return 'selected scenario-either';
+                }
+                
+                // Determine what team the SCENARIO says is in this slot
+                const isTeam1Slot = game.team1 && game.team1.name === team.name;
+                const isTeam2Slot = game.team2 && game.team2.name === team.name;
+                
+                let scenarioTeamInSlot;
+                if (isTeam1Slot) {
+                    scenarioTeamInSlot = scenarioGame.team1;
+                } else if (isTeam2Slot) {
+                    scenarioTeamInSlot = scenarioGame.team2;
+                }
+                
+                // Check if scenario team is a combined "either" team (contains "/")
+                const scenarioTeamNames = scenarioTeamInSlot ? scenarioTeamInSlot.split('/') : [];
+                const userPickIsInEither = scenarioTeamNames.length > 1 && scenarioTeamNames.includes(team.name);
+                
+                // Is this slot's scenario team the winner?
+                const isScenarioWinner = scenarioTeamInSlot === scenarioGame.winner;
+                
+                // Did the user's original pick for this slot match the scenario?
+                // Either exact match or user's pick is one of the combined either teams
+                const userMatchesScenario = team.name === scenarioTeamInSlot || userPickIsInEither;
+                
+                if (isScenarioWinner) {
+                    // This slot contains the scenario's winner
+                    if (userMatchesScenario && isUserPick) {
+                        return 'selected scenario-match';  // User picked this team AND it wins in scenario
+                    } else if (!userMatchesScenario || !isUserPick) {
+                        return 'selected scenario-mismatch';  // Scenario winner but user picked differently
+                    }
+                } else {
+                    // This slot contains the scenario's loser - no highlight
+                    return '';
+                }
             }
         }
         
-        // 4. If game is NOT in scenario AND game hasn't been played, 
-        //    it means either team can win (doesn't affect outcome)
-        if (!scenarioGame) {
-            // Only show "either" for unplayed games
-            if (!gameActuallyPlayed) {
-                // Warning: unplayed game not found in scenario - may indicate mismatched data
-                console.warn(`[getSelectionClass] WARNING: Unplayed game not in scenario! Round ${round} Game ${gameIndex} - Team: ${team.name}. This may indicate mismatched scenario data.`);
-                if (debugThis) console.log(`  -> No scenario game, unplayed, returning: "selected scenario-either"`);
-                return 'selected scenario-either';
-            }
-            // For played games not in scenario, use default colors
-            if (isUserPick) {
-                const result = status === 'pending' ? 'selected pending' : 'selected';
-                if (debugThis) console.log(`  -> No scenario game, played, returning: "${result}"`);
-                return result;
-            }
-            if (debugThis) console.log(`  -> No scenario game, played, not user pick, returning: ""`);
-            return '';
+        // Default pending state
+        if (isUserPick) {
+            return status === 'pending' ? 'selected pending' : 'selected';
         }
         
-        // 5. Check boolean flags
-        const isDead = scenarioGame.dead === true;
-        const isEither = scenarioGame.either === true;
-        
-        // 6. If dead path, show gray
-        if (isDead) {
-            if (debugThis) console.log(`  -> Dead path, returning: "scenario-dead"`);
-            return 'scenario-dead';
-        }
-        
-        // 7. If either team can win (no stake), show teal
-        if (isEither) {
-            if (debugThis) console.log(`  -> Either flag set, returning: "selected scenario-either"`);
-            return 'selected scenario-either';
-        }
-        
-        // 8. Get winner name from scenario (handle both string and object)
-        const scenarioWinner = typeof scenarioGame.winner === 'string' 
-            ? scenarioGame.winner 
-            : scenarioGame.winner?.name;
-        
-        if (debugThis) {
-            console.log(`  scenarioWinner (extracted): "${scenarioWinner}"`);
-            console.log(`  team.name: "${team.name}"`);
-            console.log(`  team.name === scenarioWinner: ${team.name === scenarioWinner}`);
-        }
-        
-        // 9. If no winner specified and not either/dead, this is TBD (participant has stake)
-        //    Show standard undecided styling (same as no scenario)
-        if (!scenarioWinner || scenarioWinner === "dead" || scenarioWinner === "either") {
-            // TBD game - use default styling based on user's pick
-            if (isUserPick) {
-                const result = status === 'pending' ? 'selected pending' : 'selected';
-                if (debugThis) console.log(`  -> TBD game, user pick, returning: "${result}"`);
-                return result;
-            }
-            if (debugThis) console.log(`  -> TBD game, not user pick, returning: ""`);
-            return '';
-        }
-        
-        // 10. Determine which slot this team is in (team1 or team2 in the bracket)
-        const isTeam1Slot = game.team1 && game.team1.name === team.name;
-        const isTeam2Slot = game.team2 && game.team2.name === team.name;
-        
-        // Get the scenario's team for this slot
-        let scenarioTeamInThisSlot;
-        if (isTeam1Slot) {
-            scenarioTeamInThisSlot = scenarioGame.team1;
-        } else if (isTeam2Slot) {
-            scenarioTeamInThisSlot = scenarioGame.team2;
-        }
-        
-        if (debugThis) {
-            console.log(`  isTeam1Slot: ${isTeam1Slot}, isTeam2Slot: ${isTeam2Slot}`);
-            console.log(`  scenarioTeamInThisSlot: "${scenarioTeamInThisSlot}"`);
-        }
-        
-        // Check if this slot's scenario team is the winner
-        // Handle combined "either" team names like "Ole Miss/Michigan St."
-        const scenarioTeamNames = scenarioTeamInThisSlot ? scenarioTeamInThisSlot.split('/') : [];
-        const thisSlotIsScenarioWinner = scenarioTeamInThisSlot === scenarioWinner || 
-                                          scenarioTeamNames.includes(scenarioWinner);
-        
-        if (debugThis) {
-            console.log(`  thisSlotIsScenarioWinner: ${thisSlotIsScenarioWinner}`);
-        }
-        
-        if (thisSlotIsScenarioWinner) {
-            // This slot contains the scenario winner - highlight it
-            // Check if user also picked the winner (user's pick matches scenario winner)
-            const userPickedWinner = game.winner && game.winner.name === scenarioWinner;
-            const result = userPickedWinner ? 'selected scenario-match' : 'selected scenario-mismatch';
-            if (debugThis) console.log(`  -> This slot IS scenario winner, userPickedWinner: ${userPickedWinner}, returning: "${result}"`);
-            return result;
-        }
-        
-        // 11. This slot contains the scenario loser - no highlight
-        if (debugThis) console.log(`  -> This slot is NOT scenario winner, returning: ""`);
         return '';
     }
     
     /**
      * Get display info for a team in the context of a scenario
      * For undecided games, shows the scenario's bracket merged with user's bracket
-     * Returns { name, seed, userPick, dead } where userPick is shown as subtitle if different
+     * Returns { name, seed, userPick } where userPick is shown as subtitle if different
      */
     function getTeamDisplayInfo(game, team, round, gameIndex) {
         if (!team) return null;
         
-        const gameActuallyPlayed = !isGameUndecided(round, gameIndex);
-        
-        // If no scenario or game has actually been played, just show the team normally
-        if (!scenario || gameActuallyPlayed) {
-            return { name: team.name, seed: team.seed, userPick: null, dead: false };
+        // If no scenario or game is decided, just show the team normally
+        if (!scenario || !isGameUndecided(round, gameIndex)) {
+            return { name: team.name, seed: team.seed, userPick: null };
         }
         
         const scenarioGame = getScenarioGame(round, gameIndex);
         if (!scenarioGame) {
-            return { name: team.name, seed: team.seed, userPick: null, dead: false };
-        }
-        
-        // Check if this is a dead path game
-        if (scenarioGame.dead) {
-            return { name: 'Dead', seed: null, userPick: null, dead: true };
+            return { name: team.name, seed: team.seed, userPick: null };
         }
         
         // Determine if this is team1 or team2 slot based on the team passed in
@@ -452,7 +306,7 @@
             isEitherTeam = scenarioGame.team2IsEither;
         } else {
             // Fallback - shouldn't happen
-            return { name: team.name, seed: team.seed, userPick: null, dead: false };
+            return { name: team.name, seed: team.seed, userPick: null };
         }
         
         // Check if the scenario team name contains "/" (combined either teams)
@@ -464,22 +318,20 @@
         // Compare user's team in this slot vs scenario's team
         if (team.name === scenarioTeamName) {
             // User's prediction matches scenario exactly - show normally
-            return { name: team.name, seed: team.seed, userPick: null, dead: false };
+            return { name: team.name, seed: team.seed, userPick: null };
         } else if (userPickIsInEither) {
             // User's pick is one of the combined either teams - show combined name, no parenthetical
             return { 
                 name: scenarioTeamName, 
                 seed: scenarioTeamSeed, 
-                userPick: null,
-                dead: false
+                userPick: null 
             };
         } else {
             // User had a different team - show scenario's team with user's pick as subtitle
             return {
                 name: scenarioTeamName,
                 seed: scenarioTeamSeed,
-                userPick: team.name,
-                dead: false
+                userPick: team.name
             };
         }
     }
@@ -505,12 +357,12 @@
                         {#if i === 0}
                             <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i))} 
+                                class:next-game={isNextGame(getResultsGame(1, i))} class:pending-game={isPendingGame(getResultsGame(1, i))} 
                                 class:clickable={isNextGame(getResultsGame(1, i))}
                                 bind:clientHeight={gameHeight}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 1, i)}
+                                on:click={() => handleNextGameClick(1, i)}
                             >
                                 {#if game.team1}
                                     {@const info1 = getTeamDisplayInfo(game, game.team1, 1, i)}
@@ -550,11 +402,11 @@
                         {:else}
                             <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i))}
+                                class:next-game={isNextGame(getResultsGame(1, i))} class:pending-game={isPendingGame(getResultsGame(1, i))}
                                 class:clickable={isNextGame(getResultsGame(1, i))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 1, i)}>
+                                on:click={() => handleNextGameClick(1, i)}>
                                 {#if game.team1}
                                     {@const info3 = getTeamDisplayInfo(game, game.team1, 1, i)}
                                     <button 
@@ -599,11 +451,11 @@
                     {#each bracket.round2.slice(0, 4) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i))}
+                                class:next-game={isNextGame(getResultsGame(2, i))} class:pending-game={isPendingGame(getResultsGame(2, i))}
                                 class:clickable={isNextGame(getResultsGame(2, i))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 2, i)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                                on:click={() => handleNextGameClick(2, i)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 {@const info5 = getTeamDisplayInfo(game, game.team1, 2, i)}
                                 <button 
@@ -647,11 +499,11 @@
                     {#each bracket.round3.slice(0, 2) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i))}
+                                class:next-game={isNextGame(getResultsGame(3, i))} class:pending-game={isPendingGame(getResultsGame(3, i))}
                                 class:clickable={isNextGame(getResultsGame(3, i))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 3, i)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                                on:click={() => handleNextGameClick(3, i)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 {@const info7 = getTeamDisplayInfo(game, game.team1, 3, i)}
                                 <button 
@@ -694,11 +546,11 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 0))}
+                                class:next-game={isNextGame(getResultsGame(4, 0))} class:pending-game={isPendingGame(getResultsGame(4, 0))}
                                 class:clickable={isNextGame(getResultsGame(4, 0))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 0)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 4, 0)} style="margin-top: {round4FirstOffset}px">
+                                on:click={() => handleNextGameClick(4, 0)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[0]?.team1}
                             {@const info9 = getTeamDisplayInfo(bracket.round4[0], bracket.round4[0].team1, 4, 0)}
                             <button 
@@ -745,11 +597,11 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 2))}
+                                class:next-game={isNextGame(getResultsGame(4, 2))} class:pending-game={isPendingGame(getResultsGame(4, 2))}
                                 class:clickable={isNextGame(getResultsGame(4, 2))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 2)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 4, 2)} style="margin-top: {round4FirstOffset}px">
+                                on:click={() => handleNextGameClick(4, 2)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[2]?.team1}
                             {@const info11 = getTeamDisplayInfo(bracket.round4[2], bracket.round4[2].team1, 4, 2)}
                             <button 
@@ -792,11 +644,11 @@
                     {#each bracket.round3.slice(4, 6) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i + 4))}
+                                class:next-game={isNextGame(getResultsGame(3, i + 4))} class:pending-game={isPendingGame(getResultsGame(3, i + 4))}
                                 class:clickable={isNextGame(getResultsGame(3, i + 4))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 4)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 3, i + 4)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                                on:click={() => handleNextGameClick(3, i + 4)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 {@const info13 = getTeamDisplayInfo(game, game.team1, 3, i + 4)}
                                 <button 
@@ -840,11 +692,11 @@
                     {#each bracket.round2.slice(8, 12) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i + 8))}
+                                class:next-game={isNextGame(getResultsGame(2, i + 8))} class:pending-game={isPendingGame(getResultsGame(2, i + 8))}
                                 class:clickable={isNextGame(getResultsGame(2, i + 8))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 8)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 2, i + 8)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                                on:click={() => handleNextGameClick(2, i + 8)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 {@const info15 = getTeamDisplayInfo(game, game.team1, 2, i + 8)}
                                 <button 
@@ -888,11 +740,11 @@
                     {#each bracket.round1.slice(16, 24) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i + 16))}
+                                class:next-game={isNextGame(getResultsGame(1, i + 16))} class:pending-game={isPendingGame(getResultsGame(1, i + 16))}
                                 class:clickable={isNextGame(getResultsGame(1, i + 16))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 16)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 1, i + 16)}>
+                                on:click={() => handleNextGameClick(1, i + 16)}>
                             {#if game.team1}
                                 {@const info17 = getTeamDisplayInfo(game, game.team1, 1, i + 16)}
                                 <button 
@@ -940,11 +792,11 @@
                 <h3>Final Four</h3>
                 <div 
                                 class="game semifinal-game" 
-                                class:next-game={isNextGame(getResultsGame(5, 0))}
+                                class:next-game={isNextGame(getResultsGame(5, 0))} class:pending-game={isPendingGame(getResultsGame(5, 0))}
                                 class:clickable={isNextGame(getResultsGame(5, 0))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 5, 0)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 5, 0)}>
+                                on:click={() => handleNextGameClick(5, 0)}>
                     {#if bracket.round5[0]?.team1}
                         {@const info19 = getTeamDisplayInfo(bracket.round5[0], bracket.round5[0].team1, 5, 0)}
                         <button 
@@ -987,11 +839,11 @@
                 <h3>Championship</h3>
                 <div 
                                 class="game championship-game" 
-                                class:next-game={isNextGame(getResultsGame(6, 0))}
+                                class:next-game={isNextGame(getResultsGame(6, 0))} class:pending-game={isPendingGame(getResultsGame(6, 0))}
                                 class:clickable={isNextGame(getResultsGame(6, 0))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 6, 0)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 6, 0)}>
+                                on:click={() => handleNextGameClick(6, 0)}>
                     {#if bracket.round6[0]?.team1}
                         {@const info21 = getTeamDisplayInfo(bracket.round6[0], bracket.round6[0].team1, 6, 0)}
                         <button 
@@ -1032,8 +884,7 @@
                 <h3 class="champion-label">🏆 Champion 🏆</h3>
                 <div class="game champion-game">
                     {#if bracket.winner}
-                        {@const champGame = bracket.round6?.[0] || {team1: null, team2: null, winner: bracket.winner}}
-                        {@const champInfo = getTeamDisplayInfo(champGame, bracket.winner, 6, 0)}
+                        {@const champInfo = getTeamDisplayInfo({winner: bracket.winner, team1: bracket.winner, team2: null}, bracket.winner, 6, 0)}
                         <div class="team-btn champion-display {getPickStatus({winner: bracket.winner}, 6, 0) === 'correct' ? 'correct' : getPickStatus({winner: bracket.winner}, 6, 0) === 'incorrect' ? 'incorrect' : ''} {scenario && isGameUndecided(6, 0) ? (champInfo.userPick ? 'scenario-mismatch' : 'scenario-match') : ''}">
                             <span class="seed">{champInfo.seed}</span>
                             <span class="team-name">{champInfo.name}</span>
@@ -1052,11 +903,11 @@
                 <h3>Final Four</h3>
                 <div 
                                 class="game semifinal-game" 
-                                class:next-game={isNextGame(getResultsGame(5, 1))}
+                                class:next-game={isNextGame(getResultsGame(5, 1))} class:pending-game={isPendingGame(getResultsGame(5, 1))}
                                 class:clickable={isNextGame(getResultsGame(5, 1))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 5, 1)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 5, 1)}>
+                                on:click={() => handleNextGameClick(5, 1)}>
                     {#if bracket.round5[1]?.team1}
                         {@const info23 = getTeamDisplayInfo(bracket.round5[1], bracket.round5[1].team1, 5, 1)}
                         <button 
@@ -1106,11 +957,11 @@
                     {#each bracket.round1.slice(8, 16) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i + 8))}
+                                class:next-game={isNextGame(getResultsGame(1, i + 8))} class:pending-game={isPendingGame(getResultsGame(1, i + 8))}
                                 class:clickable={isNextGame(getResultsGame(1, i + 8))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 8)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 1, i + 8)}>
+                                on:click={() => handleNextGameClick(1, i + 8)}>
                             {#if game.team1}
                                 {@const info25 = getTeamDisplayInfo(game, game.team1, 1, i + 8)}
                                 <button 
@@ -1154,11 +1005,11 @@
                     {#each bracket.round2.slice(4, 8) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i + 4))}
+                                class:next-game={isNextGame(getResultsGame(2, i + 4))} class:pending-game={isPendingGame(getResultsGame(2, i + 4))}
                                 class:clickable={isNextGame(getResultsGame(2, i + 4))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 4)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 2, i + 4)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                                on:click={() => handleNextGameClick(2, i + 4)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 {@const info27 = getTeamDisplayInfo(game, game.team1, 2, i + 4)}
                                 <button 
@@ -1202,11 +1053,11 @@
                     {#each bracket.round3.slice(2, 4) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i + 2))}
+                                class:next-game={isNextGame(getResultsGame(3, i + 2))} class:pending-game={isPendingGame(getResultsGame(3, i + 2))}
                                 class:clickable={isNextGame(getResultsGame(3, i + 2))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 2)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 3, i + 2)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                                on:click={() => handleNextGameClick(3, i + 2)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 {@const info29 = getTeamDisplayInfo(game, game.team1, 3, i + 2)}
                                 <button 
@@ -1249,11 +1100,11 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 1))}
+                                class:next-game={isNextGame(getResultsGame(4, 1))} class:pending-game={isPendingGame(getResultsGame(4, 1))}
                                 class:clickable={isNextGame(getResultsGame(4, 1))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 1)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 4, 1)} style="margin-top: {round4FirstOffset}px">
+                                on:click={() => handleNextGameClick(4, 1)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[1]?.team1}
                             {@const info31 = getTeamDisplayInfo(bracket.round4[1], bracket.round4[1].team1, 4, 1)}
                             <button 
@@ -1300,11 +1151,11 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 3))}
+                                class:next-game={isNextGame(getResultsGame(4, 3))} class:pending-game={isPendingGame(getResultsGame(4, 3))}
                                 class:clickable={isNextGame(getResultsGame(4, 3))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 3)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 4, 3)} style="margin-top: {round4FirstOffset}px">
+                                on:click={() => handleNextGameClick(4, 3)} style="margin-top: {round4FirstOffset}px">
                         {#if bracket.round4[3]?.team1}
                             {@const info33 = getTeamDisplayInfo(bracket.round4[3], bracket.round4[3].team1, 4, 3)}
                             <button 
@@ -1347,11 +1198,11 @@
                     {#each bracket.round3.slice(6, 8) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i + 6))}
+                                class:next-game={isNextGame(getResultsGame(3, i + 6))} class:pending-game={isPendingGame(getResultsGame(3, i + 6))}
                                 class:clickable={isNextGame(getResultsGame(3, i + 6))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 6)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 3, i + 6)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
+                                on:click={() => handleNextGameClick(3, i + 6)} style="margin-top: {i === 0 ? round3FirstOffset : round3Gap}px">
                             {#if game.team1}
                                 {@const info35 = getTeamDisplayInfo(game, game.team1, 3, i + 6)}
                                 <button 
@@ -1395,11 +1246,11 @@
                     {#each bracket.round2.slice(12, 16) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i + 12))}
+                                class:next-game={isNextGame(getResultsGame(2, i + 12))} class:pending-game={isPendingGame(getResultsGame(2, i + 12))}
                                 class:clickable={isNextGame(getResultsGame(2, i + 12))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 12)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 2, i + 12)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
+                                on:click={() => handleNextGameClick(2, i + 12)} style="margin-top: {i === 0 ? round2FirstOffset : round2Gap}px">
                             {#if game.team1}
                                 {@const info37 = getTeamDisplayInfo(game, game.team1, 2, i + 12)}
                                 <button 
@@ -1443,11 +1294,11 @@
                     {#each bracket.round1.slice(24, 32) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i + 24))}
+                                class:next-game={isNextGame(getResultsGame(1, i + 24))} class:pending-game={isPendingGame(getResultsGame(1, i + 24))}
                                 class:clickable={isNextGame(getResultsGame(1, i + 24))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 24)}
                                 on:mouseleave={handleGameMouseLeave}
-                                on:click={(e) => handleGameClicked(e, 1, i + 24)}>
+                                on:click={() => handleNextGameClick(1, i + 24)}>
                             {#if game.team1}
                                 {@const info39 = getTeamDisplayInfo(game, game.team1, 1, i + 24)}
                                 <button 
@@ -1489,44 +1340,6 @@
         </div>
     </div>
 </div>
-
-<!-- Debug Tooltip - shows on hover when DEBUG_MODE is true -->
-{#if DEBUG_MODE && hoveredGame}
-    <div 
-        class="debug-tooltip" 
-        class:pinned={pinnedGame}
-        style="left: {tooltipX}px; top: {tooltipY}px;"
-    >
-        <div class="debug-header">
-            <span>Round {hoveredGame.round} Game {hoveredGame.gameIndex}</span>
-            {#if pinnedGame}
-                <button class="debug-close" on:click={() => { pinnedGame = null; hoveredGame = null; }}>✕</button>
-            {/if}
-        </div>
-        {#if pinnedGame}
-            <div class="debug-pinned-note">📌 Pinned - click game again or ✕ to close</div>
-        {/if}
-        <div class="debug-content">
-            <div class="debug-section">
-                <strong>Status:</strong>
-                <div>isUndecided: {hoveredGame.isUndecided}</div>
-                <div>hasScenario: {hoveredGame.hasScenario}</div>
-            </div>
-            <div class="debug-section">
-                <strong>Results Game:</strong>
-                <pre>{JSON.stringify(hoveredGame.resultsGame, null, 2)}</pre>
-            </div>
-            <div class="debug-section">
-                <strong>Scenario Game:</strong>
-                <pre>{JSON.stringify(hoveredGame.scenarioGame, null, 2)}</pre>
-            </div>
-            <div class="debug-section">
-                <strong>Bracket Game (user picks):</strong>
-                <pre>{JSON.stringify(hoveredGame.bracketGame, null, 2)}</pre>
-            </div>
-        </div>
-    </div>
-{/if}
 
 <!-- Tooltip for next-game hover -->
 {#if hoveredGame && stakeData}
@@ -1586,95 +1399,6 @@
         --region-gap: 1.5rem;
         --side-gap: 1rem;
         --column-min-width: 198px;
-    }
-    
-    /* Debug tooltip styles */
-    .debug-tooltip {
-        position: fixed;
-        transform: translate(-50%, -100%) translateY(-10px);
-        background: #1f2937;
-        color: #f3f4f6;
-        padding: 12px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        z-index: 10000;
-        max-width: 500px;
-        max-height: 400px;
-        overflow: auto;
-        font-family: monospace;
-        font-size: 11px;
-    }
-    
-    .debug-tooltip.pinned {
-        border: 2px solid #fbbf24;
-        box-shadow: 0 4px 25px rgba(251, 191, 36, 0.3);
-    }
-    
-    .debug-header {
-        font-weight: bold;
-        font-size: 14px;
-        margin-bottom: 8px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #4b5563;
-        color: #fbbf24;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .debug-close {
-        background: #ef4444;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        width: 24px;
-        height: 24px;
-        cursor: pointer;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .debug-close:hover {
-        background: #dc2626;
-    }
-    
-    .debug-pinned-note {
-        background: #fbbf24;
-        color: #1f2937;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 10px;
-        margin-bottom: 8px;
-        text-align: center;
-    }
-    
-    .debug-content {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .debug-section {
-        background: #374151;
-        padding: 8px;
-        border-radius: 4px;
-    }
-    
-    .debug-section strong {
-        color: #60a5fa;
-        display: block;
-        margin-bottom: 4px;
-    }
-    
-    .debug-section pre {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-all;
-        color: #d1d5db;
-        max-height: 150px;
-        overflow: auto;
     }
     
     .bracket-scroll-container {
@@ -1831,7 +1555,14 @@
     .game.next-game {
         border-color: #f59e0b;
         border-width: 3px;
-        box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+        box-shadow: 0 0 8px rgba(245, 158, 11, 1);
+    }
+    
+    .game.pending-game {
+        border-color: #4b5563;
+        border-width: 3px;
+        box-shadow: 0 0 6px rgba(75, 85, 99, 1);
+        background: #f9fafb;
     }
     
     .game.clickable {
@@ -2004,12 +1735,6 @@
         color: white;
     }
     
-    .team-btn.scenario-dead {
-        background: #9ca3af;  /* Gray - dead path, no points possible */
-        color: white;
-        font-style: italic;
-    }
-    
     .team-btn.scenario-needed {
         background: #fef3c7;  /* Light yellow - scenario needs this but user didn't pick */
         color: #92400e;
@@ -2039,10 +1764,6 @@
     
     .team-btn.selected.scenario-either .seed {
         color: #0891b2;
-    }
-    
-    .team-btn.scenario-dead .seed {
-        display: none;  /* Hide seed for dead paths */
     }
     
     .team-btn.scenario-needed .seed {
@@ -2103,11 +1824,6 @@
     
     .team-btn.champion-display.scenario-either {
         background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
-    }
-    
-    .team-btn.champion-display.scenario-dead {
-        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
-        font-style: italic;
     }
     
     .champion-display .seed {

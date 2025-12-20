@@ -68,6 +68,12 @@
         "Winners": []
     },
     {
+        "name": "the Independent",
+        "round": 5,
+        "reason": "Lowest absolute different between left and right half of the bracket",
+        "Winners": []
+    },
+    {
         "name": "Lone wolf/sheep",
         "round": 4,
         "reason": "Has the bracket most (dis)similar to everyone else",

@@ -1215,6 +1215,9 @@
                             <h2>Tournament Results</h2>
                             <BracketView 
                                 bracketPath={`${RESULTS_FILE}.json`}
+                                resultsPath={`${RESULTS_FILE}.json`}
+                                {stakeData}
+                                on:nextGameClick={handleNextGameClick}
                             />
                         </div>
                     {/if}
