@@ -165,6 +165,16 @@ def load_star_bonuses(star_bonuses_path: str, scoring_config_path: str = None) -
 # Round keys in order
 ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
 
+# Games per round (total 63 games in tournament)
+GAMES_PER_ROUND = [32, 16, 8, 4, 2, 1]  # R1=32, R2=16, R3=8, R4=4, R5=2, R6=1
+
+# Fixed bit position offsets for each round in the 63-bit full bracket string
+# Round 1: bits 0-31, Round 2: bits 32-47, Round 3: bits 48-55, etc.
+ROUND_BIT_OFFSETS = [0, 32, 48, 56, 60, 62]  # Cumulative: [0, 32, 48, 56, 60, 62]
+
+# Total bits in full bracket representation
+TOTAL_BRACKET_BITS = 63
+
 # Progress reporting interval (print progress every N simulations)
 PROGRESS_INTERVAL = 1000
 
@@ -787,6 +797,120 @@ def get_parent_game_info(round_key: str, game_index: int) -> Optional[Tuple[str,
     slot = game_index % 2  # 0 = team1, 1 = team2
     
     return (parent_round_key, parent_game_index, slot)
+
+
+def get_fixed_bit_position(round_key: str, game_index: int) -> int:
+    """
+    Get the fixed bit position (0-62) for a specific game in the 63-bit full bracket string.
+    
+    Mapping:
+      Round 1 (32 games): bits 0-31
+      Round 2 (16 games): bits 32-47
+      Round 3 (8 games):  bits 48-55
+      Round 4 (4 games):  bits 56-59
+      Round 5 (2 games):  bits 60-61
+      Round 6 (1 game):   bit 62
+    """
+    round_idx = ROUND_KEYS.index(round_key)
+    return ROUND_BIT_OFFSETS[round_idx] + game_index
+
+
+def get_game_from_bit_position(bit_position: int) -> Tuple[str, int]:
+    """
+    Get the (round_key, game_index) for a given bit position (0-62).
+    Inverse of get_fixed_bit_position.
+    """
+    for round_idx in range(len(ROUND_KEYS) - 1, -1, -1):
+        if bit_position >= ROUND_BIT_OFFSETS[round_idx]:
+            game_index = bit_position - ROUND_BIT_OFFSETS[round_idx]
+            return (ROUND_KEYS[round_idx], game_index)
+    return (ROUND_KEYS[0], bit_position)  # Fallback to round 1
+
+
+def build_decided_games_bits(results_bracket: dict) -> Tuple[str, List[int]]:
+    """
+    Build a partial 63-bit string with decided game results.
+    Returns:
+      - base_bits: 63-char string with '1'/'0' for decided games, '?' for undecided
+      - decided_positions: list of bit positions that are decided
+    """
+    base_bits = ['?'] * TOTAL_BRACKET_BITS
+    decided_positions = []
+    
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        results_round = results_bracket.get(round_key, [])
+        offset = ROUND_BIT_OFFSETS[round_idx]
+        
+        for game_idx, game in enumerate(results_round):
+            if game:
+                winner = get_winner_name(game)
+                if winner:
+                    # Game is decided - determine which team won
+                    team1_name = get_team_name(game.get('team1'))
+                    bit_pos = offset + game_idx
+                    
+                    if winner == team1_name:
+                        base_bits[bit_pos] = '1'
+                    else:
+                        base_bits[bit_pos] = '0'
+                    decided_positions.append(bit_pos)
+    
+    return ''.join(base_bits), decided_positions
+
+
+def build_remaining_games_bit_mapping(remaining_games: List[Tuple[str, int]]) -> List[int]:
+    """
+    Build a mapping from short outcome string positions to full 63-bit positions.
+    
+    Returns:
+      List where index i is the 63-bit position for remaining_games[i]
+    """
+    return [get_fixed_bit_position(round_key, game_index) 
+            for round_key, game_index in remaining_games]
+
+
+def expand_to_full_bitstring(short_outcome: str, base_bits: str, 
+                              remaining_bit_positions: List[int]) -> str:
+    """
+    Expand a short outcome string (remaining games only) to a full 63-bit string.
+    
+    Args:
+        short_outcome: Variable-length string for remaining games ('0'/'1')
+        base_bits: 63-char string with decided games filled in ('1'/'0'/'?')
+        remaining_bit_positions: Mapping from short_outcome positions to 63-bit positions
+    
+    Returns:
+        Full 63-bit string with all games filled in
+    """
+    full_bits = list(base_bits)
+    
+    for i, bit_pos in enumerate(remaining_bit_positions):
+        full_bits[bit_pos] = short_outcome[i]
+    
+    return ''.join(full_bits)
+
+
+def expand_all_to_full_bitstrings(short_outcomes: List[str], base_bits: str,
+                                   remaining_bit_positions: List[int]) -> List[str]:
+    """
+    Expand all short outcome strings to full 63-bit strings.
+    
+    Args:
+        short_outcomes: List of variable-length outcome strings
+        base_bits: 63-char string with decided games filled in
+        remaining_bit_positions: Mapping from short positions to 63-bit positions
+    
+    Returns:
+        List of full 63-bit strings
+    """
+    results = []
+    total = len(short_outcomes)
+    
+    for i, short_outcome in enumerate(short_outcomes):
+        results.append(expand_to_full_bitstring(short_outcome, base_bits, remaining_bit_positions))
+        print_progress(i, total, "  Expanding to full bitstrings")
+    
+    return results
 
 
 def create_hypothetical_bracket(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
@@ -2277,8 +2401,20 @@ def calculate_win_probabilities(
             num_remaining, use_monte_carlo, None, num_simulations
         )
     
+    # Build mapping for full 63-bit expansion
+    print("  Building full bitstring mapping...")
+    base_bits, decided_positions = build_decided_games_bits(results_bracket)
+    remaining_bit_positions = build_remaining_games_bit_mapping(remaining_games)
+    print(f"    Decided games: {len(decided_positions)} bits, Remaining games: {len(remaining_bit_positions)} bits")
+    
+    # Expand to full 63-bit strings
+    print("  Expanding to full 63-bit strings...")
+    full_outcome_strings = expand_all_to_full_bitstrings(
+        outcome_strings, base_bits, remaining_bit_positions
+    )
+    
     t_step1 = time.time() - t_start
-    print(f"  Generated {len(outcome_strings):,} outcome strings in {t_step1:.2f}s")
+    print(f"  Generated {len(outcome_strings):,} short + {len(full_outcome_strings):,} full outcome strings in {t_step1:.2f}s")
     if enable_timing:
         timing_data['step1_generate_outcomes'] = t_step1
     
