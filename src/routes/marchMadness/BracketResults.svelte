@@ -1202,11 +1202,118 @@
     /**
      * Format preference as tuple string (Team1: X%, Team2: Y%)
      */
+    /**
+     * Generate a short abbreviation for a team name
+     * Starts with 2-3 chars, adds more only if needed to differentiate
+     */
+    function getTeamAbbreviation(teamName, otherTeamName) {
+        if (!teamName) return '??';
+        
+        // Helper to create abbreviation of given length
+        const makeAbbrev = (name, len) => {
+            // Remove common suffixes and clean up
+            const cleaned = name.replace(/\./g, '').replace(/St\s/g, 'St');
+            
+            // If it's short enough already, just use it
+            if (cleaned.length <= len) return cleaned;
+            
+            // Try to use capital letters / word starts
+            const words = cleaned.split(/[\s\/]+/);
+            if (words.length > 1) {
+                // Multi-word: use first letter of each word (all caps for acronym)
+                const initials = words.map(w => w[0]).join('').toUpperCase();
+                if (initials.length >= 2) return initials.slice(0, Math.max(len, initials.length));
+            }
+            
+            // Single word: take first N characters, capitalize only first letter
+            const abbrev = cleaned.slice(0, len);
+            return abbrev.charAt(0).toUpperCase() + abbrev.slice(1).toLowerCase();
+        };
+        
+        // Start with 3 characters
+        let len = 3;
+        let abbrev1 = makeAbbrev(teamName, len);
+        let abbrev2 = makeAbbrev(otherTeamName, len);
+        
+        // Increase length until they're different (up to 6 chars)
+        while (abbrev1 === abbrev2 && len < 6) {
+            len++;
+            abbrev1 = makeAbbrev(teamName, len);
+            abbrev2 = makeAbbrev(otherTeamName, len);
+        }
+        
+        return abbrev1;
+    }
+    
+    /**
+     * Format a percentage according to the rules:
+     * - >= 0.1%: 2 decimal places (e.g., 92.34%, 0.15%)
+     * - 0.001% to < 0.1%: round to thousandths (e.g., 0.045%)
+     * - < 0.001%: scientific notation with 3 sig figs (e.g., 8.22e-5%)
+     * - exactly 0: show "0%"
+     */
+    function formatProbabilityPercent(prob) {
+        if (prob === null || prob === undefined) return 'N/A';
+        
+        const pct = prob * 100;
+        
+        // Exactly 0
+        if (pct === 0) return '0%';
+        
+        // >= 0.1%: 2 decimal places
+        if (pct >= 0.1) {
+            return pct.toFixed(2) + '%';
+        }
+        
+        // 0.001% to < 0.1%: round to thousandths
+        if (pct >= 0.001) {
+            return pct.toFixed(3) + '%';
+        }
+        
+        // < 0.001%: scientific notation with 2 decimal places (3 sig figs)
+        return pct.toExponential(2) + '%';
+    }
+    
+    /**
+     * Format the ratio (max of t1/t2, t2/t1)
+     */
+    function formatRatio(t1, t2) {
+        if (t1 === 0 && t2 === 0) return '—';
+        if (t1 === 0 || t2 === 0) return '∞';
+        
+        const ratio = Math.max(t1 / t2, t2 / t1);
+        
+        if (ratio >= 100) {
+            return ratio.toFixed(0) + '×';
+        } else if (ratio >= 10) {
+            return ratio.toFixed(1) + '×';
+        } else {
+            return ratio.toFixed(2) + '×';
+        }
+    }
+    
     function formatPreferenceTuple(pref, team1Name, team2Name) {
         if (!pref) return 'N/A';
-        const t1Pct = (pref.team1 * 100).toFixed(0);
-        const t2Pct = (pref.team2 * 100).toFixed(0);
-        return `${team1Name}: ${t1Pct}%, ${team2Name}: ${t2Pct}%`;
+        
+        const t1 = pref.team1;
+        const t2 = pref.team2;
+        
+        // Get abbreviations
+        const abbrev1 = getTeamAbbreviation(team1Name, team2Name);
+        const abbrev2 = getTeamAbbreviation(team2Name, team1Name);
+        
+        // Format percentages
+        const t1Pct = formatProbabilityPercent(t1);
+        const t2Pct = formatProbabilityPercent(t2);
+        
+        // Calculate ratio
+        const ratio = formatRatio(t1, t2);
+        
+        // Calculate absolute difference
+        const diff = Math.abs(t1 - t2);
+        const diffPct = formatProbabilityPercent(diff);
+        
+        return `${abbrev1}: ${t1Pct}, ${abbrev2}: ${t2Pct}, ${ratio}, Δ${diffPct}`;
     }
 </script>
 
@@ -1451,8 +1558,8 @@
                             </div>
                             <div class="example-explanation">
                                 <div class="explanation-item"><strong>odds%</strong> — Vegas probability to win this game</div>
-                                <div class="explanation-item"><strong>+pts</strong> — Points riding on this team</div>
-                                <div class="explanation-item"><strong>(% scenarios)</strong> — Percent of winning scenarios they have each team winning</div>
+                                <div class="explanation-item"><strong>+pts</strong> — Points riding on this team winning</div>
+                                <div class="explanation-item"><strong>(team 1: %, team 2: %, ratio, difference)</strong> — Probability of winning given the outcomes and positive ratio and difference between them</div>
                             </div>
                         </div>
                     </div>

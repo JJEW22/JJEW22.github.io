@@ -848,6 +848,217 @@ def generate_random_outcome(num_games: int) -> str:
     return ''.join(str(random.randint(0, 1)) for _ in range(num_games))
 
 
+def find_remaining_teams(results_bracket: dict) -> List[str]:
+    """
+    Find all teams that are still alive (not eliminated).
+    A team is eliminated if they lost a game.
+    """
+    # Collect all teams that have lost
+    eliminated = set()
+    
+    for round_key in ROUND_KEYS:
+        results_round = results_bracket.get(round_key, [])
+        for game in results_round:
+            if not game:
+                continue
+            winner = get_team_name(game.get('winner'))
+            if winner:
+                team1 = get_team_name(game.get('team1'))
+                team2 = get_team_name(game.get('team2'))
+                if team1 and team1 != winner:
+                    eliminated.add(team1)
+                if team2 and team2 != winner:
+                    eliminated.add(team2)
+    
+    # Collect all teams still in the bracket
+    remaining = set()
+    for round_key in ROUND_KEYS:
+        results_round = results_bracket.get(round_key, [])
+        for game in results_round:
+            if not game:
+                continue
+            # Check team1 and team2 - if they're set and not eliminated, they're remaining
+            team1 = get_team_name(game.get('team1'))
+            team2 = get_team_name(game.get('team2'))
+            if team1 and team1 not in eliminated:
+                remaining.add(team1)
+            if team2 and team2 not in eliminated:
+                remaining.add(team2)
+    
+    return list(remaining)
+
+
+def compute_base_scores(results_bracket: dict, name_to_bracket: dict, teams_data: dict,
+                        apply_seed_bonus: bool, bonus_stars: Optional[Dict[str, int]] = None) -> Dict[str, int]:
+    """
+    Compute the base score for each participant from already-decided games.
+    This is the score locked in before any remaining games are simulated.
+    """
+    base_scores = {}
+    
+    for name, bracket in name_to_bracket.items():
+        score, _, _ = compute_score(results_bracket, bracket, teams_data, apply_seed_bonus)
+        if bonus_stars and name in bonus_stars:
+            score += bonus_stars[name]
+        base_scores[name] = score
+    
+    return base_scores
+
+
+def compute_score_delta(hypothetical_bracket: dict, picks_bracket: dict, teams_data: dict,
+                        apply_seed_bonus: bool, remaining_games: List[Tuple[str, int]]) -> int:
+    """
+    Compute only the score delta from remaining games (faster than full score computation).
+    """
+    delta = 0
+    
+    for round_key, game_index in remaining_games:
+        round_num = ROUND_KEYS.index(round_key) + 1
+        
+        hypo_game = hypothetical_bracket[round_key][game_index]
+        picks_round = picks_bracket.get(round_key, [])
+        
+        if game_index >= len(picks_round):
+            continue
+        
+        pick_game = picks_round[game_index]
+        if not pick_game:
+            continue
+        
+        hypo_winner = get_winner_name(hypo_game)
+        pick_winner = get_winner_name(pick_game)
+        
+        if not hypo_winner or not pick_winner:
+            continue
+        
+        if hypo_winner == pick_winner:
+            points = SCORE_FOR_ROUND[round_num]
+            delta += points
+            
+            # Apply upset bonus
+            if apply_seed_bonus:
+                team1_seed = get_team_seed(hypo_game.get('team1'), teams_data)
+                team2_seed = get_team_seed(hypo_game.get('team2'), teams_data)
+                winner_seed = get_team_seed(hypo_game.get('winner'), teams_data)
+                
+                if team1_seed and team2_seed and winner_seed:
+                    expected_winner_seed = min(team1_seed, team2_seed)
+                    if winner_seed > expected_winner_seed:
+                        upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[round_num]
+                        delta += upset_bonus
+    
+    return delta
+
+
+def generate_champion_stratified_outcomes(results_bracket: dict, remaining_games: List[Tuple[str, int]],
+                                          remaining_teams: List[str], num_per_team: int) -> List[str]:
+    """
+    Generate outcomes stratified by champion - ensure each remaining team wins in some outcomes.
+    For each team, we generate outcomes where that team wins the championship by:
+    1. Making that team win all their games
+    2. Randomizing other games
+    """
+    import copy
+    outcomes = []
+    num_games = len(remaining_games)
+    
+    for team_name in remaining_teams:
+        for _ in range(num_per_team):
+            # Start with random outcome
+            outcome_list = [random.randint(0, 1) for _ in range(num_games)]
+            
+            # Now force this team to win all their games
+            # We need to trace through the bracket to find which games this team plays in
+            hypo = copy.deepcopy(results_bracket)
+            
+            for i, (round_key, game_index) in enumerate(remaining_games):
+                game = hypo[round_key][game_index]
+                team1 = get_team_name(game.get('team1'))
+                team2 = get_team_name(game.get('team2'))
+                
+                # Determine winner based on current outcome
+                if outcome_list[i] == 1:
+                    winner_name = team1
+                    winner = game.get('team1')
+                else:
+                    winner_name = team2
+                    winner = game.get('team2')
+                
+                # If our target team is in this game, force them to win
+                if team1 == team_name:
+                    outcome_list[i] = 1
+                    winner = game.get('team1')
+                elif team2 == team_name:
+                    outcome_list[i] = 0
+                    winner = game.get('team2')
+                
+                # Apply winner
+                game['winner'] = winner
+                
+                # Propagate to next round
+                parent_info = get_parent_game_info(round_key, game_index)
+                if parent_info:
+                    parent_round, parent_index, slot = parent_info
+                    if parent_round in hypo and parent_index < len(hypo[parent_round]):
+                        parent_game = hypo[parent_round][parent_index]
+                        if slot == 0:
+                            parent_game['team1'] = winner
+                        else:
+                            parent_game['team2'] = winner
+            
+            outcomes.append(''.join(str(b) for b in outcome_list))
+    
+    return outcomes
+
+
+def generate_next_game_stratified_outcomes(results_bracket: dict, remaining_games: List[Tuple[str, int]],
+                                           next_games: List[Tuple[str, int]], num_outcomes: int) -> List[str]:
+    """
+    Generate outcomes stratified by next game results.
+    If we can enumerate all 2^N combinations for N next games, do that.
+    Otherwise, sample uniformly across next game combinations.
+    """
+    num_next = len(next_games)
+    num_remaining = len(remaining_games)
+    
+    # Find indices of next games within remaining games
+    next_game_indices = []
+    for ng in next_games:
+        try:
+            idx = remaining_games.index(ng)
+            next_game_indices.append(idx)
+        except ValueError:
+            pass
+    
+    outcomes = []
+    total_next_combos = 2 ** num_next
+    
+    if total_next_combos <= num_outcomes:
+        # Enumerate all combinations of next game outcomes
+        outcomes_per_combo = max(1, num_outcomes // total_next_combos)
+        
+        for combo_idx in range(total_next_combos):
+            next_game_bits = format(combo_idx, f'0{num_next}b')
+            
+            for _ in range(outcomes_per_combo):
+                # Generate random outcome
+                outcome_list = [random.randint(0, 1) for _ in range(num_remaining)]
+                
+                # Override with the specific next game combination
+                for i, ng_idx in enumerate(next_game_indices):
+                    outcome_list[ng_idx] = int(next_game_bits[i])
+                
+                outcomes.append(''.join(str(b) for b in outcome_list))
+    else:
+        # Sample uniformly across next game combinations
+        for _ in range(num_outcomes):
+            # Generate random outcome for all games
+            outcome_list = [random.randint(0, 1) for _ in range(num_remaining)]
+            outcomes.append(''.join(str(b) for b in outcome_list))
+    
+    return outcomes
+
+
 def decode_outcome_to_games(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
                             outcome_string: str) -> List[dict]:
     """
@@ -1549,26 +1760,44 @@ def compute_next_game_preferences(
             "preferences": {}
         }
         
+        # First pass: collect numerators for each participant
+        # numerator = sum of prob of participant's winning scenarios where team X wins
+        participant_team1_probs = {}  # name -> P(name wins AND team1 wins)
+        participant_team2_probs = {}  # name -> P(name wins AND team2 wins)
+        
         for name, outcomes in raw_winning_outcomes.items():
             if not outcomes:
-                game_prefs["preferences"][name] = None
+                participant_team1_probs[name] = 0.0
+                participant_team2_probs[name] = 0.0
                 continue
             
-            team1_prob = 0.0  # outcome char '0' means team1 wins
-            team2_prob = 0.0  # outcome char '1' means team2 wins
+            team1_prob = 0.0  # outcome char '1' means team1 wins
+            team2_prob = 0.0  # outcome char '0' means team2 wins
             
             for outcome_str, prob in outcomes.items():
                 if position < len(outcome_str):
-                    if outcome_str[position] == '0':
+                    if outcome_str[position] == '1':
                         team1_prob += prob
-                    else:  # '1'
+                    else:  # '0'
                         team2_prob += prob
             
-            total = team1_prob + team2_prob
-            if total > 0:
+            participant_team1_probs[name] = team1_prob
+            participant_team2_probs[name] = team2_prob
+        
+        # Second pass: compute denominators (sum across all participants)
+        # P(team1 wins) = sum of all participants' winning scenarios where team1 wins
+        total_team1_prob = sum(participant_team1_probs.values())
+        total_team2_prob = sum(participant_team2_probs.values())
+        
+        # Third pass: compute conditional probabilities
+        # P(name wins | team1 wins) = P(name wins AND team1 wins) / P(team1 wins)
+        for name in raw_winning_outcomes.keys():
+            if total_team1_prob > 0 or total_team2_prob > 0:
+                team1_cond = participant_team1_probs[name] / total_team1_prob if total_team1_prob > 0 else 0.0
+                team2_cond = participant_team2_probs[name] / total_team2_prob if total_team2_prob > 0 else 0.0
                 game_prefs["preferences"][name] = {
-                    "team1": team1_prob / total,
-                    "team2": team2_prob / total
+                    "team1": team1_cond,
+                    "team2": team2_cond
                 }
             else:
                 game_prefs["preferences"][name] = None
@@ -1665,12 +1894,88 @@ def calculate_win_probabilities(
     total_possible = 2 ** num_remaining
     use_monte_carlo = max_simulations is not None and total_possible > max_simulations
     
+    # Find next games (games where both teams are known) using existing function
+    next_games_full = find_next_games(results_bracket)  # Returns (round_key, game_index, team1, team2)
+    next_games_list = [(rk, gi) for rk, gi, _, _ in next_games_full]  # Just need (round_key, game_index)
+    num_next_games = len(next_games_list)
+    
+    # Find remaining teams (for champion stratification)
+    remaining_teams = find_remaining_teams(results_bracket)
+    num_remaining_teams = len(remaining_teams)
+    
+    print(f"Next games (ready to play): {num_next_games}")
+    for rk, gi, t1, t2 in next_games_full:
+        t1_name = get_team_name(t1) if t1 else "TBD"
+        t2_name = get_team_name(t2) if t2 else "TBD"
+        print(f"  {rk} game {gi}: {t1_name} vs {t2_name}")
+    print(f"Remaining teams: {num_remaining_teams}")
+    print(f"  {remaining_teams}")
+    
     if use_monte_carlo:
         num_simulations = max_simulations
         print(f"Total possible outcomes: {total_possible:,}")
         print(f"Using Monte Carlo sampling with {num_simulations:,} simulations")
+        
+        # Determine stratification approach
+        total_next_combos = 2 ** num_next_games
+        min_next_stratified = int(num_simulations * 0.25)  # Always at least 25%
+        
+        if total_next_combos < min_next_stratified:
+            # Few next-game combos - multiple simulations per combo to reach 25%
+            # Next game stratified: 25% of M (multiple sims per combo)
+            # Champion stratified: 12.5% of M (half of next game)
+            # Random: 62.5% of M
+            num_next_stratified = min_next_stratified
+            num_champion_stratified = min_next_stratified // 2
+            num_random = num_simulations - num_next_stratified - num_champion_stratified
+            sims_per_combo = num_next_stratified // total_next_combos
+            print(f"Stratification: {sims_per_combo} sims per next-game combo ({total_next_combos} combos)")
+        elif total_next_combos < 2 * num_simulations:
+            # Can enumerate all next-game combinations (one per combo)
+            # Next game stratified: 2^N outcomes (one per combination)
+            # Champion stratified: 2^N / 2 outcomes
+            # Random: remainder
+            num_next_stratified = total_next_combos
+            num_champion_stratified = total_next_combos // 2
+            num_random = max(0, num_simulations - num_next_stratified - num_champion_stratified)
+            print(f"Stratification: enumerate all {total_next_combos} next-game combos (1 sim each)")
+        else:
+            # Too many next-game combinations to enumerate
+            # Use percentage-based stratification: 25% next-game, 15% champion, 60% random
+            num_next_stratified = int(num_simulations * 0.25)
+            num_champion_stratified = int(num_simulations * 0.15)
+            num_random = num_simulations - num_next_stratified - num_champion_stratified
+            print(f"Stratification: sampling (too many next-game combos: {total_next_combos:,})")
+        
+        print(f"  Next-game stratified: {num_next_stratified:,}")
+        print(f"  Champion stratified: {num_champion_stratified:,}")
+        print(f"  Random: {num_random:,}")
+        
+        # Generate stratified outcomes
+        print("Generating stratified outcomes...")
+        
+        # Champion stratified outcomes
+        num_per_team = max(1, num_champion_stratified // num_remaining_teams) if num_remaining_teams > 0 else 0
+        champion_outcomes = generate_champion_stratified_outcomes(
+            results_bracket, remaining_games, remaining_teams, num_per_team
+        ) if num_per_team > 0 else []
+        
+        # Next-game stratified outcomes
+        next_game_outcomes = generate_next_game_stratified_outcomes(
+            results_bracket, remaining_games, next_games_list, num_next_stratified
+        ) if num_next_stratified > 0 else []
+        
+        # Random outcomes
+        random_outcomes = [generate_random_outcome(num_remaining) for _ in range(num_random)]
+        
+        # Combine all outcomes
+        all_outcomes = champion_outcomes + next_game_outcomes + random_outcomes
+        num_simulations = len(all_outcomes)
+        print(f"Total simulations after stratification: {num_simulations:,}")
+        
     else:
         num_simulations = total_possible
+        all_outcomes = None  # Will generate sequentially
         if max_simulations is not None:
             print(f"Total outcomes ({total_possible:,}) <= max_simulations ({max_simulations:,})")
         print(f"Simulating all {num_simulations:,} possible outcomes...")
@@ -1685,6 +1990,12 @@ def calculate_win_probabilities(
     
     # Calculate base probability per outcome (used for uniform case)
     base_probability = 1.0 / total_possible
+    
+    # Precompute base scores for each participant (scores from already-decided games)
+    print("Precomputing base scores...")
+    base_scores = compute_base_scores(results_bracket, name_to_bracket, teams_data, apply_seed_bonus, bonus_stars)
+    for name, score in base_scores.items():
+        print(f"  {name}: {score} points (locked in)")
     
     # Simulate outcomes
     total_probability_sum = 0.0  # Track sum of all outcome probabilities
@@ -1709,9 +2020,11 @@ def calculate_win_probabilities(
             print(f"\rProgress: {current_interval}/{total_intervals}", end='', flush=True)
         
         # Generate outcome
-        if use_monte_carlo:
-            outcome = generate_random_outcome(num_remaining)
+        if all_outcomes is not None:
+            # Monte Carlo with stratified outcomes
+            outcome = all_outcomes[i]
         else:
+            # Exhaustive enumeration
             outcome = format(i, f'0{num_remaining}b')
         
         # Create hypothetical results
@@ -1725,12 +2038,11 @@ def calculate_win_probabilities(
         
         total_probability_sum += outcome_probability
         
-        # Compute score for each participant
+        # Compute score for each participant using base score + delta
         all_scores = []
         for name, bracket in name_to_bracket.items():
-            score, _, _ = compute_score(hypothetical, bracket, teams_data, apply_seed_bonus)
-            if bonus_stars and name in bonus_stars:
-                score += bonus_stars[name]
+            delta = compute_score_delta(hypothetical, bracket, teams_data, apply_seed_bonus, remaining_games)
+            score = base_scores[name] + delta
             all_scores.append((name, score))
         
         # Sort by score

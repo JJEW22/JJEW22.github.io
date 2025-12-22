@@ -1,64 +1,64 @@
 ﻿TEAM,SEED,Region,prob_r32,prob_r16,prob_r8,prob_r4,prob_r2,prob_win
-Duke,1,East,1,1,1,1,0.424198,0.226823
-Auburn,1,South,1,1,0.530995,0.31143,0.179224,0.095833
-Florida,1,West,1,1,0.530995,0.31143,0.179224,0.095833
-Houston,1,Midwest,1,1,0.530995,0.31143,0.179224,0.095833
+Duke,1,East,1,1,0.835525,0.577599,0.148465,0.127323
+Houston,1,Midwest,1,0.192836,0.2319,0.128652,0.108494,0.093044
+Florida,1,West,1,1,0.607806,0.319776,0.076817,0.062564
+Auburn,1,South,1,0.061372,0.03432,0.018033,0.016813,0.013693
+Michigan St.,2,South,1,0.427908,0.415575,0.224705,0.137461,0.06776
+St. Johns,2,Midwest,1,0.495791,0.507662,0.23593,0.130546,0.06776
 Alabama,2,East,1,0,0,0,0,0
-Michigan St.,2,South,1,0.548075,0.325521,0.185412,0.103624,0.053811
 Tennesse,2,West,1,0,0,0,0,0
-St. Johns,2,Midwest,1,0,0,0,0,0
+Iowa St.,3,South,1,0.770177,0.236416,0.119094,0.116378,0.054208
+Kentucky,3,Midwest,1,0.649571,0.16811,0.072787,0.064335,0.031554
 Wisconsin,3,East,0,0,0,0,0,0
-Iowa St.,3,South,1,0,0,0,0,0
 Texas Tech.,3,West,1,0,0,0,0,0
-Kentucky,3,Midwest,1,0,0,0,0,0
-Arizona,4,East,1,0,0,0,0,0
-Texas A&M,4,South,1,0,0,0,0,0
+Texas A&M,4,South,1,0.067705,0.057738,0.029611,0.011822,0.007599
+Maryland,4,Midwest,1,0.323086,0.03216,0.017414,0.006289,0.004257
 Purdue,4,West,1,0,0,0,0,0
-Maryland,4,Midwest,1,0,0,0,0,0
-Oregon,5,East,1,1,0,0,0,0
-Michigan,5,South,1,1,0.469726,0.243708,0.124068,0.058686
-Clemson,5,West,1,1,0.469726,0.243708,0.124068,0.058686
-Memphis,5,Midwest,1,1,0.469726,0.243708,0.124068,0.058686
-BYU,6,East,1,1,1,0,0,0
-Ole Miss,6,South,1,1,0.454409,0.228073,0.112322,0.051397
-Illinois,6,West,1,1,1,0.410019,0.201928,0.0924
-Missouri,6,Midwest,1,1,1,0.410019,0.201928,0.0924
-Saint Mary's,7,East,1,1,0,0,0,0
-Marquette,7,South,0.527607,0.250839,0.126856,0.061524,0.029278,0.012946
-UCLA,7,West,1,1,0,0,0,0
-Kansas,7,Midwest,1,1,0,0,0,0
-MIssissippi St.,8,East,1,0,0,0,0,0
-Louisville,8,South,1,0,0,0,0,0
+Arizona,4,East,1,0,0,0,0,0
+Michigan,5,South,1,0.932295,0.534471,0.339656,0.22763,0.058528
+Clemson,5,West,1,1,0.392194,0.249565,0.043093,0.01108
+Oregon,5,East,1,1,0.164475,0.137521,0.025409,0.006879
+Memphis,5,Midwest,1,0.676914,0.045295,0.030393,0.018424,0.004988
+Illinois,6,West,1,1,0.844274,0.32866,0.083633,0.053759
+BYU,6,East,1,1,0.921674,0.249242,0.067864,0.045933
+Missouri,6,Midwest,1,0.350429,0.067057,0.012569,0.011228,0.007599
+Ole Miss,6,South,1,0.229823,0.052162,0.011375,0.011234,0.007221
+Kansas,7,Midwest,1,0.504209,0.257171,0.081101,0.037674,0.049037
+UCLA,7,West,1,1,0.155726,0.101998,0.013497,0.016684
+Saint Mary's,7,East,1,1,0.078326,0.035638,0.005046,0.006568
+Marquette,7,South,0.064372,0.028561,0.013817,0.00507,0.002604,0.003218
+UConn,8,Midwest,1,0.807164,0.690646,0.421155,0.376228,0.127323
+Louisville,8,South,1,0.938628,0.373471,0.215695,0.213028,0.068466
 Gonzaga,8,West,1,0,0,0,0,0
-UConn,8,Midwest,1,0,0,0,0,0
+MIssissippi St.,8,East,1,0,0,0,0,0
 Baylor,9,East,0,0,0,0,0,0
-Creighton,9,South,0,0,0,0,0,0
 Oklahoma,9,West,0,0,0,0,0,0
+Creighton,9,South,0,0,0,0,0,0
 Georgia,9,Midwest,0,0,0,0,0,0
+New Mexico,10,South,0.935628,0.543531,0.282029,0.036762,0.04599,0.002956
 Vanderbilt,10,East,0,0,0,0,0,0
-New Mexico,10,South,0.472393,0.201085,0.091052,0.039538,0.016846,0.006669
-Utah St.,10,West,0,0,0,0,0,0
 Arkansas,10,Midwest,0,0,0,0,0,0
+Utah St.,10,West,0,0,0,0,0,0
 VCU,11,East,0,0,0,0,0,0
+Drake,11,Midwest,0,0,0,0,0,0
 SD St./UNC,11,South,0,0,0,0,0,0
 Texas/Xavier,11,West,0,0,0,0,0,0
-Drake,11,Midwest,0,0,0,0,0,0
-Liberty,12,East,0,0,0,0,0,0
-UC San Diego,12,South,0,0,0,0,0,0
 McNeese,12,West,0,0,0,0,0,0
+UC San Diego,12,South,0,0,0,0,0,0
+Liberty,12,East,0,0,0,0,0,0
 Colorado St.,12,Midwest,0,0,0,0,0,0
-Akron,13,East,0,0,0,0,0,0
-Yale,13,South,0,0,0,0,0,0
 High Point,13,West,0,0,0,0,0,0
+Yale,13,South,0,0,0,0,0,0
 Grand Canyon,13,Midwest,0,0,0,0,0,0
-Montana,14,East,1,0,0,0,0,0
-Lipscomb,14,South,0,0,0,0,0,0
+Akron,13,East,0,0,0,0,0,0
 Troy,14,West,0,0,0,0,0,0
+Lipscomb,14,South,0,0,0,0,0,0
+Montana,14,East,1,0,0,0,0,0
 UNC Wilmington,14,Midwest,0,0,0,0,0,0
-Robert Morris,15,East,0,0,0,0,0,0
 Bryant,15,South,0,0,0,0,0,0
-Wofford,15,West,0,0,0,0,0,0
 Omaha,15,Midwest,0,0,0,0,0,0
+Robert Morris,15,East,0,0,0,0,0,0
+Wofford,15,West,0,0,0,0,0,0
 American/Mt. St. Mary,16,East,0,0,0,0,0,0
 Bama St./St. Fransis U,16,South,0,0,0,0,0,0
 Northfolk st.,16,West,0,0,0,0,0,0
