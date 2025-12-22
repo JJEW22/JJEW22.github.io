@@ -48,7 +48,8 @@
     let averagePlaces = {};  // Map of name -> average place
     let winningScenarios = {};  // Map of name -> array of winning scenarios
     let losingScenarios = {};  // Map of name -> array of losing scenarios
-    let nextGamePreferences = {};  // Map of game key -> preferences per participant
+    let nextGamePreferences = {};  // Map of game key -> preferences per participant (for winning)
+    let nextGameLosePreferences = {};  // Map of game key -> preferences per participant (for losing)
     let optimalBrackets = {};  // Map of name -> optimal bracket for max possible score
     
     // Star bonus data
@@ -496,6 +497,7 @@
                     winningScenarios = data.winning_scenarios || {};
                     losingScenarios = data.losing_scenarios || {};
                     nextGamePreferences = data.next_game_preferences || {};
+                    nextGameLosePreferences = data.next_game_lose_preferences || {};
                 } else if (data.probabilities) {
                     // Old format with just 'probabilities'
                     winProbabilities = data.probabilities;
@@ -504,6 +506,7 @@
                     winningScenarios = data.winning_scenarios || {};
                     losingScenarios = {};
                     nextGamePreferences = data.next_game_preferences || {};
+                    nextGameLosePreferences = {};
                 } else {
                     // Very old format - just probabilities object
                     winProbabilities = data;
@@ -512,6 +515,7 @@
                     winningScenarios = {};
                     losingScenarios = {};
                     nextGamePreferences = {};
+                    nextGameLosePreferences = {};
                 }
             } else {
                 // No probabilities file - leave empty
@@ -521,6 +525,7 @@
                 winningScenarios = {};
                 losingScenarios = {};
                 nextGamePreferences = {};
+                nextGameLosePreferences = {};
             }
         } catch (e) {
             console.log('No win probabilities file found');
@@ -530,6 +535,7 @@
             winningScenarios = {};
             losingScenarios = {};
             nextGamePreferences = {};
+            nextGameLosePreferences = {};
         }
     }
     
@@ -1194,9 +1200,28 @@
      * Returns { team1: percent, team2: percent } or null if no winning scenarios
      */
     function getPreference(gameKey, participantName) {
+        const winProb = winProbabilities[participantName] || 0;
+        
+        // If participant has 0% win probability, use lose preferences instead
+        if (winProb === 0) {
+            const gamePrefs = nextGameLosePreferences[gameKey];
+            if (!gamePrefs || !gamePrefs.preferences) return null;
+            const pref = gamePrefs.preferences[participantName] || null;
+            if (pref) {
+                // Mark this as a lose preference so we can style it differently
+                return { ...pref, isLosePreference: true };
+            }
+            return null;
+        }
+        
+        // Otherwise use win preferences
         const gamePrefs = nextGamePreferences[gameKey];
         if (!gamePrefs || !gamePrefs.preferences) return null;
-        return gamePrefs.preferences[participantName] || null;
+        const pref = gamePrefs.preferences[participantName] || null;
+        if (pref) {
+            return { ...pref, isLosePreference: false };
+        }
+        return null;
     }
     
     /**
@@ -1559,7 +1584,7 @@
                             <div class="example-explanation">
                                 <div class="explanation-item"><strong>odds%</strong> — Vegas probability to win this game</div>
                                 <div class="explanation-item"><strong>+pts</strong> — Points riding on this team winning</div>
-                                <div class="explanation-item"><strong>(team 1: %, team 2: %, ratio, difference)</strong> — Probability of winning given the outcomes and positive ratio and difference between them</div>
+                                <div class="explanation-item"><strong>(team1 %, team2 %, ratio, delta)</strong> — Odds of winning/<span class="lose-text">losing</span> based on which team wins w/ resulting positive ratio and difference</div>
                             </div>
                         </div>
                     </div>
@@ -1605,7 +1630,7 @@
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team1}</span>
-                                                        <span class="stake-pref">({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
                                                     </li>
                                                 {/if}
                                             {/each}
@@ -1624,7 +1649,7 @@
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team2}</span>
-                                                        <span class="stake-pref">({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
                                                     </li>
                                                 {/if}
                                             {/each}
@@ -1639,7 +1664,7 @@
                                                     {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
-                                                        <span class="stake-pref">({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
                                                     </li>
                                                 {/if}
                                             {/each}
@@ -2303,6 +2328,14 @@
         font-size: 0.8rem;
         color: #6b7280;
         font-style: italic;
+    }
+    
+    .stake-pref.lose-pref {
+        color: #b45309;  /* Muted red/orange for lose preferences */
+    }
+    
+    .lose-text {
+        color: #b45309;  /* Muted red/orange for "losing" text in legend */
     }
     
     h2 {

@@ -1710,20 +1710,24 @@ def find_next_games(results_bracket: dict) -> List[Tuple[str, int, dict, dict]]:
 
 
 def compute_next_game_preferences(
-    raw_winning_outcomes: Dict[str, Dict[str, float]],
+    raw_outcomes: Dict[str, Dict[str, float]],
     remaining_games: List[Tuple[str, int]],
     next_games: List[Tuple[str, int, dict, dict]],
-    results_bracket: dict
+    results_bracket: dict,
+    outcome_type: str = "winning"
 ) -> Dict[str, dict]:
     """
-    Compute what percentage of each participant's winning outcomes require each result
-    for each "next up" game.
+    Compute conditional probabilities for each participant given each next game outcome.
+    
+    For winning outcomes: P(participant wins | team X wins this game)
+    For losing outcomes: P(participant loses | team X wins this game)
     
     Args:
-        raw_winning_outcomes: Dict of {participant: {outcome_string: probability}}
+        raw_outcomes: Dict of {participant: {outcome_string: probability}}
         remaining_games: List of (round_key, game_index) tuples for all remaining games
         next_games: List of (round_key, game_index, team1, team2) for next games
         results_bracket: The results bracket
+        outcome_type: "winning" or "losing" - for logging purposes
         
     Returns:
         Dict mapping game keys to preference data:
@@ -1761,11 +1765,11 @@ def compute_next_game_preferences(
         }
         
         # First pass: collect numerators for each participant
-        # numerator = sum of prob of participant's winning scenarios where team X wins
-        participant_team1_probs = {}  # name -> P(name wins AND team1 wins)
-        participant_team2_probs = {}  # name -> P(name wins AND team2 wins)
+        # numerator = sum of prob of participant's outcomes where team X wins
+        participant_team1_probs = {}  # name -> P(name wins/loses AND team1 wins)
+        participant_team2_probs = {}  # name -> P(name wins/loses AND team2 wins)
         
-        for name, outcomes in raw_winning_outcomes.items():
+        for name, outcomes in raw_outcomes.items():
             if not outcomes:
                 participant_team1_probs[name] = 0.0
                 participant_team2_probs[name] = 0.0
@@ -1785,13 +1789,13 @@ def compute_next_game_preferences(
             participant_team2_probs[name] = team2_prob
         
         # Second pass: compute denominators (sum across all participants)
-        # P(team1 wins) = sum of all participants' winning scenarios where team1 wins
+        # P(team1 wins) = sum of all participants' outcomes where team1 wins
         total_team1_prob = sum(participant_team1_probs.values())
         total_team2_prob = sum(participant_team2_probs.values())
         
         # Third pass: compute conditional probabilities
-        # P(name wins | team1 wins) = P(name wins AND team1 wins) / P(team1 wins)
-        for name in raw_winning_outcomes.keys():
+        # P(name wins/loses | team1 wins) = P(name wins/loses AND team1 wins) / P(team1 wins)
+        for name in raw_outcomes.keys():
             if total_team1_prob > 0 or total_team2_prob > 0:
                 team1_cond = participant_team1_probs[name] / total_team1_prob if total_team1_prob > 0 else 0.0
                 team2_cond = participant_team2_probs[name] / total_team2_prob if total_team2_prob > 0 else 0.0
@@ -1816,7 +1820,7 @@ def calculate_win_probabilities(
     max_simulations: Optional[int] = None,
     bonus_stars: Optional[Dict[str, int]] = None,
     max_scenarios: int = DEFAULT_MAX_SCENARIOS
-) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, List], Dict[str, List], Dict]:
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, List], Dict[str, List], Dict, Dict]:
     """
     Calculate win probabilities for all participants.
     
@@ -1831,7 +1835,7 @@ def calculate_win_probabilities(
         max_scenarios: Maximum number of scenarios to keep per participant (for both winning and losing)
     
     Returns:
-        Tuple of (win_probabilities, lose_probabilities, average_places, winning_scenarios, losing_scenarios, next_game_prefs)
+        Tuple of (win_probabilities, lose_probabilities, average_places, winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs)
     """
     # Load results bracket
     results_bracket = load_bracket(results_path)
@@ -1887,8 +1891,11 @@ def calculate_win_probabilities(
         
         sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
         winner = sorted_scores[0][0]
-        probabilities = {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
-        return probabilities, {}, {}  # Empty winning_outcomes and next_game_prefs since tournament is over
+        loser = sorted_scores[-1][0]
+        win_probabilities = {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
+        lose_probabilities = {name: (1.0 if name == loser else 0.0) for name in name_to_bracket.keys()}
+        average_places = {name: float(i + 1) for i, (name, _) in enumerate(sorted_scores)}
+        return win_probabilities, lose_probabilities, average_places, {}, {}, {}, {}  # Empty scenarios and prefs since tournament is over
     
     # Determine simulation approach
     total_possible = 2 ** num_remaining
@@ -2121,11 +2128,23 @@ def calculate_win_probabilities(
     print("\nComputing next game preferences...")
     next_games = find_next_games(results_bracket)
     print(f"  Found {len(next_games)} next games")
+    
+    # Compute win preferences
     next_game_prefs = compute_next_game_preferences(
         raw_winning_outcomes,
         remaining_games,
         next_games,
-        results_bracket
+        results_bracket,
+        outcome_type="winning"
+    )
+    
+    # Compute lose preferences
+    next_game_lose_prefs = compute_next_game_preferences(
+        raw_losing_outcomes,
+        remaining_games,
+        next_games,
+        results_bracket,
+        outcome_type="losing"
     )
     
     # Process winning outcomes: merge similar ones and keep top N
@@ -2148,7 +2167,7 @@ def calculate_win_probabilities(
         outcome_type="losing"
     )
     
-    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs
+    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs
 
 
 def main():
@@ -2232,7 +2251,7 @@ def main():
     
     # Calculate probabilities
     (win_probabilities, lose_probabilities, average_places, 
-     winning_scenarios, losing_scenarios, next_game_prefs) = calculate_win_probabilities(
+     winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs) = calculate_win_probabilities(
         results_path=args.results,
         brackets_dir=args.brackets_dir,
         participants=participants,
@@ -2250,7 +2269,8 @@ def main():
         'average_places': average_places,
         'winning_scenarios': winning_scenarios,
         'losing_scenarios': losing_scenarios,
-        'next_game_preferences': next_game_prefs
+        'next_game_preferences': next_game_prefs,
+        'next_game_lose_preferences': next_game_lose_prefs
     }
     
     with open(args.output, 'w') as f:
