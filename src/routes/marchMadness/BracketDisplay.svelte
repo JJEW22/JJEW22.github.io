@@ -157,17 +157,26 @@
         const stakes = stakeData[gameKey];
         const team1Supporters = [];
         const team2Supporters = [];
+        const noStakes = [];
         
         for (const [name, data] of Object.entries(stakes)) {
-            if (data.team1 > 0) team1Supporters.push({ name, points: data.team1 });
-            if (data.team2 > 0) team2Supporters.push({ name, points: data.team2 });
+            if (data.team1 > 0) {
+                team1Supporters.push({ name, points: data.team1 });
+            } else if (data.team2 > 0) {
+                team2Supporters.push({ name, points: data.team2 });
+            } else {
+                // No stake in either team
+                noStakes.push(name);
+            }
         }
         
         // Sort by points descending
         team1Supporters.sort((a, b) => b.points - a.points);
         team2Supporters.sort((a, b) => b.points - a.points);
+        // Sort no stakes alphabetically
+        noStakes.sort((a, b) => a.localeCompare(b));
         
-        return { team1Supporters, team2Supporters };
+        return { team1Supporters, team2Supporters, noStakes };
     }
 
     /**
@@ -1364,7 +1373,7 @@
                         </div>
                     {/each}
                     {#if stakes.team1Supporters.length === 0}
-                        <div class="tooltip-row empty">No stakes</div>
+                        <div class="tooltip-row empty">-</div>
                     {/if}
                     {#if stakes.team1Supporters.length > 5}
                         <div class="tooltip-row more">+{stakes.team1Supporters.length - 5} more</div>
@@ -1379,10 +1388,24 @@
                         </div>
                     {/each}
                     {#if stakes.team2Supporters.length === 0}
-                        <div class="tooltip-row empty">No stakes</div>
+                        <div class="tooltip-row empty">-</div>
                     {/if}
                     {#if stakes.team2Supporters.length > 5}
                         <div class="tooltip-row more">+{stakes.team2Supporters.length - 5} more</div>
+                    {/if}
+                </div>
+                <div class="tooltip-column no-stake-column">
+                    <div class="tooltip-column-header">No Stake</div>
+                    {#each stakes.noStakes.slice(0, 5) as name}
+                        <div class="tooltip-row">
+                            <span class="supporter-name">{name}</span>
+                        </div>
+                    {/each}
+                    {#if stakes.noStakes.length === 0}
+                        <div class="tooltip-row empty">-</div>
+                    {/if}
+                    {#if stakes.noStakes.length > 5}
+                        <div class="tooltip-row more">+{stakes.noStakes.length - 5} more</div>
                     {/if}
                 </div>
             </div>
@@ -1652,6 +1675,15 @@
     .supporter-points {
         color: #059669;
         font-weight: 600;
+    }
+    
+    .tooltip-column.no-stake-column .tooltip-column-header {
+        color: #6b7280;
+    }
+    
+    .tooltip-column.no-stake-column .supporter-name {
+        color: #6b7280;
+        font-style: italic;
     }
     
     .tooltip-footer {

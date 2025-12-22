@@ -417,12 +417,35 @@
         if (!response.ok) throw new Error(`Failed to load teams: ${response.status}`);
         
         const csvText = await response.text();
-        const lines = csvText.trim().split('\n').slice(1); // Skip header
+        const lines = csvText.trim().split('\n');
+        const header = lines[0].split(',').map(s => s.trim().replace(/^\ufeff/, '')); // Remove BOM if present
         
-        teamsList = lines.map(line => {
-            const [name, seed, region] = line.split(',').map(s => s.trim());
-            const team = { name, seed: parseInt(seed), region };
-            teams[name] = team;
+        // Find column indices
+        const nameIdx = header.findIndex(h => h.toUpperCase() === 'TEAM');
+        const seedIdx = header.findIndex(h => h.toUpperCase() === 'SEED');
+        const regionIdx = header.findIndex(h => h.toUpperCase() === 'REGION');
+        const probR32Idx = header.findIndex(h => h.toLowerCase() === 'prob_r32');
+        const probR16Idx = header.findIndex(h => h.toLowerCase() === 'prob_r16');
+        const probR8Idx = header.findIndex(h => h.toLowerCase() === 'prob_r8');
+        const probR4Idx = header.findIndex(h => h.toLowerCase() === 'prob_r4');
+        const probR2Idx = header.findIndex(h => h.toLowerCase() === 'prob_r2');
+        const probWinIdx = header.findIndex(h => h.toLowerCase() === 'prob_win');
+        
+        teamsList = lines.slice(1).map(line => {
+            const cols = line.split(',').map(s => s.trim());
+            const team = { 
+                name: cols[nameIdx] || cols[0], 
+                seed: parseInt(cols[seedIdx] || cols[1]), 
+                region: cols[regionIdx] || cols[2],
+                // Probability of reaching each round (for vegas odds display)
+                prob_r32: probR32Idx >= 0 ? parseFloat(cols[probR32Idx]) || 0 : null,
+                prob_r16: probR16Idx >= 0 ? parseFloat(cols[probR16Idx]) || 0 : null,
+                prob_r8: probR8Idx >= 0 ? parseFloat(cols[probR8Idx]) || 0 : null,
+                prob_r4: probR4Idx >= 0 ? parseFloat(cols[probR4Idx]) || 0 : null,
+                prob_r2: probR2Idx >= 0 ? parseFloat(cols[probR2Idx]) || 0 : null,
+                prob_win: probWinIdx >= 0 ? parseFloat(cols[probWinIdx]) || 0 : null
+            };
+            teams[team.name] = team;
             return team;
         });
     }
@@ -892,6 +915,105 @@
         }
     }
     
+    /**
+     * Get the vegas odds (probability) for a team to win a game in a specific round.
+     * The probability is the team's chance of reaching the NEXT round.
+     * @param {Object} team - Team object with probability fields
+     * @param {number} round - Current round number (1-6)
+     * @returns {number|null} Probability or null if not available
+     */
+    function getVegasOdds(team, round) {
+        if (!team) return null;
+        
+        // Map round to the probability column for reaching the next round
+        const probMap = {
+            1: team.prob_r32,  // Round 1 → probability of reaching Round of 32
+            2: team.prob_r16,  // Round 2 → probability of reaching Sweet 16
+            3: team.prob_r8,   // Round 3 → probability of reaching Elite 8
+            4: team.prob_r4,   // Round 4 → probability of reaching Final Four
+            5: team.prob_r2,   // Round 5 → probability of reaching Championship
+            6: team.prob_win   // Round 6 → probability of winning
+        };
+        
+        return probMap[round] ?? null;
+    }
+    
+    /**
+     * Get vegas odds for both teams in a game and validate they sum to ~1
+     * @param {Object} team1 - First team
+     * @param {Object} team2 - Second team
+     * @param {number} round - Round number
+     * @returns {{ team1Odds: number|null, team2Odds: number|null, warning: string|null }}
+     */
+    function getGameOdds(team1, team2, round) {
+        const team1Odds = getVegasOdds(teams[team1?.name], round);
+        const team2Odds = getVegasOdds(teams[team2?.name], round);
+        
+        let warning = null;
+        
+        if (team1Odds !== null && team2Odds !== null) {
+            const sum = team1Odds + team2Odds;
+            if (Math.abs(sum - 1) > 0.01) {
+                warning = `Warning: Odds for ${team1?.name} vs ${team2?.name} sum to ${(sum * 100).toFixed(1)}% instead of 100%`;
+                console.warn(warning);
+            }
+        }
+        
+        return { team1Odds, team2Odds, warning };
+    }
+    
+    /**
+     * Format odds as percentage
+     */
+    function formatOdds(odds) {
+        if (odds === null || odds === undefined) return '-';
+        return `${(odds * 100).toFixed(1)}%`;
+    }
+    
+    /**
+     * Format a scheduled time for display
+     * @param {string} isoTime - ISO 8601 datetime string
+     * @returns {string} Formatted date/time string
+     */
+    function formatScheduledTime(isoTime) {
+        if (!isoTime) return null;
+        
+        try {
+            const date = new Date(isoTime);
+            
+            // Format: "Thu, Mar 19 at 12:15 PM ET"
+            const options = { 
+                weekday: 'short', 
+                month: 'short', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZone: 'America/New_York'
+            };
+            
+            const formatted = date.toLocaleString('en-US', options);
+            return `${formatted} ET`;
+        } catch (e) {
+            console.error('Error formatting time:', e);
+            return null;
+        }
+    }
+    
+    /**
+     * Get schedule info for a game
+     */
+    function getScheduleInfo(game) {
+        if (!game) return null;
+        
+        const scheduledTime = formatScheduledTime(game.scheduledTime);
+        const network = game.network || null;
+        const location = game.location || null;
+        
+        if (!scheduledTime && !network && !location) return null;
+        
+        return { scheduledTime, network, location };
+    }
+    
     function selectTab(tab) {
         activeTab = tab;
     }
@@ -1311,17 +1433,64 @@
                 <div class="stakes-view">
                     <h2>Stakes in Upcoming Games</h2>
                     
+                    <div class="stakes-legend">
+                        <p class="stakes-description">
+                            This shows what each participant has riding on upcoming games. Each column represents a team, showing who benefits if that team wins.
+                        </p>
+                        <div class="stakes-legend-example">
+                            <div class="example-column">
+                                <div class="example-header">
+                                    <span>Team Name (seed)</span>
+                                    <span class="vegas-odds-example">odds%</span>
+                                </div>
+                                <div class="example-row">
+                                    <span class="example-name">participant</span>
+                                    <span class="example-points">+pts</span>
+                                    <span class="example-pref">(% scenarios)</span>
+                                </div>
+                            </div>
+                            <div class="example-explanation">
+                                <div class="explanation-item"><strong>odds%</strong> — Vegas probability to win this game</div>
+                                <div class="explanation-item"><strong>+pts</strong> — Points riding on this team</div>
+                                <div class="explanation-item"><strong>(% scenarios)</strong> — Percent of winning scenarios they have each team winning</div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     {#if upcomingGames.length === 0}
                         <p class="no-data">No upcoming games found. The tournament may be complete or results haven't been entered.</p>
                     {:else}
                         {#each upcomingGames as gameInfo}
                             {@const gameKey = `r${gameInfo.round}-${gameInfo.index}`}
+                            {@const odds = getGameOdds(gameInfo.team1, gameInfo.team2, gameInfo.round)}
+                            {@const schedule = getScheduleInfo(gameInfo.game)}
                             <div class="stake-game" id="stake-game-{gameKey}">
-                                <h3>{getRoundName(gameInfo.round)}: {gameInfo.team1.name} vs {gameInfo.team2.name}</h3>
+                                <div class="stake-game-header">
+                                    <h3>{getRoundName(gameInfo.round)}: {gameInfo.team1.name} vs {gameInfo.team2.name}</h3>
+                                    {#if schedule}
+                                        <div class="game-schedule">
+                                            {#if schedule.scheduledTime}
+                                                <span class="schedule-time">📅 {schedule.scheduledTime}</span>
+                                            {/if}
+                                            {#if schedule.network}
+                                                <span class="schedule-network">📺 {schedule.network}</span>
+                                            {/if}
+                                            {#if schedule.location}
+                                                <span class="schedule-location">📍 {schedule.location}</span>
+                                            {/if}
+                                        </div>
+                                    {/if}
+                                </div>
+                                {#if odds.warning}
+                                    <p class="odds-warning">⚠️ {odds.warning}</p>
+                                {/if}
                                 
                                 <div class="stake-columns">
                                     <div class="stake-column">
-                                        <h4>{gameInfo.team1.name} ({gameInfo.team1.seed})</h4>
+                                        <h4>
+                                            <span>{gameInfo.team1.name} ({gameInfo.team1.seed})</span>
+                                            <span class="vegas-odds">{formatOdds(odds.team1Odds)}</span>
+                                        </h4>
                                         <ul class="stake-list">
                                             {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
                                                 {#if stake && stake.team1 > 0}
@@ -1337,7 +1506,10 @@
                                     </div>
                                     
                                     <div class="stake-column">
-                                        <h4>{gameInfo.team2.name} ({gameInfo.team2.seed})</h4>
+                                        <h4>
+                                            <span>{gameInfo.team2.name} ({gameInfo.team2.seed})</span>
+                                            <span class="vegas-odds">{formatOdds(odds.team2Odds)}</span>
+                                        </h4>
                                         <ul class="stake-list">
                                             {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
                                                 {#if stake && stake.team2 > 0}
@@ -1842,9 +2014,35 @@
         box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
     }
     
-    .stake-game h3 {
+    .stake-game-header {
         margin-bottom: 1rem;
+    }
+    
+    .stake-game h3 {
+        margin-bottom: 0.5rem;
         color: #1f2937;
+    }
+    
+    .game-schedule {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+    
+    .schedule-time {
+        color: #4b5563;
+        font-weight: 500;
+    }
+    
+    .schedule-network {
+        color: #2563eb;
+        font-weight: 500;
+    }
+    
+    .schedule-location {
+        color: #6b7280;
     }
     
     .stake-columns {
@@ -1864,6 +2062,106 @@
         margin-bottom: 0.75rem;
         padding-bottom: 0.5rem;
         border-bottom: 2px solid #0066cc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .vegas-odds {
+        font-weight: 600;
+        color: #059669;
+        font-size: 0.85rem;
+    }
+    
+    .odds-warning {
+        color: #b45309;
+        font-size: 0.8rem;
+        margin-bottom: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        background: #fef3c7;
+        border-radius: 4px;
+    }
+    
+    /* Stakes Legend */
+    .stakes-legend {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stakes-description {
+        margin: 0 0 1rem 0;
+        font-size: 0.9rem;
+        color: #4b5563;
+        line-height: 1.5;
+    }
+    
+    .stakes-legend-example {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        align-items: flex-start;
+    }
+    
+    .example-column {
+        background: white;
+        border-radius: 6px;
+        padding: 0.75rem;
+        min-width: 200px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .example-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 2px solid #0066cc;
+    }
+    
+    .example-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+    
+    .example-name {
+        flex: 1;
+        font-style: italic;
+    }
+    
+    .example-points {
+        color: #059669;
+        font-weight: 600;
+    }
+    
+    .example-pref {
+        color: #6b7280;
+        font-size: 0.75rem;
+    }
+    
+    .example-explanation {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+    
+    .explanation-item {
+        line-height: 1.4;
+    }
+    
+    .vegas-odds-example {
+        color: #059669;
+        font-weight: 600;
     }
     
     .stake-column.no-stake h4 {
