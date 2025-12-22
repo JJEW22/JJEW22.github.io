@@ -14,6 +14,7 @@ import os
 import argparse
 import random
 import csv
+import time
 from typing import Dict, List, Optional, Set, Tuple
 
 # Scoring constants - MUST be loaded from config file
@@ -1811,6 +1812,241 @@ def compute_next_game_preferences(
     return preferences
 
 
+# =============================================================================
+# BATCHED SIMULATION FUNCTIONS
+# =============================================================================
+
+def print_progress(current: int, total: int, prefix: str = "  Progress"):
+    """Print a progress indicator."""
+    if total < 1000:
+        # For small totals, don't bother with progress
+        return
+    
+    # Update every 1% or every 10000, whichever is more frequent
+    interval = max(1, min(total // 100, 10000))
+    if current % interval == 0 or current == total - 1:
+        pct = (current + 1) / total * 100
+        print(f"\r{prefix}: {current + 1:,}/{total:,} ({pct:.1f}%)", end='', flush=True)
+        if current == total - 1:
+            print()  # Newline at end
+
+
+def generate_all_outcome_strings(
+    num_remaining: int,
+    use_monte_carlo: bool,
+    all_outcomes_stratified: Optional[List[str]],
+    num_simulations: int
+) -> List[str]:
+    """
+    Generate all outcome strings for simulation.
+    
+    Args:
+        num_remaining: Number of remaining games
+        use_monte_carlo: Whether using Monte Carlo sampling
+        all_outcomes_stratified: Pre-generated stratified outcomes (if Monte Carlo)
+        num_simulations: Total number of simulations to run
+        
+    Returns:
+        List of outcome strings (each string is num_remaining bits, '0' or '1')
+    """
+    if use_monte_carlo and all_outcomes_stratified is not None:
+        return all_outcomes_stratified
+    else:
+        # Exhaustive enumeration
+        results = []
+        for i in range(num_simulations):
+            results.append(format(i, f'0{num_remaining}b'))
+            print_progress(i, num_simulations, "  Generating")
+        return results
+
+
+def calculate_all_outcome_probabilities(
+    outcome_strings: List[str],
+    results_bracket: dict,
+    remaining_games: List[Tuple[str, int]],
+    teams_data: dict,
+    has_prob_data: bool,
+    base_probability: float
+) -> List[float]:
+    """
+    Calculate the probability of each outcome.
+    Creates hypothetical brackets on the fly to avoid memory overhead.
+    
+    Args:
+        outcome_strings: List of outcome strings
+        results_bracket: The current results bracket
+        remaining_games: List of (round_key, game_index) for remaining games
+        teams_data: Team data with probability columns
+        has_prob_data: Whether probability data is available
+        base_probability: Uniform probability (1/total_outcomes) for fallback
+        
+    Returns:
+        List of probabilities (one per outcome)
+    """
+    if has_prob_data:
+        results = []
+        total = len(outcome_strings)
+        for i, outcome in enumerate(outcome_strings):
+            # Create bracket on the fly, compute probability, let it be garbage collected
+            hypo = create_hypothetical_bracket(results_bracket, remaining_games, outcome)
+            results.append(calculate_outcome_probability(hypo, teams_data))
+            print_progress(i, total, "  Calculating probs")
+        return results
+    else:
+        return [base_probability] * len(outcome_strings)
+
+
+def calculate_all_scores_batched(
+    outcome_strings: List[str],
+    results_bracket: dict,
+    remaining_games: List[Tuple[str, int]],
+    name_to_bracket: Dict[str, dict],
+    teams_data: dict,
+    apply_seed_bonus: bool,
+    base_scores: Dict[str, int]
+) -> Dict[str, List[int]]:
+    """
+    Calculate scores for all participants across all outcomes.
+    Creates hypothetical brackets on the fly to avoid memory overhead.
+    
+    Args:
+        outcome_strings: List of outcome strings
+        results_bracket: The current results bracket
+        remaining_games: List of (round_key, game_index) for remaining games
+        name_to_bracket: Dict mapping participant name to their bracket
+        teams_data: Team data for seed bonuses
+        apply_seed_bonus: Whether to apply upset bonuses
+        base_scores: Pre-computed base scores for each participant
+        
+    Returns:
+        Dict mapping participant name to list of scores (one per outcome)
+    """
+    all_scores = {name: [] for name in name_to_bracket.keys()}
+    total = len(outcome_strings)
+    
+    for i, outcome in enumerate(outcome_strings):
+        # Create bracket on the fly, compute scores, let it be garbage collected
+        hypo = create_hypothetical_bracket(results_bracket, remaining_games, outcome)
+        for name, bracket in name_to_bracket.items():
+            delta = compute_score_delta(hypo, bracket, teams_data, apply_seed_bonus, remaining_games)
+            score = base_scores[name] + delta
+            all_scores[name].append(score)
+        print_progress(i, total, "  Scoring outcomes")
+    
+    return all_scores
+
+
+def determine_winners_and_losers(
+    all_scores: Dict[str, List[int]],
+    num_outcomes: int
+) -> Tuple[List[str], List[str], List[List[Tuple[str, int]]]]:
+    """
+    Determine who won and who lost each outcome.
+    
+    Args:
+        all_scores: Dict mapping participant name to list of scores
+        num_outcomes: Number of outcomes
+        
+    Returns:
+        Tuple of:
+        - winners: List of winner names (one per outcome)
+        - losers: List of loser names (one per outcome)
+        - all_sorted_scores: List of sorted [(name, score), ...] for each outcome
+    """
+    participants = list(all_scores.keys())
+    winners = []
+    losers = []
+    all_sorted_scores = []
+    
+    for i in range(num_outcomes):
+        # Get scores for this outcome
+        scores_for_outcome = [(name, all_scores[name][i]) for name in participants]
+        
+        # Sort by score descending
+        sorted_scores = sorted(scores_for_outcome, key=lambda x: x[1], reverse=True)
+        
+        winners.append(sorted_scores[0][0])  # First place
+        losers.append(sorted_scores[-1][0])  # Last place
+        all_sorted_scores.append(sorted_scores)
+        print_progress(i, num_outcomes, "  Sorting outcomes")
+    
+    return winners, losers, all_sorted_scores
+
+
+def accumulate_results(
+    outcome_strings: List[str],
+    outcome_probabilities: List[float],
+    winners: List[str],
+    losers: List[str],
+    all_sorted_scores: List[List[Tuple[str, int]]],
+    participants: List[str]
+) -> Tuple[
+    float,  # total_probability_sum
+    Dict[str, float],  # win_probability_sum
+    Dict[str, float],  # lose_probability_sum
+    Dict[str, float],  # place_probability_sum
+    Dict[str, Dict[str, float]],  # raw_winning_outcomes
+    Dict[str, Dict[str, float]]   # raw_losing_outcomes
+]:
+    """
+    Accumulate results from all simulations.
+    
+    Args:
+        outcome_strings: List of outcome strings
+        outcome_probabilities: List of probabilities
+        winners: List of winner names per outcome
+        losers: List of loser names per outcome
+        all_sorted_scores: Sorted scores for each outcome
+        participants: List of participant names
+        
+    Returns:
+        Tuple of accumulated results
+    """
+    total_probability_sum = 0.0
+    win_probability_sum = {name: 0.0 for name in participants}
+    lose_probability_sum = {name: 0.0 for name in participants}
+    place_probability_sum = {name: 0.0 for name in participants}
+    raw_winning_outcomes = {name: {} for name in participants}
+    raw_losing_outcomes = {name: {} for name in participants}
+    
+    num_outcomes = len(outcome_strings)
+    
+    for i, (outcome, prob) in enumerate(zip(outcome_strings, outcome_probabilities)):
+        total_probability_sum += prob
+        
+        # Record winner
+        winner = winners[i]
+        win_probability_sum[winner] += prob
+        if outcome not in raw_winning_outcomes[winner]:
+            raw_winning_outcomes[winner][outcome] = prob
+        else:
+            raw_winning_outcomes[winner][outcome] += prob
+        
+        # Record loser
+        loser = losers[i]
+        lose_probability_sum[loser] += prob
+        if outcome not in raw_losing_outcomes[loser]:
+            raw_losing_outcomes[loser][outcome] = prob
+        else:
+            raw_losing_outcomes[loser][outcome] += prob
+        
+        # Record places for average calculation
+        sorted_scores = all_sorted_scores[i]
+        for place, (name, score) in enumerate(sorted_scores):
+            place_probability_sum[name] += (place + 1) * prob
+        
+        print_progress(i, num_outcomes, "  Accumulating")
+    
+    return (
+        total_probability_sum,
+        win_probability_sum,
+        lose_probability_sum,
+        place_probability_sum,
+        raw_winning_outcomes,
+        raw_losing_outcomes
+    )
+
+
 def calculate_win_probabilities(
     results_path: str,
     brackets_dir: str,
@@ -1819,8 +2055,9 @@ def calculate_win_probabilities(
     apply_seed_bonus: bool = True,
     max_simulations: Optional[int] = None,
     bonus_stars: Optional[Dict[str, int]] = None,
-    max_scenarios: int = DEFAULT_MAX_SCENARIOS
-) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, List], Dict[str, List], Dict, Dict]:
+    max_scenarios: int = DEFAULT_MAX_SCENARIOS,
+    enable_timing: bool = False
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, List], Dict[str, List], Dict, Dict, Optional[Dict]]:
     """
     Calculate win probabilities for all participants.
     
@@ -1833,10 +2070,15 @@ def calculate_win_probabilities(
         max_simulations: Max number of simulations (uses Monte Carlo if exceeded)
         bonus_stars: Optional dict of {name: bonus_points}
         max_scenarios: Maximum number of scenarios to keep per participant (for both winning and losing)
+        enable_timing: Whether to track timing of each step
     
     Returns:
-        Tuple of (win_probabilities, lose_probabilities, average_places, winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs)
+        Tuple of (win_probabilities, lose_probabilities, average_places, winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs, timing_data)
+        timing_data is None if enable_timing is False
     """
+    # Initialize timing data
+    timing_data = {} if enable_timing else None
+    
     # Load results bracket
     results_bracket = load_bracket(results_path)
     
@@ -1895,7 +2137,7 @@ def calculate_win_probabilities(
         win_probabilities = {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
         lose_probabilities = {name: (1.0 if name == loser else 0.0) for name in name_to_bracket.keys()}
         average_places = {name: float(i + 1) for i, (name, _) in enumerate(sorted_scores)}
-        return win_probabilities, lose_probabilities, average_places, {}, {}, {}, {}  # Empty scenarios and prefs since tournament is over
+        return win_probabilities, lose_probabilities, average_places, {}, {}, {}, {}, None  # Empty scenarios and prefs since tournament is over
     
     # Determine simulation approach
     total_possible = 2 ** num_remaining
@@ -1958,31 +2200,19 @@ def calculate_win_probabilities(
         print(f"  Champion stratified: {num_champion_stratified:,}")
         print(f"  Random: {num_random:,}")
         
-        # Generate stratified outcomes
-        print("Generating stratified outcomes...")
-        
-        # Champion stratified outcomes
-        num_per_team = max(1, num_champion_stratified // num_remaining_teams) if num_remaining_teams > 0 else 0
-        champion_outcomes = generate_champion_stratified_outcomes(
-            results_bracket, remaining_games, remaining_teams, num_per_team
-        ) if num_per_team > 0 else []
-        
-        # Next-game stratified outcomes
-        next_game_outcomes = generate_next_game_stratified_outcomes(
-            results_bracket, remaining_games, next_games_list, num_next_stratified
-        ) if num_next_stratified > 0 else []
-        
-        # Random outcomes
-        random_outcomes = [generate_random_outcome(num_remaining) for _ in range(num_random)]
-        
-        # Combine all outcomes
-        all_outcomes = champion_outcomes + next_game_outcomes + random_outcomes
-        num_simulations = len(all_outcomes)
-        print(f"Total simulations after stratification: {num_simulations:,}")
+        # Store stratification params for Step 1
+        stratification_params = {
+            'num_champion_stratified': num_champion_stratified,
+            'num_next_stratified': num_next_stratified,
+            'num_random': num_random,
+            'num_per_team': max(1, num_champion_stratified // num_remaining_teams) if num_remaining_teams > 0 else 0,
+            'remaining_teams': remaining_teams,
+            'next_games_list': next_games_list,
+        }
         
     else:
         num_simulations = total_possible
-        all_outcomes = None  # Will generate sequentially
+        stratification_params = None  # Will generate sequentially
         if max_simulations is not None:
             print(f"Total outcomes ({total_possible:,}) <= max_simulations ({max_simulations:,})")
         print(f"Simulating all {num_simulations:,} possible outcomes...")
@@ -2004,85 +2234,110 @@ def calculate_win_probabilities(
     for name, score in base_scores.items():
         print(f"  {name}: {score} points (locked in)")
     
-    # Simulate outcomes
-    total_probability_sum = 0.0  # Track sum of all outcome probabilities
-    win_probability_sum = {name: 0.0 for name in name_to_bracket.keys()}  # Sum of probabilities where each person wins
-    lose_probability_sum = {name: 0.0 for name in name_to_bracket.keys()}  # Sum of probabilities where each person loses (last place)
-    place_probability_sum = {name: 0.0 for name in name_to_bracket.keys()}  # Weighted sum of places for average calculation
-    # Store ALL winning and losing outcomes with their probabilities
-    raw_winning_outcomes = {name: {} for name in name_to_bracket.keys()}  # name -> {outcome: probability}
-    raw_losing_outcomes = {name: {} for name in name_to_bracket.keys()}  # name -> {outcome: probability}
+    # ==========================================================================
+    # BATCHED SIMULATION
+    # ==========================================================================
     
-    num_participants = len(name_to_bracket)
+    participants = list(name_to_bracket.keys())
     
-    # Calculate progress intervals
-    total_intervals = num_simulations // PROGRESS_INTERVAL if num_simulations >= PROGRESS_INTERVAL else 1
+    # Step 1: Generate all outcome strings
+    print("\nStep 1: Generating outcome strings...")
+    t_start = time.time()
     
-    print(f"Progress: ", end='', flush=True)
+    if use_monte_carlo and stratification_params:
+        # Generate stratified outcomes
+        print("  Generating stratified outcomes...")
+        
+        # Champion stratified outcomes
+        num_per_team = stratification_params['num_per_team']
+        champion_outcomes = generate_champion_stratified_outcomes(
+            results_bracket, remaining_games, stratification_params['remaining_teams'], num_per_team
+        ) if num_per_team > 0 else []
+        print(f"    Champion stratified: {len(champion_outcomes):,} outcomes")
+        
+        # Next-game stratified outcomes
+        next_game_outcomes = generate_next_game_stratified_outcomes(
+            results_bracket, remaining_games, stratification_params['next_games_list'], 
+            stratification_params['num_next_stratified']
+        ) if stratification_params['num_next_stratified'] > 0 else []
+        print(f"    Next-game stratified: {len(next_game_outcomes):,} outcomes")
+        
+        # Random outcomes
+        num_random = stratification_params['num_random']
+        random_outcomes = [generate_random_outcome(num_remaining) for _ in range(num_random)]
+        print(f"    Random: {len(random_outcomes):,} outcomes")
+        
+        # Combine all outcomes
+        outcome_strings = champion_outcomes + next_game_outcomes + random_outcomes
+        num_simulations = len(outcome_strings)
+        print(f"  Total after stratification: {num_simulations:,}")
+    else:
+        # Exhaustive enumeration
+        outcome_strings = generate_all_outcome_strings(
+            num_remaining, use_monte_carlo, None, num_simulations
+        )
     
-    for i in range(num_simulations):
-        # Progress reporting
-        if PROGRESS_INTERVAL > 0 and (i + 1) % PROGRESS_INTERVAL == 0:
-            current_interval = (i + 1) // PROGRESS_INTERVAL
-            print(f"\rProgress: {current_interval}/{total_intervals}", end='', flush=True)
-        
-        # Generate outcome
-        if all_outcomes is not None:
-            # Monte Carlo with stratified outcomes
-            outcome = all_outcomes[i]
-        else:
-            # Exhaustive enumeration
-            outcome = format(i, f'0{num_remaining}b')
-        
-        # Create hypothetical results
-        hypothetical = create_hypothetical_bracket(results_bracket, remaining_games, outcome)
-        
-        # Calculate probability of this specific outcome
-        if has_prob_data:
-            outcome_probability = calculate_outcome_probability(hypothetical, teams_data)
-        else:
-            outcome_probability = base_probability
-        
-        total_probability_sum += outcome_probability
-        
-        # Compute score for each participant using base score + delta
-        all_scores = []
-        for name, bracket in name_to_bracket.items():
-            delta = compute_score_delta(hypothetical, bracket, teams_data, apply_seed_bonus, remaining_games)
-            score = base_scores[name] + delta
-            all_scores.append((name, score))
-        
-        # Sort by score
-        sorted_scores = sorted(all_scores, key=lambda x: x[1], reverse=True)
-        
-        # Record places, track winner and loser
-        last_place = num_participants - 1
-        for place, (name, score) in enumerate(sorted_scores):
-            # Track weighted place for average calculation
-            place_probability_sum[name] += (place + 1) * outcome_probability
-            
-            # Check for winner (first place)
-            if place == 0:
-                win_probability_sum[name] += outcome_probability
-                # Store this winning outcome with its probability
-                if outcome not in raw_winning_outcomes[name]:
-                    raw_winning_outcomes[name][outcome] = outcome_probability
-                else:
-                    # For Monte Carlo, might see same outcome multiple times
-                    raw_winning_outcomes[name][outcome] += outcome_probability
-            
-            # Check for loser (last place)
-            if place == last_place:
-                lose_probability_sum[name] += outcome_probability
-                # Store this losing outcome with its probability
-                if outcome not in raw_losing_outcomes[name]:
-                    raw_losing_outcomes[name][outcome] = outcome_probability
-                else:
-                    # For Monte Carlo, might see same outcome multiple times
-                    raw_losing_outcomes[name][outcome] += outcome_probability
+    t_step1 = time.time() - t_start
+    print(f"  Generated {len(outcome_strings):,} outcome strings in {t_step1:.2f}s")
+    if enable_timing:
+        timing_data['step1_generate_outcomes'] = t_step1
     
-    # Clear progress line
-    print(f"\rProgress: {total_intervals}/{total_intervals} - Complete!          ")
+    # Step 2: Calculate probability of each outcome
+    # (creates hypothetical brackets on the fly to save memory)
+    print("Step 2: Calculating outcome probabilities...")
+    t_start = time.time()
+    outcome_probabilities = calculate_all_outcome_probabilities(
+        outcome_strings, results_bracket, remaining_games,
+        teams_data, has_prob_data, base_probability
+    )
+    t_step2 = time.time() - t_start
+    print(f"  Calculated {len(outcome_probabilities):,} probabilities")
+    if enable_timing:
+        timing_data['step2_calculate_probabilities'] = t_step2
+    
+    # Step 3: Calculate scores for all participants across all outcomes
+    # (creates hypothetical brackets on the fly to save memory)
+    print("Step 3: Calculating all scores...")
+    t_start = time.time()
+    all_scores = calculate_all_scores_batched(
+        outcome_strings, results_bracket, remaining_games,
+        name_to_bracket, teams_data, apply_seed_bonus, base_scores
+    )
+    t_step3 = time.time() - t_start
+    print(f"  Calculated scores for {len(all_scores)} participants across {len(outcome_strings):,} outcomes")
+    if enable_timing:
+        timing_data['step3_calculate_scores'] = t_step3
+    
+    # Step 4: Determine winners and losers
+    print("Step 4: Determining winners and losers...")
+    t_start = time.time()
+    winners, losers, all_sorted_scores = determine_winners_and_losers(
+        all_scores, len(outcome_strings)
+    )
+    t_step4 = time.time() - t_start
+    print(f"  Processed {len(winners):,} outcomes")
+    if enable_timing:
+        timing_data['step4_determine_winners'] = t_step4
+    
+    # Step 5: Accumulate results
+    print("Step 5: Accumulating results...")
+    t_start = time.time()
+    (
+        total_probability_sum,
+        win_probability_sum,
+        lose_probability_sum,
+        place_probability_sum,
+        raw_winning_outcomes,
+        raw_losing_outcomes
+    ) = accumulate_results(
+        outcome_strings, outcome_probabilities, winners, losers, 
+        all_sorted_scores, participants
+    )
+    t_step5 = time.time() - t_start
+    print(f"  Total probability sum: {total_probability_sum:.6f}")
+    if enable_timing:
+        timing_data['step5_accumulate_results'] = t_step5
+        timing_data['num_simulations'] = len(outcome_strings)
     
     # Normalize probabilities (they should sum to 1, but might not due to floating point)
     if total_probability_sum > 0:
@@ -2147,8 +2402,12 @@ def calculate_win_probabilities(
         outcome_type="losing"
     )
     
+    # Step 6: Process/merge outcomes and generate final brackets
+    print("\nStep 6: Merging and generating final brackets...")
+    t_start = time.time()
+    
     # Process winning outcomes: merge similar ones and keep top N
-    print("\nProcessing winning scenarios...")
+    print("  Processing winning scenarios...")
     processed_winning = process_outcomes(
         raw_winning_outcomes, 
         results_bracket, 
@@ -2158,7 +2417,7 @@ def calculate_win_probabilities(
     )
     
     # Process losing outcomes: merge similar ones and keep top N
-    print("\nProcessing losing scenarios...")
+    print("  Processing losing scenarios...")
     processed_losing = process_outcomes(
         raw_losing_outcomes, 
         results_bracket, 
@@ -2167,7 +2426,11 @@ def calculate_win_probabilities(
         outcome_type="losing"
     )
     
-    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs
+    t_step6 = time.time() - t_start
+    if enable_timing:
+        timing_data['step6_merge_and_generate'] = t_step6
+    
+    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs, timing_data
 
 
 def main():
@@ -2186,6 +2449,8 @@ def main():
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducible results')
     parser.add_argument('--config', default=None, help='Path to scoring-config.json file')
     parser.add_argument('--star-bonuses', default=None, help='Path to starBonuses.json file')
+    parser.add_argument('--timing', action='store_true', help='Enable timing profiling of simulation steps')
+    parser.add_argument('--timing-output', default='timing_results.csv', help='Output CSV file for timing results')
     
     args = parser.parse_args()
     
@@ -2251,7 +2516,7 @@ def main():
     
     # Calculate probabilities
     (win_probabilities, lose_probabilities, average_places, 
-     winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs) = calculate_win_probabilities(
+     winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs, timing_data) = calculate_win_probabilities(
         results_path=args.results,
         brackets_dir=args.brackets_dir,
         participants=participants,
@@ -2259,7 +2524,8 @@ def main():
         apply_seed_bonus=not args.no_seed_bonus,
         max_simulations=args.max_simulations,
         max_scenarios=args.max_scenarios,
-        bonus_stars=participant_bonuses
+        bonus_stars=participant_bonuses,
+        enable_timing=args.timing
     )
     
     # Save to JSON (include all probabilities, scenarios, and preferences)
@@ -2277,6 +2543,74 @@ def main():
         json.dump(output_data, f, indent=2)
     
     print(f"\nResults saved to {args.output}")
+    
+    # Write timing results if enabled
+    if args.timing and timing_data:
+        num_sims = timing_data.get('num_simulations', 1)
+        
+        # Calculate totals
+        step_times = {
+            'step1_generate_outcomes': timing_data.get('step1_generate_outcomes', 0),
+            'step2_calculate_probabilities': timing_data.get('step2_calculate_probabilities', 0),
+            'step3_calculate_scores': timing_data.get('step3_calculate_scores', 0),
+            'step4_determine_winners': timing_data.get('step4_determine_winners', 0),
+            'step5_accumulate_results': timing_data.get('step5_accumulate_results', 0),
+            'step6_merge_and_generate': timing_data.get('step6_merge_and_generate', 0),
+        }
+        total_time = sum(step_times.values())
+        
+        # Prepare CSV rows
+        step_names = {
+            'step1_generate_outcomes': 'generate_all_outcome_strings',
+            'step2_calculate_probabilities': 'calculate_all_outcome_probabilities',
+            'step3_calculate_scores': 'calculate_all_scores_batched',
+            'step4_determine_winners': 'determine_winners_and_losers',
+            'step5_accumulate_results': 'accumulate_results',
+            'step6_merge_and_generate': 'merge_and_generate_final_brackets',
+        }
+        
+        rows = []
+        for step_key, func_name in step_names.items():
+            step_num = step_key.split('_')[0].replace('step', '')
+            t = step_times[step_key]
+            avg_ms = (t / num_sims) * 1000 if num_sims > 0 else 0
+            pct = (t / total_time * 100) if total_time > 0 else 0
+            rows.append({
+                'Step': step_num,
+                'Function': func_name,
+                'Total Time (s)': f'{t:.4f}',
+                'Avg Time/Sim (ms)': f'{avg_ms:.6f}',
+                '% of Total': f'{pct:.1f}%'
+            })
+        
+        # Add total row
+        avg_total_ms = (total_time / num_sims) * 1000 if num_sims > 0 else 0
+        rows.append({
+            'Step': 'Total',
+            'Function': '',
+            'Total Time (s)': f'{total_time:.4f}',
+            'Avg Time/Sim (ms)': f'{avg_total_ms:.6f}',
+            '% of Total': '100.0%'
+        })
+        
+        # Write CSV
+        with open(args.timing_output, 'w', newline='') as f:
+            fieldnames = ['Step', 'Function', 'Total Time (s)', 'Avg Time/Sim (ms)', '% of Total']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        
+        print(f"Timing results saved to {args.timing_output}")
+        
+        # Also print timing summary
+        print("\n" + "=" * 70)
+        print("TIMING SUMMARY")
+        print("=" * 70)
+        print(f"{'Step':<6} {'Function':<40} {'Time (s)':<12} {'Avg (ms)':<12} {'%':<8}")
+        print("-" * 70)
+        for row in rows:
+            print(f"{row['Step']:<6} {row['Function']:<40} {row['Total Time (s)']:<12} {row['Avg Time/Sim (ms)']:<12} {row['% of Total']:<8}")
+        print("=" * 70)
 
 
 if __name__ == '__main__':
