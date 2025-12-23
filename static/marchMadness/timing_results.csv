@@ -1,8 +1,8 @@
 Step,Function,Total Time (s),Avg Time/Sim (ms),% of Total
-1,generate_all_outcome_strings,10.7626,0.108084,6.3%
-2,calculate_all_outcome_probabilities,71.2017,0.715049,41.4%
-3,calculate_all_scores_batched,76.9938,0.773216,44.8%
-4,determine_winners_and_losers,0.2496,0.002506,0.1%
-5,accumulate_results,0.1961,0.001969,0.1%
-6,merge_and_generate_final_brackets,12.5026,0.125558,7.3%
-Total,,171.9063,1.726383,100.0%
+1,generate_all_outcome_strings,48.7783,0.097972,25.3%
+2,calculate_all_outcome_probabilities,13.9182,0.027955,7.2%
+3,calculate_all_scores_batched,19.0512,0.038265,9.9%
+4,determine_winners_and_losers,1.7512,0.003517,0.9%
+5,accumulate_results,0.9881,0.001985,0.5%
+6,merge_and_generate_final_brackets,108.3241,0.217571,56.2%
+Total,,192.8110,0.387264,100.0%

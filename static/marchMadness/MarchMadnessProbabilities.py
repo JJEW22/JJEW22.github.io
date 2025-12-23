@@ -913,6 +913,917 @@ def expand_all_to_full_bitstrings(short_outcomes: List[str], base_bits: str,
     return results
 
 
+# =============================================================================
+# XNOR-BASED FAST SCORING
+# =============================================================================
+
+def build_participant_pick_bitstring(participant_bracket: dict, results_bracket: dict) -> str:
+    """
+    Convert a participant's bracket picks to a 63-bit string.
+    
+    For each game position (0-62):
+    - '1' if participant picked team1 to win (in their own bracket)
+    - '0' if participant picked team2 to win (in their own bracket)
+    - '?' if no pick exists for this game
+    
+    This is purely based on the participant's bracket - we compare their winner
+    against their own team1/team2, not against the results bracket.
+    
+    The dependency masks handle the case where the participant's earlier picks
+    were wrong (so the team they picked for a later round isn't actually there).
+    """
+    pick_bits = ['?'] * TOTAL_BRACKET_BITS
+    
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        picks_round = participant_bracket.get(round_key, [])
+        offset = ROUND_BIT_OFFSETS[round_idx]
+        
+        for game_idx, pick_game in enumerate(picks_round):
+            if not pick_game:
+                continue
+            
+            pick_winner = get_winner_name(pick_game)
+            if not pick_winner:
+                continue
+            
+            # Compare against the participant's OWN team1/team2 for this game
+            team1_name = get_team_name(pick_game.get('team1'))
+            team2_name = get_team_name(pick_game.get('team2'))
+            
+            bit_pos = offset + game_idx
+            
+            if pick_winner == team1_name:
+                pick_bits[bit_pos] = '1'
+            elif pick_winner == team2_name:
+                pick_bits[bit_pos] = '0'
+            # else: leave as '?' - shouldn't happen if bracket is valid
+    
+    return ''.join(pick_bits)
+
+
+def build_dependency_mask(round_key: str, game_index: int, participant_bracket: dict) -> int:
+    """
+    Build a dependency mask for a specific game pick.
+    
+    The mask has 1s in positions of all games that must be correct for this pick to count.
+    This includes the game itself AND all prior games where the picked team must have won.
+    
+    For example, if participant picked Duke to win in Round 3:
+    - Duke must win R1 (and participant must have picked Duke in R1)
+    - Duke must win R2 (and participant must have picked Duke in R2)
+    - Duke must win R3 (and participant must have picked Duke in R3)
+    
+    Returns:
+        Integer bitmask (63 bits) where bit positions correspond to integer bits
+        (string position p -> integer bit 62-p)
+    """
+    picks_round = participant_bracket.get(round_key, [])
+    if game_index >= len(picks_round):
+        return 0
+    
+    pick_game = picks_round[game_index]
+    if not pick_game:
+        return 0
+    
+    pick_winner = get_winner_name(pick_game)
+    if not pick_winner:
+        return 0
+    
+    # Start with the current game
+    # Convert string position to integer bit position
+    string_pos = get_fixed_bit_position(round_key, game_index)
+    int_bit_pos = 62 - string_pos
+    mask = 1 << int_bit_pos
+    
+    # Trace back through feeder games
+    round_num = ROUND_KEYS.index(round_key) + 1
+    current_round_key = round_key
+    current_game_index = game_index
+    
+    while round_num > 1:
+        # Get feeder games for current game
+        feeder_info = get_feeder_games(current_round_key, current_game_index)
+        if not feeder_info:
+            break
+        
+        prev_round_key, feeder_1, feeder_2 = feeder_info
+        prev_round = participant_bracket.get(prev_round_key, [])
+        
+        # Find which feeder game the picked winner came from
+        found_path = False
+        for feeder_idx in [feeder_1, feeder_2]:
+            if feeder_idx < len(prev_round) and prev_round[feeder_idx]:
+                feeder_game = prev_round[feeder_idx]
+                feeder_winner = get_winner_name(feeder_game)
+                if feeder_winner == pick_winner:
+                    # This is the path - add to mask
+                    string_pos = get_fixed_bit_position(prev_round_key, feeder_idx)
+                    int_bit_pos = 62 - string_pos
+                    mask |= (1 << int_bit_pos)
+                    current_round_key = prev_round_key
+                    current_game_index = feeder_idx
+                    found_path = True
+                    break
+        
+        if not found_path:
+            break
+        
+        round_num -= 1
+    
+    return mask
+
+
+def build_all_dependency_masks(participant_bracket: dict) -> List[int]:
+    """
+    Build dependency masks for all 63 game positions for a participant.
+    
+    Returns:
+        List of 63 integers, each being a bitmask
+    """
+    masks = []
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        num_games = GAMES_PER_ROUND[round_idx]
+        for game_idx in range(num_games):
+            mask = build_dependency_mask(round_key, game_idx, participant_bracket)
+            masks.append(mask)
+    return masks
+
+
+def build_points_arrays(results_bracket: dict, teams_data: dict, apply_seed_bonus: bool) -> Tuple[List[int], List[int], Set[int]]:
+    """
+    Precompute points for each game position if team1 wins vs team2 wins.
+    
+    Returns:
+        Tuple of (points_if_team1_wins, points_if_team2_wins, positions_needing_dynamic_seed_bonus)
+        Each points list is 63 integers
+        positions_needing_dynamic_seed_bonus is a set of string positions where seed bonus couldn't be precomputed
+    """
+    points_team1 = [0] * TOTAL_BRACKET_BITS
+    points_team2 = [0] * TOTAL_BRACKET_BITS
+    positions_needing_dynamic_seed = set()
+    
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        round_num = round_idx + 1
+        base_points = SCORE_FOR_ROUND[round_num]
+        results_round = results_bracket.get(round_key, [])
+        offset = ROUND_BIT_OFFSETS[round_idx]
+        
+        for game_idx in range(GAMES_PER_ROUND[round_idx]):
+            bit_pos = offset + game_idx
+            
+            game = results_round[game_idx] if game_idx < len(results_round) else None
+            
+            if not game:
+                # Game doesn't exist in results bracket - use base points only
+                points_team1[bit_pos] = base_points
+                points_team2[bit_pos] = base_points
+                if apply_seed_bonus:
+                    positions_needing_dynamic_seed.add(bit_pos)
+                continue
+            
+            team1 = game.get('team1')
+            team2 = game.get('team2')
+            
+            team1_seed = get_team_seed(team1, teams_data) if team1 else None
+            team2_seed = get_team_seed(team2, teams_data) if team2 else None
+            
+            # If either team is unknown, we can't precompute seed bonus
+            if team1_seed is None or team2_seed is None:
+                points_team1[bit_pos] = base_points
+                points_team2[bit_pos] = base_points
+                if apply_seed_bonus:
+                    positions_needing_dynamic_seed.add(bit_pos)
+                continue
+            
+            # Both teams known - precompute full points including seed bonus
+            # Points if team1 wins
+            points_team1[bit_pos] = base_points
+            if apply_seed_bonus:
+                expected_winner_seed = min(team1_seed, team2_seed)
+                if team1_seed > expected_winner_seed:
+                    upset_bonus = (team1_seed - expected_winner_seed) * SEED_FACTOR[round_num]
+                    points_team1[bit_pos] += upset_bonus
+            
+            # Points if team2 wins
+            points_team2[bit_pos] = base_points
+            if apply_seed_bonus:
+                expected_winner_seed = min(team1_seed, team2_seed)
+                if team2_seed > expected_winner_seed:
+                    upset_bonus = (team2_seed - expected_winner_seed) * SEED_FACTOR[round_num]
+                    points_team2[bit_pos] += upset_bonus
+    
+    return points_team1, points_team2, positions_needing_dynamic_seed
+
+
+# Standard seed matchups for Round 1 (repeats for each of 4 regions)
+# Game 0: 1v16, Game 1: 8v9, Game 2: 5v12, Game 3: 4v13
+# Game 4: 6v11, Game 5: 3v14, Game 6: 7v10, Game 7: 2v15
+R1_SEEDS_TEAM1 = [1, 8, 5, 4, 6, 3, 7, 2] * 4  # 32 games
+R1_SEEDS_TEAM2 = [16, 9, 12, 13, 11, 14, 10, 15] * 4  # 32 games
+
+
+def build_score_array_for_outcome(outcome_int: int) -> List[int]:
+    """
+    Build a 63-element array of scores (base + seed bonus) for each game position
+    based on the outcome.
+    
+    This propagates seeds through the bracket based on who won each game,
+    then calculates the appropriate score (with upset bonus) for each position.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        
+    Returns:
+        List of 63 integers, each being the score for that game position
+    """
+    scores = [0] * TOTAL_BRACKET_BITS
+    
+    # Track seeds that advance to each position
+    # For R1, we know the seeds from the fixed bracket structure
+    # For later rounds, we propagate based on who won
+    
+    # Round 1: Seeds are known, just compute scores
+    # Also track which seed advances from each game
+    r1_winners = [0] * 32  # Seed of winner for each R1 game
+    
+    for game_idx in range(32):
+        string_pos = game_idx  # R1 is positions 0-31
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = R1_SEEDS_TEAM1[game_idx]
+        team2_seed = R1_SEEDS_TEAM2[game_idx]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r1_winners[game_idx] = winner_seed
+        
+        # Calculate score
+        base_points = SCORE_FOR_ROUND[1]  # Round 1
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[1]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 2: Teams come from R1 winners
+    # R2 game i gets winners from R1 games 2i and 2i+1
+    r2_winners = [0] * 16
+    
+    for game_idx in range(16):
+        string_pos = 32 + game_idx  # R2 is positions 32-47
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        # Teams are winners of R1 games 2*game_idx and 2*game_idx+1
+        team1_seed = r1_winners[2 * game_idx]
+        team2_seed = r1_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r2_winners[game_idx] = winner_seed
+        
+        # Calculate score
+        base_points = SCORE_FOR_ROUND[2]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[2]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 3: Teams come from R2 winners
+    r3_winners = [0] * 8
+    
+    for game_idx in range(8):
+        string_pos = 48 + game_idx  # R3 is positions 48-55
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = r2_winners[2 * game_idx]
+        team2_seed = r2_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r3_winners[game_idx] = winner_seed
+        
+        base_points = SCORE_FOR_ROUND[3]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[3]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 4: Teams come from R3 winners
+    r4_winners = [0] * 4
+    
+    for game_idx in range(4):
+        string_pos = 56 + game_idx  # R4 is positions 56-59
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = r3_winners[2 * game_idx]
+        team2_seed = r3_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r4_winners[game_idx] = winner_seed
+        
+        base_points = SCORE_FOR_ROUND[4]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[4]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 5 (Final Four): Teams come from R4 winners
+    r5_winners = [0] * 2
+    
+    for game_idx in range(2):
+        string_pos = 60 + game_idx  # R5 is positions 60-61
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = r4_winners[2 * game_idx]
+        team2_seed = r4_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r5_winners[game_idx] = winner_seed
+        
+        base_points = SCORE_FOR_ROUND[5]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[5]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 6 (Championship): Teams come from R5 winners
+    string_pos = 62  # R6 is position 62
+    int_bit_pos = 62 - string_pos  # = 0
+    outcome_bit = (outcome_int >> int_bit_pos) & 1
+    
+    team1_seed = r5_winners[0]
+    team2_seed = r5_winners[1]
+    
+    winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+    
+    base_points = SCORE_FOR_ROUND[6]
+    expected_winner_seed = min(team1_seed, team2_seed)
+    
+    if winner_seed > expected_winner_seed:
+        upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[6]
+        scores[string_pos] = base_points + upset_bonus
+    else:
+        scores[string_pos] = base_points
+    
+    return scores
+
+
+def compute_score_xnor_v2(
+    outcome_int: int,
+    pick_int: int,
+    dependency_masks: List[int],
+    score_array: List[int],
+    valid_positions: List[int]
+) -> int:
+    """
+    Compute score using XNOR method with precomputed score array.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        pick_int: 63-bit integer representing participant's picks
+        dependency_masks: List of dependency masks for each position
+        score_array: Precomputed scores for each position (from build_score_array_for_outcome)
+        valid_positions: List of string positions to check (remaining games only)
+        
+    Returns:
+        Score delta for this outcome
+    """
+    # XNOR: bits match where outcome and picks are the same
+    xnor_result = ~(outcome_int ^ pick_int) & ((1 << TOTAL_BRACKET_BITS) - 1)
+    
+    score = 0
+    for string_pos in valid_positions:
+        bit_pos = 62 - string_pos
+        
+        # Check if pick matches outcome at this position
+        if not (xnor_result & (1 << bit_pos)):
+            continue
+        
+        # Check if all dependencies are satisfied
+        dep_mask = dependency_masks[string_pos]
+        if dep_mask == 0:
+            continue
+        
+        # All dependency bits must match
+        if (xnor_result & dep_mask) == dep_mask:
+            score += score_array[string_pos]
+    
+    return score
+
+
+def precompute_participant_scoring_data(
+    name_to_bracket: Dict[str, dict],
+    results_bracket: dict,
+    teams_data: dict,
+    apply_seed_bonus: bool,
+    remaining_positions: Optional[Set[int]] = None
+) -> Dict[str, dict]:
+    """
+    Precompute all scoring data for each participant.
+    
+    Args:
+        name_to_bracket: Dict mapping participant name to their bracket
+        results_bracket: The results bracket
+        teams_data: Team data for seed bonuses
+        apply_seed_bonus: Whether to apply upset bonuses
+        remaining_positions: Set of string positions for remaining games.
+                            If provided, only these positions will be scored.
+    
+    Returns:
+        Dict mapping participant name to:
+        {
+            'pick_bits': str (63 chars),
+            'pick_int': int (63-bit integer for XNOR),
+            'dependency_masks': List[int] (63 masks),
+            'valid_positions': List[int] (bit positions where participant has a pick AND game is remaining)
+        }
+    """
+    scoring_data = {}
+    
+    for name, bracket in name_to_bracket.items():
+        pick_bits = build_participant_pick_bitstring(bracket, results_bracket)
+        
+        # Convert to integer for bitwise operations (bit 0 = position 0)
+        pick_int = int(pick_bits.replace('?', '0'), 2)
+        
+        # Build mask for valid positions (where participant has actual picks, not '?')
+        valid_mask = int(''.join('1' if c != '?' else '0' for c in pick_bits), 2)
+        
+        # Get positions where participant has picks
+        # If remaining_positions is provided, filter to only include those
+        if remaining_positions is not None:
+            valid_positions = [i for i, c in enumerate(pick_bits) if c != '?' and i in remaining_positions]
+        else:
+            valid_positions = [i for i, c in enumerate(pick_bits) if c != '?']
+        
+        # Build dependency masks
+        dependency_masks = build_all_dependency_masks(bracket)
+        
+        scoring_data[name] = {
+            'pick_bits': pick_bits,
+            'pick_int': pick_int,
+            'valid_mask': valid_mask,
+            'dependency_masks': dependency_masks,
+            'valid_positions': valid_positions,
+        }
+    
+    return scoring_data
+
+
+def compute_score_xnor(
+    outcome_int: int,
+    pick_int: int,
+    valid_mask: int,
+    dependency_masks: List[int],
+    points_team1: List[int],
+    points_team2: List[int],
+    valid_positions: List[int]
+) -> int:
+    """
+    Compute score for a participant using XNOR-based bit operations.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        pick_int: 63-bit integer representing participant's picks
+        valid_mask: Mask of valid pick positions
+        dependency_masks: List of dependency masks for each position (indexed by string position)
+        points_team1: Points if team1 wins at each position
+        points_team2: Points if team2 wins at each position
+        valid_positions: List of string positions where participant has picks
+    
+    Returns:
+        Score delta for this outcome (points from remaining games only)
+        
+    Note: String position p maps to bit (62-p) in the integer due to int() conversion.
+    """
+    # XNOR: bits match where outcome and picks are the same
+    # XNOR(a, b) = NOT(a XOR b) = ~(a ^ b)
+    # But we only have 63 bits, so mask to avoid sign issues
+    xnor_result = ~(outcome_int ^ pick_int) & ((1 << TOTAL_BRACKET_BITS) - 1)
+    
+    # Now xnor_result has 1s where picks match outcome
+    # But we need to check dependencies too
+    
+    score = 0
+    for string_pos in valid_positions:
+        # Convert string position to actual bit position in the integer
+        bit_pos = 62 - string_pos
+        
+        # Check if this bit matches
+        if not (xnor_result & (1 << bit_pos)):
+            continue
+        
+        # Check if all dependencies are satisfied
+        dep_mask = dependency_masks[string_pos]
+        if dep_mask == 0:
+            continue
+        
+        # All dependency bits must be set in xnor_result
+        if (xnor_result & dep_mask) == dep_mask:
+            # Award points based on which team won
+            # Check the outcome bit to see if team1 (1) or team2 (0) won
+            if outcome_int & (1 << bit_pos):
+                score += points_team1[string_pos]
+            else:
+                score += points_team2[string_pos]
+    
+    return score
+
+
+def calculate_all_scores_xnor(
+    full_outcome_strings: List[str],
+    name_to_bracket: Dict[str, dict],
+    results_bracket: dict,
+    teams_data: dict,
+    apply_seed_bonus: bool,
+    base_scores: Dict[str, int],
+    remaining_positions: Set[int]
+) -> Dict[str, List[int]]:
+    """
+    Calculate scores for all participants across all outcomes using XNOR method.
+    
+    Args:
+        full_outcome_strings: List of 63-bit outcome strings
+        name_to_bracket: Dict mapping participant name to their bracket
+        results_bracket: The results bracket
+        teams_data: Team data for seed bonuses
+        apply_seed_bonus: Whether to apply upset bonuses
+        base_scores: Pre-computed base scores for each participant
+        remaining_positions: Set of string positions for remaining games (only these are scored)
+        
+    Returns:
+        Dict mapping participant name to list of scores (one per outcome)
+    """
+    # Precompute scoring data for all participants
+    print("    Precomputing participant scoring data...")
+    scoring_data = precompute_participant_scoring_data(
+        name_to_bracket, results_bracket, teams_data, apply_seed_bonus, remaining_positions
+    )
+    
+    # Convert all outcome strings to integers
+    print("    Converting outcomes to integers...")
+    outcome_ints = [int(outcome, 2) for outcome in full_outcome_strings]
+    
+    # Calculate scores
+    print("    Calculating scores...")
+    all_scores = {name: [] for name in name_to_bracket.keys()}
+    total = len(outcome_ints)
+    
+    for i, outcome_int in enumerate(outcome_ints):
+        # Build score array for this outcome (includes seed bonuses computed via propagation)
+        score_array = build_score_array_for_outcome(outcome_int)
+        
+        for name in name_to_bracket.keys():
+            data = scoring_data[name]
+            delta = compute_score_xnor_v2(
+                outcome_int,
+                data['pick_int'],
+                data['dependency_masks'],
+                score_array,
+                data['valid_positions']
+            )
+            score = base_scores[name] + delta
+            all_scores[name].append(score)
+        print_progress(i, total, "    Scoring")
+    
+    return all_scores
+
+
+# =============================================================================
+# FAST PROBABILITY CALCULATION (Top-Down Method)
+# =============================================================================
+
+def build_team_probability_matrix(results_bracket: dict, teams_data: dict) -> List[List[float]]:
+    """
+    Build a 64x7 matrix of probabilities for each team reaching each round.
+    
+    Matrix[team_index][round_reached] = probability
+    
+    round_reached:
+        1 = Lost in R1 (only made it to R64) -> prob = 1.0 (no contribution)
+        2 = Lost in R2 (made it to R32) -> prob = team's prob_r32
+        3 = Lost in R3 (made it to S16) -> prob = team's prob_r16
+        4 = Lost in R4 (made it to E8) -> prob = team's prob_r8
+        5 = Lost in R5 (made it to F4) -> prob = team's prob_r4
+        6 = Lost in R6 (made it to Finals) -> prob = team's prob_r2
+        7 = Won championship -> prob = team's prob_win
+    
+    Returns:
+        64x7 matrix (list of lists)
+    """
+    # Probability column for each round reached (index 0 = round 1, unused but for alignment)
+    # Index 1 = lost in R1 = prob 1.0
+    # Index 2 = reached R32 = prob_r32
+    # etc.
+    prob_columns = [None, None, 'prob_r32', 'prob_r16', 'prob_r8', 'prob_r4', 'prob_r2', 'prob_win']
+    
+    # Get the 64 teams from round 1 of results bracket
+    round1 = results_bracket.get('round1', [])
+    
+    # Build ordered list of 64 teams (by their position in the bracket)
+    team_names = []
+    for game in round1:
+        if game:
+            team1_name = get_team_name(game.get('team1'))
+            team2_name = get_team_name(game.get('team2'))
+            team_names.append(team1_name)
+            team_names.append(team2_name)
+        else:
+            team_names.append(None)
+            team_names.append(None)
+    
+    # Ensure we have 64 teams
+    while len(team_names) < 64:
+        team_names.append(None)
+    
+    # Build probability matrix
+    prob_matrix = []
+    for team_idx in range(64):
+        team_name = team_names[team_idx]
+        team_probs = [1.0] * 8  # Index 0-7, we use 1-7
+        
+        if team_name and team_name in teams_data:
+            team_data = teams_data[team_name]
+            for round_reached in range(2, 8):
+                col = prob_columns[round_reached]
+                if col and col in team_data:
+                    team_probs[round_reached] = team_data[col]
+                else:
+                    team_probs[round_reached] = 1.0  # Default if missing
+        
+        prob_matrix.append(team_probs)
+    
+    return prob_matrix, team_names
+
+
+def get_team_bit_positions() -> List[List[int]]:
+    """
+    Get the 6 bit positions in the 63-bit outcome string for each team's path.
+    
+    For team index i (0-63), returns the bit positions for:
+    [R1 game, R2 game, R3 game, R4 game, R5 game, R6 game]
+    
+    The team index bits (0-5) encode which side of each split they're on.
+    """
+    positions = []
+    
+    for team_idx in range(64):
+        team_positions = []
+        
+        # R1: 32 games (bits 0-31), each team is in game team_idx // 2
+        r1_game = team_idx // 2
+        team_positions.append(r1_game)  # bit position 0-31
+        
+        # R2: 16 games (bits 32-47), team is in game team_idx // 4
+        r2_game = team_idx // 4
+        team_positions.append(32 + r2_game)
+        
+        # R3: 8 games (bits 48-55), team is in game team_idx // 8
+        r3_game = team_idx // 8
+        team_positions.append(48 + r3_game)
+        
+        # R4: 4 games (bits 56-59), team is in game team_idx // 16
+        r4_game = team_idx // 16
+        team_positions.append(56 + r4_game)
+        
+        # R5: 2 games (bits 60-61), team is in game team_idx // 32
+        r5_game = team_idx // 32
+        team_positions.append(60 + r5_game)
+        
+        # R6: 1 game (bit 62)
+        team_positions.append(62)
+        
+        positions.append(team_positions)
+    
+    return positions
+
+
+def get_team_required_bits() -> List[List[int]]:
+    """
+    Get the required bit values for each team to advance at each round.
+    
+    For team index i, at each round, they need either 0 or 1 to advance.
+    This is determined by which "side" of the bracket they're on at that level.
+    
+    Returns:
+        64x6 matrix where [team_idx][round] = 0 or 1 (the bit value needed to advance)
+    """
+    required = []
+    
+    for team_idx in range(64):
+        team_required = []
+        
+        # R1: team_idx % 2 == 0 means they're team1 (need 1 to win), else team2 (need 0)
+        team_required.append(1 if team_idx % 2 == 0 else 0)
+        
+        # R2: (team_idx // 2) % 2 == 0 means left side (need 1), else right (need 0)
+        team_required.append(1 if (team_idx // 2) % 2 == 0 else 0)
+        
+        # R3: (team_idx // 4) % 2
+        team_required.append(1 if (team_idx // 4) % 2 == 0 else 0)
+        
+        # R4: (team_idx // 8) % 2
+        team_required.append(1 if (team_idx // 8) % 2 == 0 else 0)
+        
+        # R5: (team_idx // 16) % 2
+        team_required.append(1 if (team_idx // 16) % 2 == 0 else 0)
+        
+        # R6: (team_idx // 32) % 2 == 0 means left side of championship
+        team_required.append(1 if (team_idx // 32) % 2 == 0 else 0)
+        
+        required.append(team_required)
+    
+    return required
+
+
+def compute_rounds_reached_topdown(outcome_int: int) -> List[int]:
+    """
+    Compute the round reached by each of 64 teams using top-down propagation.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+                     NOTE: String position i becomes bit (62-i) in the integer
+                     So to get the value at string position p, we use >> (62 - p)
+        
+    Returns:
+        List of 64 integers, each being the round reached (1-7)
+        1 = lost in R1, 2 = lost in R2, ..., 7 = won championship
+    """
+    # All teams start with potential to win (round 7)
+    max_round = [7] * 64
+    
+    # Helper to get bit at a given STRING position (which is also our bit_position in the 63-char string)
+    # String position 0-62 maps to bit positions in the int as (62 - string_pos)
+    def get_bit(string_pos):
+        return (outcome_int >> (62 - string_pos)) & 1
+    
+    # Process from championship down to R1
+    # At each level, teams on the losing side get their max reduced
+    
+    # Level 0: Championship (string position 62, which is ROUND_BIT_OFFSETS[5] = 62)
+    # Splits teams into 0-31 (team1 side) vs 32-63 (team2 side)
+    # bit=1 means team1 wins, bit=0 means team2 wins
+    champ_bit = get_bit(62)
+    if champ_bit == 1:
+        # team1 (left side, teams 0-31) won championship
+        # team2 (right side, teams 32-63) max is 6 (finals)
+        for i in range(32, 64):
+            max_round[i] = 6
+    else:
+        # team2 (right side) won
+        for i in range(32):
+            max_round[i] = 6
+    
+    # Level 1: Final Four (string positions 60, 61)
+    # Position 60 is left F4 (teams 0-31), position 61 is right F4 (teams 32-63)
+    for half in range(2):
+        f4_bit = get_bit(60 + half)
+        base = half * 32  # 0 or 32
+        
+        if f4_bit == 1:
+            # team1 of this F4 game won (teams base to base+15)
+            # team2 (teams base+16 to base+31) gets min with 5
+            for i in range(base + 16, base + 32):
+                max_round[i] = min(max_round[i], 5)
+        else:
+            # team2 won
+            for i in range(base, base + 16):
+                max_round[i] = min(max_round[i], 5)
+    
+    # Level 2: Elite 8 (string positions 56-59)
+    for quarter in range(4):
+        e8_bit = get_bit(56 + quarter)
+        base = quarter * 16
+        
+        if e8_bit == 1:
+            # team1 won, team2 side limited to 4
+            for i in range(base + 8, base + 16):
+                max_round[i] = min(max_round[i], 4)
+        else:
+            for i in range(base, base + 8):
+                max_round[i] = min(max_round[i], 4)
+    
+    # Level 3: Sweet 16 (string positions 48-55)
+    for eighth in range(8):
+        s16_bit = get_bit(48 + eighth)
+        base = eighth * 8
+        
+        if s16_bit == 1:
+            for i in range(base + 4, base + 8):
+                max_round[i] = min(max_round[i], 3)
+        else:
+            for i in range(base, base + 4):
+                max_round[i] = min(max_round[i], 3)
+    
+    # Level 4: Round of 32 (string positions 32-47)
+    for sixteenth in range(16):
+        r32_bit = get_bit(32 + sixteenth)
+        base = sixteenth * 4
+        
+        if r32_bit == 1:
+            for i in range(base + 2, base + 4):
+                max_round[i] = min(max_round[i], 2)
+        else:
+            for i in range(base, base + 2):
+                max_round[i] = min(max_round[i], 2)
+    
+    # Level 5: Round of 64 (string positions 0-31)
+    for thirtysecond in range(32):
+        r64_bit = get_bit(thirtysecond)
+        base = thirtysecond * 2
+        
+        if r64_bit == 1:
+            # team1 won, team2 (base+1) lost in R1
+            max_round[base + 1] = min(max_round[base + 1], 1)
+        else:
+            # team2 won, team1 (base) lost in R1
+            max_round[base] = min(max_round[base], 1)
+    
+    return max_round
+
+
+def calculate_probability_fast(outcome_int: int, prob_matrix: List[List[float]]) -> float:
+    """
+    Calculate probability of an outcome using precomputed probability matrix.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        prob_matrix: 64x8 matrix of probabilities
+        
+    Returns:
+        Probability of this outcome
+    """
+    rounds_reached = compute_rounds_reached_topdown(outcome_int)
+    
+    probability = 1.0
+    for team_idx in range(64):
+        round_reached = rounds_reached[team_idx]
+        prob = prob_matrix[team_idx][round_reached]
+        probability *= prob
+    
+    return probability
+
+
+def calculate_all_probabilities_fast(
+    full_outcome_strings: List[str],
+    results_bracket: dict,
+    teams_data: dict,
+    has_prob_data: bool,
+    base_probability: float
+) -> List[float]:
+    """
+    Calculate probabilities for all outcomes using fast top-down method.
+    
+    Args:
+        full_outcome_strings: List of 63-bit outcome strings
+        results_bracket: The current results bracket
+        teams_data: Team data with probability columns
+        has_prob_data: Whether probability data is available
+        base_probability: Uniform probability for fallback
+        
+    Returns:
+        List of probabilities (one per outcome)
+    """
+    if not has_prob_data:
+        return [base_probability] * len(full_outcome_strings)
+    
+    # Build probability matrix
+    print("    Building probability matrix...")
+    prob_matrix, team_names = build_team_probability_matrix(results_bracket, teams_data)
+    
+    # Convert outcomes to integers
+    print("    Converting outcomes to integers...")
+    outcome_ints = [int(outcome, 2) for outcome in full_outcome_strings]
+    
+    # Calculate probabilities
+    print("    Calculating probabilities...")
+    probabilities = []
+    total = len(outcome_ints)
+    
+    for i, outcome_int in enumerate(outcome_ints):
+        prob = calculate_probability_fast(outcome_int, prob_matrix)
+        probabilities.append(prob)
+        print_progress(i, total, "    Computing probs")
+    
+    return probabilities
+
+
 def create_hypothetical_bracket(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
                                  outcome_string: str) -> dict:
     """
@@ -2419,12 +3330,12 @@ def calculate_win_probabilities(
         timing_data['step1_generate_outcomes'] = t_step1
     
     # Step 2: Calculate probability of each outcome
-    # (creates hypothetical brackets on the fly to save memory)
-    print("Step 2: Calculating outcome probabilities...")
+    # Using fast top-down method with full 63-bit outcome strings
+    print("Step 2: Calculating outcome probabilities (fast method)...")
     t_start = time.time()
-    outcome_probabilities = calculate_all_outcome_probabilities(
-        outcome_strings, results_bracket, remaining_games,
-        teams_data, has_prob_data, base_probability
+    outcome_probabilities = calculate_all_probabilities_fast(
+        full_outcome_strings, results_bracket, teams_data,
+        has_prob_data, base_probability
     )
     t_step2 = time.time() - t_start
     print(f"  Calculated {len(outcome_probabilities):,} probabilities")
@@ -2432,12 +3343,13 @@ def calculate_win_probabilities(
         timing_data['step2_calculate_probabilities'] = t_step2
     
     # Step 3: Calculate scores for all participants across all outcomes
-    # (creates hypothetical brackets on the fly to save memory)
-    print("Step 3: Calculating all scores...")
+    # Using XNOR-based fast scoring with full 63-bit outcome strings
+    print("Step 3: Calculating all scores (XNOR method)...")
     t_start = time.time()
-    all_scores = calculate_all_scores_batched(
-        outcome_strings, results_bracket, remaining_games,
-        name_to_bracket, teams_data, apply_seed_bonus, base_scores
+    remaining_positions = set(remaining_bit_positions)
+    all_scores = calculate_all_scores_xnor(
+        full_outcome_strings, name_to_bracket, results_bracket,
+        teams_data, apply_seed_bonus, base_scores, remaining_positions
     )
     t_step3 = time.time() - t_start
     print(f"  Calculated scores for {len(all_scores)} participants across {len(outcome_strings):,} outcomes")
@@ -2578,8 +3490,8 @@ def main():
     parser.add_argument('--participants', nargs='+', help='List of participant names')
     parser.add_argument('--participants-file', help='JSON file with list of participants')
     parser.add_argument('--no-seed-bonus', action='store_true', help='Disable upset bonus')
-    parser.add_argument('--max-simulations', type=int, default=100000,
-                       help='Maximum simulations. Uses Monte Carlo if total outcomes exceeds this. Default: 100000')
+    parser.add_argument('--max-simulations', type=int, default=500000,
+                       help='Maximum simulations. Uses Monte Carlo if total outcomes exceeds this. Default: 500000')
     parser.add_argument('--max-scenarios', type=int, default=DEFAULT_MAX_SCENARIOS,
                        help=f'Maximum scenarios to keep per participant (for both winning and losing). Default: {DEFAULT_MAX_SCENARIOS}')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducible results')
