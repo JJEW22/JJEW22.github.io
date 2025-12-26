@@ -3,6 +3,7 @@
     import { 
         SCORE_FOR_ROUND, 
         SEED_FACTOR,
+        SCORE_DIFF_BUCKETS,
         regionPositions,
         matchupPairs,
         createEmptyBracket,
@@ -674,7 +675,8 @@
             s16Rows: [10, 18, 26, 34],
             e8Rows: [14, 30],
             f4Row: 22,
-            r1Col: 'C', r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
+            r1Col: 'C', r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N',
+            r1ScoreCol: 'D', r2ScoreCol: 'F', s16ScoreCol: 'I', e8ScoreCol: 'L'
         });
         
         // West Region (left side, bottom)
@@ -684,7 +686,8 @@
             s16Rows: [45, 53, 61, 69],
             e8Rows: [49, 65],
             f4Row: 57,
-            r1Col: 'C', r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
+            r1Col: 'C', r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N',
+            r1ScoreCol: 'D', r2ScoreCol: 'F', s16ScoreCol: 'I', e8ScoreCol: 'L'
         });
         
         // South Region (right side, top)
@@ -694,7 +697,8 @@
             s16Rows: [10, 18, 26, 34],
             e8Rows: [14, 30],
             f4Row: 22,
-            r1Col: 'AL', r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
+            r1Col: 'AL', r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA',
+            r1ScoreCol: 'AK', r2ScoreCol: 'AI', s16ScoreCol: 'AF', e8ScoreCol: 'AC'
         });
         
         // Midwest Region (right side, bottom)
@@ -704,7 +708,8 @@
             s16Rows: [45, 53, 61, 69],
             e8Rows: [49, 65],
             f4Row: 57,
-            r1Col: 'AL', r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
+            r1Col: 'AL', r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA',
+            r1ScoreCol: 'AK', r2ScoreCol: 'AI', s16ScoreCol: 'AF', e8ScoreCol: 'AC'
         });
         
         // Championship
@@ -719,46 +724,138 @@
             bracket.winner = findTeam(champion);
         }
         
+        // Final Four scores (round 5)
+        // Left Final Four: score at O22 and O57 (for the two teams feeding into championship)
+        const f4Score1 = getCellValue(sheet, 'O', 22);  // East winner score
+        const f4Score2 = getCellValue(sheet, 'O', 57);  // West winner score  
+        const f4Score3 = getCellValue(sheet, 'Z', 22);  // South winner score
+        const f4Score4 = getCellValue(sheet, 'Z', 57);  // Midwest winner score
+        
+        if (f4Score1 !== null && f4Score1 !== undefined && f4Score1 !== '') {
+            bracket.round5[0].score1 = Number(f4Score1);
+        }
+        if (f4Score2 !== null && f4Score2 !== undefined && f4Score2 !== '') {
+            bracket.round5[0].score2 = Number(f4Score2);
+        }
+        if (f4Score3 !== null && f4Score3 !== undefined && f4Score3 !== '') {
+            bracket.round5[1].score1 = Number(f4Score3);
+        }
+        if (f4Score4 !== null && f4Score4 !== undefined && f4Score4 !== '') {
+            bracket.round5[1].score2 = Number(f4Score4);
+        }
+        
+        // Championship game scores (round 6)
+        const champScore1 = getCellValue(sheet, 'P', 39);  // Team 1 score
+        const champScore2 = getCellValue(sheet, 'V', 39);  // Team 2 score
+        if (champScore1 !== null && champScore1 !== undefined && champScore1 !== '') {
+            bracket.round6[0].score1 = Number(champScore1);
+        }
+        if (champScore2 !== null && champScore2 !== undefined && champScore2 !== '') {
+            bracket.round6[0].score2 = Number(champScore2);
+        }
+        
         return bracket;
     }
     
     function extractRegionWinners(sheet, bracket, region, startIndex, config) {
-        const { r1Rows, r2Rows, s16Rows, e8Rows, f4Row, r1Col, r2Col, s16Col, e8Col, f4Col } = config;
+        const { r1Rows, r2Rows, s16Rows, e8Rows, f4Row, r1Col, r2Col, s16Col, e8Col, f4Col,
+                r1ScoreCol, r2ScoreCol, s16ScoreCol, e8ScoreCol, f4ScoreCol } = config;
         
-        // Round 1 winners (from Round 2 cells)
+        // Round 1 winners (from Round 2 cells) and scores
         for (let i = 0; i < 8; i++) {
-            const row = r2Rows[i];
-            const winner = getCellValue(sheet, r2Col, row);
+            const winnerRow = r2Rows[i];
+            const winner = getCellValue(sheet, r2Col, winnerRow);
             if (winner) {
                 bracket.round1[startIndex + i].winner = findTeam(winner);
             }
+            
+            // Extract Round 1 scores from team rows
+            // Team 1 is at r1Rows[i], Team 2 is at r1Rows[i] + 2
+            if (r1ScoreCol) {
+                const team1Row = r1Rows[i];
+                const team2Row = r1Rows[i] + 2;
+                const score1 = getCellValue(sheet, r1ScoreCol, team1Row);
+                const score2 = getCellValue(sheet, r1ScoreCol, team2Row);
+                if (score1 !== null && score1 !== undefined && score1 !== '') {
+                    bracket.round1[startIndex + i].score1 = Number(score1);
+                }
+                if (score2 !== null && score2 !== undefined && score2 !== '') {
+                    bracket.round1[startIndex + i].score2 = Number(score2);
+                }
+            }
         }
         
-        // Round 2 winners (from Sweet 16 cells)
+        // Round 2 winners (from Sweet 16 cells) and scores
         for (let i = 0; i < 4; i++) {
-            const row = s16Rows[i];
-            const winner = getCellValue(sheet, s16Col, row);
+            const winnerRow = s16Rows[i];
+            const winner = getCellValue(sheet, s16Col, winnerRow);
             if (winner) {
                 const r2Index = Math.floor(startIndex / 2) + i;
                 bracket.round2[r2Index].winner = findTeam(winner);
             }
+            
+            // Extract Round 2 scores from winner rows
+            // Team 1 is at r2Rows[i*2], Team 2 is at r2Rows[i*2 + 1]
+            if (r2ScoreCol) {
+                const r2Index = Math.floor(startIndex / 2) + i;
+                const team1Row = r2Rows[i * 2];
+                const team2Row = r2Rows[i * 2 + 1];
+                const score1 = getCellValue(sheet, r2ScoreCol, team1Row);
+                const score2 = getCellValue(sheet, r2ScoreCol, team2Row);
+                if (score1 !== null && score1 !== undefined && score1 !== '') {
+                    bracket.round2[r2Index].score1 = Number(score1);
+                }
+                if (score2 !== null && score2 !== undefined && score2 !== '') {
+                    bracket.round2[r2Index].score2 = Number(score2);
+                }
+            }
         }
         
-        // Sweet 16 winners (from Elite 8 cells)
+        // Sweet 16 winners (from Elite 8 cells) and scores
         for (let i = 0; i < 2; i++) {
-            const row = e8Rows[i];
-            const winner = getCellValue(sheet, e8Col, row);
+            const winnerRow = e8Rows[i];
+            const winner = getCellValue(sheet, e8Col, winnerRow);
             if (winner) {
                 const s16Index = Math.floor(startIndex / 4) + i;
                 bracket.round3[s16Index].winner = findTeam(winner);
             }
+            
+            // Extract Sweet 16 scores
+            // Team 1 is at s16Rows[i*2], Team 2 is at s16Rows[i*2 + 1]
+            if (s16ScoreCol) {
+                const s16Index = Math.floor(startIndex / 4) + i;
+                const team1Row = s16Rows[i * 2];
+                const team2Row = s16Rows[i * 2 + 1];
+                const score1 = getCellValue(sheet, s16ScoreCol, team1Row);
+                const score2 = getCellValue(sheet, s16ScoreCol, team2Row);
+                if (score1 !== null && score1 !== undefined && score1 !== '') {
+                    bracket.round3[s16Index].score1 = Number(score1);
+                }
+                if (score2 !== null && score2 !== undefined && score2 !== '') {
+                    bracket.round3[s16Index].score2 = Number(score2);
+                }
+            }
         }
         
-        // Elite 8 winner (from Final Four cell)
+        // Elite 8 winner (from Final Four cell) and scores
         const f4Winner = getCellValue(sheet, f4Col, f4Row);
         if (f4Winner) {
             const e8Index = Math.floor(startIndex / 8);
             bracket.round4[e8Index].winner = findTeam(f4Winner);
+        }
+        
+        // Extract Elite 8 scores
+        // Team 1 is at e8Rows[0], Team 2 is at e8Rows[1]
+        if (e8ScoreCol) {
+            const e8Index = Math.floor(startIndex / 8);
+            const score1 = getCellValue(sheet, e8ScoreCol, e8Rows[0]);
+            const score2 = getCellValue(sheet, e8ScoreCol, e8Rows[1]);
+            if (score1 !== null && score1 !== undefined && score1 !== '') {
+                bracket.round4[e8Index].score1 = Number(score1);
+            }
+            if (score2 !== null && score2 !== undefined && score2 !== '') {
+                bracket.round4[e8Index].score2 = Number(score2);
+            }
         }
     }
     
@@ -826,6 +923,108 @@
         return `${total} [${picksPerRound.join(',')}]`;
     }
     
+    /**
+     * Calculate the total score differential for a participant's correct picks,
+     * along with counts in each category bucket.
+     * For each game they picked correctly, adds |score1 - score2| to their total.
+     * 
+     * Returns: { total: number, counts: number[] }
+     * - total: sum of all differentials
+     * - counts: array of counts for each category (based on SCORE_DIFF_BUCKETS)
+     */
+    function calculateScoreDifferential(resultsBracket, picksBracket) {
+        if (!resultsBracket || !picksBracket) return { total: 0, counts: [] };
+        
+        let totalDifferential = 0;
+        const differentials = [];  // Collect all differentials to categorize
+        
+        for (let round = 1; round <= 6; round++) {
+            const roundKey = `round${round}`;
+            const resultsGames = resultsBracket[roundKey] || [];
+            const picksGames = picksBracket[roundKey] || [];
+            
+            for (let i = 0; i < resultsGames.length; i++) {
+                const resultGame = resultsGames[i];
+                const pickGame = picksGames[i];
+                
+                // Skip if no result winner yet or no pick made
+                if (!resultGame?.winner || !pickGame?.winner) continue;
+                
+                // Check if the pick was correct
+                const resultWinner = resultGame.winner.name || resultGame.winner;
+                const pickWinner = pickGame.winner.name || pickGame.winner;
+                
+                if (resultWinner === pickWinner) {
+                    // Correct pick - add the score differential if scores exist
+                    if (resultGame.score1 !== undefined && resultGame.score2 !== undefined) {
+                        const differential = Math.abs(Number(resultGame.score1) - Number(resultGame.score2));
+                        totalDifferential += differential;
+                        differentials.push(differential);
+                    }
+                }
+            }
+        }
+        
+        // Categorize differentials into buckets
+        const counts = categorizeDifferentials(differentials);
+        
+        return { total: totalDifferential, counts };
+    }
+    
+    /**
+     * Categorize differentials into buckets based on SCORE_DIFF_BUCKETS.
+     * e.g., buckets [5, 10] creates categories: 0-5, 6-10, >10
+     */
+    function categorizeDifferentials(differentials) {
+        if (!SCORE_DIFF_BUCKETS || SCORE_DIFF_BUCKETS.length === 0) {
+            return [];
+        }
+        
+        // Create counts array with one extra slot for "greater than last bucket"
+        const counts = new Array(SCORE_DIFF_BUCKETS.length + 1).fill(0);
+        
+        for (const diff of differentials) {
+            let placed = false;
+            for (let i = 0; i < SCORE_DIFF_BUCKETS.length; i++) {
+                if (diff <= SCORE_DIFF_BUCKETS[i]) {
+                    counts[i]++;
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                // Greater than all buckets
+                counts[SCORE_DIFF_BUCKETS.length]++;
+            }
+        }
+        
+        return counts;
+    }
+    
+    /**
+     * Generate the column header showing bucket ranges.
+     * e.g., [5, 10] -> "Diff (0-5, 6-10, 11+)"
+     */
+    function getDiffColumnHeader() {
+        if (!SCORE_DIFF_BUCKETS || SCORE_DIFF_BUCKETS.length === 0) {
+            return "Diff";
+        }
+        
+        const ranges = [];
+        let prevMax = 0;
+        
+        for (let i = 0; i < SCORE_DIFF_BUCKETS.length; i++) {
+            const max = SCORE_DIFF_BUCKETS[i];
+            ranges.push(`${prevMax}-${max}`);
+            prevMax = max + 1;
+        }
+        
+        // Add the final "X+" range
+        ranges.push(`${prevMax}+`);
+        
+        return `Diff (${ranges.join(', ')})`;
+    }
+    
     function calculateStandings() {
         standings = [];
         
@@ -839,6 +1038,9 @@
             
             // Calculate correct picks per round
             const picksPerRound = calculatePicksPerRound(resultsBracket, bracket);
+            
+            // Calculate score differential for correct picks (tiebreaker)
+            const scoreDifferential = calculateScoreDifferential(resultsBracket, bracket);
             
             // Get star bonus points
             const starPoints = getStarPoints(name);
@@ -858,7 +1060,8 @@
                 loseProbability: loseProbabilities[name] ?? null,
                 averagePlace: averagePlaces[name] ?? null,
                 roundBreakdown: scoreResult.roundBreakdown,
-                picksPerRound
+                picksPerRound,
+                scoreDifferential
             });
         }
         
@@ -1408,6 +1611,7 @@
                                 <th>Win %</th>
                                 <th>Lose %</th>
                                 <th>Avg Place</th>
+                                <th title="Sum of score differentials for correct picks (tiebreaker)">{getDiffColumnHeader()}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1450,6 +1654,16 @@
                                     <td class="avg-place">
                                         {#if entry.averagePlace !== null}
                                             {entry.averagePlace.toFixed(2)}
+                                        {:else}
+                                            -
+                                        {/if}
+                                    </td>
+                                    <td class="total-points">
+                                        {#if entry.scoreDifferential && entry.scoreDifferential.total > 0}
+                                            {entry.scoreDifferential.total}
+                                            {#if entry.scoreDifferential.counts && entry.scoreDifferential.counts.length > 0}
+                                                <span class="diff-counts">({entry.scoreDifferential.counts.join(', ')})</span>
+                                            {/if}
                                         {:else}
                                             -
                                         {/if}
@@ -2388,6 +2602,19 @@
     .standings-table .avg-place {
         color: #6b7280;
         font-weight: 500;
+    }
+    
+    /* Total points column styling */
+    .standings-table .total-points {
+        color: #7c3aed;
+        font-weight: 500;
+    }
+    
+    .standings-table .diff-counts {
+        color: #6b7280;
+        font-weight: 400;
+        font-size: 0.85em;
+        margin-left: 2px;
     }
     
     /* Win probability column styling (keep green) */

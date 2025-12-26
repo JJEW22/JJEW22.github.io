@@ -18,9 +18,8 @@
       },
       "gameId": "r1-0",
       "region": "East",
-      "scheduledTime": "2026-03-19T12:15:00-04:00",
-      "network": "CBS",
-      "location": "Brooklyn, NY"
+      "score1": 85,
+      "score2": 81
     },
     {
       "team1": {
@@ -40,9 +39,8 @@
       },
       "gameId": "r1-1",
       "region": "East",
-      "scheduledTime": "2026-03-20T14:45:00-04:00",
-      "network": "TBS",
-      "location": "Charlotte, NC"
+      "score1": 65,
+      "score2": 56
     },
     {
       "team1": {
@@ -62,9 +60,8 @@
       },
       "gameId": "r1-2",
       "region": "East",
-      "scheduledTime": "2026-03-19T17:15:00-04:00",
-      "network": "TNT",
-      "location": "Brooklyn, NY"
+      "score1": 72,
+      "score2": 64
     },
     {
       "team1": {
@@ -84,9 +81,8 @@
       },
       "gameId": "r1-3",
       "region": "East",
-      "scheduledTime": "2026-03-20T19:45:00-04:00",
-      "network": "truTV",
-      "location": "Charlotte, NC"
+      "score1": 69,
+      "score2": 65
     },
     {
       "team1": {
@@ -106,9 +102,8 @@
       },
       "gameId": "r1-4",
       "region": "East",
-      "scheduledTime": "2026-03-19T21:30:00-04:00",
-      "network": "CBS",
-      "location": "Brooklyn, NY"
+      "score1": 86,
+      "score2": 68
     },
     {
       "team1": {
@@ -128,9 +123,8 @@
       },
       "gameId": "r1-5",
       "region": "East",
-      "scheduledTime": "2026-03-20T12:15:00-04:00",
-      "network": "TBS",
-      "location": "Charlotte, NC"
+      "score1": 48,
+      "score2": 67
     },
     {
       "team1": {
@@ -150,9 +144,8 @@
       },
       "gameId": "r1-6",
       "region": "East",
-      "scheduledTime": "2026-03-19T14:45:00-04:00",
-      "network": "TNT",
-      "location": "Brooklyn, NY"
+      "score1": 78,
+      "score2": 76
     },
     {
       "team1": {
@@ -172,9 +165,8 @@
       },
       "gameId": "r1-7",
       "region": "East",
-      "scheduledTime": "2026-03-20T17:15:00-04:00",
-      "network": "truTV",
-      "location": "Charlotte, NC"
+      "score1": 65,
+      "score2": 62
     },
     {
       "team1": {
@@ -194,9 +186,8 @@
       },
       "gameId": "r1-8",
       "region": "West",
-      "scheduledTime": "2026-03-19T19:45:00-04:00",
-      "network": "CBS",
-      "location": "Denver, CO"
+      "score1": 71,
+      "score2": 63
     },
     {
       "team1": {
@@ -216,9 +207,8 @@
       },
       "gameId": "r1-9",
       "region": "West",
-      "scheduledTime": "2026-03-20T21:30:00-04:00",
-      "network": "TBS",
-      "location": "Los Angeles, CA"
+      "score1": 81,
+      "score2": 61
     },
     {
       "team1": {
@@ -238,9 +228,8 @@
       },
       "gameId": "r1-10",
       "region": "West",
-      "scheduledTime": "2026-03-19T12:15:00-04:00",
-      "network": "TNT",
-      "location": "Denver, CO"
+      "score1": 65,
+      "score2": 47
     },
     {
       "team1": {
@@ -260,9 +249,8 @@
       },
       "gameId": "r1-11",
       "region": "West",
-      "scheduledTime": "2026-03-20T14:45:00-04:00",
-      "network": "truTV",
-      "location": "Los Angeles, CA"
+      "score1": 71,
+      "score2": 53
     },
     {
       "team1": {
@@ -282,9 +270,8 @@
       },
       "gameId": "r1-12",
       "region": "West",
-      "scheduledTime": "2026-03-19T17:15:00-04:00",
-      "network": "CBS",
-      "location": "Denver, CO"
+      "score1": 78,
+      "score2": 70
     },
     {
       "team1": {
@@ -304,9 +291,8 @@
       },
       "gameId": "r1-13",
       "region": "West",
-      "scheduledTime": "2026-03-20T19:45:00-04:00",
-      "network": "TBS",
-      "location": "Los Angeles, CA"
+      "score1": 79,
+      "score2": 60
     },
     {
       "team1": {
@@ -326,9 +312,8 @@
       },
       "gameId": "r1-14",
       "region": "West",
-      "scheduledTime": "2026-03-19T21:30:00-04:00",
-      "network": "TNT",
-      "location": "Denver, CO"
+      "score1": 73,
+      "score2": 72
     },
     {
       "team1": {
@@ -348,9 +333,8 @@
       },
       "gameId": "r1-15",
       "region": "West",
-      "scheduledTime": "2026-03-20T12:15:00-04:00",
-      "network": "truTV",
-      "location": "Los Angeles, CA"
+      "score1": 89,
+      "score2": 83
     },
     {
       "team1": {
@@ -370,9 +354,8 @@
       },
       "gameId": "r1-16",
       "region": "South",
-      "scheduledTime": "2026-03-19T14:45:00-04:00",
-      "network": "CBS",
-      "location": "Dallas, TX"
+      "score1": 87,
+      "score2": 73
     },
     {
       "team1": {
@@ -392,9 +375,8 @@
       },
       "gameId": "r1-17",
       "region": "South",
-      "scheduledTime": "2026-03-20T17:15:00-04:00",
-      "network": "TBS",
-      "location": "Atlanta, GA"
+      "score1": 75,
+      "score2": 66
     },
     {
       "team1": {
@@ -414,9 +396,8 @@
       },
       "gameId": "r1-18",
       "region": "South",
-      "scheduledTime": "2026-03-19T19:45:00-04:00",
-      "network": "TNT",
-      "location": "Dallas, TX"
+      "score1": 69,
+      "score2": 62
     },
     {
       "team1": {
@@ -436,9 +417,8 @@
       },
       "gameId": "r1-19",
       "region": "South",
-      "scheduledTime": "2026-03-20T21:30:00-04:00",
-      "network": "truTV",
-      "location": "Atlanta, GA"
+      "score1": 95,
+      "score2": 84
     },
     {
       "team1": {
@@ -458,9 +438,8 @@
       },
       "gameId": "r1-20",
       "region": "South",
-      "scheduledTime": "2026-03-19T12:15:00-04:00",
-      "network": "CBS",
-      "location": "Dallas, TX"
+      "score1": 68,
+      "score2": 65
     },
     {
       "team1": {
@@ -480,9 +459,8 @@
       },
       "gameId": "r1-21",
       "region": "South",
-      "scheduledTime": "2026-03-20T14:45:00-04:00",
-      "network": "TBS",
-      "location": "Atlanta, GA"
+      "score1": 77,
+      "score2": 73
     },
     {
       "team1": {
@@ -497,10 +475,7 @@
       },
       "winner": null,
       "gameId": "r1-22",
-      "region": "South",
-      "scheduledTime": "2026-03-19T17:15:00-04:00",
-      "network": "TNT",
-      "location": "Dallas, TX"
+      "region": "South"
     },
     {
       "team1": {
@@ -520,9 +495,8 @@
       },
       "gameId": "r1-23",
       "region": "South",
-      "scheduledTime": "2026-03-20T19:45:00-04:00",
-      "network": "truTV",
-      "location": "Atlanta, GA"
+      "score1": 76,
+      "score2": 64
     },
     {
       "team1": {
@@ -542,9 +516,8 @@
       },
       "gameId": "r1-24",
       "region": "Midwest",
-      "scheduledTime": "2026-03-19T21:30:00-04:00",
-      "network": "CBS",
-      "location": "Indianapolis, IN"
+      "score1": 84,
+      "score2": 75
     },
     {
       "team1": {
@@ -564,9 +537,8 @@
       },
       "gameId": "r1-25",
       "region": "Midwest",
-      "scheduledTime": "2026-03-20T12:15:00-04:00",
-      "network": "TBS",
-      "location": "Chicago, IL"
+      "score1": 90,
+      "score2": 88
     },
     {
       "team1": {
@@ -586,9 +558,8 @@
       },
       "gameId": "r1-26",
       "region": "Midwest",
-      "scheduledTime": "2026-03-19T14:45:00-04:00",
-      "network": "TNT",
-      "location": "Indianapolis, IN"
+      "score1": 88,
+      "score2": 73
     },
     {
       "team1": {
@@ -608,9 +579,8 @@
       },
       "gameId": "r1-27",
       "region": "Midwest",
-      "scheduledTime": "2026-03-20T17:15:00-04:00",
-      "network": "truTV",
-      "location": "Chicago, IL"
+      "score1": 82,
+      "score2": 78
     },
     {
       "team1": {
@@ -630,9 +600,8 @@
       },
       "gameId": "r1-28",
       "region": "Midwest",
-      "scheduledTime": "2026-03-19T19:45:00-04:00",
-      "network": "CBS",
-      "location": "Indianapolis, IN"
+      "score1": 94,
+      "score2": 81
     },
     {
       "team1": {
@@ -652,9 +621,8 @@
       },
       "gameId": "r1-29",
       "region": "Midwest",
-      "scheduledTime": "2026-03-20T21:30:00-04:00",
-      "network": "TBS",
-      "location": "Chicago, IL"
+      "score1": 67,
+      "score2": 49
     },
     {
       "team1": {
@@ -674,9 +642,8 @@
       },
       "gameId": "r1-30",
       "region": "Midwest",
-      "scheduledTime": "2026-03-19T12:15:00-04:00",
-      "network": "TNT",
-      "location": "Indianapolis, IN"
+      "score1": 74,
+      "score2": 54
     },
     {
       "team1": {
@@ -696,9 +663,8 @@
       },
       "gameId": "r1-31",
       "region": "Midwest",
-      "scheduledTime": "2026-03-20T14:45:00-04:00",
-      "network": "truTV",
-      "location": "Chicago, IL"
+      "score1": 93,
+      "score2": 81
     }
   ],
   "round2": [
@@ -720,9 +686,8 @@
       },
       "gameId": "r2-0",
       "region": "",
-      "scheduledTime": "2026-03-21T12:15:00-04:00",
-      "network": "CBS",
-      "location": "Brooklyn, NY"
+      "score1": 83,
+      "score2": 76
     },
     {
       "team1": {
@@ -742,9 +707,8 @@
       },
       "gameId": "r2-1",
       "region": "",
-      "scheduledTime": "2026-03-22T14:45:00-04:00",
-      "network": "TBS",
-      "location": "Charlotte, NC"
+      "score1": 87,
+      "score2": 84
     },
     {
       "team1": {
@@ -764,9 +728,8 @@
       },
       "gameId": "r2-2",
       "region": "",
-      "scheduledTime": "2026-03-21T17:15:00-04:00",
-      "network": "TNT",
-      "location": "Brooklyn, NY"
+      "score1": 66,
+      "score2": 58
     },
     {
       "team1": {
@@ -786,9 +749,8 @@
       },
       "gameId": "r2-3",
       "region": "",
-      "scheduledTime": "2026-03-22T19:45:00-04:00",
-      "network": "truTV",
-      "location": "Charlotte, NC"
+      "score1": 89,
+      "score2": 79
     },
     {
       "team1": {
@@ -808,9 +770,8 @@
       },
       "gameId": "r2-4",
       "region": "",
-      "scheduledTime": "2026-03-21T21:30:00-04:00",
-      "network": "CBS",
-      "location": "Denver, CO"
+      "score1": 67,
+      "score2": 59
     },
     {
       "team1": {
@@ -830,9 +791,8 @@
       },
       "gameId": "r2-5",
       "region": "",
-      "scheduledTime": "2026-03-22T12:15:00-04:00",
-      "network": "TBS",
-      "location": "Los Angeles, CA"
+      "score1": 92,
+      "score2": 88
     },
     {
       "team1": {
@@ -852,9 +812,8 @@
       },
       "gameId": "r2-6",
       "region": "",
-      "scheduledTime": "2026-03-21T14:45:00-04:00",
-      "network": "TNT",
-      "location": "Denver, CO"
+      "score1": 77,
+      "score2": 68
     },
     {
       "team1": {
@@ -874,9 +833,8 @@
       },
       "gameId": "r2-7",
       "region": "",
-      "scheduledTime": "2026-03-22T17:15:00-04:00",
-      "network": "truTV",
-      "location": "Los Angeles, CA"
+      "score1": 79,
+      "score2": 67
     },
     {
       "team1": {
@@ -891,10 +849,7 @@
       },
       "winner": null,
       "gameId": "r2-8",
-      "region": "",
-      "scheduledTime": "2026-03-21T19:45:00-04:00",
-      "network": "CBS",
-      "location": "Dallas, TX"
+      "region": ""
     },
     {
       "team1": {
@@ -909,10 +864,7 @@
       },
       "winner": null,
       "gameId": "r2-9",
-      "region": "",
-      "scheduledTime": "2026-03-22T21:30:00-04:00",
-      "network": "TBS",
-      "location": "Atlanta, GA"
+      "region": ""
     },
     {
       "team1": {
@@ -927,10 +879,7 @@
       },
       "winner": null,
       "gameId": "r2-10",
-      "region": "",
-      "scheduledTime": "2026-03-21T12:15:00-04:00",
-      "network": "TNT",
-      "location": "Dallas, TX"
+      "region": ""
     },
     {
       "team1": null,
@@ -941,10 +890,7 @@
       },
       "winner": null,
       "gameId": "r2-11",
-      "region": "",
-      "scheduledTime": "2026-03-22T14:45:00-04:00",
-      "network": "truTV",
-      "location": "TBD"
+      "region": ""
     },
     {
       "team1": {
@@ -959,10 +905,7 @@
       },
       "winner": null,
       "gameId": "r2-12",
-      "region": "",
-      "scheduledTime": "2026-03-21T17:15:00-04:00",
-      "network": "CBS",
-      "location": "Indianapolis, IN"
+      "region": ""
     },
     {
       "team1": {
@@ -977,10 +920,7 @@
       },
       "winner": null,
       "gameId": "r2-13",
-      "region": "",
-      "scheduledTime": "2026-03-22T19:45:00-04:00",
-      "network": "TBS",
-      "location": "Chicago, IL"
+      "region": ""
     },
     {
       "team1": {
@@ -995,10 +935,7 @@
       },
       "winner": null,
       "gameId": "r2-14",
-      "region": "",
-      "scheduledTime": "2026-03-21T21:30:00-04:00",
-      "network": "TNT",
-      "location": "Indianapolis, IN"
+      "region": ""
     },
     {
       "team1": {
@@ -1013,10 +950,7 @@
       },
       "winner": null,
       "gameId": "r2-15",
-      "region": "",
-      "scheduledTime": "2026-03-22T12:15:00-04:00",
-      "network": "truTV",
-      "location": "Chicago, IL"
+      "region": ""
     }
   ],
   "round3": [
@@ -1033,10 +967,7 @@
       },
       "winner": null,
       "gameId": "r3-0",
-      "region": "",
-      "scheduledTime": "2026-03-26T12:15:00-04:00",
-      "network": "CBS",
-      "location": "Brooklyn, NY"
+      "region": ""
     },
     {
       "team1": {
@@ -1051,10 +982,7 @@
       },
       "winner": null,
       "gameId": "r3-1",
-      "region": "",
-      "scheduledTime": "2026-03-27T14:45:00-04:00",
-      "network": "TBS",
-      "location": "Charlotte, NC"
+      "region": ""
     },
     {
       "team1": {
@@ -1069,10 +997,7 @@
       },
       "winner": null,
       "gameId": "r3-2",
-      "region": "",
-      "scheduledTime": "2026-03-26T17:15:00-04:00",
-      "network": "TNT",
-      "location": "Denver, CO"
+      "region": ""
     },
     {
       "team1": {
@@ -1087,50 +1012,35 @@
       },
       "winner": null,
       "gameId": "r3-3",
-      "region": "",
-      "scheduledTime": "2026-03-27T19:45:00-04:00",
-      "network": "truTV",
-      "location": "Los Angeles, CA"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r3-4",
-      "region": "",
-      "scheduledTime": "2026-03-26T21:30:00-04:00",
-      "network": "CBS",
-      "location": "Dallas, TX"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r3-5",
-      "region": "",
-      "scheduledTime": "2026-03-27T12:15:00-04:00",
-      "network": "TBS",
-      "location": "Atlanta, GA"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r3-6",
-      "region": "",
-      "scheduledTime": "2026-03-26T14:45:00-04:00",
-      "network": "TNT",
-      "location": "Indianapolis, IN"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r3-7",
-      "region": "",
-      "scheduledTime": "2026-03-27T17:15:00-04:00",
-      "network": "truTV",
-      "location": "Chicago, IL"
+      "region": ""
     }
   ],
   "round4": [
@@ -1139,40 +1049,28 @@
       "team2": null,
       "winner": null,
       "gameId": "r4-0",
-      "region": "",
-      "scheduledTime": "2026-03-28T12:15:00-04:00",
-      "network": "CBS",
-      "location": "Brooklyn, NY"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r4-1",
-      "region": "",
-      "scheduledTime": "2026-03-29T14:45:00-04:00",
-      "network": "TBS",
-      "location": "TBD"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r4-2",
-      "region": "",
-      "scheduledTime": "2026-03-28T17:15:00-04:00",
-      "network": "TNT",
-      "location": "TBD"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r4-3",
-      "region": "",
-      "scheduledTime": "2026-03-29T19:45:00-04:00",
-      "network": "truTV",
-      "location": "TBD"
+      "region": ""
     }
   ],
   "round5": [
@@ -1181,20 +1079,14 @@
       "team2": null,
       "winner": null,
       "gameId": "r5-0",
-      "region": "",
-      "scheduledTime": "2026-04-04T12:15:00-04:00",
-      "network": "CBS",
-      "location": "Indianapolis, IN"
+      "region": ""
     },
     {
       "team1": null,
       "team2": null,
       "winner": null,
       "gameId": "r5-1",
-      "region": "",
-      "scheduledTime": "2026-04-04T14:45:00-04:00",
-      "network": "CBS",
-      "location": "Indianapolis, IN"
+      "region": ""
     }
   ],
   "round6": [
@@ -1203,10 +1095,7 @@
       "team2": null,
       "winner": null,
       "gameId": "r6-0",
-      "region": "",
-      "scheduledTime": "2026-04-06T12:15:00-04:00",
-      "network": "CBS",
-      "location": "Indianapolis, IN"
+      "region": ""
     }
   ],
   "winner": null

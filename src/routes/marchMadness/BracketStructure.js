@@ -1,19 +1,18 @@
 // Shared bracket structure and utilities for March Madness
 
-// Default scoring constants (can be overridden by loading config)
+// Scoring constants (use let so they can be updated from config)
 export let SCORE_FOR_ROUND = [0, 10, 20, 30, 50, 80, 130];
 export let SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6];
-export let ROUND_NAMES = ['', 'Round of 64', 'Round of 32', 'Sweet 16', 'Elite 8', 'Final Four', 'Championship'];
-export let START_BONUS = {};
+export let ROUND_NAMES = ["", "Round of 64", "Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship"];
+export let STAR_BONUS = [25, 20, 15, 10, 5];
+export let SCORE_DIFF_BUCKETS = [5, 10];  // Buckets for categorizing score differentials
 
-// Flag to track if config has been loaded
+// Track if config has been loaded
 let configLoaded = false;
 
 /**
- * Load scoring configuration from JSON file.
- * This should be called once at app initialization.
- * @param {string} configPath - Path to the scoring-config.json file
- * @returns {Promise<boolean>} - True if loaded successfully
+ * Load scoring configuration from a JSON file.
+ * Updates SCORE_FOR_ROUND, SEED_FACTOR, ROUND_NAMES, and STAR_BONUS from the config.
  */
 export async function loadScoringConfig(configPath = '/marchMadness/2026/scoring-config.json') {
     if (configLoaded) {
@@ -38,31 +37,20 @@ export async function loadScoringConfig(configPath = '/marchMadness/2026/scoring
         if (config.roundNames && Array.isArray(config.roundNames)) {
             ROUND_NAMES = config.roundNames;
         }
-        if (config.startBonus && typeof config.startBonus === 'object') {
-            START_BONUS = config.startBonus;
+        if (config.starBonus && Array.isArray(config.starBonus)) {
+            STAR_BONUS = config.starBonus;
+        }
+        if (config.scoreDiffBuckets && Array.isArray(config.scoreDiffBuckets)) {
+            SCORE_DIFF_BUCKETS = config.scoreDiffBuckets;
         }
         
         configLoaded = true;
-        console.log('Loaded scoring config:', { SCORE_FOR_ROUND, SEED_FACTOR, ROUND_NAMES, START_BONUS });
+        console.log('Loaded scoring config:', { SCORE_FOR_ROUND, SEED_FACTOR, ROUND_NAMES, STAR_BONUS, SCORE_DIFF_BUCKETS });
         return true;
     } catch (err) {
         console.warn('Error loading scoring config, using defaults:', err);
         return false;
     }
-}
-
-/**
- * Get current scoring configuration.
- * @returns {Object} - Current scoring configuration
- */
-export function getScoringConfig() {
-    return {
-        scoreForRound: SCORE_FOR_ROUND,
-        seedFactor: SEED_FACTOR,
-        roundNames: ROUND_NAMES,
-        startBonus: START_BONUS,
-        configLoaded
-    };
 }
 
 // Region positioning
@@ -147,7 +135,21 @@ export const CELL_MAPPINGS = {
         rightS16: 'AG',
         rightR2: 'AJ',
         rightTeam: 'AL',
-        rightSeed: 'AM'
+        rightSeed: 'AM',
+        // Score columns (placed between team name and next round, toward center)
+        leftR1Score: 'D',      // Score for Round 1 teams (next to C)
+        leftR2Score: 'F',      // Score for Round 2 winners (next to E)
+        leftS16Score: 'I',     // Score for Sweet 16 winners (next to H)
+        leftE8Score: 'L',      // Score for Elite 8 winners (next to K)
+        leftF4Score: 'O',      // Score for Final Four winners (next to N) - rows 22, 57
+        champTeam1Score: 'P',  // Score for Championship Team 1 (row 39)
+        champTeam2Score: 'V',  // Score for Championship Team 2 (row 39)
+        champWinnerScore: 'S', // Score for Championship winner (row 44)
+        rightF4Score: 'Z',     // Score for Final Four winners (next to AA)
+        rightE8Score: 'AC',    // Score for Elite 8 winners (next to AD)
+        rightS16Score: 'AF',   // Score for Sweet 16 winners (next to AG)
+        rightR2Score: 'AI',    // Score for Round 2 winners (next to AJ)
+        rightR1Score: 'AK'     // Score for Round 1 teams (next to AL)
     },
     
     // Championship rows

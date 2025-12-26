@@ -11,10 +11,12 @@
     "Championship"
   ],
   "starBonus": [25, 20, 15, 10, 5],
+  "scoreDiffBuckets": [5, 10],
   "description": {
     "baseScoring": "Points are awarded for each correct pick based on the round.",
     "underdogPoints": "Additional points are awarded for correctly picking upsets. The bonus is can be calculated from how much of an upset it was and in what round it was. The exact formula is: (winner seed - expected winner seed) × seed factor for that round.",
     "tiebreaker": "In case of a tie, the participant who correctly picked more games in later rounds wins.",
-    "starBonus": "description of star bonus"
+    "starBonus": "description of star bonus",
+    "scoreDiffBuckets": "Buckets for categorizing score differentials. [5, 10] creates categories: 0-5 (close), 6-10 (moderate), >10 (blowout)"
   }
 }
