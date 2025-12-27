@@ -1685,6 +1685,7 @@
                                 bracketPath={`${RESULTS_FILE}.json`}
                                 resultsPath={`${RESULTS_FILE}.json`}
                                 {stakeData}
+                                showScores={true}
                                 on:nextGameClick={handleNextGameClick}
                             />
                         </div>

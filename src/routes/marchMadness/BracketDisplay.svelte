@@ -9,6 +9,7 @@
     export let interactive = false;         // Whether picks can be made
     export let stakeData = null;           // Optional stake data for tooltips {gameKey: {participant: {team1: pts, team2: pts}}}
     export let scenario = null;            // Optional winning scenario to display
+    export let showScores = false;         // Whether to show game scores (for results bracket)
     
     const dispatch = createEventDispatcher();
     
@@ -78,23 +79,6 @@
     }
     
     /**
-     * Check if a game is pending - undecided but NOT next (waiting on earlier rounds)
-     * @param {Object} resultsGame - The game from the results bracket
-     */
-    function isPendingGame(resultsGame) {
-        if (!resultsGame) return false;
-        
-        // Already has a winner - not pending
-        if (resultsGame.winner) return false;
-        
-        // If it's a next game, it's not "pending" (it gets gold highlight instead)
-        if (isNextGame(resultsGame)) return false;
-        
-        // Otherwise it's pending (undecided but waiting on parents)
-        return true;
-    }
-    
-    /**
      * Get the results game corresponding to a user's bracket game
      */
     function getResultsGame(round, gameIndex) {
@@ -157,26 +141,17 @@
         const stakes = stakeData[gameKey];
         const team1Supporters = [];
         const team2Supporters = [];
-        const noStakes = [];
         
         for (const [name, data] of Object.entries(stakes)) {
-            if (data.team1 > 0) {
-                team1Supporters.push({ name, points: data.team1 });
-            } else if (data.team2 > 0) {
-                team2Supporters.push({ name, points: data.team2 });
-            } else {
-                // No stake in either team
-                noStakes.push(name);
-            }
+            if (data.team1 > 0) team1Supporters.push({ name, points: data.team1 });
+            if (data.team2 > 0) team2Supporters.push({ name, points: data.team2 });
         }
         
         // Sort by points descending
         team1Supporters.sort((a, b) => b.points - a.points);
         team2Supporters.sort((a, b) => b.points - a.points);
-        // Sort no stakes alphabetically
-        noStakes.sort((a, b) => a.localeCompare(b));
         
-        return { team1Supporters, team2Supporters, noStakes };
+        return { team1Supporters, team2Supporters };
     }
 
     /**
@@ -224,7 +199,12 @@
         
         // For decided games, use normal coloring
         if (status === 'correct' || status === 'incorrect') {
-            return isUserPick ? `selected ${status}` : '';
+            if (isUserPick) {
+                return `selected ${status}`;
+            } else {
+                // This team lost - apply loser styling if showScores is enabled
+                return showScores ? 'loser' : '';
+            }
         }
         
         // For undecided games, check if there's a scenario
@@ -284,19 +264,22 @@
     /**
      * Get display info for a team in the context of a scenario
      * For undecided games, shows the scenario's bracket merged with user's bracket
-     * Returns { name, seed, userPick } where userPick is shown as subtitle if different
+     * Returns { name, seed, userPick, score } where userPick is shown as subtitle if different
      */
     function getTeamDisplayInfo(game, team, round, gameIndex) {
         if (!team) return null;
         
+        // Get the score for this team if showScores is enabled
+        const score = getTeamScore(game, team);
+        
         // If no scenario or game is decided, just show the team normally
         if (!scenario || !isGameUndecided(round, gameIndex)) {
-            return { name: team.name, seed: team.seed, userPick: null };
+            return { name: team.name, seed: team.seed, userPick: null, score };
         }
         
         const scenarioGame = getScenarioGame(round, gameIndex);
         if (!scenarioGame) {
-            return { name: team.name, seed: team.seed, userPick: null };
+            return { name: team.name, seed: team.seed, userPick: null, score };
         }
         
         // Determine if this is team1 or team2 slot based on the team passed in
@@ -315,7 +298,7 @@
             isEitherTeam = scenarioGame.team2IsEither;
         } else {
             // Fallback - shouldn't happen
-            return { name: team.name, seed: team.seed, userPick: null };
+            return { name: team.name, seed: team.seed, userPick: null, score };
         }
         
         // Check if the scenario team name contains "/" (combined either teams)
@@ -327,20 +310,22 @@
         // Compare user's team in this slot vs scenario's team
         if (team.name === scenarioTeamName) {
             // User's prediction matches scenario exactly - show normally
-            return { name: team.name, seed: team.seed, userPick: null };
+            return { name: team.name, seed: team.seed, userPick: null, score };
         } else if (userPickIsInEither) {
             // User's pick is one of the combined either teams - show combined name, no parenthetical
             return { 
                 name: scenarioTeamName, 
                 seed: scenarioTeamSeed, 
-                userPick: null 
+                userPick: null,
+                score
             };
         } else {
             // User had a different team - show scenario's team with user's pick as subtitle
             return {
                 name: scenarioTeamName,
                 seed: scenarioTeamSeed,
-                userPick: team.name
+                userPick: team.name,
+                score
             };
         }
     }
@@ -349,6 +334,25 @@
         if (interactive) {
             dispatch('selectWinner', { round, gameIndex, team });
         }
+    }
+    
+    /**
+     * Get the score for a specific team in a game from the bracket.
+     * @param {Object} game - The game object
+     * @param {Object} team - The team to get the score for
+     * @returns {number|null} - The score or null if not available
+     */
+    function getTeamScore(game, team) {
+        if (!game || !team || !showScores) return null;
+        
+        // Check if this team is team1 or team2 and return corresponding score
+        if (game.team1 && game.team1.name === team.name && game.score1 !== undefined) {
+            return game.score1;
+        }
+        if (game.team2 && game.team2.name === team.name && game.score2 !== undefined) {
+            return game.score2;
+        }
+        return null;
     }
 </script>
 
@@ -366,7 +370,7 @@
                         {#if i === 0}
                             <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i))} class:pending-game={isPendingGame(getResultsGame(1, i))} 
+                                class:next-game={isNextGame(getResultsGame(1, i))} 
                                 class:clickable={isNextGame(getResultsGame(1, i))}
                                 bind:clientHeight={gameHeight}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i)}
@@ -381,7 +385,7 @@
 
                                     >
                                         <span class="seed">{info1.seed}</span>
-                                        <span class="team-name">{info1.name}</span>
+                                        <span class="team-name">{info1.name}</span>{#if info1.score !== null}<span class="game-score">{info1.score}</span>{/if}
                                         {#if info1.userPick}
                                             <span class="user-pick">({info1.userPick})</span>
 
@@ -398,7 +402,7 @@
 
                                     >
                                         <span class="seed">{info2.seed}</span>
-                                        <span class="team-name">{info2.name}</span>
+                                        <span class="team-name">{info2.name}</span>{#if info2.score !== null}<span class="game-score">{info2.score}</span>{/if}
                                         {#if info2.userPick}
                                             <span class="user-pick">({info2.userPick})</span>
 
@@ -411,7 +415,7 @@
                         {:else}
                             <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i))} class:pending-game={isPendingGame(getResultsGame(1, i))}
+                                class:next-game={isNextGame(getResultsGame(1, i))}
                                 class:clickable={isNextGame(getResultsGame(1, i))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -424,7 +428,7 @@
 
                                     >
                                         <span class="seed">{info3.seed}</span>
-                                        <span class="team-name">{info3.name}</span>
+                                        <span class="team-name">{info3.name}</span>{#if info3.score !== null}<span class="game-score">{info3.score}</span>{/if}
                                         {#if info3.userPick}
                                             <span class="user-pick">({info3.userPick})</span>
 
@@ -441,7 +445,7 @@
 
                                     >
                                         <span class="seed">{info4.seed}</span>
-                                        <span class="team-name">{info4.name}</span>
+                                        <span class="team-name">{info4.name}</span>{#if info4.score !== null}<span class="game-score">{info4.score}</span>{/if}
                                         {#if info4.userPick}
                                             <span class="user-pick">({info4.userPick})</span>
 
@@ -460,7 +464,7 @@
                     {#each bracket.round2.slice(0, 4) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i))} class:pending-game={isPendingGame(getResultsGame(2, i))}
+                                class:next-game={isNextGame(getResultsGame(2, i))}
                                 class:clickable={isNextGame(getResultsGame(2, i))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -473,7 +477,7 @@
 
                                 >
                                     <span class="seed">{info5.seed}</span>
-                                    <span class="team-name">{info5.name}</span>
+                                    <span class="team-name">{info5.name}</span>{#if info5.score !== null}<span class="game-score">{info5.score}</span>{/if}
                                     {#if info5.userPick}
                                         <span class="user-pick">({info5.userPick})</span>
 
@@ -490,7 +494,7 @@
 
                                 >
                                     <span class="seed">{info6.seed}</span>
-                                    <span class="team-name">{info6.name}</span>
+                                    <span class="team-name">{info6.name}</span>{#if info6.score !== null}<span class="game-score">{info6.score}</span>{/if}
                                     {#if info6.userPick}
                                         <span class="user-pick">({info6.userPick})</span>
 
@@ -508,7 +512,7 @@
                     {#each bracket.round3.slice(0, 2) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i))} class:pending-game={isPendingGame(getResultsGame(3, i))}
+                                class:next-game={isNextGame(getResultsGame(3, i))}
                                 class:clickable={isNextGame(getResultsGame(3, i))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -521,7 +525,7 @@
 
                                 >
                                     <span class="seed">{info7.seed}</span>
-                                    <span class="team-name">{info7.name}</span>
+                                    <span class="team-name">{info7.name}</span>{#if info7.score !== null}<span class="game-score">{info7.score}</span>{/if}
                                     {#if info7.userPick}
                                         <span class="user-pick">({info7.userPick})</span>
 
@@ -538,7 +542,7 @@
 
                                 >
                                     <span class="seed">{info8.seed}</span>
-                                    <span class="team-name">{info8.name}</span>
+                                    <span class="team-name">{info8.name}</span>{#if info8.score !== null}<span class="game-score">{info8.score}</span>{/if}
                                     {#if info8.userPick}
                                         <span class="user-pick">({info8.userPick})</span>
 
@@ -555,7 +559,7 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 0))} class:pending-game={isPendingGame(getResultsGame(4, 0))}
+                                class:next-game={isNextGame(getResultsGame(4, 0))}
                                 class:clickable={isNextGame(getResultsGame(4, 0))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 0)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -568,7 +572,7 @@
 
                             >
                                 <span class="seed">{info9.seed}</span>
-                                <span class="team-name">{info9.name}</span>
+                                <span class="team-name">{info9.name}</span>{#if info9.score !== null}<span class="game-score">{info9.score}</span>{/if}
                                 {#if info9.userPick}
                                     <span class="user-pick">({info9.userPick})</span>
 
@@ -585,7 +589,7 @@
 
                             >
                                 <span class="seed">{info10.seed}</span>
-                                <span class="team-name">{info10.name}</span>
+                                <span class="team-name">{info10.name}</span>{#if info10.score !== null}<span class="game-score">{info10.score}</span>{/if}
                                 {#if info10.userPick}
                                     <span class="user-pick">({info10.userPick})</span>
 
@@ -606,7 +610,7 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 2))} class:pending-game={isPendingGame(getResultsGame(4, 2))}
+                                class:next-game={isNextGame(getResultsGame(4, 2))}
                                 class:clickable={isNextGame(getResultsGame(4, 2))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 2)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -619,7 +623,7 @@
 
                             >
                                 <span class="seed">{info11.seed}</span>
-                                <span class="team-name">{info11.name}</span>
+                                <span class="team-name">{info11.name}</span>{#if info11.score !== null}<span class="game-score">{info11.score}</span>{/if}
                                 {#if info11.userPick}
                                     <span class="user-pick">({info11.userPick})</span>
 
@@ -636,7 +640,7 @@
 
                             >
                                 <span class="seed">{info12.seed}</span>
-                                <span class="team-name">{info12.name}</span>
+                                <span class="team-name">{info12.name}</span>{#if info12.score !== null}<span class="game-score">{info12.score}</span>{/if}
                                 {#if info12.userPick}
                                     <span class="user-pick">({info12.userPick})</span>
 
@@ -653,7 +657,7 @@
                     {#each bracket.round3.slice(4, 6) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i + 4))} class:pending-game={isPendingGame(getResultsGame(3, i + 4))}
+                                class:next-game={isNextGame(getResultsGame(3, i + 4))}
                                 class:clickable={isNextGame(getResultsGame(3, i + 4))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 4)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -666,7 +670,7 @@
 
                                 >
                                     <span class="seed">{info13.seed}</span>
-                                    <span class="team-name">{info13.name}</span>
+                                    <span class="team-name">{info13.name}</span>{#if info13.score !== null}<span class="game-score">{info13.score}</span>{/if}
                                     {#if info13.userPick}
                                         <span class="user-pick">({info13.userPick})</span>
 
@@ -683,7 +687,7 @@
 
                                 >
                                     <span class="seed">{info14.seed}</span>
-                                    <span class="team-name">{info14.name}</span>
+                                    <span class="team-name">{info14.name}</span>{#if info14.score !== null}<span class="game-score">{info14.score}</span>{/if}
                                     {#if info14.userPick}
                                         <span class="user-pick">({info14.userPick})</span>
 
@@ -701,7 +705,7 @@
                     {#each bracket.round2.slice(8, 12) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i + 8))} class:pending-game={isPendingGame(getResultsGame(2, i + 8))}
+                                class:next-game={isNextGame(getResultsGame(2, i + 8))}
                                 class:clickable={isNextGame(getResultsGame(2, i + 8))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 8)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -714,7 +718,7 @@
 
                                 >
                                     <span class="seed">{info15.seed}</span>
-                                    <span class="team-name">{info15.name}</span>
+                                    <span class="team-name">{info15.name}</span>{#if info15.score !== null}<span class="game-score">{info15.score}</span>{/if}
                                     {#if info15.userPick}
                                         <span class="user-pick">({info15.userPick})</span>
 
@@ -731,7 +735,7 @@
 
                                 >
                                     <span class="seed">{info16.seed}</span>
-                                    <span class="team-name">{info16.name}</span>
+                                    <span class="team-name">{info16.name}</span>{#if info16.score !== null}<span class="game-score">{info16.score}</span>{/if}
                                     {#if info16.userPick}
                                         <span class="user-pick">({info16.userPick})</span>
 
@@ -749,7 +753,7 @@
                     {#each bracket.round1.slice(16, 24) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i + 16))} class:pending-game={isPendingGame(getResultsGame(1, i + 16))}
+                                class:next-game={isNextGame(getResultsGame(1, i + 16))}
                                 class:clickable={isNextGame(getResultsGame(1, i + 16))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 16)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -762,7 +766,7 @@
 
                                 >
                                     <span class="seed">{info17.seed}</span>
-                                    <span class="team-name">{info17.name}</span>
+                                    <span class="team-name">{info17.name}</span>{#if info17.score !== null}<span class="game-score">{info17.score}</span>{/if}
                                     {#if info17.userPick}
                                         <span class="user-pick">({info17.userPick})</span>
 
@@ -779,7 +783,7 @@
 
                                 >
                                     <span class="seed">{info18.seed}</span>
-                                    <span class="team-name">{info18.name}</span>
+                                    <span class="team-name">{info18.name}</span>{#if info18.score !== null}<span class="game-score">{info18.score}</span>{/if}
                                     {#if info18.userPick}
                                         <span class="user-pick">({info18.userPick})</span>
 
@@ -801,7 +805,7 @@
                 <h3>Final Four</h3>
                 <div 
                                 class="game semifinal-game" 
-                                class:next-game={isNextGame(getResultsGame(5, 0))} class:pending-game={isPendingGame(getResultsGame(5, 0))}
+                                class:next-game={isNextGame(getResultsGame(5, 0))}
                                 class:clickable={isNextGame(getResultsGame(5, 0))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 5, 0)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -814,7 +818,7 @@
 
                         >
                             <span class="seed">{info19.seed}</span>
-                            <span class="team-name">{info19.name}</span>
+                            <span class="team-name">{info19.name}</span>{#if info19.score !== null}<span class="game-score">{info19.score}</span>{/if}
                             {#if info19.userPick}
                                 <span class="user-pick">({info19.userPick})</span>
 
@@ -831,7 +835,7 @@
 
                         >
                             <span class="seed">{info20.seed}</span>
-                            <span class="team-name">{info20.name}</span>
+                            <span class="team-name">{info20.name}</span>{#if info20.score !== null}<span class="game-score">{info20.score}</span>{/if}
                             {#if info20.userPick}
                                 <span class="user-pick">({info20.userPick})</span>
 
@@ -848,7 +852,7 @@
                 <h3>Championship</h3>
                 <div 
                                 class="game championship-game" 
-                                class:next-game={isNextGame(getResultsGame(6, 0))} class:pending-game={isPendingGame(getResultsGame(6, 0))}
+                                class:next-game={isNextGame(getResultsGame(6, 0))}
                                 class:clickable={isNextGame(getResultsGame(6, 0))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 6, 0)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -861,7 +865,7 @@
 
                         >
                             <span class="seed">{info21.seed}</span>
-                            <span class="team-name">{info21.name}</span>
+                            <span class="team-name">{info21.name}</span>{#if info21.score !== null}<span class="game-score">{info21.score}</span>{/if}
                             {#if info21.userPick}
                                 <span class="user-pick">({info21.userPick})</span>
 
@@ -878,7 +882,7 @@
 
                         >
                             <span class="seed">{info22.seed}</span>
-                            <span class="team-name">{info22.name}</span>
+                            <span class="team-name">{info22.name}</span>{#if info22.score !== null}<span class="game-score">{info22.score}</span>{/if}
                             {#if info22.userPick}
                                 <span class="user-pick">({info22.userPick})</span>
 
@@ -912,7 +916,7 @@
                 <h3>Final Four</h3>
                 <div 
                                 class="game semifinal-game" 
-                                class:next-game={isNextGame(getResultsGame(5, 1))} class:pending-game={isPendingGame(getResultsGame(5, 1))}
+                                class:next-game={isNextGame(getResultsGame(5, 1))}
                                 class:clickable={isNextGame(getResultsGame(5, 1))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 5, 1)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -925,7 +929,7 @@
 
                         >
                             <span class="seed">{info23.seed}</span>
-                            <span class="team-name">{info23.name}</span>
+                            <span class="team-name">{info23.name}</span>{#if info23.score !== null}<span class="game-score">{info23.score}</span>{/if}
                             {#if info23.userPick}
                                 <span class="user-pick">({info23.userPick})</span>
 
@@ -942,7 +946,7 @@
 
                         >
                             <span class="seed">{info24.seed}</span>
-                            <span class="team-name">{info24.name}</span>
+                            <span class="team-name">{info24.name}</span>{#if info24.score !== null}<span class="game-score">{info24.score}</span>{/if}
                             {#if info24.userPick}
                                 <span class="user-pick">({info24.userPick})</span>
 
@@ -966,7 +970,7 @@
                     {#each bracket.round1.slice(8, 16) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i + 8))} class:pending-game={isPendingGame(getResultsGame(1, i + 8))}
+                                class:next-game={isNextGame(getResultsGame(1, i + 8))}
                                 class:clickable={isNextGame(getResultsGame(1, i + 8))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 8)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -979,7 +983,7 @@
 
                                 >
                                     <span class="seed">{info25.seed}</span>
-                                    <span class="team-name">{info25.name}</span>
+                                    <span class="team-name">{info25.name}</span>{#if info25.score !== null}<span class="game-score">{info25.score}</span>{/if}
                                     {#if info25.userPick}
                                         <span class="user-pick">({info25.userPick})</span>
 
@@ -996,7 +1000,7 @@
 
                                 >
                                     <span class="seed">{info26.seed}</span>
-                                    <span class="team-name">{info26.name}</span>
+                                    <span class="team-name">{info26.name}</span>{#if info26.score !== null}<span class="game-score">{info26.score}</span>{/if}
                                     {#if info26.userPick}
                                         <span class="user-pick">({info26.userPick})</span>
 
@@ -1014,7 +1018,7 @@
                     {#each bracket.round2.slice(4, 8) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i + 4))} class:pending-game={isPendingGame(getResultsGame(2, i + 4))}
+                                class:next-game={isNextGame(getResultsGame(2, i + 4))}
                                 class:clickable={isNextGame(getResultsGame(2, i + 4))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 4)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -1027,7 +1031,7 @@
 
                                 >
                                     <span class="seed">{info27.seed}</span>
-                                    <span class="team-name">{info27.name}</span>
+                                    <span class="team-name">{info27.name}</span>{#if info27.score !== null}<span class="game-score">{info27.score}</span>{/if}
                                     {#if info27.userPick}
                                         <span class="user-pick">({info27.userPick})</span>
 
@@ -1044,7 +1048,7 @@
 
                                 >
                                     <span class="seed">{info28.seed}</span>
-                                    <span class="team-name">{info28.name}</span>
+                                    <span class="team-name">{info28.name}</span>{#if info28.score !== null}<span class="game-score">{info28.score}</span>{/if}
                                     {#if info28.userPick}
                                         <span class="user-pick">({info28.userPick})</span>
 
@@ -1062,7 +1066,7 @@
                     {#each bracket.round3.slice(2, 4) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i + 2))} class:pending-game={isPendingGame(getResultsGame(3, i + 2))}
+                                class:next-game={isNextGame(getResultsGame(3, i + 2))}
                                 class:clickable={isNextGame(getResultsGame(3, i + 2))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 2)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -1075,7 +1079,7 @@
 
                                 >
                                     <span class="seed">{info29.seed}</span>
-                                    <span class="team-name">{info29.name}</span>
+                                    <span class="team-name">{info29.name}</span>{#if info29.score !== null}<span class="game-score">{info29.score}</span>{/if}
                                     {#if info29.userPick}
                                         <span class="user-pick">({info29.userPick})</span>
 
@@ -1092,7 +1096,7 @@
 
                                 >
                                     <span class="seed">{info30.seed}</span>
-                                    <span class="team-name">{info30.name}</span>
+                                    <span class="team-name">{info30.name}</span>{#if info30.score !== null}<span class="game-score">{info30.score}</span>{/if}
                                     {#if info30.userPick}
                                         <span class="user-pick">({info30.userPick})</span>
 
@@ -1109,7 +1113,7 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 1))} class:pending-game={isPendingGame(getResultsGame(4, 1))}
+                                class:next-game={isNextGame(getResultsGame(4, 1))}
                                 class:clickable={isNextGame(getResultsGame(4, 1))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 1)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -1122,7 +1126,7 @@
 
                             >
                                 <span class="seed">{info31.seed}</span>
-                                <span class="team-name">{info31.name}</span>
+                                <span class="team-name">{info31.name}</span>{#if info31.score !== null}<span class="game-score">{info31.score}</span>{/if}
                                 {#if info31.userPick}
                                     <span class="user-pick">({info31.userPick})</span>
 
@@ -1139,7 +1143,7 @@
 
                             >
                                 <span class="seed">{info32.seed}</span>
-                                <span class="team-name">{info32.name}</span>
+                                <span class="team-name">{info32.name}</span>{#if info32.score !== null}<span class="game-score">{info32.score}</span>{/if}
                                 {#if info32.userPick}
                                     <span class="user-pick">({info32.userPick})</span>
 
@@ -1160,7 +1164,7 @@
                 <div class="bracket-column">
                     <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(4, 3))} class:pending-game={isPendingGame(getResultsGame(4, 3))}
+                                class:next-game={isNextGame(getResultsGame(4, 3))}
                                 class:clickable={isNextGame(getResultsGame(4, 3))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 4, 3)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -1173,7 +1177,7 @@
 
                             >
                                 <span class="seed">{info33.seed}</span>
-                                <span class="team-name">{info33.name}</span>
+                                <span class="team-name">{info33.name}</span>{#if info33.score !== null}<span class="game-score">{info33.score}</span>{/if}
                                 {#if info33.userPick}
                                     <span class="user-pick">({info33.userPick})</span>
 
@@ -1190,7 +1194,7 @@
 
                             >
                                 <span class="seed">{info34.seed}</span>
-                                <span class="team-name">{info34.name}</span>
+                                <span class="team-name">{info34.name}</span>{#if info34.score !== null}<span class="game-score">{info34.score}</span>{/if}
                                 {#if info34.userPick}
                                     <span class="user-pick">({info34.userPick})</span>
 
@@ -1207,7 +1211,7 @@
                     {#each bracket.round3.slice(6, 8) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(3, i + 6))} class:pending-game={isPendingGame(getResultsGame(3, i + 6))}
+                                class:next-game={isNextGame(getResultsGame(3, i + 6))}
                                 class:clickable={isNextGame(getResultsGame(3, i + 6))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 3, i + 6)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -1220,7 +1224,7 @@
 
                                 >
                                     <span class="seed">{info35.seed}</span>
-                                    <span class="team-name">{info35.name}</span>
+                                    <span class="team-name">{info35.name}</span>{#if info35.score !== null}<span class="game-score">{info35.score}</span>{/if}
                                     {#if info35.userPick}
                                         <span class="user-pick">({info35.userPick})</span>
 
@@ -1237,7 +1241,7 @@
 
                                 >
                                     <span class="seed">{info36.seed}</span>
-                                    <span class="team-name">{info36.name}</span>
+                                    <span class="team-name">{info36.name}</span>{#if info36.score !== null}<span class="game-score">{info36.score}</span>{/if}
                                     {#if info36.userPick}
                                         <span class="user-pick">({info36.userPick})</span>
 
@@ -1255,7 +1259,7 @@
                     {#each bracket.round2.slice(12, 16) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(2, i + 12))} class:pending-game={isPendingGame(getResultsGame(2, i + 12))}
+                                class:next-game={isNextGame(getResultsGame(2, i + 12))}
                                 class:clickable={isNextGame(getResultsGame(2, i + 12))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 2, i + 12)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -1268,7 +1272,7 @@
 
                                 >
                                     <span class="seed">{info37.seed}</span>
-                                    <span class="team-name">{info37.name}</span>
+                                    <span class="team-name">{info37.name}</span>{#if info37.score !== null}<span class="game-score">{info37.score}</span>{/if}
                                     {#if info37.userPick}
                                         <span class="user-pick">({info37.userPick})</span>
 
@@ -1285,7 +1289,7 @@
 
                                 >
                                     <span class="seed">{info38.seed}</span>
-                                    <span class="team-name">{info38.name}</span>
+                                    <span class="team-name">{info38.name}</span>{#if info38.score !== null}<span class="game-score">{info38.score}</span>{/if}
                                     {#if info38.userPick}
                                         <span class="user-pick">({info38.userPick})</span>
 
@@ -1303,7 +1307,7 @@
                     {#each bracket.round1.slice(24, 32) as game, i}
                         <div 
                                 class="game" 
-                                class:next-game={isNextGame(getResultsGame(1, i + 24))} class:pending-game={isPendingGame(getResultsGame(1, i + 24))}
+                                class:next-game={isNextGame(getResultsGame(1, i + 24))}
                                 class:clickable={isNextGame(getResultsGame(1, i + 24))}
                                 on:mouseenter={(e) => handleGameMouseEnter(e, 1, i + 24)}
                                 on:mouseleave={handleGameMouseLeave}
@@ -1316,7 +1320,7 @@
 
                                 >
                                     <span class="seed">{info39.seed}</span>
-                                    <span class="team-name">{info39.name}</span>
+                                    <span class="team-name">{info39.name}</span>{#if info39.score !== null}<span class="game-score">{info39.score}</span>{/if}
                                     {#if info39.userPick}
                                         <span class="user-pick">({info39.userPick})</span>
 
@@ -1333,7 +1337,7 @@
 
                                 >
                                     <span class="seed">{info40.seed}</span>
-                                    <span class="team-name">{info40.name}</span>
+                                    <span class="team-name">{info40.name}</span>{#if info40.score !== null}<span class="game-score">{info40.score}</span>{/if}
                                     {#if info40.userPick}
                                         <span class="user-pick">({info40.userPick})</span>
 
@@ -1373,7 +1377,7 @@
                         </div>
                     {/each}
                     {#if stakes.team1Supporters.length === 0}
-                        <div class="tooltip-row empty">-</div>
+                        <div class="tooltip-row empty">No stakes</div>
                     {/if}
                     {#if stakes.team1Supporters.length > 5}
                         <div class="tooltip-row more">+{stakes.team1Supporters.length - 5} more</div>
@@ -1388,24 +1392,10 @@
                         </div>
                     {/each}
                     {#if stakes.team2Supporters.length === 0}
-                        <div class="tooltip-row empty">-</div>
+                        <div class="tooltip-row empty">No stakes</div>
                     {/if}
                     {#if stakes.team2Supporters.length > 5}
                         <div class="tooltip-row more">+{stakes.team2Supporters.length - 5} more</div>
-                    {/if}
-                </div>
-                <div class="tooltip-column no-stake-column">
-                    <div class="tooltip-column-header">No Stake</div>
-                    {#each stakes.noStakes.slice(0, 5) as name}
-                        <div class="tooltip-row">
-                            <span class="supporter-name">{name}</span>
-                        </div>
-                    {/each}
-                    {#if stakes.noStakes.length === 0}
-                        <div class="tooltip-row empty">-</div>
-                    {/if}
-                    {#if stakes.noStakes.length > 5}
-                        <div class="tooltip-row more">+{stakes.noStakes.length - 5} more</div>
                     {/if}
                 </div>
             </div>
@@ -1578,14 +1568,7 @@
     .game.next-game {
         border-color: #f59e0b;
         border-width: 3px;
-        box-shadow: 0 0 8px rgba(245, 158, 11, 1);
-    }
-    
-    .game.pending-game {
-        border-color: #4b5563;
-        border-width: 3px;
-        box-shadow: 0 0 6px rgba(75, 85, 99, 1);
-        background: #f9fafb;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
     }
     
     .game.clickable {
@@ -1675,15 +1658,6 @@
     .supporter-points {
         color: #059669;
         font-weight: 600;
-    }
-    
-    .tooltip-column.no-stake-column .tooltip-column-header {
-        color: #6b7280;
-    }
-    
-    .tooltip-column.no-stake-column .supporter-name {
-        color: #6b7280;
-        font-style: italic;
     }
     
     .tooltip-footer {
@@ -1906,6 +1880,48 @@
         overflow: hidden;
         text-overflow: clip;
         min-width: 0;
+    }
+    
+    .game-score {
+        font-weight: 600;
+        color: #6b7280;
+        margin-left: 8px;
+        padding-left: 8px;
+        font-size: 0.9em;
+        border-left: 1px solid #d1d5db;
+    }
+    
+    /* Score on winner (green) background - white text */
+    .team-btn.selected .game-score {
+        color: rgba(255, 255, 255, 0.95);
+        border-left-color: rgba(255, 255, 255, 0.4);
+    }
+    
+    /* Score on incorrect (red) background - white text */
+    .team-btn.selected.incorrect .game-score {
+        color: rgba(255, 255, 255, 0.95);
+        border-left-color: rgba(255, 255, 255, 0.4);
+    }
+    
+    /* Gray out losing teams (non-selected with a score showing) */
+    .team-btn:not(.selected):not(.empty) {
+        /* Default styling for non-winners */
+    }
+    
+    /* When showing scores, gray out the loser */
+    .team-btn.loser {
+        background: #f3f4f6;
+        color: #9ca3af;
+    }
+    
+    .team-btn.loser .seed {
+        background: #e5e7eb;
+        color: #9ca3af;
+    }
+    
+    .team-btn.loser .game-score {
+        color: #9ca3af;
+        border-left-color: #d1d5db;
     }
     
     @media (max-width: 768px) {
