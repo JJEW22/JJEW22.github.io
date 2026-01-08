@@ -6,13 +6,13 @@
         "Winners": []
     },
     {
-        "name": "shortest stick",
+        "name": "Shortest Stick",
         "round": 0,
         "reason": "has the lowest probability of winning at the beginning",
         "Winners": []
     },
     {
-        "name": "nerd or loner",
+        "name": "Nerd or Loner",
         "round": 0,
         "reason": "awarded for finding something in the rules before the first game, if no one finds it jack wins",
         "Winners": []
@@ -31,7 +31,7 @@
         "Winners": [[], []]
     },
     {
-        "name": "Fell from grace",
+        "name": "Fallen From Grace",
         "round": 2,
         "reason": "worst ratio of 1st round picks/ 2nd round picks",
         "Winners": []
@@ -43,10 +43,11 @@
         "Winners": []
     },
     {
-        "name": "bribery",
+        "name": "Cheater",
         "round": 3,
         "reason": "Typical had my teams going the furthest (qr code to my venmo)",
-        "Winners": []
+        "Winners": [],
+        "image": "/marchMadness/2026/badges/Venmo_QR_code.png"
     },
     {
         "name": "More than fair",

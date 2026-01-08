@@ -194,12 +194,18 @@
             if (isSplitAward) {
                 // Split award: check each sublist
                 const awardNames = award.name.split('/');
+                const splitImages = award.images || awardNames.map(splitName => {
+                    const splitSlug = splitName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                    return `/marchMadness/${YEAR}/badges/${splitSlug}.png`;
+                });
+                
                 for (let i = 0; i < award.Winners.length; i++) {
                     const winnerList = award.Winners[i];
                     if (Array.isArray(winnerList) && winnerList.some(w => w.toLowerCase() === normalizedName)) {
                         // This participant won this sub-award
                         earned.push({
                             name: awardNames[i] || `Award ${i + 1}`,
+                            imagePath: splitImages[i],
                             originalAward: award,
                             subIndex: i,
                             isSplit: true
@@ -209,8 +215,12 @@
             } else {
                 // Regular award
                 if (award.Winners.some(winner => winner.toLowerCase() === normalizedName)) {
+                    const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                    const imagePath = award.image || `/marchMadness/${YEAR}/badges/${badgeSlug}.png`;
+                    
                     earned.push({
                         name: award.name,
+                        imagePath: imagePath,
                         originalAward: award,
                         isSplit: false
                     });
@@ -278,18 +288,57 @@
      * Prepare awards for display (keeps split awards together)
      */
     function prepareAwardsForDisplay(awards) {
+        console.log('=== Star Bonus Image Debug ===');
+        console.log('Total awards to prepare:', awards.length);
+        
         return awards.map(award => {
             const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners?.[0]);
+            const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            
+            // Use image from JSON if provided, otherwise generate path from slug
+            const imagePath = award.image || `/marchMadness/${YEAR}/badges/${badgeSlug}.png`;
+            
+            console.log(`Award: "${award.name}"`);
+            console.log(`  Badge slug: "${badgeSlug}"`);
+            console.log(`  Image from JSON: "${award.image || '(not set)'}"`);
+            console.log(`  Final image path: "${imagePath}"`);
+            console.log(`  Is split: ${isSplitAward}`);
+            console.log(`  Winners:`, award.Winners);
+            
+            // Test if image exists
+            const img = new Image();
+            img.onload = () => console.log(`  ✓ Image loaded successfully: ${imagePath}`);
+            img.onerror = () => console.log(`  ✗ Image failed to load: ${imagePath}`);
+            img.src = imagePath;
             
             if (isSplitAward) {
                 const awardNames = award.name.split('/');
                 const totalWinners = getTotalWinnerCount(award);
                 const hasAnyWinners = award.Winners.some(list => Array.isArray(list) && list.length > 0);
                 
+                // For split awards, check for images array or generate from split names
+                const splitImages = award.images || awardNames.map(splitName => {
+                    const splitSlug = splitName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                    return `/marchMadness/${YEAR}/badges/${splitSlug}.png`;
+                });
+                
+                // Log split image paths
+                awardNames.forEach((splitName, i) => {
+                    const splitImagePath = splitImages[i] || `/marchMadness/${YEAR}/badges/${splitName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`;
+                    console.log(`  Split "${splitName}" -> "${splitImagePath}"`);
+                    
+                    const splitImg = new Image();
+                    splitImg.onload = () => console.log(`    ✓ Split image loaded: ${splitImagePath}`);
+                    splitImg.onerror = () => console.log(`    ✗ Split image failed: ${splitImagePath}`);
+                    splitImg.src = splitImagePath;
+                });
+                
                 return {
                     ...award,
                     isSplit: true,
                     splitNames: awardNames,
+                    splitImages: splitImages,
+                    imagePath: imagePath,
                     totalWinnersForPoints: totalWinners,
                     hasWinners: hasAnyWinners
                 };
@@ -297,6 +346,7 @@
                 return {
                     ...award,
                     isSplit: false,
+                    imagePath: imagePath,
                     totalWinnersForPoints: award.Winners?.length || 0,
                     hasWinners: award.Winners && award.Winners.length > 0
                 };
@@ -1921,10 +1971,14 @@
                                                             on:click={() => scrollToBadge(badgeSlug)}
                                                         >
                                                             <img 
-                                                                src="/marchMadness/{YEAR}/badges/{badgeSlug}.png" 
+                                                                src={badge.imagePath}
                                                                 alt={badge.name}
                                                                 class="mini-badge-image"
-                                                                on:error={(e) => e.target.outerHTML = generatePlaceholderBadge(badge.name, true)}
+                                                                on:load={() => console.log(`✓ Mini badge loaded: ${badge.imagePath}`)}
+                                                                on:error={(e) => {
+                                                                    console.log(`✗ Mini badge FAILED: ${badge.imagePath}`);
+                                                                    e.target.outerHTML = generatePlaceholderBadge(badge.name, true);
+                                                                }}
                                                             />
                                                         </button>
                                                     {/each}
@@ -1970,38 +2024,39 @@
                                                     <!-- Split award: show multiple images with slashes -->
                                                     <div class="split-badge-row">
                                                         {#each award.splitNames as splitName, i}
-                                                            {@const splitSlug = splitName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
+                                                            {@const splitImagePath = award.splitImages[i]}
                                                             {@const splitHasWinner = Array.isArray(award.Winners[i]) && award.Winners[i].length > 0}
                                                             {#if i > 0}
                                                                 <span class="split-separator">/</span>
                                                             {/if}
                                                             <div class="split-badge-item" class:earned={splitHasWinner} class:locked={!splitHasWinner}>
-                                                                {#if splitHasWinner}
-                                                                    <img 
-                                                                        src="/marchMadness/{YEAR}/badges/{splitSlug}.png" 
-                                                                        alt={splitName}
-                                                                        class="split-badge-image"
-                                                                        on:error={(e) => e.target.src = `data:image/svg+xml,${encodeURIComponent(generatePlaceholderBadge(splitName, true))}`}
-                                                                    />
-                                                                {:else}
-                                                                    <div class="split-badge-placeholder">
-                                                                        {@html generatePlaceholderBadge(splitName, false)}
-                                                                    </div>
-                                                                {/if}
+                                                                <img 
+                                                                    src={splitImagePath}
+                                                                    alt={splitName}
+                                                                    class="split-badge-image"
+                                                                    class:locked={!splitHasWinner}
+                                                                    on:load={() => console.log(`✓ Split badge loaded: ${splitImagePath}`)}
+                                                                    on:error={(e) => {
+                                                                        console.log(`✗ Split badge FAILED: ${splitImagePath}`);
+                                                                        e.target.src = `data:image/svg+xml,${encodeURIComponent(generatePlaceholderBadge(splitName, !splitHasWinner))}`;
+                                                                    }}
+                                                                />
                                                             </div>
                                                         {/each}
                                                     </div>
-                                                {:else if award.hasWinners}
+                                                {:else}
+                                                    <!-- Regular (non-split) badge - always show image -->
                                                     <img 
-                                                        src="/marchMadness/{YEAR}/badges/{badgeSlug}.png" 
+                                                        src={award.imagePath}
                                                         alt={award.name}
                                                         class="badge-image"
-                                                        on:error={(e) => e.target.src = `data:image/svg+xml,${encodeURIComponent(generatePlaceholderBadge(award.name, true))}`}
+                                                        class:locked={!award.hasWinners}
+                                                        on:load={() => console.log(`✓ Badge image loaded: ${award.imagePath}`)}
+                                                        on:error={(e) => {
+                                                            console.log(`✗ Badge image FAILED: ${award.imagePath}`);
+                                                            e.target.src = `data:image/svg+xml,${encodeURIComponent(generatePlaceholderBadge(award.name, !award.hasWinners))}`;
+                                                        }}
                                                     />
-                                                {:else}
-                                                    <div class="badge-placeholder locked">
-                                                        {@html generatePlaceholderBadge(award.name, false)}
-                                                    </div>
                                                 {/if}
                                             </div>
                                             
@@ -2711,7 +2766,6 @@
         width: 100%;
         height: 100%;
         object-fit: contain;
-        border-radius: 50%;
     }
     
     .mini-badge :global(svg) {
@@ -2818,7 +2872,13 @@
         width: 100%;
         height: 100%;
         object-fit: contain;
-        border-radius: 50%;
+    }
+    
+    /* Locked (not yet awarded) badge styling */
+    .badge-image.locked,
+    .split-badge-image.locked {
+        filter: grayscale(100%);
+        opacity: 0.5;
     }
     
     .badge-placeholder {
@@ -2889,7 +2949,6 @@
         width: 100%;
         height: 100%;
         object-fit: contain;
-        border-radius: 50%;
     }
     
     .split-badge-placeholder {
