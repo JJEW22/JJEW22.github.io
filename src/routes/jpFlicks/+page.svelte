@@ -40,6 +40,12 @@
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
+    
+    // Adjustment constant for games per session calculation (C in the algorithm)
+    const GAMES_PER_SESSION_ADJUSTMENT = 0.1;
+    
+    // Team that will be adjusted last to ensure even total (players not on other teams)
+    const LAST_TEAM_FOR_ADJUSTMENT = 'Kalice';
 
     // Tournament points file
     const TOURNAMENT_POINTS_FILE = '/marchMadness/2026/tournamentPoints.json'
@@ -62,6 +68,174 @@
     const PLAYER2_TEAM1 = 'player2_team1'
     const PLAYER1_TEAM2 = 'player1_team2'
     const PLAYER2_TEAM2 = 'player2_team2'
+
+    // Get the date of the next Thursday (or today if Thursday) for consistent seeding
+    function getThursdaySeed() {
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0 = Sunday, 4 = Thursday
+        
+        let thursday;
+        if (dayOfWeek === 4) {
+            // Today is Thursday
+            thursday = today;
+        } else {
+            // Calculate days until next Thursday
+            const daysUntilThursday = (4 - dayOfWeek + 7) % 7 || 7;
+            thursday = new Date(today);
+            thursday.setDate(today.getDate() + daysUntilThursday);
+        }
+        
+        // Return as YYYYMMDD number for seed
+        return thursday.getFullYear() * 10000 + 
+               (thursday.getMonth() + 1) * 100 + 
+               thursday.getDate();
+    }
+    
+    // Seeded random number generator (mulberry32)
+    function seededRandom(seed) {
+        return function() {
+            let t = seed += 0x6D2B79F5;
+            t = Math.imul(t ^ t >>> 15, t | 1);
+            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+    
+    // Get the current Thursday seed
+    const thursdaySeed = getThursdaySeed();
+    const random = seededRandom(thursdaySeed);
+
+    /**
+     * Compute the number of games each team should play this week.
+     * 
+     * Algorithm:
+     * 1. Calculate X = (remaining games) / SESSION_COUNT for each team
+     * 2. Add adjustment C to get X + C
+     * 3. Probabilistically round: decimal part = probability of rounding up
+     * 4. Ensure each team plays at least 1 game
+     * 5. Cap players on multiple teams to 3 games total (unless their X values sum > 3)
+     * 6. Adjust last team (Kalice) to ensure total is even
+     * 
+     * @param {Array} games - Array of all unplayed games
+     * @param {Array} teamsInfo - Array of team info with player1, player2, teamName
+     * @param {Function} randomFn - Seeded random function
+     * @returns {Object} - Map of teamName -> number of games to play
+     */
+    function computeGamesPerTeam(games, teamsInfo, randomFn) {
+        if (!games || !teamsInfo || games.length === 0) return {};
+        
+        // Step 1: Count remaining games per team
+        const remainingGamesPerTeam = {};
+        games.forEach(game => {
+            if (!game.played) {
+                remainingGamesPerTeam[game.team1] = (remainingGamesPerTeam[game.team1] || 0) + 1;
+                remainingGamesPerTeam[game.team2] = (remainingGamesPerTeam[game.team2] || 0) + 1;
+            }
+        });
+        
+        // Step 2: Calculate X + C for each team and probabilistically round
+        const gamesPerTeam = {};
+        const teamXValues = {}; // Store X values for multi-team cap calculation
+        
+        Object.keys(remainingGamesPerTeam).forEach(teamName => {
+            const remaining = remainingGamesPerTeam[teamName];
+            const X = remaining / SESSION_COUNT;
+            teamXValues[teamName] = X;
+            
+            const adjusted = X + GAMES_PER_SESSION_ADJUSTMENT;
+            const floor = Math.floor(adjusted);
+            const decimal = adjusted - floor;
+            
+            // Probabilistic rounding: decimal is probability of rounding up
+            const roundedGames = randomFn() < decimal ? floor + 1 : floor;
+            
+            // Ensure at least 1 game per team
+            gamesPerTeam[teamName] = Math.max(1, roundedGames);
+        });
+        
+        // Step 3: Build player -> teams mapping
+        const playerTeams = {};
+        teamsInfo.forEach(team => {
+            const p1 = team.player1?.toLowerCase();
+            const p2 = team.player2?.toLowerCase();
+            
+            if (p1) {
+                if (!playerTeams[p1]) playerTeams[p1] = [];
+                playerTeams[p1].push(team.teamName);
+            }
+            if (p2) {
+                if (!playerTeams[p2]) playerTeams[p2] = [];
+                playerTeams[p2].push(team.teamName);
+            }
+        });
+        
+        // Step 4: Cap multi-team players at 3 games (unless X1 + X2 > 3)
+        Object.entries(playerTeams).forEach(([player, teams]) => {
+            if (teams.length > 1) {
+                const totalGames = teams.reduce((sum, t) => sum + (gamesPerTeam[t] || 0), 0);
+                const totalX = teams.reduce((sum, t) => sum + (teamXValues[t] || 0), 0);
+                
+                const cap = Math.max(3, Math.ceil(totalX));
+                
+                if (totalGames > cap) {
+                    // Need to reduce - find team with lowest X value (excluding last team)
+                    const sortedTeams = teams
+                        .filter(t => t !== LAST_TEAM_FOR_ADJUSTMENT)
+                        .sort((a, b) => (teamXValues[a] || 0) - (teamXValues[b] || 0));
+                    
+                    let excess = totalGames - cap;
+                    for (const teamToReduce of sortedTeams) {
+                        if (excess <= 0) break;
+                        const currentGames = gamesPerTeam[teamToReduce];
+                        const reduction = Math.min(excess, currentGames - 1); // Keep at least 1
+                        if (reduction > 0) {
+                            gamesPerTeam[teamToReduce] -= reduction;
+                            excess -= reduction;
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Step 5: Calculate total and adjust last team for even sum
+        let totalGames = Object.values(gamesPerTeam).reduce((sum, g) => sum + g, 0);
+        
+        if (totalGames % 2 !== 0) {
+            // Adjust Kalice to make it even
+            if (gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT] !== undefined) {
+                // Decide whether to add or subtract based on their X value
+                const kaliceX = teamXValues[LAST_TEAM_FOR_ADJUSTMENT] || 0;
+                const kaliceCurrent = gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT];
+                
+                if (kaliceCurrent > kaliceX + GAMES_PER_SESSION_ADJUSTMENT) {
+                    // Current is higher than expected, reduce by 1
+                    gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT] = Math.max(1, kaliceCurrent - 1);
+                } else {
+                    // Add 1
+                    gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT] = kaliceCurrent + 1;
+                }
+            }
+        }
+        
+        // Recalculate total for logging
+        totalGames = Object.values(gamesPerTeam).reduce((sum, g) => sum + g, 0);
+        
+        console.log('=== Games Per Team This Week ===');
+        console.log('Thursday seed:', thursdaySeed);
+        console.log('Sessions remaining:', SESSION_COUNT);
+        console.log('');
+        console.log('Team breakdown:');
+        Object.entries(gamesPerTeam).sort((a, b) => b[1] - a[1]).forEach(([team, games]) => {
+            const X = teamXValues[team]?.toFixed(2) || '?';
+            const remaining = remainingGamesPerTeam[team] || 0;
+            console.log(`  ${team}: ${games} games this week | ${remaining} games remaining (X=${X})`);
+        });
+        console.log('');
+        console.log(`Total games this week: ${totalGames} (${totalGames % 2 === 0 ? 'even ✓' : 'odd ✗'})`);
+        console.log('================================');
+        
+        return gamesPerTeam;
+    }
 
     // Configuration
     const config = {
@@ -525,19 +699,31 @@
     let filteredGames = [];
     let hiddenTeams = new Set(); // Teams to hide from the display
     let teamGameCounts = {};
+    let suggestedGameIds = new Set(); // Track which games are suggested for this week
+    
+    // Generate a unique ID for a game (for tracking suggestions)
+    function getGameId(game) {
+        return `${game.team1}-${game.team2}-${game.isHome}`;
+    }
+    
+    // Check if a game is suggested for this week
+    function isGameSuggested(game) {
+        return suggestedGameIds.has(getGameId(game));
+    }
     
     // Filter games based on player name
     function filterGamesByPlayer() {
         if (!playerName.trim()) {
             filteredGames = [];
             teamGameCounts = {};
+            suggestedGameIds = new Set();
             return;
         }
         
         const searchName = playerName.toLowerCase().trim();
         
         // Filter games where the player is involved and not yet played
-        filteredGames = allGames.filter(game => {
+        let playerGames = allGames.filter(game => {
             if (game.played) return false;
             
             const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
@@ -548,9 +734,32 @@
             return playerInTeam1 || playerInTeam2;
         });
         
+        // Mark suggested games (using seeded random based on player name + thursday seed)
+        // This ensures consistent suggestions for the same player each week
+        const playerSeed = thursdaySeed + searchName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const playerRandom = seededRandom(playerSeed);
+        
+        suggestedGameIds = new Set();
+        playerGames.forEach(game => {
+            // For now, mark games with some probability (placeholder for your algorithm)
+            // This will be replaced with your actual algorithm later
+            if (playerRandom() < 0.3) { // ~30% chance to be suggested
+                suggestedGameIds.add(getGameId(game));
+            }
+        });
+        
         // Apply hidden teams filter
-        filteredGames = filteredGames.filter(game => {
+        filteredGames = playerGames.filter(game => {
             return !hiddenTeams.has(game.team1) && !hiddenTeams.has(game.team2);
+        });
+        
+        // Sort so suggested games appear at the top
+        filteredGames = filteredGames.sort((a, b) => {
+            const aSuggested = isGameSuggested(a);
+            const bSuggested = isGameSuggested(b);
+            if (aSuggested && !bSuggested) return -1;
+            if (!aSuggested && bSuggested) return 1;
+            return 0;
         });
         
         // Count games per team
@@ -807,6 +1016,13 @@
     // Update allGames when data is ready
     $: if (dataReady) {
         allGames = generateGamesData();
+    }
+    
+    // Compute suggested games per team when data is ready
+    let weeklyGamesPerTeam = {};
+    $: if (dataReady && allGames.length > 0 && teams_info) {
+        const unplayedGames = allGames.filter(g => !g.played);
+        weeklyGamesPerTeam = computeGamesPerTeam(unplayedGames, teams_info, seededRandom(thursdaySeed));
     }
 
 </script>
@@ -1091,8 +1307,10 @@
                             {@const playerTeam = getPlayerTeam(game)}
                             {@const opponentTeam = getOpponentTeam(game)}
                             {@const isTeam1 = playerTeam === game.team1}
-                            <tr>
-                                <td class="team-name">
+                            {@const suggested = isGameSuggested(game)}
+                            <tr class:suggested-game={suggested}>
+                                <td class="team-name" class:suggested-cell={suggested}>
+                                    {#if suggested}<span class="suggested-star">⭐</span>{/if}
                                     <button 
                                         class="team-link"
                                         on:click={() => toggleTeamFilter(playerTeam)}
@@ -1101,15 +1319,15 @@
                                         {playerTeam}
                                     </button>
                                 </td>
-                                <td>
+                                <td class:suggested-cell={suggested}>
                                     {#if isTeam1}
                                         {game[PLAYER1_TEAM1] === playerName ? game[PLAYER2_TEAM1] : game[PLAYER1_TEAM1]}
                                     {:else}
                                         {game[PLAYER1_TEAM2] === playerName ? game[PLAYER2_TEAM2] : game[PLAYER1_TEAM2]}
                                     {/if}
                                 </td>
-                                <td class="vs">vs</td>
-                                <td class="team-name">
+                                <td class="vs" class:suggested-cell={suggested}>vs</td>
+                                <td class="team-name" class:suggested-cell={suggested}>
                                     <button 
                                         class="team-link"
                                         on:click={() => toggleTeamFilter(opponentTeam)}
@@ -1118,9 +1336,9 @@
                                         {opponentTeam}
                                     </button>
                                 </td>
-                                <td>{isTeam1 ? game[PLAYER1_TEAM2] : game[PLAYER1_TEAM1]}</td>
-                                <td>{isTeam1 ? game[PLAYER2_TEAM2] : game[PLAYER2_TEAM1]}</td>
-                                <td>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td>
+                                <td class:suggested-cell={suggested}>{isTeam1 ? game[PLAYER1_TEAM2] : game[PLAYER1_TEAM1]}</td>
+                                <td class:suggested-cell={suggested}>{isTeam1 ? game[PLAYER2_TEAM2] : game[PLAYER2_TEAM1]}</td>
+                                <td class:suggested-cell={suggested}>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td>
                             </tr>
                         {/each}
                     </tbody>
@@ -1976,6 +2194,25 @@
     
     .games-table tbody tr:hover {
         background: #f9fafb;
+    }
+    
+    /* Suggested game styles */
+    .suggested-game {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-left: 4px solid #f59e0b;
+    }
+    
+    .suggested-game:hover {
+        background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+    }
+    
+    .suggested-star {
+        margin-right: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    .suggested-cell {
+        font-weight: 600;
     }
     
     .team-name {
