@@ -8,7 +8,7 @@
     
     /* Make breadcrumb appear inside white area with rounded top */
     .breadcrumb {
-        background: white;
+        background: transparent;
         margin: 0;
         padding: 1rem 1.5rem 0 1.5rem;
         border-radius: 12px 12px 0 0; /* Rounded top corners only */
