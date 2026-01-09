@@ -104,6 +104,7 @@
     // Get the current Thursday seed
     const thursdaySeed = getThursdaySeed();
     const random = seededRandom(thursdaySeed);
+    console.log('🗓️ THURSDAY SEED:', thursdaySeed);
 
     /**
      * Compute the number of games each team should play this week.
@@ -1249,18 +1250,29 @@
         }
         
         const searchName = playerName.toLowerCase().trim();
+        const showAll = searchName === 'all';
         
-        // Filter games where the player is involved and not yet played
-        let playerGames = allGames.filter(game => {
-            if (game.played) return false;
-            
-            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
-                                 game[PLAYER1_TEAM2].toLowerCase().includes(searchName);
-            const playerInTeam2 = game[PLAYER2_TEAM1].toLowerCase().includes(searchName) || 
-                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
-            
-            return playerInTeam1 || playerInTeam2;
-        });
+        let playerGames;
+        
+        if (showAll) {
+            // Show all scheduled games (original + rebalanced)
+            playerGames = allGames.filter(game => {
+                if (game.played) return false;
+                return isGameSuggested(game);
+            });
+        } else {
+            // Filter games where the player is involved and not yet played
+            playerGames = allGames.filter(game => {
+                if (game.played) return false;
+                
+                const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                     game[PLAYER1_TEAM2].toLowerCase().includes(searchName);
+                const playerInTeam2 = game[PLAYER2_TEAM1].toLowerCase().includes(searchName) || 
+                                     game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+                
+                return playerInTeam1 || playerInTeam2;
+            });
+        }
         
         // Apply hidden teams filter
         filteredGames = playerGames.filter(game => {
@@ -1279,7 +1291,7 @@
             if (!aSuggested && bSuggested) return 1;
             
             // For non-scheduled games, sort by opponent's flex score (lowest first)
-            if (!aSuggested && !bSuggested) {
+            if (!aSuggested && !bSuggested && !showAll) {
                 const aOpponent = getOpponentTeamForPlayer(a, searchName);
                 const bOpponent = getOpponentTeamForPlayer(b, searchName);
                 const aFlex = flexOrder[aOpponent] || 999;
@@ -1298,23 +1310,32 @@
     function updateTeamCounts() {
         teamGameCounts = {};
         const searchName = playerName.toLowerCase().trim();
+        const showAll = searchName === 'all';
         
         // First pass: count all games including hidden ones
         allGames.forEach(game => {
             if (game.played) return;
             
-            // Check which team the player is on
-            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
-                                 game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
-            const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
-                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
-            
-            if (playerInTeam1 || playerInTeam2) {
-                if (playerInTeam1) {
+            if (showAll) {
+                // For "all", count scheduled games by team
+                if (isGameSuggested(game)) {
                     teamGameCounts[game.team1] = (teamGameCounts[game.team1] || 0) + 1;
-                }
-                if (playerInTeam2) {
                     teamGameCounts[game.team2] = (teamGameCounts[game.team2] || 0) + 1;
+                }
+            } else {
+                // Check which team the player is on
+                const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                     game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+                const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
+                                     game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+                
+                if (playerInTeam1 || playerInTeam2) {
+                    if (playerInTeam1) {
+                        teamGameCounts[game.team1] = (teamGameCounts[game.team1] || 0) + 1;
+                    }
+                    if (playerInTeam2) {
+                        teamGameCounts[game.team2] = (teamGameCounts[game.team2] || 0) + 1;
+                    }
                 }
             }
         });
