@@ -197,7 +197,16 @@
             }
         });
         
-        // Step 5: Calculate total and adjust last team for even sum
+        // Step 5: Compute max games per player for rebalancing checks
+        // Formula: MAX(1 + n, CEIL(X_1 + X_2 + ... + X_n)) where n = number of teams
+        const maxGamesPerPlayer = {};
+        Object.entries(playerTeams).forEach(([player, teams]) => {
+            const n = teams.length;
+            const totalX = teams.reduce((sum, t) => sum + (teamXValues[t] || 0), 0);
+            maxGamesPerPlayer[player] = Math.max(1 + n, Math.ceil(totalX));
+        });
+        
+        // Step 6: Calculate total and adjust last team for even sum
         let totalGames = Object.values(gamesPerTeam).reduce((sum, g) => sum + g, 0);
         
         if (totalGames % 2 !== 0) {
@@ -220,7 +229,7 @@
         // Recalculate total for logging
         totalGames = Object.values(gamesPerTeam).reduce((sum, g) => sum + g, 0);
         
-        return { gamesPerTeam, remainingGamesPerTeam, teamXValues, totalGames };
+        return { gamesPerTeam, remainingGamesPerTeam, teamXValues, totalGames, maxGamesPerPlayer };
     }
 
     /**
@@ -1057,6 +1066,62 @@
             });
         }
         
+        // Helper: Get players for a team
+        function getPlayersForTeam(teamName) {
+            const teamInfo = teams_info?.find(t => t.teamName === teamName);
+            if (!teamInfo) return [];
+            return [teamInfo.player1?.toLowerCase(), teamInfo.player2?.toLowerCase()].filter(Boolean);
+        }
+        
+        // Helper: Count scheduled games for a player (original + rebalanced so far)
+        function countPlayerGames(playerName) {
+            const playerLower = playerName.toLowerCase();
+            let count = 0;
+            
+            // Count original scheduled games (that aren't cancelled due to hidden teams)
+            unplayedGames.forEach(game => {
+                if (!selectedGamesThisWeek.has(getGameId(game))) return;
+                if (hiddenTeams.has(game.team1) || hiddenTeams.has(game.team2)) return;
+                
+                const players = [
+                    game[PLAYER1_TEAM1]?.toLowerCase(),
+                    game[PLAYER2_TEAM1]?.toLowerCase(),
+                    game[PLAYER1_TEAM2]?.toLowerCase(),
+                    game[PLAYER2_TEAM2]?.toLowerCase()
+                ];
+                if (players.includes(playerLower)) count++;
+            });
+            
+            // Count rebalanced games assigned so far
+            rebalancedGameIds.forEach(gameId => {
+                const game = unplayedGames.find(g => getGameId(g) === gameId);
+                if (!game) return;
+                
+                const players = [
+                    game[PLAYER1_TEAM1]?.toLowerCase(),
+                    game[PLAYER2_TEAM1]?.toLowerCase(),
+                    game[PLAYER1_TEAM2]?.toLowerCase(),
+                    game[PLAYER2_TEAM2]?.toLowerCase()
+                ];
+                if (players.includes(playerLower)) count++;
+            });
+            
+            return count;
+        }
+        
+        // Helper: Check if adding a game to a team would exceed any player's max
+        function wouldExceedPlayerMax(teamName) {
+            const players = getPlayersForTeam(teamName);
+            for (const player of players) {
+                const currentGames = countPlayerGames(player);
+                const maxGames = maxGamesPerPlayer[player] || 999;
+                if (currentGames >= maxGames) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
         // Step 3: Get teams sorted by flex order
         const teamsNeedingGames = Object.keys(gamesNeeded)
             .sort((a, b) => (flexOrder[a] || 999) - (flexOrder[b] || 999));
@@ -1064,6 +1129,7 @@
         console.log('Teams needing games (sorted by flex):', teamsNeedingGames);
         
         // Phase 1: Match teams that lost games with each other
+        console.log('--- PHASE 1: Matching teams that lost games with each other ---');
         const teamsInNeedSet = new Set(teamsNeedingGames);
         
         for (const teamA of teamsNeedingGames) {
@@ -1095,12 +1161,19 @@
                     console.log(`Phase 1: Paired ${teamA} with ${bestPartner}`);
                 } else {
                     // No partner found in Phase 1, move to Phase 2
+                    console.log(`Phase 1: No partner found for ${teamA} in Phase 1 (${gamesNeeded[teamA]} games still needed)`);
                     break;
                 }
             }
         }
         
+        // Log remaining games needed after Phase 1
+        const remainingAfterPhase1 = Object.entries(gamesNeeded).filter(([t, c]) => c > 0);
+        console.log('--- END PHASE 1 ---');
+        console.log('Games still needed after Phase 1:', Object.fromEntries(remainingAfterPhase1));
+        
         // Phase 2: Match remaining teams with teams that didn't lose games
+        console.log('--- PHASE 2: Matching with teams that did not lose games ---');
         const teamsGivenGamesInPhase2 = new Set();
         
         for (const teamA of teamsNeedingGames) {
@@ -1109,14 +1182,20 @@
                 let bestPartner = null;
                 let bestGame = null;
                 
-                // Get all teams sorted by flex that aren't in the needing set
+                // Get all teams sorted by flex (any team that isn't hidden and hasn't been given a replacement game in phase 2)
                 const otherTeams = Object.keys(flexOrder)
-                    .filter(t => !teamsInNeedSet.has(t) && !hiddenTeams.has(t))
+                    .filter(t => t !== teamA && !hiddenTeams.has(t))
                     .sort((a, b) => (flexOrder[a] || 999) - (flexOrder[b] || 999));
                 
                 for (const teamB of otherTeams) {
                     // Skip if already given a game in phase 2
                     if (teamsGivenGamesInPhase2.has(teamB)) continue;
+                    
+                    // Skip if adding a game would exceed any of teamB's players' max games
+                    if (wouldExceedPlayerMax(teamB)) {
+                        console.log(`Phase 2: Skipping ${teamB} - player(s) at max games`);
+                        continue;
+                    }
                     
                     const game = getAvailableGameBetween(teamA, teamB);
                     if (game) {
@@ -1140,6 +1219,14 @@
                     break;
                 }
             }
+        }
+        
+        console.log('--- END PHASE 2 ---');
+        const remainingAfterPhase2 = Object.entries(gamesNeeded).filter(([t, c]) => c > 0);
+        if (remainingAfterPhase2.length > 0) {
+            console.log('⚠️ Games still needed after Phase 2 (unfulfilled):', Object.fromEntries(remainingAfterPhase2));
+        } else {
+            console.log('✅ All replacement games found!');
         }
         
         console.log('Rebalanced games:', [...rebalancedGameIds]);
@@ -1522,6 +1609,7 @@
     let remainingGamesPerTeam = {};
     let selectedGamesThisWeek = new Set();
     let flexOrder = {};
+    let maxGamesPerPlayer = {};
     
     $: if (dataReady && allGames.length > 0 && teams_info) {
         const unplayedGames = allGames.filter(g => !g.played);
@@ -1531,6 +1619,7 @@
         const result = computeGamesPerTeam(unplayedGames, teams_info, randomFn);
         weeklyGamesPerTeam = result.gamesPerTeam;
         remainingGamesPerTeam = result.remainingGamesPerTeam;
+        maxGamesPerPlayer = result.maxGamesPerPlayer;
         
         // Step 2: Select specific games for this week
         selectedGamesThisWeek = selectGamesForWeek(weeklyGamesPerTeam, unplayedGames, seededRandom(thursdaySeed + 1));
@@ -1548,6 +1637,8 @@
             flexOrder, 
             unplayedGames
         );
+        
+        console.log('🎮 MAX GAMES PER PLAYER:', maxGamesPerPlayer);
     }
 
 </script>
