@@ -36,7 +36,7 @@
     const SERIES_WIN_SCORE = 1;
     const UNPLAYED_STRING = "UNPLAYED"
     const WONT_PLAY_STRING = "XXX"
-    const SESSION_COUNT = 11
+    const SESSION_COUNT = 9
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
@@ -1446,6 +1446,12 @@
     
     // Total games count
     $: shownGames = filteredGames.length;
+    
+    // Check if we're in "all" mode
+    $: isAllMode = playerName.toLowerCase().trim() === 'all';
+    
+    // Total unplayed games in the season
+    $: totalUnplayedGames = allGames.filter(g => !g.played).length;
 
     // Filter played games for the player, organized by team
     $: playedGames = (() => {
@@ -1876,9 +1882,13 @@
         {#if playerName && (shownGames > 0 || hiddenTeams.size > 0)}
             <div class="summary-section">
                 <div class="total-games">
-                    Showing <strong>{shownGames}</strong> out of {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
-                        return accumulator + currentValue;
-                    })} Total games to play. On average you need to play {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {return accumulator + currentValue;}) / SESSION_COUNT} games per session to complete all your games by the end of the season.
+                    {#if isAllMode}
+                        Showing <strong>{shownGames}</strong> scheduled games out of {totalUnplayedGames} total matchups remaining this season.
+                    {:else}
+                        Showing <strong>{shownGames}</strong> out of {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
+                            return accumulator + currentValue;
+                        })} Total games to play. On average you need to play {(Object.values(teamGameCounts).reduce((accumulator, currentValue) => {return accumulator + currentValue;}) / SESSION_COUNT).toFixed(2)} games per session to complete all your games by the end of the season.
+                    {/if}
                     {#if hiddenTeams.size > 0 && shownGames === 0}
                         <span class="filtered-warning"> (All games filtered out)</span>
                     {/if}
@@ -1911,7 +1921,11 @@
                                 on:click={() => toggleTeamFilter(team)}
                                 title="Click to {hiddenTeams.has(team) ? 'show' : 'hide'} games with {team}"
                             >
-                                {team}: {count} {count === 1 ? 'game' : 'games'} ({(count / SESSION_COUNT).toFixed(2)} Avg) | Flex: {flexOrder[team] || '?'}
+                                {#if isAllMode}
+                                    {team}: {count} {count === 1 ? 'game' : 'games'} this week ({((remainingGamesPerTeam[team] || 0) / SESSION_COUNT).toFixed(2)} Avg) | Flex: {flexOrder[team] || '?'}
+                                {:else}
+                                    {team}: {count} {count === 1 ? 'game' : 'games'} ({(count / SESSION_COUNT).toFixed(2)} Avg) | Flex: {flexOrder[team] || '?'}
+                                {/if}
                                 {#if hiddenTeams.has(team)}
                                     <span class="pill-icon">✕</span>
                                 {/if}
