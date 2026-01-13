@@ -36,7 +36,7 @@
     const SERIES_WIN_SCORE = 1;
     const UNPLAYED_STRING = "UNPLAYED"
     const WONT_PLAY_STRING = "XXX"
-    const SESSION_COUNT = 9
+    const SESSION_COUNT = 11
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
@@ -316,9 +316,11 @@
         const teams = Object.keys(gamesPerTeam);
         const numTeams = teams.length;
         
-        // Shuffle available games for randomness
-        let availableGames = [...unplayedGames];
-        availableGames = availableGames.sort(() => randomFn() - 0.5);
+        // Shuffle available games for randomness (assign random values once, then sort)
+        let availableGames = [...unplayedGames]
+            .map(game => ({ game, sortKey: randomFn() }))
+            .sort((a, b) => a.sortKey - b.sortKey)
+            .map(item => item.game);
         
         // Greedy matching: iterate through shuffled games, add if neither team is matched yet
         const matchedTeams = new Set();
