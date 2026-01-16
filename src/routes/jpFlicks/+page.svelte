@@ -36,7 +36,7 @@
     const SERIES_WIN_SCORE = 1;
     const UNPLAYED_STRING = "UNPLAYED"
     const WONT_PLAY_STRING = "XXX"
-    const SESSION_COUNT = 9
+    const SESSION_COUNT = 8
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
