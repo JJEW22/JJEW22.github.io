@@ -247,9 +247,11 @@
      * @param {Object} gamesPerTeam - Map of teamName -> number of games to play this week
      * @param {Array} unplayedGames - Array of unplayed games
      * @param {Function} randomFn - Seeded random function
+     * @param {Object} teamXValues - Map of teamName -> X value (remaining games / sessions)
+     * @param {Object} maxGamesPerPlayer - Map of playerName -> max games allowed
      * @returns {Set} - Set of game IDs that are selected for this week
      */
-    function selectGamesForWeek(gamesPerTeam, unplayedGames, randomFn) {
+    function selectGamesForWeek(gamesPerTeam, unplayedGames, randomFn, teamXValues = {}, maxGamesPerPlayer = {}) {
         if (!gamesPerTeam || !unplayedGames || unplayedGames.length === 0) return new Set();
         
         const selectedGameIds = new Set();
@@ -257,6 +259,13 @@
         
         // Track remaining games needed per team
         const remainingNeeded = { ...gamesPerTeam };
+        
+        // Track which team pairings have been scheduled (to prevent full series in one day)
+        const scheduledPairings = new Set();
+        
+        function getPairingKey(team1, team2) {
+            return [team1, team2].sort().join('-');
+        }
         
         // Helper: Get players for a team from a game object
         function getPlayersForTeam(game, teamName) {
@@ -285,7 +294,13 @@
             return players1.some(p => players2.includes(p));
         }
         
-        // Helper: Check if adding a game violates the no-shared-opponent constraint
+        // CONSTRAINT #2: Check if adding a game would complete a series (both home & away)
+        function violatesSeriesConstraint(game) {
+            const pairingKey = getPairingKey(game.team1, game.team2);
+            return scheduledPairings.has(pairingKey);
+        }
+        
+        // CONSTRAINT #3: Check if adding a game violates the no-shared-opponent constraint
         function violatesSharedOpponentConstraint(newGame, teamName) {
             const newOpponentPlayers = getOpponentPlayers(newGame, teamName);
             
@@ -310,9 +325,11 @@
             selectedGames.push(game);
             remainingNeeded[game.team1]--;
             remainingNeeded[game.team2]--;
+            scheduledPairings.add(getPairingKey(game.team1, game.team2));
         }
         
         // PHASE 1: Find initial matching (each team plays at most 1 game)
+        console.log('🎯 GAME SELECTION - PHASE 1: Initial Matching');
         const teams = Object.keys(gamesPerTeam);
         const numTeams = teams.length;
         
@@ -332,16 +349,19 @@
                 selectGame(game);
                 matchedTeams.add(game.team1);
                 matchedTeams.add(game.team2);
+                console.log(`  Phase 1: ${game.team1} vs ${game.team2} (${game.isHome ? 'Home' : 'Away'})`);
             }
             
             // Stop if we've matched all teams we can
             if (matchedTeams.size >= numTeams - (numTeams % 2)) break;
         }
+        console.log(`  Phase 1 complete: ${selectedGameIds.size} games, ${matchedTeams.size}/${numTeams} teams matched`);
         
         // For odd number of teams, the unmatched team should get a second game
         if (numTeams % 2 === 1) {
             const unmatchedTeam = teams.find(t => !matchedTeams.has(t));
             if (unmatchedTeam && remainingNeeded[unmatchedTeam] > 0) {
+                console.log(`  Odd teams: Finding game for unmatched team ${unmatchedTeam}`);
                 // Find a game for the unmatched team
                 const validGames = availableGames.filter(game => {
                     if (selectedGameIds.has(getGameId(game))) return false;
@@ -352,14 +372,19 @@
                 
                 if (validGames.length > 0) {
                     const randomIndex = Math.floor(randomFn() * validGames.length);
-                    selectGame(validGames[randomIndex]);
+                    const game = validGames[randomIndex];
+                    selectGame(game);
+                    console.log(`  Phase 1 (odd): ${game.team1} vs ${game.team2} (${game.isHome ? 'Home' : 'Away'})`);
                 }
             }
         }
         
-        // PHASE 2: Assign remaining games respecting shared-opponent constraint
+        // PHASE 2: Assign remaining games respecting constraints (with relaxation)
+        console.log('🎯 GAME SELECTION - PHASE 2: Additional games (with constraints)');
+        const phase2Start = selectedGameIds.size;
         let iterations = 0;
         const maxIterations = 1000;
+        let phase2ConstraintRelaxed = false;
         
         while (iterations < maxIterations) {
             iterations++;
@@ -371,27 +396,186 @@
             
             if (teamsNeedingGames.length === 0) break;
             
-            // Find valid games: both teams need games AND doesn't violate shared-opponent constraint
-            const validGames = availableGames.filter(game => {
+            // Find valid games with all constraints
+            let validGames = availableGames.filter(game => {
                 if (selectedGameIds.has(getGameId(game))) return false;
                 if (remainingNeeded[game.team1] <= 0 || remainingNeeded[game.team2] <= 0) return false;
                 
-                // Check shared-opponent constraint for both teams
-                if (violatesSharedOpponentConstraint(game, game.team1)) return false;
-                if (violatesSharedOpponentConstraint(game, game.team2)) return false;
+                // CONSTRAINT #2: No full series in one day
+                if (violatesSeriesConstraint(game)) return false;
+                
+                // CONSTRAINT #3: No shared opponent (can be relaxed)
+                if (!phase2ConstraintRelaxed) {
+                    if (violatesSharedOpponentConstraint(game, game.team1)) return false;
+                    if (violatesSharedOpponentConstraint(game, game.team2)) return false;
+                }
                 
                 return true;
             });
             
+            // If no valid games and constraint not yet relaxed, try relaxing
+            if (validGames.length === 0 && !phase2ConstraintRelaxed) {
+                console.log('  Phase 2: No valid games with all constraints, relaxing shared-opponent constraint...');
+                phase2ConstraintRelaxed = true;
+                
+                // Try again with relaxed constraint
+                validGames = availableGames.filter(game => {
+                    if (selectedGameIds.has(getGameId(game))) return false;
+                    if (remainingNeeded[game.team1] <= 0 || remainingNeeded[game.team2] <= 0) return false;
+                    
+                    // CONSTRAINT #2: No full series in one day (never relaxed)
+                    if (violatesSeriesConstraint(game)) return false;
+                    
+                    return true;
+                });
+            }
+            
             if (validGames.length === 0) {
-                console.warn('Could not fully satisfy game constraints with shared-opponent restriction.');
+                console.warn('  Phase 2: Could not find any valid games even with relaxed constraints.');
+                console.log(`  Teams still needing games: ${teamsNeedingGames.join(', ')}`);
                 break;
             }
             
             // Select a random valid game
             const randomIndex = Math.floor(randomFn() * validGames.length);
-            selectGame(validGames[randomIndex]);
+            const game = validGames[randomIndex];
+            selectGame(game);
+            const relaxedNote = phase2ConstraintRelaxed ? ' [RELAXED]' : '';
+            console.log(`  Phase 2: ${game.team1} vs ${game.team2} (${game.isHome ? 'Home' : 'Away'})${relaxedNote}`);
         }
+        console.log(`  Phase 2 complete: ${selectedGameIds.size - phase2Start} additional games added${phase2ConstraintRelaxed ? ' (constraint was relaxed)' : ''}`);
+        
+        // PHASE 3: Check if we need more games and add them with weighted selection
+        console.log('🎯 GAME SELECTION - PHASE 3: Weighted selection to reach expected count');
+        const phase3Start = selectedGameIds.size;
+        const sumOfX = Object.values(teamXValues).reduce((sum, x) => sum + x, 0);
+        const expectedGames = Math.round((sumOfX + GAMES_PER_SESSION_ADJUSTMENT * numTeams) / 2);
+        
+        console.log(`  Expected: ${expectedGames}, Current: ${selectedGameIds.size} (sum X = ${sumOfX.toFixed(2)}, C = ${GAMES_PER_SESSION_ADJUSTMENT}, teams = ${numTeams})`);
+        
+        if (selectedGameIds.size < expectedGames) {
+            console.log(`  Need ${expectedGames - selectedGameIds.size} more games...`);
+            
+            // Helper: Weighted random selection
+            function weightedRandomSelect(games, weights) {
+                const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+                if (totalWeight === 0) return null;
+                
+                let random = randomFn() * totalWeight;
+                for (let i = 0; i < games.length; i++) {
+                    random -= weights[i];
+                    if (random <= 0) return games[i];
+                }
+                return games[games.length - 1];
+            }
+            
+            // Helper: Count games per player from selected games
+            function countPlayerGamesFromSelected(playerName) {
+                const playerLower = playerName.toLowerCase();
+                let count = 0;
+                selectedGames.forEach(game => {
+                    const players = [
+                        game[PLAYER1_TEAM1]?.toLowerCase(),
+                        game[PLAYER2_TEAM1]?.toLowerCase(),
+                        game[PLAYER1_TEAM2]?.toLowerCase(),
+                        game[PLAYER2_TEAM2]?.toLowerCase()
+                    ];
+                    if (players.includes(playerLower)) count++;
+                });
+                return count;
+            }
+            
+            // CONSTRAINT #1: Check if adding a game would exceed any player's max
+            function wouldExceedPlayerMax(game) {
+                const players = [
+                    game[PLAYER1_TEAM1],
+                    game[PLAYER2_TEAM1],
+                    game[PLAYER1_TEAM2],
+                    game[PLAYER2_TEAM2]
+                ].filter(Boolean);
+                
+                for (const player of players) {
+                    const playerLower = player.toLowerCase();
+                    const currentGames = countPlayerGamesFromSelected(playerLower);
+                    const maxGames = maxGamesPerPlayer[playerLower] || 999;
+                    if (currentGames >= maxGames) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            let phase3ConstraintRelaxed = false;
+            
+            while (selectedGameIds.size < expectedGames) {
+                // Find valid games with all constraints
+                let validGames = unplayedGames.filter(game => {
+                    if (selectedGameIds.has(getGameId(game))) return false;
+                    
+                    // CONSTRAINT #1: Max games per player (never relaxed)
+                    if (wouldExceedPlayerMax(game)) return false;
+                    
+                    // CONSTRAINT #2: No full series in one day (never relaxed)
+                    if (violatesSeriesConstraint(game)) return false;
+                    
+                    // CONSTRAINT #3: No shared opponent (can be relaxed)
+                    if (!phase3ConstraintRelaxed) {
+                        if (violatesSharedOpponentConstraint(game, game.team1)) return false;
+                        if (violatesSharedOpponentConstraint(game, game.team2)) return false;
+                    }
+                    
+                    return true;
+                });
+                
+                // If no valid games and constraint not yet relaxed, try relaxing
+                if (validGames.length === 0 && !phase3ConstraintRelaxed) {
+                    console.log('  Phase 3: No valid games with all constraints, relaxing shared-opponent constraint...');
+                    phase3ConstraintRelaxed = true;
+                    
+                    // Try again with relaxed constraint
+                    validGames = unplayedGames.filter(game => {
+                        if (selectedGameIds.has(getGameId(game))) return false;
+                        
+                        // CONSTRAINT #1: Max games per player (never relaxed)
+                        if (wouldExceedPlayerMax(game)) return false;
+                        
+                        // CONSTRAINT #2: No full series in one day (never relaxed)
+                        if (violatesSeriesConstraint(game)) return false;
+                        
+                        return true;
+                    });
+                }
+                
+                if (validGames.length === 0) {
+                    console.warn('  Phase 3: No more valid games to add even with relaxed constraints.');
+                    break;
+                }
+                
+                // Calculate weights: X_i * X_j for each game
+                const weights = validGames.map(game => {
+                    const x1 = teamXValues[game.team1] || 0;
+                    const x2 = teamXValues[game.team2] || 0;
+                    return x1 * x2;
+                });
+                
+                // Select game using weighted random
+                const selectedGame = weightedRandomSelect(validGames, weights);
+                if (!selectedGame) {
+                    console.warn('  Weighted selection returned null.');
+                    break;
+                }
+                
+                selectGame(selectedGame);
+                const relaxedNote = phase3ConstraintRelaxed ? ' [RELAXED]' : '';
+                console.log(`  Phase 3: ${selectedGame.team1} vs ${selectedGame.team2} (weight: ${(teamXValues[selectedGame.team1] || 0).toFixed(2)} * ${(teamXValues[selectedGame.team2] || 0).toFixed(2)})${relaxedNote}`);
+            }
+            
+            console.log(`  Phase 3 complete: ${selectedGameIds.size - phase3Start} additional games added${phase3ConstraintRelaxed ? ' (constraint was relaxed)' : ''}`);
+        } else {
+            console.log('  No additional games needed');
+        }
+        
+        console.log(`🎯 GAME SELECTION COMPLETE: ${selectedGameIds.size} total games`);
         
         return selectedGameIds;
     }
@@ -834,7 +1018,9 @@
         } else if (combined_score < 0) {
             team_info.seriesLosses += 1
         } else {
-            throw new Error("Given a series that ended in a tie");
+            // Tie - add 0.5 to wins for each team
+            team_info.seriesWins += 0.5
+            team_info.seriesLosses += 0.5
         }
     }
 
@@ -1646,19 +1832,29 @@
         
         // Step 1: Compute how many games each team should play
         const result = computeGamesPerTeam(unplayedGames, teams_info, randomFn);
-        weeklyGamesPerTeam = result.gamesPerTeam;
+        const targetGamesPerTeam = result.gamesPerTeam;
         remainingGamesPerTeam = result.remainingGamesPerTeam;
         maxGamesPerPlayer = result.maxGamesPerPlayer;
         
         // Step 2: Select specific games for this week
-        selectedGamesThisWeek = selectGamesForWeek(weeklyGamesPerTeam, unplayedGames, seededRandom(thursdaySeed + 1));
+        selectedGamesThisWeek = selectGamesForWeek(targetGamesPerTeam, unplayedGames, seededRandom(thursdaySeed + 1), result.teamXValues, result.maxGamesPerPlayer);
         
-        // Step 3: Assign flex order for rebalancing
-        flexOrder = assignFlexOrder(weeklyGamesPerTeam, remainingGamesPerTeam, seededRandom(thursdaySeed + 2));
+        // Step 2.5: Calculate actual games per team from selected games
+        const actualGamesPerTeam = {};
+        unplayedGames.forEach(game => {
+            if (selectedGamesThisWeek.has(`${game.team1}-${game.team2}-${game.isHome}`)) {
+                actualGamesPerTeam[game.team1] = (actualGamesPerTeam[game.team1] || 0) + 1;
+                actualGamesPerTeam[game.team2] = (actualGamesPerTeam[game.team2] || 0) + 1;
+            }
+        });
+        weeklyGamesPerTeam = actualGamesPerTeam;
+        
+        // Step 3: Assign flex order for rebalancing (using actual scheduled games, not targets)
+        flexOrder = assignFlexOrder(actualGamesPerTeam, remainingGamesPerTeam, seededRandom(thursdaySeed + 2));
         
         // Step 4: Log everything to console
         logWeeklySchedule(
-            weeklyGamesPerTeam, 
+            actualGamesPerTeam, 
             remainingGamesPerTeam, 
             result.teamXValues, 
             result.totalGames, 
@@ -1667,7 +1863,29 @@
             unplayedGames
         );
         
-        console.log('🎮 MAX GAMES PER PLAYER:', maxGamesPerPlayer);
+        // Calculate actual games per player from selected games
+        const actualGamesPerPlayer = {};
+        unplayedGames.forEach(game => {
+            if (selectedGamesThisWeek.has(`${game.team1}-${game.team2}-${game.isHome}`)) {
+                const players = [
+                    game[PLAYER1_TEAM1]?.toLowerCase(),
+                    game[PLAYER2_TEAM1]?.toLowerCase(),
+                    game[PLAYER1_TEAM2]?.toLowerCase(),
+                    game[PLAYER2_TEAM2]?.toLowerCase()
+                ].filter(Boolean);
+                players.forEach(player => {
+                    actualGamesPerPlayer[player] = (actualGamesPerPlayer[player] || 0) + 1;
+                });
+            }
+        });
+        
+        console.log('🎮 GAMES PER PLAYER:');
+        Object.keys(maxGamesPerPlayer).sort().forEach(player => {
+            const actual = actualGamesPerPlayer[player] || 0;
+            const max = maxGamesPerPlayer[player];
+            const status = actual >= max ? '⚠️ AT MAX' : '✓';
+            console.log(`  ${player}: ${actual} scheduled (max: ${max}) ${status}`);
+        });
     }
 
 </script>
@@ -2100,7 +2318,7 @@
             GP {getSortIndicator('gamesPlayed')}
         </th>
         <th class="sortable numeric" on:click={() => sortTable('seriesWins')}>
-            Series W {getSortIndicator('seriesWins')}
+            Series {getSortIndicator('seriesWins')}
         </th>
         <th class="sortable numeric" on:click={() => sortTable('tournamentPoints')}>
             TP {getSortIndicator('tournamentPoints')}
@@ -2146,7 +2364,7 @@
             </td>
             <td class="team-name">{team.teamName}</td>
             <td class="numeric">{team.gamesPlayed}</td>
-            <td class="numeric">{team.seriesWins}</td>
+            <td class="numeric">{team.seriesWins}-{team.seriesLosses}</td>
             <td class="numeric">{team.tournamentPoints}</td>
             <td class="numeric">{team.wins}</td>
             <td class="numeric">{team.ties}</td>
