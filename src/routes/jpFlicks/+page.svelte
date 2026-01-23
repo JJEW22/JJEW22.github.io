@@ -36,7 +36,7 @@
     const SERIES_WIN_SCORE = 1;
     const UNPLAYED_STRING = "UNPLAYED"
     const WONT_PLAY_STRING = "XXX"
-    const SESSION_COUNT = 8
+    const SESSION_COUNT = 7
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
@@ -1305,11 +1305,25 @@
                 const currentGames = countPlayerGames(player);
                 const maxGames = maxGamesPerPlayer[player] || 999;
                 if (currentGames >= maxGames) {
+                    console.log(`  ⚠️ ${teamName}: Player ${player} at max (${currentGames}/${maxGames})`);
                     return true;
                 }
             }
             return false;
         }
+        
+        // Debug: Log current game counts for all players
+        console.log('🎮 REBALANCING - Player game counts:');
+        const allPlayersInGame = new Set();
+        teams_info?.forEach(team => {
+            if (team.player1) allPlayersInGame.add(team.player1.toLowerCase());
+            if (team.player2) allPlayersInGame.add(team.player2.toLowerCase());
+        });
+        allPlayersInGame.forEach(player => {
+            const count = countPlayerGames(player);
+            const max = maxGamesPerPlayer[player] || 999;
+            console.log(`  ${player}: ${count}/${max}`);
+        });
         
         // Step 3: Get teams sorted by flex order
         const teamsNeedingGames = Object.keys(gamesNeeded)
@@ -1504,8 +1518,11 @@
         allGames.forEach(game => {
             if (game.played) return;
             
+            // Skip games involving hidden teams
+            if (hiddenTeams.has(game.team1) || hiddenTeams.has(game.team2)) return;
+            
             if (showAll) {
-                // For "all", count scheduled games by team
+                // For "all", count scheduled games by team (excluding hidden)
                 if (isGameSuggested(game)) {
                     teamGameCounts[game.team1] = (teamGameCounts[game.team1] || 0) + 1;
                     teamGameCounts[game.team2] = (teamGameCounts[game.team2] || 0) + 1;
