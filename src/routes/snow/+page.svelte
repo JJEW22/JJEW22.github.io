@@ -23,8 +23,8 @@
     let currentWinner = null;
     let nextChange = null;
     let processedPredictions = [];
-    let hasSnowed = false; // Set to true once it actually snows
-    let actualSnowDate = null; // Set this when it snows
+    let hasSnowed = true; // Set to true once it actually snows
+    let actualSnowDate = "2025-12-14"; // Set this when it snows
 
     onMount(() => {
         calculatePredictions();
