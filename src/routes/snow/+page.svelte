@@ -20,17 +20,21 @@
 
     let today = new Date();
     let todayString = today.toISOString().split('T')[0];
-    let currentWinner = null;
+    let currentWinner = "null";
+    let finalWinner = { name: "Aidan & Na'ama", predictedDate: "2025-12-15", daysDiff: 0}
     let nextChange = null;
     let processedPredictions = [];
     let hasSnowed = true; // Set to true once it actually snows
-    let actualSnowDate = "2025-12-14"; // Set this when it snows
+    let actualSnowDate = "2025-12-15"; // Set this when it snows (snowed on 14th but it was rounding down?)
 
     onMount(() => {
         calculatePredictions();
     });
 
     function calculatePredictions() {
+        if (hasSnowed) {
+            calculateWinner();
+        }
         const todayTime = today.getTime();
 
         // Process each prediction
@@ -234,15 +238,15 @@
                 <div class="winner-card final">
                     <h2>🎉 Final Winner!</h2>
                     <div class="winner-content">
-                        <div class="winner-name">{currentWinner.name}</div>
+                        <div class="winner-name">{finalWinner.name}</div>
                         <div class="winner-prediction">
-                            Predicted: {currentWinner.displayDate}
+                            Predicted: {formatDate(new Date(finalWinner.predictedDate))}
                         </div>
                         <div class="winner-prediction">
                             Actually snowed: {formatDate(new Date(actualSnowDate))}
                         </div>
                         <div class="winner-status">
-                            Off by {Math.abs(currentWinner.daysDiff)} {Math.abs(currentWinner.daysDiff) === 1 ? 'day' : 'days'}!
+                            Off by {Math.abs(finalWinner.daysDiff)} {Math.abs(finalWinner.daysDiff) === 1 ? 'day' : 'days'}!
                         </div>
                     </div>
                 </div>
