@@ -104,7 +104,7 @@
     // Get the current Thursday seed
     const thursdaySeed = getThursdaySeed();
     const random = seededRandom(thursdaySeed);
-    console.log('🗓️ THURSDAY SEED:', thursdaySeed);
+    console.log('ðŸ—“ï¸ THURSDAY SEED:', thursdaySeed);
 
     /**
      * Compute the number of games each team should play this week.
@@ -329,7 +329,7 @@
         }
         
         // PHASE 1: Find initial matching (each team plays at most 1 game)
-        console.log('🎯 GAME SELECTION - PHASE 1: Initial Matching');
+        console.log('ðŸŽ¯ GAME SELECTION - PHASE 1: Initial Matching');
         const teams = Object.keys(gamesPerTeam);
         const numTeams = teams.length;
         
@@ -380,7 +380,7 @@
         }
         
         // PHASE 2: Assign remaining games respecting constraints (with relaxation)
-        console.log('🎯 GAME SELECTION - PHASE 2: Additional games (with constraints)');
+        console.log('ðŸŽ¯ GAME SELECTION - PHASE 2: Additional games (with constraints)');
         const phase2Start = selectedGameIds.size;
         let iterations = 0;
         const maxIterations = 1000;
@@ -446,7 +446,7 @@
         console.log(`  Phase 2 complete: ${selectedGameIds.size - phase2Start} additional games added${phase2ConstraintRelaxed ? ' (constraint was relaxed)' : ''}`);
         
         // PHASE 3: Check if we need more games and add them with weighted selection
-        console.log('🎯 GAME SELECTION - PHASE 3: Weighted selection to reach expected count');
+        console.log('ðŸŽ¯ GAME SELECTION - PHASE 3: Weighted selection to reach expected count');
         const phase3Start = selectedGameIds.size;
         const sumOfX = Object.values(teamXValues).reduce((sum, x) => sum + x, 0);
         const expectedGames = Math.round((sumOfX + GAMES_PER_SESSION_ADJUSTMENT * numTeams) / 2);
@@ -575,7 +575,7 @@
             console.log('  No additional games needed');
         }
         
-        console.log(`🎯 GAME SELECTION COMPLETE: ${selectedGameIds.size} total games`);
+        console.log(`ðŸŽ¯ GAME SELECTION COMPLETE: ${selectedGameIds.size} total games`);
         
         return selectedGameIds;
     }
@@ -634,8 +634,8 @@
      */
     function logWeeklySchedule(gamesPerTeam, remainingGamesPerTeam, teamXValues, totalGamesTarget, selectedGameIds, flexOrder, unplayedGames) {
         console.log('╔════════════════════════════════════════════════════════════════╗');
-        console.log('║            WEEKLY CROKINOLE SCHEDULE                           ║');
-        console.log('╚════════════════════════════════════════════════════════════════╝');
+        console.log('â•‘            WEEKLY CROKINOLE SCHEDULE                           â•‘');
+        console.log('║════════════════════════════════════════════════════════════════â•');
         console.log('');
         console.log('Thursday seed:', thursdaySeed);
         console.log('Sessions remaining:', SESSION_COUNT);
@@ -655,7 +655,7 @@
             });
         console.log('└─────────────────────────────────────────────────────────────────┘');
         console.log('');
-        console.log(`Target games this week: ${totalGamesTarget} (${totalGamesTarget % 2 === 0 ? 'even ✓' : 'odd ✗'})`);
+        console.log(`Target games this week: ${totalGamesTarget} (${totalGamesTarget % 2 === 0 ? 'even ✔' : 'odd ✗'})`);
         console.log('');
         
         // Selected games
@@ -1313,7 +1313,7 @@
         }
         
         // Debug: Log current game counts for all players
-        console.log('🎮 REBALANCING - Player game counts:');
+        console.log('ðŸŽ® REBALANCING - Player game counts:');
         const allPlayersInGame = new Set();
         teams_info?.forEach(team => {
             if (team.player1) allPlayersInGame.add(team.player1.toLowerCase());
@@ -1429,7 +1429,7 @@
         if (remainingAfterPhase2.length > 0) {
             console.log('⚠️ Games still needed after Phase 2 (unfulfilled):', Object.fromEntries(remainingAfterPhase2));
         } else {
-            console.log('✅ All replacement games found!');
+            console.log('âœ… All replacement games found!');
         }
         
         console.log('Rebalanced games:', [...rebalancedGameIds]);
@@ -1611,8 +1611,8 @@
     
     // Reactive: Get all players for display (only after data is loaded)
     $: allPlayers = dataReady && teams_info ? getAllPlayers() : [];
-    $: if (dataReady) console.log('🎯 ALL PLAYERS DEBUG 🎯', allPlayers);
-    $: if (dataReady) console.log('🎯 TEAMS INFO DEBUG 🎯', teams_info);
+    $: if (dataReady) console.log('ðŸŽ¯ ALL PLAYERS DEBUG ðŸŽ¯', allPlayers);
+    $: if (dataReady) console.log('ðŸŽ¯ TEAMS INFO DEBUG ðŸŽ¯', teams_info);
     
     // Get player's team for a specific game
     function getPlayerTeam(game) {
@@ -1675,85 +1675,91 @@
         });
     })();
 
-    // Group played games by the player's team with all display data pre-computed
+    // Group played games by the player's team, then by opponent (series), with series score
     $: playedGamesByTeam = (() => {
         if (!playedGames.length) return {};
         
         const searchName = playerName.toLowerCase().trim();
-        const grouped = {};
+        // First collect all games per team
+        const gamesByTeam = {};
         
-        console.log('=== GROUPING PLAYED GAMES ===');
-        console.log('Search name:', searchName);
-        console.log('Total played games:', playedGames.length);
+        function makeResultObj(playerResult) {
+            if (playerResult > 0) {
+                return { text: 'W', class: 'win', diff: `+${playerResult}`, numericDiff: playerResult };
+            } else if (playerResult < 0) {
+                return { text: 'L', class: 'loss', diff: `${playerResult}`, numericDiff: playerResult };
+            } else {
+                return { text: 'D', class: 'draw', diff: '0', numericDiff: 0 };
+            }
+        }
         
-        playedGames.forEach((game, index) => {
-            console.log(`Game ${index}:`, game.team1, 'vs', game.team2);
-            console.log(`  Player1_Team1: ${game[PLAYER1_TEAM1]}, Player2_Team1: ${game[PLAYER2_TEAM1]}`);
-            console.log(`  Player1_Team2: ${game[PLAYER1_TEAM2]}, Player2_Team2: ${game[PLAYER2_TEAM2]}`);
-            
+        playedGames.forEach((game) => {
             const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
                                  game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
             const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
                                  game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
             
-            console.log(`  playerInTeam1: ${playerInTeam1}, playerInTeam2: ${playerInTeam2}`);
-            
-            // Add to team1's group if player is on team1
             if (playerInTeam1) {
                 const playerTeam = game.team1;
-                const opponentTeam = game.team2;
-                const playerResult = game.result; // positive = team1 won
-                
-                let resultObj;
-                if (playerResult > 0) {
-                    resultObj = { text: 'W', class: 'win', diff: `+${playerResult}` };
-                } else if (playerResult < 0) {
-                    resultObj = { text: 'L', class: 'loss', diff: `${playerResult}` };
-                } else {
-                    resultObj = { text: 'D', class: 'draw', diff: '0' };
-                }
-                
-                if (!grouped[playerTeam]) {
-                    grouped[playerTeam] = [];
-                }
-                grouped[playerTeam].push({
-                    opponentTeam,
-                    result: resultObj,
+                if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
+                gamesByTeam[playerTeam].push({
+                    opponentTeam: game.team2,
+                    result: makeResultObj(game.result),
                     board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
                 });
-                console.log(`  Added to ${playerTeam} group`);
             }
             
-            // Add to team2's group if player is on team2
             if (playerInTeam2) {
                 const playerTeam = game.team2;
-                const opponentTeam = game.team1;
-                const playerResult = -game.result; // flip for team2 perspective
-                
-                let resultObj;
-                if (playerResult > 0) {
-                    resultObj = { text: 'W', class: 'win', diff: `+${playerResult}` };
-                } else if (playerResult < 0) {
-                    resultObj = { text: 'L', class: 'loss', diff: `${playerResult}` };
-                } else {
-                    resultObj = { text: 'D', class: 'draw', diff: '0' };
-                }
-                
-                if (!grouped[playerTeam]) {
-                    grouped[playerTeam] = [];
-                }
-                grouped[playerTeam].push({
-                    opponentTeam,
-                    result: resultObj,
+                if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
+                gamesByTeam[playerTeam].push({
+                    opponentTeam: game.team1,
+                    result: makeResultObj(-game.result),
                     board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
                 });
-                console.log(`  Added to ${playerTeam} group`);
             }
         });
         
-        console.log('=== FINAL GROUPED DATA ===');
-        Object.entries(grouped).forEach(([team, games]) => {
-            console.log(`${team}: ${games.length} games`, games);
+        // Now group each team's games by opponent to form series
+        const grouped = {};
+        Object.entries(gamesByTeam).forEach(([teamName, games]) => {
+            const byOpponent = {};
+            games.forEach(game => {
+                if (!byOpponent[game.opponentTeam]) {
+                    byOpponent[game.opponentTeam] = [];
+                }
+                byOpponent[game.opponentTeam].push(game);
+            });
+            
+            // Build series array
+            const series = Object.entries(byOpponent).map(([opponent, opGames]) => {
+                const seriesTotal = opGames.reduce((sum, g) => sum + g.result.numericDiff, 0);
+                let seriesResult;
+                if (opGames.length >= 2) {
+                    // Full series played
+                    if (seriesTotal > 0) {
+                        seriesResult = { text: 'W', class: 'win', diff: `+${seriesTotal}` };
+                    } else if (seriesTotal < 0) {
+                        seriesResult = { text: 'L', class: 'loss', diff: `${seriesTotal}` };
+                    } else {
+                        seriesResult = { text: 'D', class: 'draw', diff: '0' };
+                    }
+                } else {
+                    // Only 1 game played so far, series incomplete
+                    seriesResult = { text: '—', class: 'pending', diff: `${seriesTotal > 0 ? '+' : ''}${seriesTotal}` };
+                }
+                return {
+                    opponent,
+                    games: opGames,
+                    seriesScore: seriesTotal,
+                    seriesResult,
+                    isComplete: opGames.length >= 2
+                };
+            });
+            
+            // Sort: complete series first, then incomplete
+            series.sort((a, b) => (b.isComplete ? 1 : 0) - (a.isComplete ? 1 : 0));
+            grouped[teamName] = series;
         });
         
         return grouped;
@@ -1896,11 +1902,11 @@
             }
         });
         
-        console.log('🎮 GAMES PER PLAYER:');
+        console.log('ðŸŽ® GAMES PER PLAYER:');
         Object.keys(maxGamesPerPlayer).sort().forEach(player => {
             const actual = actualGamesPerPlayer[player] || 0;
             const max = maxGamesPerPlayer[player];
-            const status = actual >= max ? '⚠️ AT MAX' : '✓';
+            const status = actual >= max ? '⚠️ AT MAX' : '✔';
             console.log(`  ${player}: ${actual} scheduled (max: ${max}) ${status}`);
         });
     }
@@ -1994,12 +2000,12 @@
                         <td>January 8th</td>
                     </tr>
                     <tr>
-                        <td>Off for Spring Break</td>
-                        <td>March 5th</td>
+                        <td><b>Final Tournament</b></td>
+                        <td>April 2th</td>
                     </tr>
                     <tr>
-                        <td><b>Final Tournament</b></td>
-                        <td>March 26th</td>
+                        <td><b>Final Day Of League</b></td>
+                        <td>April 9th</td>
                     </tr>
                 </tbody>
             </table>
@@ -2269,9 +2275,10 @@
             <div class="played-games-section">
                 <h3>Completed Games ({playedGames.length})</h3>
                 
-                {#each Object.entries(playedGamesByTeam) as [teamName, games]}
+                {#each Object.entries(playedGamesByTeam) as [teamName, seriesList]}
+                    {@const totalGames = seriesList.reduce((sum, s) => sum + s.games.length, 0)}
                     <div class="team-games-group">
-                        <h4>{teamName} ({games.length} {games.length === 1 ? 'game' : 'games'})</h4>
+                        <h4>{teamName} ({totalGames} {totalGames === 1 ? 'game' : 'games'})</h4>
                         <div class="games-table-wrapper">
                             <table class="games-table played-games-table">
                                 <thead>
@@ -2282,18 +2289,27 @@
                                         <th>Opponent</th>
                                         <th>+/-</th>
                                         <th>Board</th>
+                                        <th>Series</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {#each games as game}
-                                        <tr>
-                                            <td class="result-cell {game.result.class}">{game.result.text}</td>
-                                            <td class="team-name">{teamName}</td>
-                                            <td class="vs">vs</td>
-                                            <td class="team-name">{game.opponentTeam}</td>
-                                            <td class="diff-cell {game.result.class}">{game.result.diff}</td>
-                                            <td>{game.board}</td>
-                                        </tr>
+                                    {#each seriesList as series}
+                                        {#each series.games as game, gameIdx}
+                                            <tr class:series-group-border={gameIdx === 0 && seriesList.indexOf(series) > 0}>
+                                                <td class="result-cell {game.result.class}">{game.result.text}</td>
+                                                <td class="team-name">{teamName}</td>
+                                                <td class="vs">vs</td>
+                                                <td class="team-name">{game.opponentTeam}</td>
+                                                <td class="diff-cell {game.result.class}">{game.result.diff}</td>
+                                                <td>{game.board}</td>
+                                                {#if gameIdx === 0}
+                                                    <td class="series-cell {series.seriesResult.class}" rowspan={series.games.length}>
+                                                        <span class="series-result-text">{series.seriesResult.text}</span>
+                                                        <span class="series-diff">{series.seriesResult.diff}</span>
+                                                    </td>
+                                                {/if}
+                                            </tr>
+                                        {/each}
                                     {/each}
                                 </tbody>
                             </table>
@@ -2460,7 +2476,7 @@
     /* Optional: Add horizontal scroll indicator */
     .table-wrapper[data-scrollable]::after,
     :global(.mobile-friendly) .table-wrapper[data-scrollable]::after {
-        content: '← Swipe to see more →';
+        content: '← Swipe to see more ↑';
         display: block;
         text-align: center;
         padding: 0.5rem;
@@ -3385,5 +3401,49 @@
     
     .diff-cell.draw {
         color: #d97706;
+    }
+    
+    /* Series grouping styles */
+    .series-group-border td {
+        border-top: 2px solid #cbd5e1;
+    }
+    
+    .series-cell {
+        text-align: center;
+        vertical-align: middle;
+        font-weight: 700;
+        border-left: 2px solid #e5e7eb;
+        min-width: 70px;
+    }
+    
+    .series-cell.win {
+        background-color: #d1fae5;
+        color: #059669;
+    }
+    
+    .series-cell.loss {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    
+    .series-cell.draw {
+        background-color: #fef3c7;
+        color: #d97706;
+    }
+    
+    .series-cell.pending {
+        background-color: #f3f4f6;
+        color: #6b7280;
+    }
+    
+    .series-result-text {
+        display: block;
+        font-size: 1rem;
+    }
+    
+    .series-diff {
+        display: block;
+        font-size: 0.8rem;
+        opacity: 0.85;
     }
 </style>
