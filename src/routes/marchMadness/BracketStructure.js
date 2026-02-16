@@ -1,8 +1,57 @@
 // Shared bracket structure and utilities for March Madness
 
-// Scoring constants
-export const SCORE_FOR_ROUND = [0, 10, 20, 30, 50, 80, 130];
-export const SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6];
+// Scoring constants (use let so they can be updated from config)
+export let SCORE_FOR_ROUND = [0, 10, 20, 30, 50, 80, 130];
+export let SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6];
+export let ROUND_NAMES = ["", "Round of 64", "Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship"];
+export let STAR_BONUS = [25, 20, 15, 10, 5];
+export let SCORE_DIFF_BUCKETS = [5, 10];  // Buckets for categorizing score differentials
+
+// Track if config has been loaded
+let configLoaded = false;
+
+/**
+ * Load scoring configuration from a JSON file.
+ * Updates SCORE_FOR_ROUND, SEED_FACTOR, ROUND_NAMES, and STAR_BONUS from the config.
+ */
+export async function loadScoringConfig(configPath = '/marchMadness/2026/scoring-config.json') {
+    if (configLoaded) {
+        return true;  // Already loaded
+    }
+    
+    try {
+        const response = await fetch(configPath);
+        if (!response.ok) {
+            console.warn(`Could not load scoring config from ${configPath}, using defaults`);
+            return false;
+        }
+        
+        const config = await response.json();
+        
+        if (config.scoreForRound && Array.isArray(config.scoreForRound)) {
+            SCORE_FOR_ROUND = config.scoreForRound;
+        }
+        if (config.seedFactor && Array.isArray(config.seedFactor)) {
+            SEED_FACTOR = config.seedFactor;
+        }
+        if (config.roundNames && Array.isArray(config.roundNames)) {
+            ROUND_NAMES = config.roundNames;
+        }
+        if (config.starBonus && Array.isArray(config.starBonus)) {
+            STAR_BONUS = config.starBonus;
+        }
+        if (config.scoreDiffBuckets && Array.isArray(config.scoreDiffBuckets)) {
+            SCORE_DIFF_BUCKETS = config.scoreDiffBuckets;
+        }
+        
+        configLoaded = true;
+        console.log('Loaded scoring config:', { SCORE_FOR_ROUND, SEED_FACTOR, ROUND_NAMES, STAR_BONUS, SCORE_DIFF_BUCKETS });
+        return true;
+    } catch (err) {
+        console.warn('Error loading scoring config, using defaults:', err);
+        return false;
+    }
+}
 
 // Region positioning
 export const regionPositions = {
@@ -86,7 +135,21 @@ export const CELL_MAPPINGS = {
         rightS16: 'AG',
         rightR2: 'AJ',
         rightTeam: 'AL',
-        rightSeed: 'AM'
+        rightSeed: 'AM',
+        // Score columns (placed between team name and next round, toward center)
+        leftR1Score: 'D',      // Score for Round 1 teams (next to C)
+        leftR2Score: 'F',      // Score for Round 2 winners (next to E)
+        leftS16Score: 'I',     // Score for Sweet 16 winners (next to H)
+        leftE8Score: 'L',      // Score for Elite 8 winners (next to K)
+        leftF4Score: 'O',      // Score for Final Four winners (next to N) - rows 22, 57
+        champTeam1Score: 'P',  // Score for Championship Team 1 (row 39)
+        champTeam2Score: 'V',  // Score for Championship Team 2 (row 39)
+        champWinnerScore: 'S', // Score for Championship winner (row 44)
+        rightF4Score: 'Z',     // Score for Final Four winners (next to AA)
+        rightE8Score: 'AC',    // Score for Elite 8 winners (next to AD)
+        rightS16Score: 'AF',   // Score for Sweet 16 winners (next to AG)
+        rightR2Score: 'AI',    // Score for Round 2 winners (next to AJ)
+        rightR1Score: 'AK'     // Score for Round 1 teams (next to AL)
     },
     
     // Championship rows
@@ -349,10 +412,15 @@ export function computeScore(resultsBracket, picksBracket, teamsData, options = 
 }
 
 /**
- * Compute remaining possible points for a bracket
+ * Compute remaining possible points for a bracket, including potential seed bonuses.
+ * @param {Object} resultsBracket - The official results bracket
+ * @param {Object} picksBracket - The user's picks bracket
+ * @param {Object} teamsData - Map of team names to their data (for seeds)
+ * @returns {Object} { basePoints, bonusPoints, total }
  */
 export function computePossibleRemaining(resultsBracket, picksBracket, teamsData) {
-    let possibleRemaining = 0;
+    let basePoints = 0;
+    let bonusPoints = 0;
     
     // Find teams still alive in the tournament
     const remainingTeams = new Set();
@@ -389,12 +457,29 @@ export function computePossibleRemaining(resultsBracket, picksBracket, teamsData
             
             // If game hasn't been decided yet and user's pick is still alive
             if (!resultGame.winner && pickGame.winner && remainingTeams.has(pickGame.winner.name)) {
-                possibleRemaining += SCORE_FOR_ROUND[round];
+                // Add base points for this round
+                basePoints += SCORE_FOR_ROUND[round];
+                
+                // Calculate potential seed bonus: MAX(0, seed_chosen - seed_opponent) * SEED_FACTOR[round]
+                if (resultGame.team1 && resultGame.team2) {
+                    const pickName = pickGame.winner.name;
+                    const team1Name = resultGame.team1.name;
+                    const team2Name = resultGame.team2.name;
+                    
+                    const pickSeed = teamsData[pickName]?.seed || pickGame.winner.seed;
+                    const opponentName = (pickName === team1Name) ? team2Name : team1Name;
+                    const opponentSeed = teamsData[opponentName]?.seed || 
+                        (pickName === team1Name ? resultGame.team2.seed : resultGame.team1.seed);
+                    
+                    if (pickSeed && opponentSeed && pickSeed > opponentSeed) {
+                        bonusPoints += (pickSeed - opponentSeed) * SEED_FACTOR[round];
+                    }
+                }
             }
         });
     }
     
-    return possibleRemaining;
+    return { basePoints, bonusPoints, total: basePoints + bonusPoints };
 }
 
 /**

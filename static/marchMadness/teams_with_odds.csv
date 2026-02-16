@@ -1,4 +1,4 @@
-﻿TEAM,SEED,Region,prob_r32,prob_r16,prob_r8,prob_r4,prob_r2,prob_win
+TEAM,SEED,Region,prob_r32,prob_r16,prob_r8,prob_r4,prob_r2,prob_win
 Duke,1,East,1,1,0.835525,0.577599,0.148465,0.127323
 Houston,1,Midwest,1,0.192836,0.2319,0.128652,0.108494,0.093044
 Florida,1,West,1,1,0.607806,0.319776,0.076817,0.062564

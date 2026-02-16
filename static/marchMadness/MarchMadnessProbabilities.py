@@ -4,207 +4,3471 @@ Calculate win probabilities for March Madness bracket competition.
 
 This script simulates all possible outcomes for remaining games and calculates
 the probability of each participant winning the competition.
+
+Uses JSON bracket files instead of Excel.
+Supports merging similar winning outcomes and showing top N most probable scenarios.
 """
 
-import pandas as pd
-import numpy as np
-import os
 import json
+import os
 import argparse
+import random
+import numpy as np
+import csv
+import time
+from typing import Dict, List, Optional, Set, Tuple, Union
 
-# Constants
-CHOSEN_TEAM = 'Chosen Winner'
-CHOSEN_TEAM_COL = 'Chosen winner col'
-CHOSEN_TEAM_ROW = 'Chosen winner row'
-CHOSEN_UPPER = 'Chosen Upper'
-UPPER_TEAM_ROW = 'Upper team row'
-UPPER_TEAM_COL = 'Upper team col'
-CHOSEN_LOWER = 'Chosen Lower'
-LOWER_TEAM_ROW = 'Lower team row'
-LOWER_TEAM_COL = 'Lower team col'
-REGION = 'Region'
-ROUND = 'Round'
-SEED = 'SEED'
-END_TOKEN = 'END'
-IS_PARENT_UPPER = 'ParentIsUpper'
-PARENT = 'Parent_id'
+# Scoring constants - MUST be loaded from config file
+SCORE_FOR_ROUND = None
+SEED_FACTOR = None
+START_BONUS = None
 
-SCORE_FOR_ROUND = [0, 10, 20, 30, 50, 80, 130]
-SEED_FACTOR = [0, 1, 2, 3, 4, 5, 6]
-
-# Default configuration
-DEFAULT_BRACKET_SHEET_NAME = 'madness'
+# Flag to track if config has been loaded
+_config_loaded = False
 
 
-def letter_to_number(letter):
-    """Convert Excel column letter to 0-indexed number."""
-    list_letters = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','al', 'aj', 'ag', 'ad', 'aa']
-    list_numbers = list(range(0,26)) + [37, 35, 32, 29, 26]
-    dictionary_thing = dict(map(lambda i,j : (i,j), list_letters, list_numbers))
-    lower_letter = letter.lower()
-    return dictionary_thing[lower_letter]
-
-
-def extract_from_bracket(bracket_structure, bracket):
-    """Extract bracket picks from an Excel bracket using the bracket structure."""
-    main_dictionary = dict()
-    for index, data_row in bracket_structure.iterrows():
-        row_info = dict()
-        col = letter_to_number(data_row[CHOSEN_TEAM_COL])
-        row = data_row[CHOSEN_TEAM_ROW] - 2
-        
-        row_info[CHOSEN_TEAM] = bracket.iloc[row, col]
-        row_info[ROUND] = data_row[ROUND]
-        row_info[REGION] = data_row[REGION]
-        row_info[CHOSEN_UPPER] = bracket.iloc[data_row[UPPER_TEAM_ROW] - 2, letter_to_number(data_row[UPPER_TEAM_COL])]
-        row_info[CHOSEN_LOWER] = bracket.iloc[data_row[LOWER_TEAM_ROW] - 2, letter_to_number(data_row[LOWER_TEAM_COL])]
-        row_info[PARENT] = data_row[PARENT]
-        row_info[IS_PARENT_UPPER] = data_row[IS_PARENT_UPPER]
-        
-        main_dictionary[index] = row_info
+def load_scoring_config(config_path: str = None) -> bool:
+    """
+    Load scoring configuration from JSON file.
     
-    return main_dictionary
-
-
-def load_teams(teams_file):
-    """Load teams from CSV file and create seed lookup."""
-    teams_df = pd.read_csv(teams_file)
-    seed_dict = {}
-    for _, row in teams_df.iterrows():
-        seed_dict[row['Team']] = row['Seed']
-    return seed_dict
-
-
-def seed_for_team(team_name, seed_dict):
-    """Get the seed for a team, returning 0 if not found."""
-    if pd.isna(team_name):
-        return 0
-    return seed_dict.get(team_name, 0)
-
-
-def compute_current_score(results_bracket, other_bracket, seed_dict, 
-                          scoring_vector=None, rounds=None, regions=None, 
-                          apply_seed_bonus=True):
-    """Compute the score for a bracket against results."""
-    if scoring_vector is None:
-        scoring_vector = SCORE_FOR_ROUND
-    if rounds is None:
-        rounds = {1, 2, 3, 4, 5, 6}
-    if regions is None:
-        regions = {'East', 'West', 'South', 'Midwest', 'Finals'}
+    Args:
+        config_path: Path to scoring-config.json. If None, tries to find it
+                     relative to the script directory or in common locations.
     
-    total_score = 0
-    for index, row_data in other_bracket.iterrows():
-        results_row = results_bracket.loc[index]
+    Returns:
+        True if loaded successfully, False otherwise
         
-        if (results_row[CHOSEN_TEAM] == row_data[CHOSEN_TEAM] and 
-            results_row[ROUND] in rounds and 
-            results_row[REGION] in regions):
-            # Score for correct pick
-            total_score += scoring_vector[results_row[ROUND]]
+    Raises:
+        FileNotFoundError: If config file cannot be found
+        ValueError: If config file is missing required fields
+    """
+    global SCORE_FOR_ROUND, SEED_FACTOR, START_BONUS, _config_loaded
+    
+    if _config_loaded:
+        return True
+    
+    # Try to find config file
+    search_paths = []
+    if config_path:
+        search_paths.append(config_path)
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    search_paths.extend([
+        os.path.join(script_dir, 'scoring-config.json'),
+        os.path.join(script_dir, '2026', 'scoring-config.json'),
+        os.path.join(script_dir, '..', 'static', 'marchMadness', '2026', 'scoring-config.json'),
+        'scoring-config.json',
+    ])
+    
+    for path in search_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                # Validate required fields
+                if 'scoreForRound' not in config or not isinstance(config['scoreForRound'], list):
+                    raise ValueError(f"Config file {path} missing required 'scoreForRound' array")
+                if 'seedFactor' not in config or not isinstance(config['seedFactor'], list):
+                    raise ValueError(f"Config file {path} missing required 'seedFactor' array")
+                
+                SCORE_FOR_ROUND = config['scoreForRound']
+                SEED_FACTOR = config['seedFactor']
+                START_BONUS = config.get('startBonus', {})
+                
+                _config_loaded = True
+                print(f"Loaded scoring config from {path}")
+                print(f"  SCORE_FOR_ROUND: {SCORE_FOR_ROUND}")
+                print(f"  SEED_FACTOR: {SEED_FACTOR}")
+                if START_BONUS:
+                    print(f"  START_BONUS: {START_BONUS}")
+                return True
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON in config file {path}: {e}")
+                continue
+            except ValueError as e:
+                print(f"Error: {e}")
+                continue
+    
+    # Config file is required - raise error if not found
+    searched = "\n  ".join(search_paths)
+    raise FileNotFoundError(
+        f"Could not find scoring-config.json. Searched:\n  {searched}\n"
+        f"Please ensure scoring-config.json exists with 'scoreForRound' and 'seedFactor' arrays."
+    )
+
+
+def load_star_bonuses(star_bonuses_path: str, scoring_config_path: str = None) -> Dict[str, int]:
+    """
+    Load star bonuses from JSON file and calculate total bonus points per participant.
+    
+    Args:
+        star_bonuses_path: Path to starBonuses.json file
+        scoring_config_path: Path to scoring-config.json (for starBonus points array)
+        
+    Returns:
+        Dict mapping participant name (lowercase) to total star bonus points
+    """
+    if not os.path.exists(star_bonuses_path):
+        print(f"No star bonuses file found at {star_bonuses_path}")
+        return {}
+    
+    # Load star bonuses
+    with open(star_bonuses_path, 'r', encoding='utf-8') as f:
+        star_bonuses = json.load(f)
+    
+    # Load scoring config to get starBonus points array
+    star_bonus_points = [25, 20, 15, 10, 5]  # Default values
+    
+    if scoring_config_path and os.path.exists(scoring_config_path):
+        with open(scoring_config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            if 'starBonus' in config:
+                star_bonus_points = config['starBonus']
+    
+    # Calculate points per participant
+    participant_points = {}
+    
+    for award in star_bonuses:
+        winners = award.get('Winners', [])
+        if not winners:
+            continue
+        
+        # Check if this is a split award (name contains "/" and Winners[0] is an array)
+        is_split = award.get('name', '').find('/') != -1 and isinstance(winners[0] if winners else None, list)
+        
+        if is_split:
+            # Split award: total winners is sum of all sublists
+            total_winners = sum(len(w) if isinstance(w, list) else 0 for w in winners)
+            points_per_winner = star_bonus_points[min(total_winners - 1, len(star_bonus_points) - 1)] if total_winners > 0 else 0
             
-            # Points for upset bonus
-            if apply_seed_bonus:
-                top_seed = seed_for_team(results_row[CHOSEN_UPPER], seed_dict)
-                bottom_seed = seed_for_team(results_row[CHOSEN_LOWER], seed_dict)
-                seed_factor = SEED_FACTOR[results_row[ROUND]]
-                upset_score = (top_seed - bottom_seed) * (1 - 2 * (results_row[CHOSEN_LOWER] == row_data[CHOSEN_TEAM]))
-                total_score += max(0, seed_factor * upset_score)
-    
-    return total_score
-
-
-def create_hypothetical_bracket(current_bracket, games, victory_string):
-    """Create a hypothetical bracket by simulating game outcomes."""
-    new_bracket = current_bracket.copy()
-    
-    for index in range(len(games)):
-        game = games[index]
-        victory = victory_string[index]
-        
-        if victory == '1':
-            chosen_winner = new_bracket.loc[game, CHOSEN_UPPER]
+            # Award points to each winner in each sublist
+            for winner_list in winners:
+                if isinstance(winner_list, list):
+                    for winner in winner_list:
+                        name_lower = winner.lower()
+                        participant_points[name_lower] = participant_points.get(name_lower, 0) + points_per_winner
         else:
-            chosen_winner = new_bracket.loc[game, CHOSEN_LOWER]
-        
-        new_bracket.loc[game, CHOSEN_TEAM] = chosen_winner
-        
-        # Propagate winner to parent game
-        if new_bracket.loc[game, PARENT] != END_TOKEN:
-            parent_id = new_bracket.loc[game, PARENT]
-            if new_bracket.loc[game, IS_PARENT_UPPER]:
-                new_bracket.loc[parent_id, CHOSEN_UPPER] = chosen_winner
-            else:
-                new_bracket.loc[parent_id, CHOSEN_LOWER] = chosen_winner
+            # Regular award
+            winner_count = len(winners)
+            points_per_winner = star_bonus_points[min(winner_count - 1, len(star_bonus_points) - 1)] if winner_count > 0 else 0
+            
+            for winner in winners:
+                name_lower = winner.lower()
+                participant_points[name_lower] = participant_points.get(name_lower, 0) + points_per_winner
     
-    return new_bracket
+    if participant_points:
+        print(f"Loaded star bonuses: {participant_points}")
+    
+    return participant_points
 
 
-def find_remaining_games(results_bracket):
-    """Find all games that haven't been decided yet."""
-    remaining_games = []
-    for game_id, row in results_bracket.iterrows():
-        if pd.isnull(row[CHOSEN_TEAM]):
-            remaining_games.append(game_id)
-    return remaining_games
+# Round keys in order
+ROUND_KEYS = ['round1', 'round2', 'round3', 'round4', 'round5', 'round6']
+
+# Games per round (total 63 games in tournament)
+GAMES_PER_ROUND = [32, 16, 8, 4, 2, 1]  # R1=32, R2=16, R3=8, R4=4, R5=2, R6=1
+
+# Fixed bit position offsets for each round in the 63-bit full bracket string
+# Round 1: bits 0-31, Round 2: bits 32-47, Round 3: bits 48-55, etc.
+ROUND_BIT_OFFSETS = [0, 32, 48, 56, 60, 62]  # Cumulative: [0, 32, 48, 56, 60, 62]
+
+# Total bits in full bracket representation
+TOTAL_BRACKET_BITS = 63
+
+# Progress reporting interval (print progress every N simulations)
+PROGRESS_INTERVAL = 1000
+
+# Default number of top scenarios to keep per participant (for both winning and losing)
+DEFAULT_MAX_SCENARIOS = 5
+
+# Seed-based probability file (relative to this script's directory)
+SEED_PROBABILITIES_FILE = "seed_probabilities.csv"
+
+# Seed-based probability data (loaded from CSV)
+# Maps seed -> {prob_column -> probability}
+SEED_PROBABILITIES = {}
+SEED_PROB_METHOD = "50/50"  # Will be updated when seed probabilities are loaded
 
 
-def generate_random_outcome(num_games):
-    """Generate a random outcome string (e.g., '101001' for 6 games)."""
-    return ''.join(str(np.random.randint(0, 2)) for _ in range(num_games))
+def load_seed_probabilities(filepath: str = None) -> bool:
+    """
+    Load seed-based probability data from CSV file.
+    
+    Args:
+        filepath: Path to the seed probabilities CSV file. 
+                  If None, uses SEED_PROBABILITIES_FILE relative to script directory.
+        
+    Returns:
+        True if loaded successfully, False otherwise
+    """
+    global SEED_PROBABILITIES, SEED_PROB_METHOD
+    
+    # Use default path if not specified
+    if filepath is None:
+        # Look for file relative to this script's directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        filepath = os.path.join(script_dir, SEED_PROBABILITIES_FILE)
+    
+    if not os.path.exists(filepath):
+        print(f"Seed probabilities file not found: {filepath}")
+        print("Using 50/50 probability method as fallback")
+        SEED_PROB_METHOD = "50/50"
+        return False
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                seed = int(row['seed'])
+                SEED_PROBABILITIES[seed] = {
+                    'prob_r32': float(row.get('prob_r32', 0.5)),
+                    'prob_r16': float(row.get('prob_r16', 0.25)),
+                    'prob_r8': float(row.get('prob_r8', 0.125)),
+                    'prob_r4': float(row.get('prob_r4', 0.0625)),
+                    'prob_r2': float(row.get('prob_r2', 0.03125)),
+                    'prob_win': float(row.get('prob_win', 0.015625)),
+                }
+        print(f"Loaded seed probabilities from {filepath}")
+        print("Using seed-based probability method")
+        SEED_PROB_METHOD = "seed-based"
+        return True
+    except Exception as e:
+        print(f"Error loading seed probabilities: {e}")
+        print("Using 50/50 probability method as fallback")
+        SEED_PROB_METHOD = "50/50"
+        return False
+
+
+def get_seed_probability(seed: int, prob_column: str) -> Optional[float]:
+    """
+    Get the probability for a seed reaching a specific round.
+    
+    Args:
+        seed: The team's seed (1-16)
+        prob_column: Column name (e.g., 'prob_r32', 'prob_r16', etc.)
+        
+    Returns:
+        Probability value from seed data, or None if not available
+    """
+    if not SEED_PROBABILITIES:
+        return None
+    
+    if seed in SEED_PROBABILITIES and prob_column in SEED_PROBABILITIES[seed]:
+        return SEED_PROBABILITIES[seed][prob_column]
+    
+    return None
+
+
+def american_odds_to_probability(odds: float, remove_vig: bool = False) -> float:
+    """
+    Convert American betting odds to implied probability.
+    
+    American odds work differently for favorites and underdogs:
+    - Negative odds (favorites): The number is how much you bet to win $100
+    - Positive odds (underdogs): The number is how much you win on a $100 bet
+    
+    Args:
+        odds: American odds value (e.g., -150, +200)
+        remove_vig: If True, this is just one side and vig removal should be done
+                    separately by normalizing all probabilities to sum to 1
+    
+    Returns:
+        Implied probability as a decimal (0.0 to 1.0)
+    
+    Examples:
+        -150 -> 0.60 (60% implied probability)
+        +200 -> 0.333 (33.3% implied probability)
+        -110 -> 0.524 (52.4% implied probability)
+        +100 -> 0.50 (50% implied probability)
+    """
+    if odds < 0:
+        # Favorite: probability = |odds| / (|odds| + 100)
+        return abs(odds) / (abs(odds) + 100)
+    else:
+        # Underdog: probability = 100 / (odds + 100)
+        return 100 / (odds + 100)
+
+
+def normalize_probabilities(probs: dict) -> dict:
+    """
+    Normalize probabilities to sum to 1.0 (removes the vig/juice).
+    
+    Sportsbooks build in a margin, so raw implied probabilities sum to > 100%.
+    This function normalizes them to get "true" probabilities.
+    
+    Args:
+        probs: Dict mapping team/outcome name to implied probability
+        
+    Returns:
+        Dict with normalized probabilities summing to 1.0
+    """
+    total = sum(probs.values())
+    if total == 0:
+        return probs
+    return {k: v / total for k, v in probs.items()}
+
+
+def load_bracket(filepath: str) -> dict:
+    """Load a bracket from a JSON file."""
+    with open(filepath, 'r') as f:
+        return json.load(f)
+
+
+# Probability column names for each round
+# These represent probability of reaching/winning that round
+PROB_COLUMNS = ['prob_r32', 'prob_r16', 'prob_r8', 'prob_r4', 'prob_r2', 'prob_win']
+
+# Expected sum for each probability column (how many teams reach that round)
+EXPECTED_SUMS = {
+    'prob_r32': 32.0,   # 32 teams reach round of 32
+    'prob_r16': 16.0,   # 16 teams reach round of 16 (sweet 16)
+    'prob_r8': 8.0,     # 8 teams reach elite 8
+    'prob_r4': 4.0,     # 4 teams reach final 4
+    'prob_r2': 2.0,     # 2 teams reach championship
+    'prob_win': 1.0     # 1 winner
+}
+
+# Floating point tolerance for validation
+PROB_TOLERANCE = 0.001
+
+
+def validate_team_probabilities(teams: Dict[str, dict], results_bracket: dict = None) -> List[str]:
+    """
+    Validate team probability data.
+    
+    Checks:
+    1. No probability is negative or greater than 1
+    2. Sum of probabilities for each round equals expected value
+    3. For decided games, winner has prob ~1 and loser has prob ~0 for next round
+    4. Probabilities are monotonically decreasing (prob_r32 >= prob_r16 >= ... >= prob_win)
+    
+    Args:
+        teams: Dict mapping team name to team data (including probabilities)
+        results_bracket: Optional results bracket to check decided games
+        
+    Returns:
+        List of warning/error messages (empty if all valid)
+    """
+    errors = []
+    
+    # Check if probability columns exist
+    sample_team = next(iter(teams.values())) if teams else {}
+    has_probs = any(col in sample_team for col in PROB_COLUMNS)
+    
+    if not has_probs:
+        return []  # No probability columns, skip validation
+    
+    # Check 1: No value < 0 or > 1
+    for team_name, team_data in teams.items():
+        for col in PROB_COLUMNS:
+            if col in team_data:
+                prob = team_data[col]
+                if prob < 0:
+                    errors.append(f"Negative probability for {team_name}.{col}: {prob}")
+                if prob > 1 + PROB_TOLERANCE:
+                    errors.append(f"Probability > 1 for {team_name}.{col}: {prob}")
+    
+    # Check 2: Sums equal expected values
+    for col in PROB_COLUMNS:
+        total = sum(team_data.get(col, 0) for team_data in teams.values())
+        expected = EXPECTED_SUMS[col]
+        if abs(total - expected) > PROB_TOLERANCE:
+            errors.append(f"Sum of {col} is {total:.4f}, expected {expected:.4f}")
+    
+    # Check 3: Decided games have correct probabilities
+    if results_bracket:
+        for round_idx, round_key in enumerate(ROUND_KEYS):
+            if round_key not in results_bracket:
+                continue
+            
+            # The probability column for "reaching the next round"
+            # round1 winners reach round2, which is prob_r32
+            # round2 winners reach round3, which is prob_r16
+            # etc.
+            if round_idx >= len(PROB_COLUMNS):
+                continue
+            prob_col = PROB_COLUMNS[round_idx]
+            
+            for game in results_bracket[round_key]:
+                if not game:
+                    continue
+                winner_name = get_winner_name(game)
+                if not winner_name:
+                    continue  # Game not decided
+                
+                # Get both teams
+                team1_name = get_team_name(game.get('team1'))
+                team2_name = get_team_name(game.get('team2'))
+                
+                if not team1_name or not team2_name:
+                    continue
+                
+                loser_name = team2_name if winner_name == team1_name else team1_name
+                
+                # Check winner has prob ~1 and loser has prob ~0 for this round
+                if winner_name in teams:
+                    winner_prob = teams[winner_name].get(prob_col, 0)
+                    if winner_prob < 1 - PROB_TOLERANCE:
+                        errors.append(
+                            f"Decided game: {winner_name} won in {round_key} but {prob_col}={winner_prob:.4f} (expected ~1.0)"
+                        )
+                
+                if loser_name in teams:
+                    loser_prob = teams[loser_name].get(prob_col, 0)
+                    if loser_prob > PROB_TOLERANCE:
+                        errors.append(
+                            f"Decided game: {loser_name} lost in {round_key} but {prob_col}={loser_prob:.4f} (expected ~0.0)"
+                        )
+    
+    # Check 4: Probabilities should be monotonically decreasing for each team
+    # prob_r32 >= prob_r16 >= prob_r8 >= prob_r4 >= prob_r2 >= prob_win
+    for team_name, team_data in teams.items():
+        prev_prob = None
+        prev_col = None
+        for col in PROB_COLUMNS:
+            if col in team_data:
+                prob = team_data[col]
+                if prev_prob is not None and prob > prev_prob + PROB_TOLERANCE:
+                    errors.append(
+                        f"Non-monotonic probability for {team_name}: {prev_col}={prev_prob:.4f} < {col}={prob:.4f}"
+                    )
+                prev_prob = prob
+                prev_col = col
+    
+    return errors
+
+
+def load_teams(filepath: str, results_bracket: dict = None, validate: bool = True) -> Dict[str, dict]:
+    """
+    Load teams from a JSON or CSV file and return a dict mapping name to team data.
+    
+    For CSV files, also loads probability columns (prob_r32, prob_r16, prob_r8, prob_r4, prob_r2, prob_win)
+    if present.
+    
+    Args:
+        filepath: Path to teams file (JSON or CSV)
+        results_bracket: Optional results bracket for validation of decided games
+        validate: Whether to validate probability data
+        
+    Returns:
+        Dict mapping team name to team data
+    """
+    teams = {}
+    
+    if filepath.endswith('.json'):
+        with open(filepath, 'r') as f:
+            team_list = json.load(f)
+            for team in team_list:
+                teams[team['name']] = team
+    elif filepath.endswith('.csv'):
+        import csv
+        with open(filepath, 'r', encoding='utf-8-sig') as f:  # utf-8-sig handles BOM automatically
+            reader = csv.DictReader(f)
+            
+            # Debug: print column names found
+            print(f"CSV columns found: {reader.fieldnames}")
+            
+            for row in reader:
+                # Handle various column name possibilities
+                name = row.get('TEAM') or row.get('\ufeffTEAM') or row.get('Team') or row.get('name')
+                
+                # Skip empty rows or rows without a team name
+                if not name or not name.strip():
+                    continue
+                
+                name = name.strip()  # Remove any whitespace
+                
+                seed_str = row.get('SEED') or row.get('Seed') or row.get('seed', '0')
+                seed = int(seed_str) if seed_str and seed_str.strip() else 0
+                region = row.get('Region') or row.get('region', '')
+                
+                team_data = {'name': name, 'seed': seed, 'region': region}
+                
+                # Load probability columns if present
+                for col in PROB_COLUMNS:
+                    if col in row and row[col]:
+                        try:
+                            team_data[col] = float(row[col])
+                        except ValueError:
+                            pass  # Skip invalid values
+                
+                teams[name] = team_data
+    
+    # Validate probabilities
+    if validate and teams:
+        errors = validate_team_probabilities(teams, results_bracket)
+        if errors:
+            print("\nProbability validation warnings:")
+            for error in errors:
+                print(f"  - {error}")
+            print()
+    
+    return teams
+
+
+def get_winner_name(game: dict) -> Optional[str]:
+    """Get the winner's name from a game, handling different data formats."""
+    if not game or not game.get('winner'):
+        return None
+    winner = game['winner']
+    if isinstance(winner, dict):
+        return winner.get('name')
+    return winner
+
+
+def get_team_name(team) -> Optional[str]:
+    """Get team name from team data, handling different formats."""
+    if not team:
+        return None
+    if isinstance(team, dict):
+        return team.get('name')
+    return team
+
+
+def get_team_seed(team, teams_data: dict) -> int:
+    """Get seed for a team."""
+    if not team:
+        return 0
+    
+    name = get_team_name(team)
+    if name and name in teams_data:
+        return teams_data[name].get('seed', 0)
+    
+    if isinstance(team, dict):
+        return team.get('seed', 0)
+    
+    return 0
+
+
+# Track which teams we've warned about missing probability data
+_warned_missing_prob_teams = set()
+
+
+def get_team_probability(team_name: str, prob_column: str, teams_data: dict) -> float:
+    """
+    Get a team's probability for reaching a specific round.
+    
+    Args:
+        team_name: Name of the team
+        prob_column: Column name (e.g., 'prob_r32', 'prob_r16', etc.)
+        teams_data: Dict mapping team name to team data
+        
+    Returns:
+        Probability value from team data, seed-based fallback, or 50/50 fallback
+    """
+    global _warned_missing_prob_teams
+    
+    # Map prob_column to number of rounds needed from R64 (for 50/50 fallback)
+    rounds_needed = {
+        'prob_r32': 1,
+        'prob_r16': 2,
+        'prob_r8': 3,
+        'prob_r4': 4,
+        'prob_r2': 5,
+        'prob_win': 6
+    }
+    
+    # Check if team exists and has probability data
+    if team_name in teams_data:
+        team_data = teams_data[team_name]
+        if prob_column in team_data:
+            return team_data[prob_column]
+        
+        # Fallback to seed-based probability if available
+        seed = team_data.get('seed')
+        if seed:
+            seed_prob = get_seed_probability(seed, prob_column)
+            if seed_prob is not None:
+                # Warn once per team
+                warn_key = (team_name, prob_column)
+                if warn_key not in _warned_missing_prob_teams:
+                    _warned_missing_prob_teams.add(warn_key)
+                    print(f"  Using seed-based probability for '{team_name}' (seed {seed}): {prob_column}={seed_prob:.6f}")
+                return seed_prob
+    
+    # Ultimate fallback: 50/50
+    r = rounds_needed.get(prob_column, 1)
+    default_prob = (0.5) ** r
+    
+    # Warn once per team
+    warn_key = (team_name, prob_column)
+    if warn_key not in _warned_missing_prob_teams:
+        _warned_missing_prob_teams.add(warn_key)
+        print(f"  Warning: No data for '{team_name}', using 50/50 default {default_prob:.6f}")
+    
+    return default_prob
+
+
+def calculate_outcome_probability(hypothetical_bracket: dict, teams_data: dict) -> float:
+    """
+    Calculate the probability of a specific bracket outcome.
+    
+    The probability is computed as:
+    P(bracket) = P_win(winner) × P_r2(finalist) × ∏P_r4(F4 losers) × ∏P_r8(E8 losers) × ...
+    
+    For each round, we multiply by the probability of teams that "exit" at that round
+    (i.e., reached that round but went no further).
+    
+    Args:
+        hypothetical_bracket: A completed bracket with all winners determined
+        teams_data: Dict mapping team name to team data with probabilities
+        
+    Returns:
+        Probability of this specific outcome
+    """
+    probability = 1.0
+    
+    # The winner (exits at championship with a win)
+    winner_name = get_team_name(hypothetical_bracket.get('winner'))
+    if winner_name:
+        prob = get_team_probability(winner_name, 'prob_win', teams_data)
+        probability *= prob
+    
+    # Championship loser (reached championship but didn't win) - use prob_r2
+    final_game = hypothetical_bracket.get('round6', [{}])[0]
+    if final_game:
+        final_winner = get_team_name(final_game.get('winner'))
+        team1 = get_team_name(final_game.get('team1'))
+        team2 = get_team_name(final_game.get('team2'))
+        finalist_loser = team2 if final_winner == team1 else team1
+        if finalist_loser:
+            prob = get_team_probability(finalist_loser, 'prob_r2', teams_data)
+            probability *= prob
+    
+    # Final Four losers (reached F4 but not championship) - use prob_r4
+    # Round 5 has 2 games, losers are F4 exits
+    for game in hypothetical_bracket.get('round5', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r4', teams_data)
+            probability *= prob
+    
+    # Elite 8 losers (reached E8 but not F4) - use prob_r8
+    # Round 4 has 4 games
+    for game in hypothetical_bracket.get('round4', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r8', teams_data)
+            probability *= prob
+    
+    # Sweet 16 losers (reached S16 but not E8) - use prob_r16
+    # Round 3 has 8 games
+    for game in hypothetical_bracket.get('round3', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r16', teams_data)
+            probability *= prob
+    
+    # Round of 32 losers (reached R32 but not S16) - use prob_r32
+    # Round 2 has 16 games
+    for game in hypothetical_bracket.get('round2', []):
+        if not game:
+            continue
+        winner = get_team_name(game.get('winner'))
+        team1 = get_team_name(game.get('team1'))
+        team2 = get_team_name(game.get('team2'))
+        loser = team2 if winner == team1 else team1
+        if loser:
+            prob = get_team_probability(loser, 'prob_r32', teams_data)
+            probability *= prob
+    
+    # Round of 64 losers don't contribute (they didn't "reach" any tracked round)
+    # Their elimination is implicit in the probabilities of teams that did advance
+    
+    return probability
+
+
+def compute_score(results_bracket: dict, picks_bracket: dict, teams_data: dict,
+                  apply_seed_bonus: bool = True) -> Tuple[int, int, int]:
+    """
+    Compute score for a bracket against results.
+    Returns (total_score, correct_picks, seed_bonus)
+    """
+    total_score = 0
+    correct_picks = 0
+    seed_bonus = 0
+    
+    for round_num, round_key in enumerate(ROUND_KEYS, start=1):
+        results_round = results_bracket.get(round_key, [])
+        picks_round = picks_bracket.get(round_key, [])
+        
+        if not results_round or not picks_round:
+            continue
+        
+        for i, result_game in enumerate(results_round):
+            if i >= len(picks_round):
+                continue
+            
+            pick_game = picks_round[i]
+            
+            if not result_game or not pick_game:
+                continue
+            
+            result_winner = get_winner_name(result_game)
+            pick_winner = get_winner_name(pick_game)
+            
+            if not result_winner or not pick_winner:
+                continue
+            
+            # Check if pick matches result
+            if result_winner == pick_winner:
+                points = SCORE_FOR_ROUND[round_num]
+                total_score += points
+                correct_picks += 1
+                
+                # Apply upset bonus
+                if apply_seed_bonus:
+                    team1_seed = get_team_seed(result_game.get('team1'), teams_data)
+                    team2_seed = get_team_seed(result_game.get('team2'), teams_data)
+                    winner_seed = get_team_seed(result_game.get('winner'), teams_data)
+                    
+                    if team1_seed and team2_seed and winner_seed:
+                        expected_winner_seed = min(team1_seed, team2_seed)
+                        if winner_seed > expected_winner_seed:
+                            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[round_num]
+                            total_score += upset_bonus
+                            seed_bonus += upset_bonus
+    
+    return total_score, correct_picks, seed_bonus
+
+
+def find_remaining_games(results_bracket: dict) -> List[Tuple[str, int]]:
+    """
+    Find all games that haven't been decided yet (including future rounds).
+    Returns list of (round_key, game_index) tuples in round order.
+    """
+    remaining = []
+    
+    for round_key in ROUND_KEYS:
+        results_round = results_bracket.get(round_key, [])
+        
+        for i, game in enumerate(results_round):
+            if game and not get_winner_name(game):
+                # Game exists but no winner yet - include it regardless of whether teams are determined
+                remaining.append((round_key, i))
+    
+    return remaining
+
+
+def get_feeder_games(round_key: str, game_index: int) -> Optional[Tuple[str, int, int]]:
+    """
+    Get the two feeder games that feed into this game.
+    Returns (prev_round_key, feeder_game_1_index, feeder_game_2_index) or None for round 1.
+    """
+    round_num = ROUND_KEYS.index(round_key) + 1
+    
+    if round_num == 1:
+        return None  # Round 1 has no feeder games
+    
+    prev_round_key = ROUND_KEYS[round_num - 2]  # Previous round
+    feeder_1 = game_index * 2
+    feeder_2 = game_index * 2 + 1
+    
+    return (prev_round_key, feeder_1, feeder_2)
+
+
+def get_parent_game_info(round_key: str, game_index: int) -> Optional[Tuple[str, int, int]]:
+    """
+    Get the parent game that this game feeds into.
+    Returns (parent_round_key, parent_game_index, slot) where slot is 0 for team1, 1 for team2.
+    """
+    round_num = ROUND_KEYS.index(round_key) + 1
+    
+    if round_num >= 6:  # Championship has no parent
+        return None
+    
+    parent_round_key = ROUND_KEYS[round_num]  # Next round
+    parent_game_index = game_index // 2
+    slot = game_index % 2  # 0 = team1, 1 = team2
+    
+    return (parent_round_key, parent_game_index, slot)
+
+
+def get_fixed_bit_position(round_key: str, game_index: int) -> int:
+    """
+    Get the fixed bit position (0-62) for a specific game in the 63-bit full bracket string.
+    
+    Mapping:
+      Round 1 (32 games): bits 0-31
+      Round 2 (16 games): bits 32-47
+      Round 3 (8 games):  bits 48-55
+      Round 4 (4 games):  bits 56-59
+      Round 5 (2 games):  bits 60-61
+      Round 6 (1 game):   bit 62
+    """
+    round_idx = ROUND_KEYS.index(round_key)
+    return ROUND_BIT_OFFSETS[round_idx] + game_index
+
+
+def get_game_from_bit_position(bit_position: int) -> Tuple[str, int]:
+    """
+    Get the (round_key, game_index) for a given bit position (0-62).
+    Inverse of get_fixed_bit_position.
+    """
+    for round_idx in range(len(ROUND_KEYS) - 1, -1, -1):
+        if bit_position >= ROUND_BIT_OFFSETS[round_idx]:
+            game_index = bit_position - ROUND_BIT_OFFSETS[round_idx]
+            return (ROUND_KEYS[round_idx], game_index)
+    return (ROUND_KEYS[0], bit_position)  # Fallback to round 1
+
+
+def build_decided_games_bits(results_bracket: dict) -> Tuple[str, List[int]]:
+    """
+    Build a partial 63-bit string with decided game results.
+    Returns:
+      - base_bits: 63-char string with '1'/'0' for decided games, '?' for undecided
+      - decided_positions: list of bit positions that are decided
+    """
+    base_bits = ['?'] * TOTAL_BRACKET_BITS
+    decided_positions = []
+    
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        results_round = results_bracket.get(round_key, [])
+        offset = ROUND_BIT_OFFSETS[round_idx]
+        
+        for game_idx, game in enumerate(results_round):
+            if game:
+                winner = get_winner_name(game)
+                if winner:
+                    # Game is decided - determine which team won
+                    team1_name = get_team_name(game.get('team1'))
+                    bit_pos = offset + game_idx
+                    
+                    if winner == team1_name:
+                        base_bits[bit_pos] = '1'
+                    else:
+                        base_bits[bit_pos] = '0'
+                    decided_positions.append(bit_pos)
+    
+    return ''.join(base_bits), decided_positions
+
+
+def build_remaining_games_bit_mapping(remaining_games: List[Tuple[str, int]]) -> List[int]:
+    """
+    Build a mapping from short outcome string positions to full 63-bit positions.
+    
+    Returns:
+      List where index i is the 63-bit position for remaining_games[i]
+    """
+    return [get_fixed_bit_position(round_key, game_index) 
+            for round_key, game_index in remaining_games]
+
+
+def expand_to_full_bitstring(short_outcome: str, base_bits: str, 
+                              remaining_bit_positions: List[int]) -> str:
+    """
+    Expand a short outcome string (remaining games only) to a full 63-bit string.
+    
+    Args:
+        short_outcome: Variable-length string for remaining games ('0'/'1')
+        base_bits: 63-char string with decided games filled in ('1'/'0'/'?')
+        remaining_bit_positions: Mapping from short_outcome positions to 63-bit positions
+    
+    Returns:
+        Full 63-bit string with all games filled in
+    """
+    full_bits = list(base_bits)
+    
+    for i, bit_pos in enumerate(remaining_bit_positions):
+        full_bits[bit_pos] = short_outcome[i]
+    
+    return ''.join(full_bits)
+
+
+def expand_all_to_full_bitstrings(short_outcomes: List[str], base_bits: str,
+                                   remaining_bit_positions: List[int]) -> List[str]:
+    """
+    Expand all short outcome strings to full 63-bit strings.
+    Uses fully vectorized numpy operations for speed.
+    
+    Args:
+        short_outcomes: List of variable-length outcome strings
+        base_bits: 63-char string with decided games filled in
+        remaining_bit_positions: Mapping from short positions to 63-bit positions
+    
+    Returns:
+        List of full 63-bit strings
+    """
+    total = len(short_outcomes)
+    
+    if total == 0:
+        return []
+    
+    num_remaining = len(remaining_bit_positions)
+    full_length = len(base_bits)  # 63
+    
+    # Convert base_bits to numpy array of ASCII codes
+    base_array = np.array([ord(c) for c in base_bits], dtype=np.uint8)
+    
+    # Create 2D array: (num_outcomes x 63), initialized with base_bits
+    full_arrays = np.tile(base_array, (total, 1))
+    
+    # Convert all short outcomes to a single numpy array at once
+    # Join all strings, convert to bytes, reshape to 2D
+    all_chars = ''.join(short_outcomes)
+    short_arrays = np.frombuffer(all_chars.encode('ascii'), dtype=np.uint8).reshape(total, num_remaining)
+    
+    # Vectorized column assignment - fill all remaining positions at once
+    full_arrays[:, remaining_bit_positions] = short_arrays
+    
+    # Convert back to strings using tobytes for each row
+    results = [row.tobytes().decode('ascii') for row in full_arrays]
+    
+    return results
+
+
+# =============================================================================
+# XNOR-BASED FAST SCORING
+# =============================================================================
+
+def build_participant_pick_bitstring(participant_bracket: dict, results_bracket: dict) -> str:
+    """
+    Convert a participant's bracket picks to a 63-bit string.
+    
+    For each game position (0-62):
+    - '1' if participant picked team1 to win (in their own bracket)
+    - '0' if participant picked team2 to win (in their own bracket)
+    - '?' if no pick exists for this game
+    
+    This is purely based on the participant's bracket - we compare their winner
+    against their own team1/team2, not against the results bracket.
+    
+    The dependency masks handle the case where the participant's earlier picks
+    were wrong (so the team they picked for a later round isn't actually there).
+    """
+    pick_bits = ['?'] * TOTAL_BRACKET_BITS
+    
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        picks_round = participant_bracket.get(round_key, [])
+        offset = ROUND_BIT_OFFSETS[round_idx]
+        
+        for game_idx, pick_game in enumerate(picks_round):
+            if not pick_game:
+                continue
+            
+            pick_winner = get_winner_name(pick_game)
+            if not pick_winner:
+                continue
+            
+            # Compare against the participant's OWN team1/team2 for this game
+            team1_name = get_team_name(pick_game.get('team1'))
+            team2_name = get_team_name(pick_game.get('team2'))
+            
+            bit_pos = offset + game_idx
+            
+            if pick_winner == team1_name:
+                pick_bits[bit_pos] = '1'
+            elif pick_winner == team2_name:
+                pick_bits[bit_pos] = '0'
+            # else: leave as '?' - shouldn't happen if bracket is valid
+    
+    return ''.join(pick_bits)
+
+
+def build_dependency_mask(round_key: str, game_index: int, participant_bracket: dict) -> int:
+    """
+    Build a dependency mask for a specific game pick.
+    
+    The mask has 1s in positions of all games that must be correct for this pick to count.
+    This includes the game itself AND all prior games where the picked team must have won.
+    
+    For example, if participant picked Duke to win in Round 3:
+    - Duke must win R1 (and participant must have picked Duke in R1)
+    - Duke must win R2 (and participant must have picked Duke in R2)
+    - Duke must win R3 (and participant must have picked Duke in R3)
+    
+    Returns:
+        Integer bitmask (63 bits) where bit positions correspond to integer bits
+        (string position p -> integer bit 62-p)
+    """
+    picks_round = participant_bracket.get(round_key, [])
+    if game_index >= len(picks_round):
+        return 0
+    
+    pick_game = picks_round[game_index]
+    if not pick_game:
+        return 0
+    
+    pick_winner = get_winner_name(pick_game)
+    if not pick_winner:
+        return 0
+    
+    # Start with the current game
+    # Convert string position to integer bit position
+    string_pos = get_fixed_bit_position(round_key, game_index)
+    int_bit_pos = 62 - string_pos
+    mask = 1 << int_bit_pos
+    
+    # Trace back through feeder games
+    round_num = ROUND_KEYS.index(round_key) + 1
+    current_round_key = round_key
+    current_game_index = game_index
+    
+    while round_num > 1:
+        # Get feeder games for current game
+        feeder_info = get_feeder_games(current_round_key, current_game_index)
+        if not feeder_info:
+            break
+        
+        prev_round_key, feeder_1, feeder_2 = feeder_info
+        prev_round = participant_bracket.get(prev_round_key, [])
+        
+        # Find which feeder game the picked winner came from
+        found_path = False
+        for feeder_idx in [feeder_1, feeder_2]:
+            if feeder_idx < len(prev_round) and prev_round[feeder_idx]:
+                feeder_game = prev_round[feeder_idx]
+                feeder_winner = get_winner_name(feeder_game)
+                if feeder_winner == pick_winner:
+                    # This is the path - add to mask
+                    string_pos = get_fixed_bit_position(prev_round_key, feeder_idx)
+                    int_bit_pos = 62 - string_pos
+                    mask |= (1 << int_bit_pos)
+                    current_round_key = prev_round_key
+                    current_game_index = feeder_idx
+                    found_path = True
+                    break
+        
+        if not found_path:
+            break
+        
+        round_num -= 1
+    
+    return mask
+
+
+def build_all_dependency_masks(participant_bracket: dict) -> List[int]:
+    """
+    Build dependency masks for all 63 game positions for a participant.
+    
+    Returns:
+        List of 63 integers, each being a bitmask
+    """
+    masks = []
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        num_games = GAMES_PER_ROUND[round_idx]
+        for game_idx in range(num_games):
+            mask = build_dependency_mask(round_key, game_idx, participant_bracket)
+            masks.append(mask)
+    return masks
+
+
+def build_points_arrays(results_bracket: dict, teams_data: dict, apply_seed_bonus: bool) -> Tuple[List[int], List[int], Set[int]]:
+    """
+    Precompute points for each game position if team1 wins vs team2 wins.
+    
+    Returns:
+        Tuple of (points_if_team1_wins, points_if_team2_wins, positions_needing_dynamic_seed_bonus)
+        Each points list is 63 integers
+        positions_needing_dynamic_seed_bonus is a set of string positions where seed bonus couldn't be precomputed
+    """
+    points_team1 = [0] * TOTAL_BRACKET_BITS
+    points_team2 = [0] * TOTAL_BRACKET_BITS
+    positions_needing_dynamic_seed = set()
+    
+    for round_idx, round_key in enumerate(ROUND_KEYS):
+        round_num = round_idx + 1
+        base_points = SCORE_FOR_ROUND[round_num]
+        results_round = results_bracket.get(round_key, [])
+        offset = ROUND_BIT_OFFSETS[round_idx]
+        
+        for game_idx in range(GAMES_PER_ROUND[round_idx]):
+            bit_pos = offset + game_idx
+            
+            game = results_round[game_idx] if game_idx < len(results_round) else None
+            
+            if not game:
+                # Game doesn't exist in results bracket - use base points only
+                points_team1[bit_pos] = base_points
+                points_team2[bit_pos] = base_points
+                if apply_seed_bonus:
+                    positions_needing_dynamic_seed.add(bit_pos)
+                continue
+            
+            team1 = game.get('team1')
+            team2 = game.get('team2')
+            
+            team1_seed = get_team_seed(team1, teams_data) if team1 else None
+            team2_seed = get_team_seed(team2, teams_data) if team2 else None
+            
+            # If either team is unknown, we can't precompute seed bonus
+            if team1_seed is None or team2_seed is None:
+                points_team1[bit_pos] = base_points
+                points_team2[bit_pos] = base_points
+                if apply_seed_bonus:
+                    positions_needing_dynamic_seed.add(bit_pos)
+                continue
+            
+            # Both teams known - precompute full points including seed bonus
+            # Points if team1 wins
+            points_team1[bit_pos] = base_points
+            if apply_seed_bonus:
+                expected_winner_seed = min(team1_seed, team2_seed)
+                if team1_seed > expected_winner_seed:
+                    upset_bonus = (team1_seed - expected_winner_seed) * SEED_FACTOR[round_num]
+                    points_team1[bit_pos] += upset_bonus
+            
+            # Points if team2 wins
+            points_team2[bit_pos] = base_points
+            if apply_seed_bonus:
+                expected_winner_seed = min(team1_seed, team2_seed)
+                if team2_seed > expected_winner_seed:
+                    upset_bonus = (team2_seed - expected_winner_seed) * SEED_FACTOR[round_num]
+                    points_team2[bit_pos] += upset_bonus
+    
+    return points_team1, points_team2, positions_needing_dynamic_seed
+
+
+# Standard seed matchups for Round 1 (repeats for each of 4 regions)
+# Game 0: 1v16, Game 1: 8v9, Game 2: 5v12, Game 3: 4v13
+# Game 4: 6v11, Game 5: 3v14, Game 6: 7v10, Game 7: 2v15
+R1_SEEDS_TEAM1 = [1, 8, 5, 4, 6, 3, 7, 2] * 4  # 32 games
+R1_SEEDS_TEAM2 = [16, 9, 12, 13, 11, 14, 10, 15] * 4  # 32 games
+
+
+def build_score_array_for_outcome(outcome_int: int) -> List[int]:
+    """
+    Build a 63-element array of scores (base + seed bonus) for each game position
+    based on the outcome.
+    
+    This propagates seeds through the bracket based on who won each game,
+    then calculates the appropriate score (with upset bonus) for each position.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        
+    Returns:
+        List of 63 integers, each being the score for that game position
+    """
+    scores = [0] * TOTAL_BRACKET_BITS
+    
+    # Track seeds that advance to each position
+    # For R1, we know the seeds from the fixed bracket structure
+    # For later rounds, we propagate based on who won
+    
+    # Round 1: Seeds are known, just compute scores
+    # Also track which seed advances from each game
+    r1_winners = [0] * 32  # Seed of winner for each R1 game
+    
+    for game_idx in range(32):
+        string_pos = game_idx  # R1 is positions 0-31
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = R1_SEEDS_TEAM1[game_idx]
+        team2_seed = R1_SEEDS_TEAM2[game_idx]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r1_winners[game_idx] = winner_seed
+        
+        # Calculate score
+        base_points = SCORE_FOR_ROUND[1]  # Round 1
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[1]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 2: Teams come from R1 winners
+    # R2 game i gets winners from R1 games 2i and 2i+1
+    r2_winners = [0] * 16
+    
+    for game_idx in range(16):
+        string_pos = 32 + game_idx  # R2 is positions 32-47
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        # Teams are winners of R1 games 2*game_idx and 2*game_idx+1
+        team1_seed = r1_winners[2 * game_idx]
+        team2_seed = r1_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r2_winners[game_idx] = winner_seed
+        
+        # Calculate score
+        base_points = SCORE_FOR_ROUND[2]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[2]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 3: Teams come from R2 winners
+    r3_winners = [0] * 8
+    
+    for game_idx in range(8):
+        string_pos = 48 + game_idx  # R3 is positions 48-55
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = r2_winners[2 * game_idx]
+        team2_seed = r2_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r3_winners[game_idx] = winner_seed
+        
+        base_points = SCORE_FOR_ROUND[3]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[3]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 4: Teams come from R3 winners
+    r4_winners = [0] * 4
+    
+    for game_idx in range(4):
+        string_pos = 56 + game_idx  # R4 is positions 56-59
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = r3_winners[2 * game_idx]
+        team2_seed = r3_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r4_winners[game_idx] = winner_seed
+        
+        base_points = SCORE_FOR_ROUND[4]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[4]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 5 (Final Four): Teams come from R4 winners
+    r5_winners = [0] * 2
+    
+    for game_idx in range(2):
+        string_pos = 60 + game_idx  # R5 is positions 60-61
+        int_bit_pos = 62 - string_pos
+        outcome_bit = (outcome_int >> int_bit_pos) & 1
+        
+        team1_seed = r4_winners[2 * game_idx]
+        team2_seed = r4_winners[2 * game_idx + 1]
+        
+        winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+        r5_winners[game_idx] = winner_seed
+        
+        base_points = SCORE_FOR_ROUND[5]
+        expected_winner_seed = min(team1_seed, team2_seed)
+        
+        if winner_seed > expected_winner_seed:
+            upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[5]
+            scores[string_pos] = base_points + upset_bonus
+        else:
+            scores[string_pos] = base_points
+    
+    # Round 6 (Championship): Teams come from R5 winners
+    string_pos = 62  # R6 is position 62
+    int_bit_pos = 62 - string_pos  # = 0
+    outcome_bit = (outcome_int >> int_bit_pos) & 1
+    
+    team1_seed = r5_winners[0]
+    team2_seed = r5_winners[1]
+    
+    winner_seed = team1_seed if outcome_bit == 1 else team2_seed
+    
+    base_points = SCORE_FOR_ROUND[6]
+    expected_winner_seed = min(team1_seed, team2_seed)
+    
+    if winner_seed > expected_winner_seed:
+        upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[6]
+        scores[string_pos] = base_points + upset_bonus
+    else:
+        scores[string_pos] = base_points
+    
+    return scores
+
+
+def compute_score_xnor_v2(
+    outcome_int: int,
+    pick_int: int,
+    dependency_masks: List[int],
+    score_array: List[int],
+    valid_positions: List[int]
+) -> int:
+    """
+    Compute score using XNOR method with precomputed score array.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        pick_int: 63-bit integer representing participant's picks
+        dependency_masks: List of dependency masks for each position
+        score_array: Precomputed scores for each position (from build_score_array_for_outcome)
+        valid_positions: List of string positions to check (remaining games only)
+        
+    Returns:
+        Score delta for this outcome
+    """
+    # XNOR: bits match where outcome and picks are the same
+    xnor_result = ~(outcome_int ^ pick_int) & ((1 << TOTAL_BRACKET_BITS) - 1)
+    
+    score = 0
+    for string_pos in valid_positions:
+        bit_pos = 62 - string_pos
+        
+        # Check if pick matches outcome at this position
+        if not (xnor_result & (1 << bit_pos)):
+            continue
+        
+        # Check if all dependencies are satisfied
+        dep_mask = dependency_masks[string_pos]
+        if dep_mask == 0:
+            continue
+        
+        # All dependency bits must match
+        if (xnor_result & dep_mask) == dep_mask:
+            score += score_array[string_pos]
+    
+    return score
+
+
+def precompute_participant_scoring_data(
+    name_to_bracket: Dict[str, dict],
+    results_bracket: dict,
+    teams_data: dict,
+    apply_seed_bonus: bool,
+    remaining_positions: Optional[Set[int]] = None
+) -> Dict[str, dict]:
+    """
+    Precompute all scoring data for each participant.
+    
+    Args:
+        name_to_bracket: Dict mapping participant name to their bracket
+        results_bracket: The results bracket
+        teams_data: Team data for seed bonuses
+        apply_seed_bonus: Whether to apply upset bonuses
+        remaining_positions: Set of string positions for remaining games.
+                            If provided, only these positions will be scored.
+    
+    Returns:
+        Dict mapping participant name to:
+        {
+            'pick_bits': str (63 chars),
+            'pick_int': int (63-bit integer for XNOR),
+            'dependency_masks': List[int] (63 masks),
+            'valid_positions': List[int] (bit positions where participant has a pick AND game is remaining)
+        }
+    """
+    scoring_data = {}
+    
+    for name, bracket in name_to_bracket.items():
+        pick_bits = build_participant_pick_bitstring(bracket, results_bracket)
+        
+        # Convert to integer for bitwise operations (bit 0 = position 0)
+        pick_int = int(pick_bits.replace('?', '0'), 2)
+        
+        # Build mask for valid positions (where participant has actual picks, not '?')
+        valid_mask = int(''.join('1' if c != '?' else '0' for c in pick_bits), 2)
+        
+        # Get positions where participant has picks
+        # If remaining_positions is provided, filter to only include those
+        if remaining_positions is not None:
+            valid_positions = [i for i, c in enumerate(pick_bits) if c != '?' and i in remaining_positions]
+        else:
+            valid_positions = [i for i, c in enumerate(pick_bits) if c != '?']
+        
+        # Build dependency masks
+        dependency_masks = build_all_dependency_masks(bracket)
+        
+        scoring_data[name] = {
+            'pick_bits': pick_bits,
+            'pick_int': pick_int,
+            'valid_mask': valid_mask,
+            'dependency_masks': dependency_masks,
+            'valid_positions': valid_positions,
+        }
+    
+    return scoring_data
+
+
+def compute_score_xnor(
+    outcome_int: int,
+    pick_int: int,
+    valid_mask: int,
+    dependency_masks: List[int],
+    points_team1: List[int],
+    points_team2: List[int],
+    valid_positions: List[int]
+) -> int:
+    """
+    Compute score for a participant using XNOR-based bit operations.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        pick_int: 63-bit integer representing participant's picks
+        valid_mask: Mask of valid pick positions
+        dependency_masks: List of dependency masks for each position (indexed by string position)
+        points_team1: Points if team1 wins at each position
+        points_team2: Points if team2 wins at each position
+        valid_positions: List of string positions where participant has picks
+    
+    Returns:
+        Score delta for this outcome (points from remaining games only)
+        
+    Note: String position p maps to bit (62-p) in the integer due to int() conversion.
+    """
+    # XNOR: bits match where outcome and picks are the same
+    # XNOR(a, b) = NOT(a XOR b) = ~(a ^ b)
+    # But we only have 63 bits, so mask to avoid sign issues
+    xnor_result = ~(outcome_int ^ pick_int) & ((1 << TOTAL_BRACKET_BITS) - 1)
+    
+    # Now xnor_result has 1s where picks match outcome
+    # But we need to check dependencies too
+    
+    score = 0
+    for string_pos in valid_positions:
+        # Convert string position to actual bit position in the integer
+        bit_pos = 62 - string_pos
+        
+        # Check if this bit matches
+        if not (xnor_result & (1 << bit_pos)):
+            continue
+        
+        # Check if all dependencies are satisfied
+        dep_mask = dependency_masks[string_pos]
+        if dep_mask == 0:
+            continue
+        
+        # All dependency bits must be set in xnor_result
+        if (xnor_result & dep_mask) == dep_mask:
+            # Award points based on which team won
+            # Check the outcome bit to see if team1 (1) or team2 (0) won
+            if outcome_int & (1 << bit_pos):
+                score += points_team1[string_pos]
+            else:
+                score += points_team2[string_pos]
+    
+    return score
+
+
+def calculate_all_scores_xnor(
+    full_outcome_strings: List[str],
+    name_to_bracket: Dict[str, dict],
+    results_bracket: dict,
+    teams_data: dict,
+    apply_seed_bonus: bool,
+    base_scores: Dict[str, int],
+    remaining_positions: Set[int]
+) -> Dict[str, List[int]]:
+    """
+    Calculate scores for all participants across all outcomes using XNOR method.
+    
+    Args:
+        full_outcome_strings: List of 63-bit outcome strings
+        name_to_bracket: Dict mapping participant name to their bracket
+        results_bracket: The results bracket
+        teams_data: Team data for seed bonuses
+        apply_seed_bonus: Whether to apply upset bonuses
+        base_scores: Pre-computed base scores for each participant
+        remaining_positions: Set of string positions for remaining games (only these are scored)
+        
+    Returns:
+        Dict mapping participant name to list of scores (one per outcome)
+    """
+    # Precompute scoring data for all participants
+    print("    Precomputing participant scoring data...")
+    scoring_data = precompute_participant_scoring_data(
+        name_to_bracket, results_bracket, teams_data, apply_seed_bonus, remaining_positions
+    )
+    
+    # Convert all outcome strings to integers
+    print("    Converting outcomes to integers...")
+    outcome_ints = [int(outcome, 2) for outcome in full_outcome_strings]
+    
+    # Calculate scores
+    print("    Calculating scores...")
+    all_scores = {name: [] for name in name_to_bracket.keys()}
+    total = len(outcome_ints)
+    
+    for i, outcome_int in enumerate(outcome_ints):
+        # Build score array for this outcome (includes seed bonuses computed via propagation)
+        score_array = build_score_array_for_outcome(outcome_int)
+        
+        for name in name_to_bracket.keys():
+            data = scoring_data[name]
+            delta = compute_score_xnor_v2(
+                outcome_int,
+                data['pick_int'],
+                data['dependency_masks'],
+                score_array,
+                data['valid_positions']
+            )
+            score = base_scores[name] + delta
+            all_scores[name].append(score)
+        print_progress(i, total, "    Scoring")
+    
+    return all_scores
+
+
+# =============================================================================
+# FAST PROBABILITY CALCULATION (Top-Down Method)
+# =============================================================================
+
+def build_team_probability_matrix(results_bracket: dict, teams_data: dict) -> List[List[float]]:
+    """
+    Build a 64x7 matrix of probabilities for each team reaching each round.
+    
+    Matrix[team_index][round_reached] = probability
+    
+    round_reached:
+        1 = Lost in R1 (only made it to R64) -> prob = 1.0 (no contribution)
+        2 = Lost in R2 (made it to R32) -> prob = team's prob_r32
+        3 = Lost in R3 (made it to S16) -> prob = team's prob_r16
+        4 = Lost in R4 (made it to E8) -> prob = team's prob_r8
+        5 = Lost in R5 (made it to F4) -> prob = team's prob_r4
+        6 = Lost in R6 (made it to Finals) -> prob = team's prob_r2
+        7 = Won championship -> prob = team's prob_win
+    
+    Returns:
+        64x7 matrix (list of lists)
+    """
+    # Probability column for each round reached (index 0 = round 1, unused but for alignment)
+    # Index 1 = lost in R1 = prob 1.0
+    # Index 2 = reached R32 = prob_r32
+    # etc.
+    prob_columns = [None, None, 'prob_r32', 'prob_r16', 'prob_r8', 'prob_r4', 'prob_r2', 'prob_win']
+    
+    # Get the 64 teams from round 1 of results bracket
+    round1 = results_bracket.get('round1', [])
+    
+    # Build ordered list of 64 teams (by their position in the bracket)
+    team_names = []
+    for game in round1:
+        if game:
+            team1_name = get_team_name(game.get('team1'))
+            team2_name = get_team_name(game.get('team2'))
+            team_names.append(team1_name)
+            team_names.append(team2_name)
+        else:
+            team_names.append(None)
+            team_names.append(None)
+    
+    # Ensure we have 64 teams
+    while len(team_names) < 64:
+        team_names.append(None)
+    
+    # Build probability matrix
+    prob_matrix = []
+    for team_idx in range(64):
+        team_name = team_names[team_idx]
+        team_probs = [1.0] * 8  # Index 0-7, we use 1-7
+        
+        if team_name and team_name in teams_data:
+            team_data = teams_data[team_name]
+            for round_reached in range(2, 8):
+                col = prob_columns[round_reached]
+                if col and col in team_data:
+                    team_probs[round_reached] = team_data[col]
+                else:
+                    team_probs[round_reached] = 1.0  # Default if missing
+        
+        prob_matrix.append(team_probs)
+    
+    return prob_matrix, team_names
+
+
+def get_team_bit_positions() -> List[List[int]]:
+    """
+    Get the 6 bit positions in the 63-bit outcome string for each team's path.
+    
+    For team index i (0-63), returns the bit positions for:
+    [R1 game, R2 game, R3 game, R4 game, R5 game, R6 game]
+    
+    The team index bits (0-5) encode which side of each split they're on.
+    """
+    positions = []
+    
+    for team_idx in range(64):
+        team_positions = []
+        
+        # R1: 32 games (bits 0-31), each team is in game team_idx // 2
+        r1_game = team_idx // 2
+        team_positions.append(r1_game)  # bit position 0-31
+        
+        # R2: 16 games (bits 32-47), team is in game team_idx // 4
+        r2_game = team_idx // 4
+        team_positions.append(32 + r2_game)
+        
+        # R3: 8 games (bits 48-55), team is in game team_idx // 8
+        r3_game = team_idx // 8
+        team_positions.append(48 + r3_game)
+        
+        # R4: 4 games (bits 56-59), team is in game team_idx // 16
+        r4_game = team_idx // 16
+        team_positions.append(56 + r4_game)
+        
+        # R5: 2 games (bits 60-61), team is in game team_idx // 32
+        r5_game = team_idx // 32
+        team_positions.append(60 + r5_game)
+        
+        # R6: 1 game (bit 62)
+        team_positions.append(62)
+        
+        positions.append(team_positions)
+    
+    return positions
+
+
+def get_team_required_bits() -> List[List[int]]:
+    """
+    Get the required bit values for each team to advance at each round.
+    
+    For team index i, at each round, they need either 0 or 1 to advance.
+    This is determined by which "side" of the bracket they're on at that level.
+    
+    Returns:
+        64x6 matrix where [team_idx][round] = 0 or 1 (the bit value needed to advance)
+    """
+    required = []
+    
+    for team_idx in range(64):
+        team_required = []
+        
+        # R1: team_idx % 2 == 0 means they're team1 (need 1 to win), else team2 (need 0)
+        team_required.append(1 if team_idx % 2 == 0 else 0)
+        
+        # R2: (team_idx // 2) % 2 == 0 means left side (need 1), else right (need 0)
+        team_required.append(1 if (team_idx // 2) % 2 == 0 else 0)
+        
+        # R3: (team_idx // 4) % 2
+        team_required.append(1 if (team_idx // 4) % 2 == 0 else 0)
+        
+        # R4: (team_idx // 8) % 2
+        team_required.append(1 if (team_idx // 8) % 2 == 0 else 0)
+        
+        # R5: (team_idx // 16) % 2
+        team_required.append(1 if (team_idx // 16) % 2 == 0 else 0)
+        
+        # R6: (team_idx // 32) % 2 == 0 means left side of championship
+        team_required.append(1 if (team_idx // 32) % 2 == 0 else 0)
+        
+        required.append(team_required)
+    
+    return required
+
+
+def compute_rounds_reached_topdown(outcome_int: int) -> List[int]:
+    """
+    Compute the round reached by each of 64 teams using top-down propagation.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+                     NOTE: String position i becomes bit (62-i) in the integer
+                     So to get the value at string position p, we use >> (62 - p)
+        
+    Returns:
+        List of 64 integers, each being the round reached (1-7)
+        1 = lost in R1, 2 = lost in R2, ..., 7 = won championship
+    """
+    # All teams start with potential to win (round 7)
+    max_round = [7] * 64
+    
+    # Helper to get bit at a given STRING position (which is also our bit_position in the 63-char string)
+    # String position 0-62 maps to bit positions in the int as (62 - string_pos)
+    def get_bit(string_pos):
+        return (outcome_int >> (62 - string_pos)) & 1
+    
+    # Process from championship down to R1
+    # At each level, teams on the losing side get their max reduced
+    
+    # Level 0: Championship (string position 62, which is ROUND_BIT_OFFSETS[5] = 62)
+    # Splits teams into 0-31 (team1 side) vs 32-63 (team2 side)
+    # bit=1 means team1 wins, bit=0 means team2 wins
+    champ_bit = get_bit(62)
+    if champ_bit == 1:
+        # team1 (left side, teams 0-31) won championship
+        # team2 (right side, teams 32-63) max is 6 (finals)
+        for i in range(32, 64):
+            max_round[i] = 6
+    else:
+        # team2 (right side) won
+        for i in range(32):
+            max_round[i] = 6
+    
+    # Level 1: Final Four (string positions 60, 61)
+    # Position 60 is left F4 (teams 0-31), position 61 is right F4 (teams 32-63)
+    for half in range(2):
+        f4_bit = get_bit(60 + half)
+        base = half * 32  # 0 or 32
+        
+        if f4_bit == 1:
+            # team1 of this F4 game won (teams base to base+15)
+            # team2 (teams base+16 to base+31) gets min with 5
+            for i in range(base + 16, base + 32):
+                max_round[i] = min(max_round[i], 5)
+        else:
+            # team2 won
+            for i in range(base, base + 16):
+                max_round[i] = min(max_round[i], 5)
+    
+    # Level 2: Elite 8 (string positions 56-59)
+    for quarter in range(4):
+        e8_bit = get_bit(56 + quarter)
+        base = quarter * 16
+        
+        if e8_bit == 1:
+            # team1 won, team2 side limited to 4
+            for i in range(base + 8, base + 16):
+                max_round[i] = min(max_round[i], 4)
+        else:
+            for i in range(base, base + 8):
+                max_round[i] = min(max_round[i], 4)
+    
+    # Level 3: Sweet 16 (string positions 48-55)
+    for eighth in range(8):
+        s16_bit = get_bit(48 + eighth)
+        base = eighth * 8
+        
+        if s16_bit == 1:
+            for i in range(base + 4, base + 8):
+                max_round[i] = min(max_round[i], 3)
+        else:
+            for i in range(base, base + 4):
+                max_round[i] = min(max_round[i], 3)
+    
+    # Level 4: Round of 32 (string positions 32-47)
+    for sixteenth in range(16):
+        r32_bit = get_bit(32 + sixteenth)
+        base = sixteenth * 4
+        
+        if r32_bit == 1:
+            for i in range(base + 2, base + 4):
+                max_round[i] = min(max_round[i], 2)
+        else:
+            for i in range(base, base + 2):
+                max_round[i] = min(max_round[i], 2)
+    
+    # Level 5: Round of 64 (string positions 0-31)
+    for thirtysecond in range(32):
+        r64_bit = get_bit(thirtysecond)
+        base = thirtysecond * 2
+        
+        if r64_bit == 1:
+            # team1 won, team2 (base+1) lost in R1
+            max_round[base + 1] = min(max_round[base + 1], 1)
+        else:
+            # team2 won, team1 (base) lost in R1
+            max_round[base] = min(max_round[base], 1)
+    
+    return max_round
+
+
+def calculate_probability_fast(outcome_int: int, prob_matrix: List[List[float]]) -> float:
+    """
+    Calculate probability of an outcome using precomputed probability matrix.
+    
+    Args:
+        outcome_int: 63-bit integer representing the outcome
+        prob_matrix: 64x8 matrix of probabilities
+        
+    Returns:
+        Probability of this outcome
+    """
+    rounds_reached = compute_rounds_reached_topdown(outcome_int)
+    
+    probability = 1.0
+    for team_idx in range(64):
+        round_reached = rounds_reached[team_idx]
+        prob = prob_matrix[team_idx][round_reached]
+        probability *= prob
+    
+    return probability
+
+
+def calculate_all_probabilities_fast(
+    full_outcome_strings: List[str],
+    results_bracket: dict,
+    teams_data: dict,
+    has_prob_data: bool,
+    base_probability: float
+) -> List[float]:
+    """
+    Calculate probabilities for all outcomes using fast top-down method.
+    
+    Args:
+        full_outcome_strings: List of 63-bit outcome strings
+        results_bracket: The current results bracket
+        teams_data: Team data with probability columns
+        has_prob_data: Whether probability data is available
+        base_probability: Uniform probability for fallback
+        
+    Returns:
+        List of probabilities (one per outcome)
+    """
+    if not has_prob_data:
+        return [base_probability] * len(full_outcome_strings)
+    
+    # Build probability matrix
+    print("    Building probability matrix...")
+    prob_matrix, team_names = build_team_probability_matrix(results_bracket, teams_data)
+    
+    # Convert outcomes to integers
+    print("    Converting outcomes to integers...")
+    outcome_ints = [int(outcome, 2) for outcome in full_outcome_strings]
+    
+    # Calculate probabilities
+    print("    Calculating probabilities...")
+    probabilities = []
+    total = len(outcome_ints)
+    
+    for i, outcome_int in enumerate(outcome_ints):
+        prob = calculate_probability_fast(outcome_int, prob_matrix)
+        probabilities.append(prob)
+        print_progress(i, total, "    Computing probs")
+    
+    return probabilities
+
+
+def create_hypothetical_bracket(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
+                                 outcome_string: str) -> dict:
+    """
+    Create a hypothetical completed bracket by simulating game outcomes.
+    outcome_string: binary string where '1' means team1 wins, '0' means team2 wins.
+    
+    Games are processed in round order, so earlier round results propagate to later rounds.
+    """
+    import copy
+    hypothetical = copy.deepcopy(results_bracket)
+    
+    for i, (round_key, game_index) in enumerate(remaining_games):
+        game = hypothetical[round_key][game_index]
+        
+        # Get the teams - they should be populated from previous rounds by now
+        team1 = game.get('team1')
+        team2 = game.get('team2')
+        
+        # Skip if teams aren't determined yet (shouldn't happen if processed in order)
+        if not team1 or not team2:
+            continue
+        
+        # Determine winner based on outcome string
+        if outcome_string[i] == '1':
+            winner = team1
+        else:
+            winner = team2
+        
+        game['winner'] = winner
+        
+        # Propagate winner to next round's game
+        parent_info = get_parent_game_info(round_key, game_index)
+        if parent_info:
+            parent_round, parent_index, slot = parent_info
+            
+            # Make sure parent round exists
+            if parent_round not in hypothetical:
+                continue
+            if parent_index >= len(hypothetical[parent_round]):
+                continue
+                
+            parent_game = hypothetical[parent_round][parent_index]
+            
+            if slot == 0:
+                parent_game['team1'] = winner
+            else:
+                parent_game['team2'] = winner
+    
+    # Set overall winner
+    final_game = hypothetical.get('round6', [{}])[0]
+    hypothetical['winner'] = final_game.get('winner')
+    
+    return hypothetical
+
+
+def generate_random_outcome(num_games: int) -> str:
+    """Generate a random outcome string using numpy for speed."""
+    bits = np.random.randint(0, 2, size=num_games, dtype=np.uint8)
+    return (bits + ord('0')).tobytes().decode('ascii')
+
+
+def generate_random_outcomes_batch(num_games: int, num_outcomes: int) -> List[str]:
+    """
+    Generate multiple random outcome strings efficiently using numpy.
+    
+    Args:
+        num_games: Number of games (bits) per outcome
+        num_outcomes: Number of outcomes to generate
+        
+    Returns:
+        List of outcome strings
+    """
+    if num_outcomes == 0:
+        return []
+    
+    # Generate all random bits at once: shape (num_outcomes, num_games)
+    bits = np.random.randint(0, 2, size=(num_outcomes, num_games), dtype=np.uint8)
+    
+    # Convert 0,1 to ASCII '0','1' and decode to strings
+    # This is ~35x faster than looping with join()
+    char_bits = bits + ord('0')
+    outcomes = [row.tobytes().decode('ascii') for row in char_bits]
+    
+    return outcomes
+
+
+def find_remaining_teams(results_bracket: dict) -> List[str]:
+    """
+    Find all teams that are still alive (not eliminated).
+    A team is eliminated if they lost a game.
+    """
+    # Collect all teams that have lost
+    eliminated = set()
+    
+    for round_key in ROUND_KEYS:
+        results_round = results_bracket.get(round_key, [])
+        for game in results_round:
+            if not game:
+                continue
+            winner = get_team_name(game.get('winner'))
+            if winner:
+                team1 = get_team_name(game.get('team1'))
+                team2 = get_team_name(game.get('team2'))
+                if team1 and team1 != winner:
+                    eliminated.add(team1)
+                if team2 and team2 != winner:
+                    eliminated.add(team2)
+    
+    # Collect all teams still in the bracket
+    remaining = set()
+    for round_key in ROUND_KEYS:
+        results_round = results_bracket.get(round_key, [])
+        for game in results_round:
+            if not game:
+                continue
+            # Check team1 and team2 - if they're set and not eliminated, they're remaining
+            team1 = get_team_name(game.get('team1'))
+            team2 = get_team_name(game.get('team2'))
+            if team1 and team1 not in eliminated:
+                remaining.add(team1)
+            if team2 and team2 not in eliminated:
+                remaining.add(team2)
+    
+    return list(remaining)
+
+
+def compute_base_scores(results_bracket: dict, name_to_bracket: dict, teams_data: dict,
+                        apply_seed_bonus: bool, bonus_stars: Optional[Dict[str, int]] = None) -> Dict[str, int]:
+    """
+    Compute the base score for each participant from already-decided games.
+    This is the score locked in before any remaining games are simulated.
+    """
+    base_scores = {}
+    
+    for name, bracket in name_to_bracket.items():
+        score, _, _ = compute_score(results_bracket, bracket, teams_data, apply_seed_bonus)
+        if bonus_stars and name in bonus_stars:
+            score += bonus_stars[name]
+        base_scores[name] = score
+    
+    return base_scores
+
+
+def compute_score_delta(hypothetical_bracket: dict, picks_bracket: dict, teams_data: dict,
+                        apply_seed_bonus: bool, remaining_games: List[Tuple[str, int]]) -> int:
+    """
+    Compute only the score delta from remaining games (faster than full score computation).
+    """
+    delta = 0
+    
+    for round_key, game_index in remaining_games:
+        round_num = ROUND_KEYS.index(round_key) + 1
+        
+        hypo_game = hypothetical_bracket[round_key][game_index]
+        picks_round = picks_bracket.get(round_key, [])
+        
+        if game_index >= len(picks_round):
+            continue
+        
+        pick_game = picks_round[game_index]
+        if not pick_game:
+            continue
+        
+        hypo_winner = get_winner_name(hypo_game)
+        pick_winner = get_winner_name(pick_game)
+        
+        if not hypo_winner or not pick_winner:
+            continue
+        
+        if hypo_winner == pick_winner:
+            points = SCORE_FOR_ROUND[round_num]
+            delta += points
+            
+            # Apply upset bonus
+            if apply_seed_bonus:
+                team1_seed = get_team_seed(hypo_game.get('team1'), teams_data)
+                team2_seed = get_team_seed(hypo_game.get('team2'), teams_data)
+                winner_seed = get_team_seed(hypo_game.get('winner'), teams_data)
+                
+                if team1_seed and team2_seed and winner_seed:
+                    expected_winner_seed = min(team1_seed, team2_seed)
+                    if winner_seed > expected_winner_seed:
+                        upset_bonus = (winner_seed - expected_winner_seed) * SEED_FACTOR[round_num]
+                        delta += upset_bonus
+    
+    return delta
+
+
+def build_team_win_path_template(team_start_game: int, num_remaining_games: int, 
+                                   remaining_games: List[Tuple[str, int]]) -> str:
+    """
+    Build a template string for a team's path to championship.
+    
+    Args:
+        team_start_game: The R1 game index (0-31) where this team starts
+        num_remaining_games: Number of remaining games
+        remaining_games: List of (round_key, game_index) for remaining games
+        
+    Returns:
+        Template string with '1'/'0' for games the team must win, '?' for others
+    """
+    template = ['?'] * num_remaining_games
+    
+    # Track which game index the team would be in for each round
+    # In R1, team is in game team_start_game
+    # team1 side (even position within game's teams) needs bit=1 to win
+    # team2 side (odd position within game's teams) needs bit=0 to win
+    
+    # Determine if team started as team1 or team2 in their R1 game
+    # team1 is always the "upper" team in the bracket pairing
+    # For our purposes, we need to track which "side" of each game the team is on
+    
+    current_game = team_start_game
+    is_team1_side = True  # In R1, we assume the team we're tracking is team1 of their game
+    
+    for round_idx in range(6):  # R1 through R6
+        round_key = ROUND_KEYS[round_idx]
+        
+        # Find this game in remaining_games
+        try:
+            remaining_idx = remaining_games.index((round_key, current_game))
+            # This game is remaining, so we need to set the bit
+            template[remaining_idx] = '1' if is_team1_side else '0'
+        except ValueError:
+            # Game already decided, skip
+            pass
+        
+        # Move to next round
+        # Game index halves each round (game 0,1 -> 0, game 2,3 -> 1, etc.)
+        # Team is on team1 side of next game if they came from even game index
+        is_team1_side = (current_game % 2 == 0)
+        current_game = current_game // 2
+    
+    return ''.join(template)
+
+
+def find_team_start_positions(results_bracket: dict, remaining_teams: List[str]) -> Dict[str, int]:
+    """
+    Find the R1 game index for each remaining team.
+    
+    Args:
+        results_bracket: The results bracket
+        remaining_teams: List of team names still in contention
+        
+    Returns:
+        Dict mapping team name to their R1 game index (0-31)
+    """
+    team_positions = {}
+    round1 = results_bracket.get('round1', [])
+    
+    for game_idx, game in enumerate(round1):
+        if not game:
+            continue
+        team1_name = get_team_name(game.get('team1'))
+        team2_name = get_team_name(game.get('team2'))
+        
+        if team1_name in remaining_teams:
+            team_positions[team1_name] = (game_idx, True)  # (game_index, is_team1)
+        if team2_name in remaining_teams:
+            team_positions[team2_name] = (game_idx, False)  # (game_index, is_team1)
+    
+    return team_positions
+
+
+def build_team_win_path_template_v2(r1_game_idx: int, is_team1: bool, 
+                                     remaining_games: List[Tuple[str, int]]) -> str:
+    """
+    Build a template string for a team's path to championship.
+    
+    Args:
+        r1_game_idx: The R1 game index (0-31) where this team starts
+        is_team1: Whether the team is team1 (True) or team2 (False) in their R1 game
+        remaining_games: List of (round_key, game_index) for remaining games
+        
+    Returns:
+        Template string with '1'/'0' for games the team must win, '?' for others
+    """
+    num_remaining = len(remaining_games)
+    template = ['?'] * num_remaining
+    
+    # Build a quick lookup for remaining games
+    remaining_lookup = {(rk, gi): idx for idx, (rk, gi) in enumerate(remaining_games)}
+    
+    # Track current game index and whether team is on team1 side
+    current_game = r1_game_idx
+    current_is_team1 = is_team1
+    
+    for round_idx in range(6):  # R1 through R6
+        round_key = ROUND_KEYS[round_idx]
+        
+        # Check if this game is in remaining games
+        if (round_key, current_game) in remaining_lookup:
+            remaining_idx = remaining_lookup[(round_key, current_game)]
+            # Team needs to win: team1 wins with '1', team2 wins with '0'
+            template[remaining_idx] = '1' if current_is_team1 else '0'
+        
+        # Move to next round
+        # The team will be team1 in the next round if they came from an even-indexed game
+        current_is_team1 = (current_game % 2 == 0)
+        current_game = current_game // 2
+    
+    return ''.join(template)
+
+
+def generate_champion_stratified_outcomes(results_bracket: dict, remaining_games: List[Tuple[str, int]],
+                                          remaining_teams: List[str], num_per_team: int) -> List[str]:
+    """
+    Generate outcomes stratified by champion - ensure each remaining team wins in some outcomes.
+    
+    Optimized version that:
+    1. Precomputes a "win path template" for each team (just a string with 1s, 0s, and ?s)
+    2. Generates outcomes by filling in the ?s with random bits
+    
+    No bracket copying or propagation needed!
+    """
+    num_games = len(remaining_games)
+    
+    if num_games == 0 or len(remaining_teams) == 0 or num_per_team == 0:
+        return []
+    
+    # Step 1: Find each team's starting position in R1
+    team_positions = find_team_start_positions(results_bracket, remaining_teams)
+    
+    # Step 2: Build win path templates for each team
+    templates = {}
+    for team_name in remaining_teams:
+        if team_name in team_positions:
+            r1_game_idx, is_team1 = team_positions[team_name]
+            templates[team_name] = build_team_win_path_template_v2(
+                r1_game_idx, is_team1, remaining_games
+            )
+    
+    # Step 3: Generate outcomes by filling in templates with random bits
+    outcomes = []
+    
+    # Pre-generate all random bits we'll need
+    total_outcomes = len(templates) * num_per_team
+    all_random_bits = np.random.randint(0, 2, size=(total_outcomes, num_games), dtype=np.uint8)
+    outcome_idx = 0
+    
+    for team_name in remaining_teams:
+        if team_name not in templates:
+            continue
+            
+        template = templates[team_name]
+        
+        # Find positions of '?' in template (positions that need random bits)
+        question_positions = [i for i, c in enumerate(template) if c == '?']
+        fixed_positions = [(i, c) for i, c in enumerate(template) if c != '?']
+        
+        for _ in range(num_per_team):
+            # Start with random bits
+            outcome_array = all_random_bits[outcome_idx].copy()
+            outcome_idx += 1
+            
+            # Override with fixed positions from template
+            for pos, bit in fixed_positions:
+                outcome_array[pos] = int(bit)
+            
+            # Convert to string efficiently
+            outcomes.append((outcome_array + ord('0')).tobytes().decode('ascii'))
+    
+    return outcomes
+
+
+def generate_next_game_stratified_outcomes(results_bracket: dict, remaining_games: List[Tuple[str, int]],
+                                           next_games: List[Tuple[str, int]], num_outcomes: int) -> List[str]:
+    """
+    Generate outcomes stratified by next game results.
+    If we can enumerate all 2^N combinations for N next games, do that.
+    Otherwise, sample uniformly across next game combinations.
+    """
+    num_next = len(next_games)
+    num_remaining = len(remaining_games)
+    
+    # Find indices of next games within remaining games
+    next_game_indices = []
+    for ng in next_games:
+        try:
+            idx = remaining_games.index(ng)
+            next_game_indices.append(idx)
+        except ValueError:
+            pass
+    
+    outcomes = []
+    total_next_combos = 2 ** num_next
+    
+    if total_next_combos <= num_outcomes:
+        # Enumerate all combinations of next game outcomes
+        outcomes_per_combo = max(1, num_outcomes // total_next_combos)
+        
+        # Pre-generate all random bits
+        total_random = total_next_combos * outcomes_per_combo
+        all_random_bits = np.random.randint(0, 2, size=(total_random, num_remaining), dtype=np.uint8)
+        random_idx = 0
+        
+        for combo_idx in range(total_next_combos):
+            next_game_bits = format(combo_idx, f'0{num_next}b')
+            
+            for _ in range(outcomes_per_combo):
+                # Get random outcome from pre-generated array
+                outcome_list = all_random_bits[random_idx].tolist()
+                random_idx += 1
+                
+                # Override with the specific next game combination
+                for i, ng_idx in enumerate(next_game_indices):
+                    outcome_list[ng_idx] = int(next_game_bits[i])
+                
+                outcomes.append(''.join(str(b) for b in outcome_list))
+    else:
+        # Sample uniformly across next game combinations using batch generation
+        outcomes = generate_random_outcomes_batch(num_remaining, num_outcomes)
+    
+    return outcomes
+
+
+def decode_outcome_to_games(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
+                            outcome_string: str) -> List[dict]:
+    """
+    Decode an outcome string into a list of game results.
+    Returns list of dicts with round, game index, and winner info.
+    """
+    import copy
+    hypothetical = copy.deepcopy(results_bracket)
+    game_results = []
+    
+    for i, (round_key, game_index) in enumerate(remaining_games):
+        game = hypothetical[round_key][game_index]
+        
+        team1 = game.get('team1')
+        team2 = game.get('team2')
+        
+        if not team1 or not team2:
+            continue
+        
+        if outcome_string[i] == '1':
+            winner = team1
+            loser = team2
+        else:
+            winner = team2
+            loser = team1
+        
+        game['winner'] = winner
+        
+        # Record this game result
+        round_num = ROUND_KEYS.index(round_key) + 1
+        game_results.append({
+            'round': round_num,
+            'roundKey': round_key,
+            'gameIndex': game_index,
+            'team1': get_team_name(team1),
+            'team2': get_team_name(team2),
+            'winner': get_team_name(winner),
+            'loser': get_team_name(loser),
+            'team1Seed': team1.get('seed') if team1 else None,
+            'team2Seed': team2.get('seed') if team2 else None,
+            'winnerSeed': winner.get('seed') if winner else None
+        })
+        
+        # Propagate winner to next round
+        parent_info = get_parent_game_info(round_key, game_index)
+        if parent_info:
+            parent_round, parent_index, slot = parent_info
+            
+            if parent_round in hypothetical and parent_index < len(hypothetical[parent_round]):
+                parent_game = hypothetical[parent_round][parent_index]
+                if slot == 0:
+                    parent_game['team1'] = winner
+                else:
+                    parent_game['team2'] = winner
+    
+    return game_results
+
+
+def can_merge_outcomes(outcome1: str, outcome2: str) -> Optional[int]:
+    """
+    Check if two outcome strings can be merged (differ by exactly 1 position).
+    Returns the differing position index if mergeable, None otherwise.
+    Both outcomes can contain 'X' for "either" positions.
+    """
+    if len(outcome1) != len(outcome2):
+        return None
+    
+    diff_positions = []
+    for i, (c1, c2) in enumerate(zip(outcome1, outcome2)):
+        if c1 != c2:
+            # Can only merge if both are concrete values (0 or 1), not X
+            if c1 == 'X' or c2 == 'X':
+                return None
+            diff_positions.append(i)
+            if len(diff_positions) > 1:
+                return None  # Early exit if more than 1 difference
+    
+    if len(diff_positions) == 1:
+        return diff_positions[0]
+    return None
+
+
+def merge_two_outcomes(outcome1: str, outcome2: str, diff_pos: int) -> str:
+    """
+    Merge two outcomes that differ at exactly one position.
+    Returns new outcome with 'X' at the differing position.
+    """
+    result = list(outcome1)
+    result[diff_pos] = 'X'
+    return ''.join(result)
+
+
+def get_merge_key(outcome: str, pos: int) -> str:
+    """
+    Get a key for grouping outcomes that could potentially merge at position pos.
+    Returns the outcome with position pos replaced with 'X'.
+    """
+    result = list(outcome)
+    result[pos] = 'X'
+    return ''.join(result)
+
+
+import heapq
+
+class MergeCandidateTracker:
+    """
+    Efficiently tracks merge candidates using incremental group maintenance.
+    
+    Maintains:
+    - groups[pos][key] = set of outcomes that share this merge key at position pos
+    - A max-heap of merge candidates (negative prob for max-heap behavior)
+    - probabilities[outcome] = probability of each outcome
+    """
+    
+    def __init__(self, outcomes_with_probs: Dict[str, float]):
+        self.probabilities = dict(outcomes_with_probs)
+        self.num_positions = len(next(iter(outcomes_with_probs))) if outcomes_with_probs else 0
+        
+        # groups[pos][key] = set of outcomes with that merge key at position pos
+        self.groups: List[Dict[str, set]] = [{} for _ in range(self.num_positions)]
+        
+        # Priority queue: (-combined_prob, outcome1, outcome2, position)
+        # Using negative prob because heapq is a min-heap
+        self.heap = []
+        
+        # Track valid candidates (some in heap may be stale)
+        self.valid_outcomes = set(outcomes_with_probs.keys())
+        
+        # Build initial groups
+        self._build_initial_groups()
+    
+    def _build_initial_groups(self):
+        """Build initial groups for all positions. O(N * L)"""
+        for outcome in self.probabilities:
+            self._add_outcome_to_groups(outcome)
+        
+        # Find all initial merge candidates
+        self._find_all_merge_candidates()
+    
+    def _add_outcome_to_groups(self, outcome: str):
+        """Add an outcome to all relevant position groups. O(L)"""
+        for pos in range(self.num_positions):
+            if outcome[pos] == 'X':
+                continue  # Skip positions that are already merged
+            key = get_merge_key(outcome, pos)
+            if key not in self.groups[pos]:
+                self.groups[pos][key] = set()
+            self.groups[pos][key].add(outcome)
+    
+    def _remove_outcome_from_groups(self, outcome: str):
+        """Remove an outcome from all position groups. O(L)"""
+        for pos in range(self.num_positions):
+            if outcome[pos] == 'X':
+                continue
+            key = get_merge_key(outcome, pos)
+            if key in self.groups[pos]:
+                self.groups[pos][key].discard(outcome)
+                # Clean up empty groups
+                if not self.groups[pos][key]:
+                    del self.groups[pos][key]
+    
+    def _find_all_merge_candidates(self):
+        """Find all merge candidates from current groups. O(N * L) total."""
+        for pos in range(self.num_positions):
+            for key, members in self.groups[pos].items():
+                if len(members) == 2:
+                    self._add_candidate_from_group(pos, members)
+    
+    def _add_candidate_from_group(self, pos: int, members: set):
+        """Add a merge candidate to the heap if valid."""
+        if len(members) != 2:
+            return
+        members_list = sorted(members)  # Sort for deterministic ordering
+        out1, out2 = members_list[0], members_list[1]
+        
+        # Verify both are still valid
+        if out1 not in self.valid_outcomes or out2 not in self.valid_outcomes:
+            return
+        
+        combined_prob = self.probabilities[out1] + self.probabilities[out2]
+        # Use negative for max-heap behavior
+        # Tiebreaker: prefer lower positions (add pos as secondary sort key)
+        # Then prefer lower out1 (lexicographic order) for determinism
+        heapq.heappush(self.heap, (-combined_prob, pos, out1, out2))
+    
+    def _check_and_add_candidates_for_outcome(self, outcome: str):
+        """Check if this outcome forms any new merge candidates. O(L)"""
+        for pos in range(self.num_positions):
+            if outcome[pos] == 'X':
+                continue
+            key = get_merge_key(outcome, pos)
+            if key in self.groups[pos] and len(self.groups[pos][key]) == 2:
+                self._add_candidate_from_group(pos, self.groups[pos][key])
+    
+    def get_best_merge(self) -> Optional[Tuple[str, str, int, float]]:
+        """
+        Get the best (highest probability) merge candidate.
+        Returns (outcome1, outcome2, position, combined_prob) or None if no merges available.
+        Handles stale entries in the heap. O(log N) amortized.
+        """
+        while self.heap:
+            neg_prob, pos, out1, out2 = heapq.heappop(self.heap)
+            
+            # Check if this candidate is still valid (not stale)
+            if out1 in self.valid_outcomes and out2 in self.valid_outcomes:
+                # Verify they're still in the same group (extra safety check)
+                key = get_merge_key(out1, pos)
+                if key in self.groups[pos] and out1 in self.groups[pos][key] and out2 in self.groups[pos][key]:
+                    return (out1, out2, pos, -neg_prob)
+        
+        return None
+    
+    def perform_merge(self, out1: str, out2: str, pos: int) -> str:
+        """
+        Perform a merge and update all data structures. O(L)
+        Returns the merged outcome.
+        """
+        # Create merged outcome
+        merged = merge_two_outcomes(out1, out2, pos)
+        
+        # Calculate new probability
+        prob1 = self.probabilities.pop(out1)
+        prob2 = self.probabilities.pop(out2)
+        new_prob = prob1 + prob2
+        
+        # Remove old outcomes from tracking
+        self.valid_outcomes.discard(out1)
+        self.valid_outcomes.discard(out2)
+        
+        # Remove old outcomes from groups
+        self._remove_outcome_from_groups(out1)
+        self._remove_outcome_from_groups(out2)
+        
+        # Add merged outcome (or combine if it already exists)
+        if merged in self.probabilities:
+            self.probabilities[merged] += new_prob
+        else:
+            self.probabilities[merged] = new_prob
+            self.valid_outcomes.add(merged)
+            self._add_outcome_to_groups(merged)
+            self._check_and_add_candidates_for_outcome(merged)
+        
+        return merged
+    
+    def get_results(self) -> Dict[str, float]:
+        """Get the final outcomes with probabilities."""
+        return self.probabilities
+
+
+def find_outcomes_with_neighbors(outcomes_with_probs: Dict[str, float]) -> Tuple[Set[str], Set[str]]:
+    """
+    Identify which outcomes have at least one 1-bit neighbor (potential merge partner).
+    
+    Args:
+        outcomes_with_probs: Dict mapping outcome strings to their probabilities
+        
+    Returns:
+        Tuple of (outcomes_with_neighbors, outcomes_without_neighbors)
+    """
+    if len(outcomes_with_probs) <= 1:
+        return set(outcomes_with_probs.keys()), set()
+    
+    outcomes = list(outcomes_with_probs.keys())
+    outcome_length = len(outcomes[0])
+    
+    # For each position, group outcomes by their "merge key" (outcome with that position as X)
+    # If a group has 2+ members, those outcomes have a potential merge partner
+    has_neighbor = set()
+    
+    for pos in range(outcome_length):
+        groups = {}
+        for outcome in outcomes:
+            if outcome[pos] == 'X':
+                continue  # Skip already merged positions
+            # Create key by replacing this position with X
+            key = outcome[:pos] + 'X' + outcome[pos+1:]
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(outcome)
+        
+        # Any group with 2+ members means those outcomes have a 1-bit neighbor
+        for key, members in groups.items():
+            if len(members) >= 2:
+                has_neighbor.update(members)
+    
+    # Outcomes without neighbors are those not in has_neighbor
+    without_neighbor = set(outcomes) - has_neighbor
+    
+    return has_neighbor, without_neighbor
+
+
+def prefilter_unmergeable_outcomes(outcomes_with_probs: Dict[str, float], 
+                                    max_unmergeable_to_keep: int = 100) -> Dict[str, float]:
+    """
+    Pre-filter outcomes that have no merge partners, keeping only top N by probability.
+    
+    Outcomes with no 1-bit neighbors can never participate in any merge, so we can
+    safely discard all but the top N of them before the expensive merge process.
+    
+    Args:
+        outcomes_with_probs: Dict mapping outcome strings to their probabilities
+        max_unmergeable_to_keep: Maximum number of unmergeable outcomes to keep
+        
+    Returns:
+        Filtered dict of outcomes with probabilities
+    """
+    if len(outcomes_with_probs) <= max_unmergeable_to_keep:
+        return dict(outcomes_with_probs)
+    
+    has_neighbor, without_neighbor = find_outcomes_with_neighbors(outcomes_with_probs)
+    
+    if len(without_neighbor) <= max_unmergeable_to_keep:
+        # Nothing to filter
+        return dict(outcomes_with_probs)
+    
+    # Keep all outcomes that have neighbors (they might merge)
+    filtered = {o: outcomes_with_probs[o] for o in has_neighbor}
+    
+    # For outcomes without neighbors, keep only top N by probability
+    without_neighbor_list = [(o, outcomes_with_probs[o]) for o in without_neighbor]
+    without_neighbor_list.sort(key=lambda x: x[1], reverse=True)
+    
+    for outcome, prob in without_neighbor_list[:max_unmergeable_to_keep]:
+        filtered[outcome] = prob
+    
+    num_discarded = len(without_neighbor) - max_unmergeable_to_keep
+    if num_discarded > 0:
+        print(f"    Pre-filtered {num_discarded} unmergeable low-probability outcomes")
+    
+    return filtered
+
+
+def merge_outcomes(outcomes_with_probs: Dict[str, float], 
+                   remaining_games: List[Tuple[str, int]] = None,
+                   max_unmergeable_to_keep: int = None,
+                   return_timing: bool = False) -> Union[Dict[str, float], Tuple[Dict[str, float], Dict[str, float]]]:
+    """
+    Merge outcomes by processing positions in round order.
+    For each position, finds all pairs that differ only at that position and merges them.
+    
+    Args:
+        outcomes_with_probs: Dict mapping outcome strings to their probabilities
+        remaining_games: List of (round_key, game_index) tuples indicating which games 
+                        each position in the outcome string represents
+        max_unmergeable_to_keep: If set, pre-filter unmergeable outcomes keeping only top N.
+                                 Disabled by default (None) as the merge is fast enough.
+        return_timing: If True, return (merged_outcomes, timing_dict)
+        
+    Returns:
+        Dict of merged outcomes with combined probabilities
+        If return_timing=True: Tuple of (merged_outcomes, timing_dict)
+    """
+    import time
+    timing = {'prefilter': 0.0, 'merge_loop': 0.0}
+    
+    if len(outcomes_with_probs) <= 1:
+        if return_timing:
+            return dict(outcomes_with_probs), timing
+        return dict(outcomes_with_probs)
+    
+    # Pre-filter: optionally remove low-probability outcomes that can never merge
+    t_start = time.time()
+    if max_unmergeable_to_keep is not None:
+        current_outcomes = prefilter_unmergeable_outcomes(outcomes_with_probs, max_unmergeable_to_keep)
+    else:
+        current_outcomes = dict(outcomes_with_probs)
+    timing['prefilter'] = time.time() - t_start
+    
+    if len(current_outcomes) <= 1:
+        if return_timing:
+            return current_outcomes, timing
+        return current_outcomes
+    
+    t_start = time.time()
+    outcome_length = len(next(iter(current_outcomes)))
+    
+    # If no remaining_games provided, fall back to merging all positions together
+    if remaining_games is None:
+        positions_by_round = {1: list(range(outcome_length))}
+    else:
+        # Group positions by round number
+        positions_by_round = {}
+        for pos, (round_key, game_idx) in enumerate(remaining_games):
+            round_num = int(round_key.replace('round', ''))
+            if round_num not in positions_by_round:
+                positions_by_round[round_num] = []
+            positions_by_round[round_num].append(pos)
+    
+    total_merge_count = 0
+    
+    # Build list of positions in round order
+    positions_in_order = []
+    for round_num in sorted(positions_by_round.keys()):
+        positions_in_order.extend(positions_by_round[round_num])
+    
+    # Vectorized merge using numpy
+    # Convert outcomes to numpy array for efficient batch operations
+    X_code = ord('X')
+    zero_code = ord('0')
+    one_code = ord('1')
+    
+    outcomes_list = list(current_outcomes.keys())
+    n = len(outcomes_list)
+    
+    # Create 2D array of ASCII codes for all outcome strings
+    all_chars = ''.join(outcomes_list)
+    o_arr = np.frombuffer(all_chars.encode('ascii'), dtype=np.uint8).reshape(n, outcome_length).copy()
+    probs = np.array([current_outcomes[o] for o in outcomes_list], dtype=np.float64)
+    
+    # Process one position at a time
+    for pos in positions_in_order:
+        n_current = len(o_arr)
+        if n_current < 2:
+            break
+        
+        # Find outcomes with 0 or 1 at this position (not X or D)
+        col = o_arr[:, pos]
+        valid_mask = (col == zero_code) | (col == one_code)
+        
+        if valid_mask.sum() < 2:
+            continue
+        
+        # Create keys array: replace position with X (vectorized)
+        keys_arr = o_arr.copy()
+        keys_arr[:, pos] = X_code
+        keys_bytes = keys_arr.view('S' + str(outcome_length)).flatten()
+        
+        # Sort by keys to group identical keys together
+        sort_idx = np.argsort(keys_bytes)
+        sorted_keys = keys_bytes[sort_idx]
+        sorted_valid = valid_mask[sort_idx]
+        sorted_probs = probs[sort_idx]
+        
+        # Find group boundaries where keys change
+        key_changes = np.concatenate([[True], sorted_keys[1:] != sorted_keys[:-1]])
+        group_ids = np.cumsum(key_changes) - 1
+        n_groups = group_ids[-1] + 1
+        
+        # Count valid items per group (vectorized)
+        valid_counts = np.bincount(group_ids, weights=sorted_valid.astype(float), minlength=n_groups).astype(int)
+        
+        # Groups with 2+ valid items can merge
+        mergeable_groups = valid_counts >= 2
+        
+        if not mergeable_groups.any():
+            continue
+        
+        # Compute within-group index for each valid item (vectorized)
+        valid_int = sorted_valid.astype(int)
+        cumsum_valid = np.cumsum(valid_int)
+        
+        group_start_cumsum = np.zeros(n_groups + 1, dtype=int)
+        group_start_cumsum[1:] = np.bincount(group_ids, weights=valid_int.astype(float), minlength=n_groups).astype(int).cumsum()
+        within_group_idx = cumsum_valid - group_start_cumsum[group_ids] - 1
+        within_group_idx = np.where(sorted_valid, within_group_idx, -1)
+        
+        # Determine pair index and position within pair
+        pair_idx = within_group_idx // 2
+        pos_in_pair = within_group_idx % 2  # 0 = first, 1 = second
+        
+        # Max pairs per group
+        max_pairs = valid_counts // 2
+        
+        # Can pair: valid, in mergeable group, and pair_idx < max_pairs for that group
+        in_mergeable = mergeable_groups[group_ids]
+        can_pair = sorted_valid & in_mergeable & (pair_idx < max_pairs[group_ids]) & (pair_idx >= 0)
+        
+        is_first = can_pair & (pos_in_pair == 0)
+        is_second = can_pair & (pos_in_pair == 1)
+        
+        first_indices = np.where(is_first)[0]
+        second_indices = np.where(is_second)[0]
+        
+        if len(first_indices) == 0:
+            continue
+        
+        # Sum probabilities for pairs (vectorized)
+        merged_probs = sorted_probs[first_indices] + sorted_probs[second_indices]
+        
+        # Get merged keys (from first of each pair)
+        merged_keys_arr = keys_arr[sort_idx[first_indices]]
+        
+        # Mark items to remove
+        to_remove = np.zeros(n_current, dtype=bool)
+        to_remove[first_indices] = True
+        to_remove[second_indices] = True
+        
+        # Unsort the removal mask back to original order
+        unsort_idx = np.argsort(sort_idx)
+        to_remove_original = to_remove[unsort_idx]
+        
+        # Remove merged originals, keep the rest
+        keep_mask = ~to_remove_original
+        o_arr = o_arr[keep_mask]
+        probs = probs[keep_mask]
+        
+        # Add merged outcomes
+        o_arr = np.vstack([o_arr, merged_keys_arr])
+        probs = np.concatenate([probs, merged_probs])
+        
+        total_merge_count += len(merged_probs)
+    
+    # Convert back to dict
+    current_outcomes = {}
+    for i in range(len(o_arr)):
+        key = o_arr[i].tobytes().decode('ascii')
+        if key in current_outcomes:
+            current_outcomes[key] += probs[i]
+        else:
+            current_outcomes[key] = probs[i]
+    
+    timing['merge_loop'] = time.time() - t_start
+    
+    if total_merge_count > 0:
+        print(f"    Merged {total_merge_count} outcome pairs")
+    
+    if return_timing:
+        return current_outcomes, timing
+    return current_outcomes
+
+
+def get_top_scenarios(outcomes_with_probs: Dict[str, float], max_scenarios: int) -> List[Tuple[str, float]]:
+    """
+    Get the top N most probable scenarios.
+    
+    Returns:
+        List of (outcome_string, probability) tuples, sorted by probability descending
+    """
+    sorted_outcomes = sorted(outcomes_with_probs.items(), key=lambda x: x[1], reverse=True)
+    return sorted_outcomes[:max_scenarios]
+
+
+def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
+                                    outcome_string: str) -> List[dict]:
+    """
+    Decode a potentially merged outcome string (containing 'X' for either) into a list of game results.
+    Returns list of dicts with round, game index, and winner info.
+    For positions with 'X', winner is set to 'either' and both teams are valid.
+    When an 'either' game propagates to later rounds, both team names are combined with '/'.
+    """
+    import copy
+    hypothetical = copy.deepcopy(results_bracket)
+    game_results = []
+    
+    def get_combined_name(team):
+        """Get team name, handling combined 'either' teams."""
+        if isinstance(team, dict):
+            if team.get('either_teams'):
+                # This is a combined either team
+                return team.get('name', '')
+            return get_team_name(team)
+        return str(team) if team else None
+    
+    def get_combined_seed(team):
+        """Get team seed, handling combined 'either' teams."""
+        if isinstance(team, dict):
+            if team.get('either_teams'):
+                # Return seeds as combined string
+                return team.get('seed', '')
+            return team.get('seed')
+        return None
+    
+    for i, (round_key, game_index) in enumerate(remaining_games):
+        game = hypothetical[round_key][game_index]
+        
+        team1 = game.get('team1')
+        team2 = game.get('team2')
+        
+        if not team1 or not team2:
+            continue
+        
+        outcome_char = outcome_string[i]
+        
+        # Check if either team came from an "either" game (combined teams)
+        team1_is_either = isinstance(team1, dict) and team1.get('either_teams')
+        team2_is_either = isinstance(team2, dict) and team2.get('either_teams')
+        
+        if outcome_char == 'D':
+            # Dead path - this game doesn't matter and participant has no stake
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
+                'winner': 'dead',
+                'dead': True,
+                'either': False,
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
+            })
+            
+            # For dead paths, just propagate team1 - it doesn't matter since
+            # downstream games will also be dead
+            winner = team1
+        elif outcome_char == 'X':
+            # Either team can win - this game doesn't matter for the outcome
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
+                'winner': 'either',
+                'either': True,
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
+            })
+            
+            # For propagation, create a combined team representing both possibilities
+            # Combine all possible teams from both sides
+            team1_names = team1.get('either_teams', [get_team_name(team1)]) if isinstance(team1, dict) else [get_team_name(team1)]
+            team2_names = team2.get('either_teams', [get_team_name(team2)]) if isinstance(team2, dict) else [get_team_name(team2)]
+            all_teams = team1_names + team2_names
+            
+            team1_seeds = team1.get('either_seeds', [team1.get('seed')]) if isinstance(team1, dict) else [team1.get('seed') if isinstance(team1, dict) else None]
+            team2_seeds = team2.get('either_seeds', [team2.get('seed')]) if isinstance(team2, dict) else [team2.get('seed') if isinstance(team2, dict) else None]
+            all_seeds = team1_seeds + team2_seeds
+            
+            winner = {
+                'name': '/'.join(all_teams),
+                'seed': '/'.join(str(s) for s in all_seeds if s),
+                'either_teams': all_teams,
+                'either_seeds': all_seeds
+            }
+        elif outcome_char == '0':
+            winner = team1
+            loser = team2
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
+                'winner': get_combined_name(winner),
+                'loser': get_combined_name(loser),
+                'either': False,
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'winnerSeed': get_combined_seed(winner),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
+                'winnerIsEither': team1_is_either,
+                # Include the list of teams if winner came from either
+                'winnerEitherTeams': team1.get('either_teams') if team1_is_either else None
+            })
+        else:  # '1'
+            winner = team2
+            loser = team1
+            game_results.append({
+                'round': ROUND_KEYS.index(round_key) + 1,
+                'roundKey': round_key,
+                'gameIndex': game_index,
+                'team1': get_combined_name(team1),
+                'team2': get_combined_name(team2),
+                'winner': get_combined_name(winner),
+                'loser': get_combined_name(loser),
+                'either': False,
+                'team1Seed': get_combined_seed(team1),
+                'team2Seed': get_combined_seed(team2),
+                'winnerSeed': get_combined_seed(winner),
+                'team1IsEither': team1_is_either,
+                'team2IsEither': team2_is_either,
+                'winnerIsEither': team2_is_either,
+                # Include the list of teams if winner came from either
+                'winnerEitherTeams': team2.get('either_teams') if team2_is_either else None
+            })
+        
+        # Propagate winner to next round
+        parent_info = get_parent_game_info(round_key, game_index)
+        if parent_info:
+            parent_round, parent_index, slot = parent_info
+            
+            if parent_round in hypothetical and parent_index < len(hypothetical[parent_round]):
+                parent_game = hypothetical[parent_round][parent_index]
+                if slot == 0:
+                    parent_game['team1'] = winner
+                else:
+                    parent_game['team2'] = winner
+    
+    return game_results
+
+
+def process_outcomes(
+    raw_outcomes: Dict[str, Dict[str, float]],  # name -> {outcome: probability}
+    results_bracket: dict,
+    remaining_games: List[Tuple[str, int]],
+    max_scenarios: int,
+    outcome_type: str = "winning",
+    return_timing: bool = False
+) -> Union[Dict[str, List[dict]], Tuple[Dict[str, List[dict]], Dict[str, float]]]:
+    """
+    Process raw outcomes: merge similar ones and keep top N.
+    
+    Args:
+        raw_outcomes: Dict mapping participant name to {outcome_string: probability}
+        results_bracket: The results bracket for decoding games
+        remaining_games: List of remaining games
+        max_scenarios: Maximum scenarios to keep per participant
+        outcome_type: Type of outcome for logging ("winning" or "losing")
+        return_timing: If True, return (processed, timing_dict)
+        
+    Returns:
+        Dict mapping participant name to list of scenario dicts with probability
+        If return_timing=True: Tuple of (processed, timing_dict)
+    """
+    import time
+    processed = {}
+    total_prefilter_time = 0.0
+    total_merge_time = 0.0
+    total_decode_time = 0.0
+    
+    for name, outcomes in raw_outcomes.items():
+        if not outcomes:
+            processed[name] = []
+            continue
+        
+        print(f"  Processing {name}: {len(outcomes)} raw {outcome_type} outcomes")
+        
+        # Merge similar outcomes (using round-by-round approach)
+        merged, merge_timing = merge_outcomes(outcomes, remaining_games, return_timing=True)
+        total_prefilter_time += merge_timing['prefilter']
+        total_merge_time += merge_timing['merge_loop']
+        print(f"    After merging: {len(merged)} outcomes")
+        
+        # Get top scenarios
+        top = get_top_scenarios(merged, max_scenarios)
+        print(f"    Keeping top {len(top)} scenarios")
+        
+        # Decode each scenario to game results
+        t_decode_start = time.time()
+        scenarios = []
+        for outcome_str, probability in top:
+            games = decode_merged_outcome_to_games(results_bracket, remaining_games, outcome_str)
+            scenarios.append({
+                'outcome': outcome_str,
+                'probability': probability,
+                'games': games
+            })
+        total_decode_time += time.time() - t_decode_start
+        
+        processed[name] = scenarios
+    
+    if return_timing:
+        timing = {
+            'prefilter': total_prefilter_time,
+            'merge_loop': total_merge_time,
+            'decode': total_decode_time
+        }
+        return processed, timing
+    return processed
+
+
+def find_next_games(results_bracket: dict) -> List[Tuple[str, int, dict, dict]]:
+    """
+    Find games that are "next up" - both parent games have been decided.
+    Returns list of (round_key, game_index, team1, team2) tuples.
+    """
+    next_games = []
+    
+    for round_key in ROUND_KEYS:
+        round_num = ROUND_KEYS.index(round_key) + 1
+        results_round = results_bracket.get(round_key, [])
+        
+        for i, game in enumerate(results_round):
+            if not game:
+                continue
+            
+            # Skip if already has a winner
+            if get_winner_name(game):
+                continue
+            
+            team1 = game.get('team1')
+            team2 = game.get('team2')
+            
+            # Both teams must be determined
+            if not team1 or not team2:
+                continue
+            
+            # For round 1, all games with teams are "next"
+            if round_num == 1:
+                next_games.append((round_key, i, team1, team2))
+                continue
+            
+            # For later rounds, check if both feeder games have winners
+            feeder_info = get_feeder_games(round_key, i)
+            if feeder_info:
+                prev_round_key, f1_idx, f2_idx = feeder_info
+                prev_round = results_bracket.get(prev_round_key, [])
+                
+                f1_game = prev_round[f1_idx] if f1_idx < len(prev_round) else None
+                f2_game = prev_round[f2_idx] if f2_idx < len(prev_round) else None
+                
+                if f1_game and f2_game and get_winner_name(f1_game) and get_winner_name(f2_game):
+                    next_games.append((round_key, i, team1, team2))
+    
+    return next_games
+
+
+def compute_next_game_preferences(
+    raw_outcomes: Dict[str, Dict[str, float]],
+    remaining_games: List[Tuple[str, int]],
+    next_games: List[Tuple[str, int, dict, dict]],
+    results_bracket: dict,
+    outcome_type: str = "winning"
+) -> Dict[str, dict]:
+    """
+    Compute conditional probabilities for each participant given each next game outcome.
+    
+    For winning outcomes: P(participant wins | team X wins this game)
+    For losing outcomes: P(participant loses | team X wins this game)
+    
+    Args:
+        raw_outcomes: Dict of {participant: {outcome_string: probability}}
+        remaining_games: List of (round_key, game_index) tuples for all remaining games
+        next_games: List of (round_key, game_index, team1, team2) for next games
+        results_bracket: The results bracket
+        outcome_type: "winning" or "losing" - for logging purposes
+        
+    Returns:
+        Dict mapping game keys to preference data:
+        {
+            "r3-2": {
+                "team1": "Florida",
+                "team2": "Clemson", 
+                "preferences": {
+                    "alice": {"team1": 0.65, "team2": 0.35},
+                    "bob": null
+                }
+            }
+        }
+    """
+    # Build a mapping from (round_key, game_index) to position in outcome string
+    game_to_position = {(rk, gi): pos for pos, (rk, gi) in enumerate(remaining_games)}
+    
+    preferences = {}
+    
+    for round_key, game_index, team1, team2 in next_games:
+        game_key = f"r{ROUND_KEYS.index(round_key) + 1}-{game_index}"
+        
+        # Check if this game is in remaining games
+        if (round_key, game_index) not in game_to_position:
+            continue
+        
+        position = game_to_position[(round_key, game_index)]
+        
+        game_prefs = {
+            "team1": get_team_name(team1),
+            "team2": get_team_name(team2),
+            "team1Seed": team1.get('seed') if team1 else None,
+            "team2Seed": team2.get('seed') if team2 else None,
+            "preferences": {}
+        }
+        
+        # First pass: collect numerators for each participant
+        # numerator = sum of prob of participant's outcomes where team X wins
+        participant_team1_probs = {}  # name -> P(name wins/loses AND team1 wins)
+        participant_team2_probs = {}  # name -> P(name wins/loses AND team2 wins)
+        
+        for name, outcomes in raw_outcomes.items():
+            if not outcomes:
+                participant_team1_probs[name] = 0.0
+                participant_team2_probs[name] = 0.0
+                continue
+            
+            team1_prob = 0.0  # outcome char '1' means team1 wins
+            team2_prob = 0.0  # outcome char '0' means team2 wins
+            
+            for outcome_str, prob in outcomes.items():
+                if position < len(outcome_str):
+                    if outcome_str[position] == '1':
+                        team1_prob += prob
+                    else:  # '0'
+                        team2_prob += prob
+            
+            participant_team1_probs[name] = team1_prob
+            participant_team2_probs[name] = team2_prob
+        
+        # Second pass: compute denominators (sum across all participants)
+        # P(team1 wins) = sum of all participants' outcomes where team1 wins
+        total_team1_prob = sum(participant_team1_probs.values())
+        total_team2_prob = sum(participant_team2_probs.values())
+        
+        # Third pass: compute conditional probabilities
+        # P(name wins/loses | team1 wins) = P(name wins/loses AND team1 wins) / P(team1 wins)
+        for name in raw_outcomes.keys():
+            if total_team1_prob > 0 or total_team2_prob > 0:
+                team1_cond = participant_team1_probs[name] / total_team1_prob if total_team1_prob > 0 else 0.0
+                team2_cond = participant_team2_probs[name] / total_team2_prob if total_team2_prob > 0 else 0.0
+                game_prefs["preferences"][name] = {
+                    "team1": team1_cond,
+                    "team2": team2_cond
+                }
+            else:
+                game_prefs["preferences"][name] = None
+        
+        preferences[game_key] = game_prefs
+    
+    return preferences
+
+
+# =============================================================================
+# BATCHED SIMULATION FUNCTIONS
+# =============================================================================
+
+def print_progress(current: int, total: int, prefix: str = "  Progress"):
+    """Print a progress indicator."""
+    if total < 1000:
+        # For small totals, don't bother with progress
+        return
+    
+    # Update every 1% or every 10000, whichever is more frequent
+    interval = max(1, min(total // 100, 10000))
+    if current % interval == 0 or current == total - 1:
+        pct = (current + 1) / total * 100
+        print(f"\r{prefix}: {current + 1:,}/{total:,} ({pct:.1f}%)", end='', flush=True)
+        if current == total - 1:
+            print()  # Newline at end
+
+
+def generate_all_outcome_strings(
+    num_remaining: int,
+    use_monte_carlo: bool,
+    all_outcomes_stratified: Optional[List[str]],
+    num_simulations: int
+) -> List[str]:
+    """
+    Generate all outcome strings for simulation.
+    
+    Args:
+        num_remaining: Number of remaining games
+        use_monte_carlo: Whether using Monte Carlo sampling
+        all_outcomes_stratified: Pre-generated stratified outcomes (if Monte Carlo)
+        num_simulations: Total number of simulations to run
+        
+    Returns:
+        List of outcome strings (each string is num_remaining bits, '0' or '1')
+    """
+    if use_monte_carlo and all_outcomes_stratified is not None:
+        return all_outcomes_stratified
+    else:
+        # Exhaustive enumeration
+        results = []
+        for i in range(num_simulations):
+            results.append(format(i, f'0{num_remaining}b'))
+            print_progress(i, num_simulations, "  Generating")
+        return results
+
+
+def calculate_all_outcome_probabilities(
+    outcome_strings: List[str],
+    results_bracket: dict,
+    remaining_games: List[Tuple[str, int]],
+    teams_data: dict,
+    has_prob_data: bool,
+    base_probability: float
+) -> List[float]:
+    """
+    Calculate the probability of each outcome.
+    Creates hypothetical brackets on the fly to avoid memory overhead.
+    
+    Args:
+        outcome_strings: List of outcome strings
+        results_bracket: The current results bracket
+        remaining_games: List of (round_key, game_index) for remaining games
+        teams_data: Team data with probability columns
+        has_prob_data: Whether probability data is available
+        base_probability: Uniform probability (1/total_outcomes) for fallback
+        
+    Returns:
+        List of probabilities (one per outcome)
+    """
+    if has_prob_data:
+        results = []
+        total = len(outcome_strings)
+        for i, outcome in enumerate(outcome_strings):
+            # Create bracket on the fly, compute probability, let it be garbage collected
+            hypo = create_hypothetical_bracket(results_bracket, remaining_games, outcome)
+            results.append(calculate_outcome_probability(hypo, teams_data))
+            print_progress(i, total, "  Calculating probs")
+        return results
+    else:
+        return [base_probability] * len(outcome_strings)
+
+
+def calculate_all_scores_batched(
+    outcome_strings: List[str],
+    results_bracket: dict,
+    remaining_games: List[Tuple[str, int]],
+    name_to_bracket: Dict[str, dict],
+    teams_data: dict,
+    apply_seed_bonus: bool,
+    base_scores: Dict[str, int]
+) -> Dict[str, List[int]]:
+    """
+    Calculate scores for all participants across all outcomes.
+    Creates hypothetical brackets on the fly to avoid memory overhead.
+    
+    Args:
+        outcome_strings: List of outcome strings
+        results_bracket: The current results bracket
+        remaining_games: List of (round_key, game_index) for remaining games
+        name_to_bracket: Dict mapping participant name to their bracket
+        teams_data: Team data for seed bonuses
+        apply_seed_bonus: Whether to apply upset bonuses
+        base_scores: Pre-computed base scores for each participant
+        
+    Returns:
+        Dict mapping participant name to list of scores (one per outcome)
+    """
+    all_scores = {name: [] for name in name_to_bracket.keys()}
+    total = len(outcome_strings)
+    
+    for i, outcome in enumerate(outcome_strings):
+        # Create bracket on the fly, compute scores, let it be garbage collected
+        hypo = create_hypothetical_bracket(results_bracket, remaining_games, outcome)
+        for name, bracket in name_to_bracket.items():
+            delta = compute_score_delta(hypo, bracket, teams_data, apply_seed_bonus, remaining_games)
+            score = base_scores[name] + delta
+            all_scores[name].append(score)
+        print_progress(i, total, "  Scoring outcomes")
+    
+    return all_scores
+
+
+def determine_winners_and_losers(
+    all_scores: Dict[str, List[int]],
+    num_outcomes: int
+) -> Tuple[List[str], List[str], List[List[Tuple[str, int]]]]:
+    """
+    Determine who won and who lost each outcome.
+    
+    Args:
+        all_scores: Dict mapping participant name to list of scores
+        num_outcomes: Number of outcomes
+        
+    Returns:
+        Tuple of:
+        - winners: List of winner names (one per outcome)
+        - losers: List of loser names (one per outcome)
+        - all_sorted_scores: List of sorted [(name, score), ...] for each outcome
+    """
+    participants = list(all_scores.keys())
+    winners = []
+    losers = []
+    all_sorted_scores = []
+    
+    for i in range(num_outcomes):
+        # Get scores for this outcome
+        scores_for_outcome = [(name, all_scores[name][i]) for name in participants]
+        
+        # Sort by score descending
+        sorted_scores = sorted(scores_for_outcome, key=lambda x: x[1], reverse=True)
+        
+        winners.append(sorted_scores[0][0])  # First place
+        losers.append(sorted_scores[-1][0])  # Last place
+        all_sorted_scores.append(sorted_scores)
+        print_progress(i, num_outcomes, "  Sorting outcomes")
+    
+    return winners, losers, all_sorted_scores
+
+
+def accumulate_results(
+    outcome_strings: List[str],
+    outcome_probabilities: List[float],
+    winners: List[str],
+    losers: List[str],
+    all_sorted_scores: List[List[Tuple[str, int]]],
+    participants: List[str]
+) -> Tuple[
+    float,  # total_probability_sum
+    Dict[str, float],  # win_probability_sum
+    Dict[str, float],  # lose_probability_sum
+    Dict[str, float],  # place_probability_sum
+    Dict[str, Dict[str, float]],  # raw_winning_outcomes
+    Dict[str, Dict[str, float]]   # raw_losing_outcomes
+]:
+    """
+    Accumulate results from all simulations.
+    
+    Args:
+        outcome_strings: List of outcome strings
+        outcome_probabilities: List of probabilities
+        winners: List of winner names per outcome
+        losers: List of loser names per outcome
+        all_sorted_scores: Sorted scores for each outcome
+        participants: List of participant names
+        
+    Returns:
+        Tuple of accumulated results
+    """
+    total_probability_sum = 0.0
+    win_probability_sum = {name: 0.0 for name in participants}
+    lose_probability_sum = {name: 0.0 for name in participants}
+    place_probability_sum = {name: 0.0 for name in participants}
+    raw_winning_outcomes = {name: {} for name in participants}
+    raw_losing_outcomes = {name: {} for name in participants}
+    
+    num_outcomes = len(outcome_strings)
+    
+    for i, (outcome, prob) in enumerate(zip(outcome_strings, outcome_probabilities)):
+        total_probability_sum += prob
+        
+        # Record winner
+        winner = winners[i]
+        win_probability_sum[winner] += prob
+        if outcome not in raw_winning_outcomes[winner]:
+            raw_winning_outcomes[winner][outcome] = prob
+        else:
+            raw_winning_outcomes[winner][outcome] += prob
+        
+        # Record loser
+        loser = losers[i]
+        lose_probability_sum[loser] += prob
+        if outcome not in raw_losing_outcomes[loser]:
+            raw_losing_outcomes[loser][outcome] = prob
+        else:
+            raw_losing_outcomes[loser][outcome] += prob
+        
+        # Record places for average calculation
+        sorted_scores = all_sorted_scores[i]
+        for place, (name, score) in enumerate(sorted_scores):
+            place_probability_sum[name] += (place + 1) * prob
+        
+        print_progress(i, num_outcomes, "  Accumulating")
+    
+    return (
+        total_probability_sum,
+        win_probability_sum,
+        lose_probability_sum,
+        place_probability_sum,
+        raw_winning_outcomes,
+        raw_losing_outcomes
+    )
 
 
 def calculate_win_probabilities(
-    bracket_structure_path,
-    results_bracket_path,
-    brackets_dir,
-    participants,
-    teams_file,
-    bracket_sheet_name=DEFAULT_BRACKET_SHEET_NAME,
-    apply_seed_bonus=True,
-    bonus_stars=None,
-    max_simulations=None
-):
+    results_path: str,
+    brackets_dir: str,
+    participants: List[str],
+    teams_file: str,
+    apply_seed_bonus: bool = True,
+    max_simulations: Optional[int] = None,
+    bonus_stars: Optional[Dict[str, int]] = None,
+    max_scenarios: int = DEFAULT_MAX_SCENARIOS,
+    enable_timing: bool = False
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, List], Dict[str, List], Dict, Dict, Optional[Dict]]:
     """
     Calculate win probabilities for all participants.
     
     Args:
-        bracket_structure_path: Path to Excel file with bracket structure (SelectionsSheets)
-        results_bracket_path: Path to Excel file with current results
-        brackets_dir: Directory containing participant bracket files
+        results_path: Path to results bracket JSON file
+        brackets_dir: Directory containing participant bracket JSON files
         participants: List of participant names
-        teams_file: Path to CSV file with team seeds
-        bracket_sheet_name: Name of the sheet in bracket Excel files
+        teams_file: Path to teams JSON/CSV file (for seed bonuses)
         apply_seed_bonus: Whether to apply upset bonus points
-        bonus_stars: Optional dict of {name: bonus_points} for bonus stars
-        max_simulations: Maximum number of outcomes to simulate. If None or if total
-                        outcomes is less than this, all outcomes are simulated.
-                        Otherwise, random sampling (Monte Carlo) is used.
+        max_simulations: Max number of simulations (uses Monte Carlo if exceeded)
+        bonus_stars: Optional dict of {name: bonus_points}
+        max_scenarios: Maximum number of scenarios to keep per participant (for both winning and losing)
+        enable_timing: Whether to track timing of each step
     
     Returns:
-        Dict of {participant_name: win_probability}
+        Tuple of (win_probabilities, lose_probabilities, average_places, winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs, timing_data)
+        timing_data is None if enable_timing is False
     """
-    # Load bracket structure
-    bracket_structure = pd.read_excel(bracket_structure_path, sheet_name='SelectionsSheets', index_col='Game_id')
-    
-    # Load teams/seeds
-    seed_dict = load_teams(teams_file)
+    # Initialize timing data
+    timing_data = {} if enable_timing else None
     
     # Load results bracket
-    results_excel = pd.read_excel(results_bracket_path, sheet_name=bracket_sheet_name)
-    results_bracket_dict = extract_from_bracket(bracket_structure, results_excel)
-    results_bracket = pd.DataFrame(results_bracket_dict).transpose()
+    results_bracket = load_bracket(results_path)
+    
+    # Load teams data (with validation against results)
+    teams_data = load_teams(teams_file, results_bracket) if teams_file and os.path.exists(teams_file) else {}
     
     # Load all participant brackets
     name_to_bracket = {}
     for name in participants:
-        bracket_path = os.path.join(brackets_dir, f'{name}-bracket-march-madness-{get_year_from_path(results_bracket_path)}.xlsx')
-        if os.path.exists(bracket_path):
-            bracket_excel = pd.read_excel(bracket_path, sheet_name=bracket_sheet_name)
-            bracket_dict = extract_from_bracket(bracket_structure, bracket_excel)
-            name_to_bracket[name] = pd.DataFrame(bracket_dict).transpose()
+        # Try different file naming conventions
+        possible_paths = [
+            os.path.join(brackets_dir, f'{name}.json'),
+            os.path.join(brackets_dir, f'{name}-bracket.json'),
+            os.path.join(brackets_dir, f'{name.lower()}.json'),
+            os.path.join(brackets_dir, f'{name.lower()}-bracket.json'),
+        ]
+        
+        # Also search for files containing the participant name
+        if os.path.exists(brackets_dir):
+            for f in os.listdir(brackets_dir):
+                if f.endswith('.json') and name.lower() in f.lower() and 'results' not in f.lower():
+                    possible_paths.append(os.path.join(brackets_dir, f))
+        
+        bracket_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                bracket_path = path
+                break
+        
+        if bracket_path:
+            name_to_bracket[name] = load_bracket(bracket_path)
         else:
-            print(f"Warning: Bracket not found for {name} at {bracket_path}")
+            print(f"Warning: Bracket not found for {name}")
+    
+    if not name_to_bracket:
+        print("Error: No brackets found")
+        return {}, {}
     
     # Find remaining games
     remaining_games = find_remaining_games(results_bracket)
@@ -215,120 +3479,402 @@ def calculate_win_probabilities(
     if num_remaining == 0:
         scores = []
         for name, bracket in name_to_bracket.items():
-            score = compute_current_score(results_bracket, bracket, seed_dict,
-                                         apply_seed_bonus=apply_seed_bonus)
+            score, _, _ = compute_score(results_bracket, bracket, teams_data, apply_seed_bonus)
             if bonus_stars and name in bonus_stars:
                 score += bonus_stars[name]
             scores.append((name, score))
         
         sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
         winner = sorted_scores[0][0]
-        return {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
+        loser = sorted_scores[-1][0]
+        win_probabilities = {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
+        lose_probabilities = {name: (1.0 if name == loser else 0.0) for name in name_to_bracket.keys()}
+        average_places = {name: float(i + 1) for i, (name, _) in enumerate(sorted_scores)}
+        return win_probabilities, lose_probabilities, average_places, {}, {}, {}, {}, None  # Empty scenarios and prefs since tournament is over
     
-    # Determine whether to use exhaustive or Monte Carlo simulation
-    total_possible_outcomes = 2 ** num_remaining
-    use_monte_carlo = max_simulations is not None and total_possible_outcomes > max_simulations
+    # Determine simulation approach
+    total_possible = 2 ** num_remaining
+    use_monte_carlo = max_simulations is not None and total_possible > max_simulations
+    
+    # Find next games (games where both teams are known) using existing function
+    next_games_full = find_next_games(results_bracket)  # Returns (round_key, game_index, team1, team2)
+    next_games_list = [(rk, gi) for rk, gi, _, _ in next_games_full]  # Just need (round_key, game_index)
+    num_next_games = len(next_games_list)
+    
+    # Find remaining teams (for champion stratification)
+    remaining_teams = find_remaining_teams(results_bracket)
+    num_remaining_teams = len(remaining_teams)
+    
+    print(f"Next games (ready to play): {num_next_games}")
+    for rk, gi, t1, t2 in next_games_full:
+        t1_name = get_team_name(t1) if t1 else "TBD"
+        t2_name = get_team_name(t2) if t2 else "TBD"
+        print(f"  {rk} game {gi}: {t1_name} vs {t2_name}")
+    print(f"Remaining teams: {num_remaining_teams}")
+    print(f"  {remaining_teams}")
     
     if use_monte_carlo:
         num_simulations = max_simulations
-        print(f"Total possible outcomes: {total_possible_outcomes:,}")
-        print(f"Using Monte Carlo sampling with {num_simulations:,} random simulations")
+        print(f"Total possible outcomes: {total_possible:,}")
+        print(f"Using Monte Carlo sampling with {num_simulations:,} simulations")
+        
+        # Determine stratification approach
+        total_next_combos = 2 ** num_next_games
+        min_next_stratified = int(num_simulations * 0.25)  # Always at least 25%
+        
+        if total_next_combos < min_next_stratified:
+            # Few next-game combos - multiple simulations per combo to reach 25%
+            # Next game stratified: 25% of M (multiple sims per combo)
+            # Champion stratified: 12.5% of M (half of next game)
+            # Random: 62.5% of M
+            num_next_stratified = min_next_stratified
+            num_champion_stratified = min_next_stratified // 2
+            num_random = num_simulations - num_next_stratified - num_champion_stratified
+            sims_per_combo = num_next_stratified // total_next_combos
+            print(f"Stratification: {sims_per_combo} sims per next-game combo ({total_next_combos} combos)")
+        elif total_next_combos < 2 * num_simulations:
+            # Can enumerate all next-game combinations (one per combo)
+            # Next game stratified: 2^N outcomes (one per combination)
+            # Champion stratified: 2^N / 2 outcomes
+            # Random: remainder
+            num_next_stratified = total_next_combos
+            num_champion_stratified = total_next_combos // 2
+            num_random = max(0, num_simulations - num_next_stratified - num_champion_stratified)
+            print(f"Stratification: enumerate all {total_next_combos} next-game combos (1 sim each)")
+        else:
+            # Too many next-game combinations to enumerate
+            # Use percentage-based stratification: 25% next-game, 15% champion, 60% random
+            num_next_stratified = int(num_simulations * 0.25)
+            num_champion_stratified = int(num_simulations * 0.15)
+            num_random = num_simulations - num_next_stratified - num_champion_stratified
+            print(f"Stratification: sampling (too many next-game combos: {total_next_combos:,})")
+        
+        print(f"  Next-game stratified: {num_next_stratified:,}")
+        print(f"  Champion stratified: {num_champion_stratified:,}")
+        print(f"  Random: {num_random:,}")
+        
+        # Store stratification params for Step 1
+        stratification_params = {
+            'num_champion_stratified': num_champion_stratified,
+            'num_next_stratified': num_next_stratified,
+            'num_random': num_random,
+            'num_per_team': max(1, num_champion_stratified // num_remaining_teams) if num_remaining_teams > 0 else 0,
+            'remaining_teams': remaining_teams,
+            'next_games_list': next_games_list,
+        }
+        
     else:
-        num_simulations = total_possible_outcomes
+        num_simulations = total_possible
+        stratification_params = None  # Will generate sequentially
         if max_simulations is not None:
-            print(f"Total outcomes ({total_possible_outcomes:,}) <= max_simulations ({max_simulations:,})")
+            print(f"Total outcomes ({total_possible:,}) <= max_simulations ({max_simulations:,})")
         print(f"Simulating all {num_simulations:,} possible outcomes...")
     
-    # Simulate outcomes
-    number_of_wins = {name: 0 for name in name_to_bracket.keys()}
-    places = {name: [] for name in name_to_bracket.keys()}
+    # Check if we have probability data
+    sample_team = next(iter(teams_data.values())) if teams_data else {}
+    has_prob_data = any(col in sample_team for col in PROB_COLUMNS)
+    if has_prob_data:
+        print("Using team probability data for outcome weighting")
+    else:
+        print("No probability data found, using uniform (50/50) probabilities")
     
-    for i in range(num_simulations):
-        if (i + 1) % 10000 == 0:
-            print(f"  Processed {i + 1:,}/{num_simulations:,} outcomes...")
-        
-        # Generate outcome - either sequential (exhaustive) or random (Monte Carlo)
-        if use_monte_carlo:
-            outcome = generate_random_outcome(num_remaining)
-        else:
-            outcome = format(i, f'0{num_remaining}b')
-        
-        # Create hypothetical results
-        hypothetical_results = create_hypothetical_bracket(results_bracket, remaining_games, outcome)
-        
-        # Compute score for each participant
-        all_scores = []
-        for name, bracket in name_to_bracket.items():
-            score = compute_current_score(hypothetical_results, bracket, seed_dict,
-                                         apply_seed_bonus=apply_seed_bonus)
-            if bonus_stars and name in bonus_stars:
-                score += bonus_stars[name]
-            all_scores.append((name, score))
-        
-        # Sort by score
-        sorted_scores = sorted(all_scores, key=lambda x: x[1], reverse=True)
-        
-        # Record places
-        for place, (name, score) in enumerate(sorted_scores):
-            places[name].append(place + 1)
-            if place == 0:
-                number_of_wins[name] += 1
+    # Calculate base probability per outcome (used for uniform case)
+    base_probability = 1.0 / total_possible
     
-    # Calculate probabilities
+    # Precompute base scores for each participant (scores from already-decided games)
+    print("Precomputing base scores...")
+    base_scores = compute_base_scores(results_bracket, name_to_bracket, teams_data, apply_seed_bonus, bonus_stars)
+    for name, score in base_scores.items():
+        print(f"  {name}: {score} points (locked in)")
+    
+    # ==========================================================================
+    # BATCHED SIMULATION
+    # ==========================================================================
+    
+    participants = list(name_to_bracket.keys())
+    
+    # Step 1: Generate all outcome strings
+    print("\nStep 1: Generating outcome strings...")
+    t_step1_start = time.time()
+    
+    # Sub-timings for Step 1
+    t_champion = 0
+    t_next_game = 0
+    t_random = 0
+    t_combine = 0
+    t_mapping = 0
+    t_expand = 0
+    
+    if use_monte_carlo and stratification_params:
+        # Generate stratified outcomes
+        print("  Generating stratified outcomes...")
+        
+        # Champion stratified outcomes
+        t_sub = time.time()
+        num_per_team = stratification_params['num_per_team']
+        champion_outcomes = generate_champion_stratified_outcomes(
+            results_bracket, remaining_games, stratification_params['remaining_teams'], num_per_team
+        ) if num_per_team > 0 else []
+        t_champion = time.time() - t_sub
+        print(f"    Champion stratified: {len(champion_outcomes):,} outcomes ({t_champion:.2f}s)")
+        
+        # Next-game stratified outcomes
+        t_sub = time.time()
+        next_game_outcomes = generate_next_game_stratified_outcomes(
+            results_bracket, remaining_games, stratification_params['next_games_list'], 
+            stratification_params['num_next_stratified']
+        ) if stratification_params['num_next_stratified'] > 0 else []
+        t_next_game = time.time() - t_sub
+        print(f"    Next-game stratified: {len(next_game_outcomes):,} outcomes ({t_next_game:.2f}s)")
+        
+        # Random outcomes - use batch generation
+        t_sub = time.time()
+        num_random = stratification_params['num_random']
+        random_outcomes = generate_random_outcomes_batch(num_remaining, num_random) if num_random > 0 else []
+        t_random = time.time() - t_sub
+        print(f"    Random: {len(random_outcomes):,} outcomes ({t_random:.2f}s)")
+        
+        # Combine all outcomes
+        t_sub = time.time()
+        outcome_strings = champion_outcomes + next_game_outcomes + random_outcomes
+        num_simulations = len(outcome_strings)
+        t_combine = time.time() - t_sub
+        print(f"  Total after stratification: {num_simulations:,} ({t_combine:.2f}s)")
+    else:
+        # Exhaustive enumeration
+        outcome_strings = generate_all_outcome_strings(
+            num_remaining, use_monte_carlo, None, num_simulations
+        )
+    
+    # Build mapping for full 63-bit expansion
+    t_sub = time.time()
+    print("  Building full bitstring mapping...")
+    base_bits, decided_positions = build_decided_games_bits(results_bracket)
+    remaining_bit_positions = build_remaining_games_bit_mapping(remaining_games)
+    t_mapping = time.time() - t_sub
+    print(f"    Decided games: {len(decided_positions)} bits, Remaining games: {len(remaining_bit_positions)} bits ({t_mapping:.2f}s)")
+    
+    # Expand to full 63-bit strings
+    t_sub = time.time()
+    print("  Expanding to full 63-bit strings...")
+    full_outcome_strings = expand_all_to_full_bitstrings(
+        outcome_strings, base_bits, remaining_bit_positions
+    )
+    t_expand = time.time() - t_sub
+    print(f"    Expansion complete ({t_expand:.2f}s)")
+    
+    t_step1 = time.time() - t_step1_start
+    print(f"  Generated {len(outcome_strings):,} short + {len(full_outcome_strings):,} full outcome strings in {t_step1:.2f}s")
+    if enable_timing:
+        timing_data['step1_generate_outcomes'] = t_step1
+        timing_data['step1a_champion_stratified'] = t_champion
+        timing_data['step1b_next_game_stratified'] = t_next_game
+        timing_data['step1c_random_outcomes'] = t_random
+        timing_data['step1d_combine'] = t_combine
+        timing_data['step1e_mapping'] = t_mapping
+        timing_data['step1f_expand'] = t_expand
+    
+    # Step 2: Calculate probability of each outcome
+    # Using fast top-down method with full 63-bit outcome strings
+    print("Step 2: Calculating outcome probabilities (fast method)...")
+    t_start = time.time()
+    outcome_probabilities = calculate_all_probabilities_fast(
+        full_outcome_strings, results_bracket, teams_data,
+        has_prob_data, base_probability
+    )
+    t_step2 = time.time() - t_start
+    print(f"  Calculated {len(outcome_probabilities):,} probabilities")
+    if enable_timing:
+        timing_data['step2_calculate_probabilities'] = t_step2
+    
+    # Step 3: Calculate scores for all participants across all outcomes
+    # Using XNOR-based fast scoring with full 63-bit outcome strings
+    print("Step 3: Calculating all scores (XNOR method)...")
+    t_start = time.time()
+    remaining_positions = set(remaining_bit_positions)
+    all_scores = calculate_all_scores_xnor(
+        full_outcome_strings, name_to_bracket, results_bracket,
+        teams_data, apply_seed_bonus, base_scores, remaining_positions
+    )
+    t_step3 = time.time() - t_start
+    print(f"  Calculated scores for {len(all_scores)} participants across {len(outcome_strings):,} outcomes")
+    if enable_timing:
+        timing_data['step3_calculate_scores'] = t_step3
+    
+    # Step 4: Determine winners and losers
+    print("Step 4: Determining winners and losers...")
+    t_start = time.time()
+    winners, losers, all_sorted_scores = determine_winners_and_losers(
+        all_scores, len(outcome_strings)
+    )
+    t_step4 = time.time() - t_start
+    print(f"  Processed {len(winners):,} outcomes")
+    if enable_timing:
+        timing_data['step4_determine_winners'] = t_step4
+    
+    # Step 5: Accumulate results
+    print("Step 5: Accumulating results...")
+    t_start = time.time()
+    (
+        total_probability_sum,
+        win_probability_sum,
+        lose_probability_sum,
+        place_probability_sum,
+        raw_winning_outcomes,
+        raw_losing_outcomes
+    ) = accumulate_results(
+        outcome_strings, outcome_probabilities, winners, losers, 
+        all_sorted_scores, participants
+    )
+    t_step5 = time.time() - t_start
+    print(f"  Total probability sum: {total_probability_sum:.6f}")
+    if enable_timing:
+        timing_data['step5_accumulate_results'] = t_step5
+        timing_data['num_simulations'] = len(outcome_strings)
+    
+    # Normalize probabilities (they should sum to 1, but might not due to floating point)
+    if total_probability_sum > 0:
+        normalization_factor = 1.0 / total_probability_sum
+    else:
+        normalization_factor = 1.0
+    
+    # Calculate win/lose probabilities and average places
     win_probabilities = {}
+    lose_probabilities = {}
+    average_places = {}
     
     print("\nResults:")
-    print("-" * 50)
+    print("-" * 70)
     if use_monte_carlo:
         print(f"(Estimated from {num_simulations:,} Monte Carlo samples)")
-    for name in sorted(name_to_bracket.keys(), key=lambda n: number_of_wins[n], reverse=True):
-        prob = number_of_wins[name] / num_simulations
-        avg_place = sum(places[name]) / len(places[name])
-        win_probabilities[name] = prob
-        print(f"{name}: {prob*100:.2f}% win probability, avg place: {avg_place:.1f}")
+    if has_prob_data:
+        print(f"(Weighted by team probability data, total prob sum: {total_probability_sum:.6f})")
     
-    return win_probabilities
-
-
-def get_year_from_path(path):
-    """Extract year from a bracket path."""
-    import re
-    match = re.search(r'20\d{2}', path)
-    if match:
-        return match.group()
-    return '2026'
+    for name in sorted(name_to_bracket.keys(), key=lambda n: win_probability_sum[n], reverse=True):
+        win_prob = win_probability_sum[name] * normalization_factor
+        lose_prob = lose_probability_sum[name] * normalization_factor
+        avg_place = place_probability_sum[name] * normalization_factor  # Weighted average
+        
+        win_probabilities[name] = win_prob
+        lose_probabilities[name] = lose_prob
+        average_places[name] = avg_place
+        
+        num_win_raw = len(raw_winning_outcomes.get(name, {}))
+        num_lose_raw = len(raw_losing_outcomes.get(name, {}))
+        print(f"{name}: {win_prob*100:.2f}% win, {lose_prob*100:.2f}% lose, avg place: {avg_place:.2f}, "
+              f"{num_win_raw} win/{num_lose_raw} lose outcomes")
+    
+    # Normalize raw outcome probabilities too
+    for name in raw_winning_outcomes:
+        for outcome in raw_winning_outcomes[name]:
+            raw_winning_outcomes[name][outcome] *= normalization_factor
+    for name in raw_losing_outcomes:
+        for outcome in raw_losing_outcomes[name]:
+            raw_losing_outcomes[name][outcome] *= normalization_factor
+    
+    # Compute next game preferences (before merging)
+    print("\nComputing next game preferences...")
+    next_games = find_next_games(results_bracket)
+    print(f"  Found {len(next_games)} next games")
+    
+    # Compute win preferences
+    next_game_prefs = compute_next_game_preferences(
+        raw_winning_outcomes,
+        remaining_games,
+        next_games,
+        results_bracket,
+        outcome_type="winning"
+    )
+    
+    # Compute lose preferences
+    next_game_lose_prefs = compute_next_game_preferences(
+        raw_losing_outcomes,
+        remaining_games,
+        next_games,
+        results_bracket,
+        outcome_type="losing"
+    )
+    
+    # Step 6: Process/merge outcomes and generate final brackets
+    print("\nStep 6: Merging and generating final brackets...")
+    t_start = time.time()
+    
+    # Process winning outcomes: merge similar ones and keep top N
+    print("  Processing winning scenarios...")
+    processed_winning, winning_timing = process_outcomes(
+        raw_winning_outcomes, 
+        results_bracket, 
+        remaining_games, 
+        max_scenarios,
+        outcome_type="winning",
+        return_timing=True
+    )
+    
+    # Process losing outcomes: merge similar ones and keep top N
+    print("  Processing losing scenarios...")
+    processed_losing, losing_timing = process_outcomes(
+        raw_losing_outcomes, 
+        results_bracket, 
+        remaining_games, 
+        max_scenarios,
+        outcome_type="losing",
+        return_timing=True
+    )
+    
+    t_step6 = time.time() - t_start
+    if enable_timing:
+        timing_data['step6_merge_and_generate'] = t_step6
+        # Sub-timings for Step 6 (combined from winning and losing)
+        timing_data['step6a_prefilter'] = winning_timing['prefilter'] + losing_timing['prefilter']
+        timing_data['step6b_merge_loop'] = winning_timing['merge_loop'] + losing_timing['merge_loop']
+        timing_data['step6c_decode'] = winning_timing['decode'] + losing_timing['decode']
+    
+    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs, timing_data
 
 
 def main():
     parser = argparse.ArgumentParser(description='Calculate March Madness win probabilities')
-    parser.add_argument('--year', default='2026', help='Tournament year')
-    parser.add_argument('--base-dir', default='.', help='Base directory for bracket files')
+    parser.add_argument('--results', required=True, help='Path to results bracket JSON file')
+    parser.add_argument('--brackets-dir', required=True, help='Directory containing participant bracket JSON files')
+    parser.add_argument('--teams', default=None, help='Path to teams JSON/CSV file (for seed bonuses)')
     parser.add_argument('--output', default='winProbabilities.json', help='Output JSON file')
     parser.add_argument('--participants', nargs='+', help='List of participant names')
     parser.add_argument('--participants-file', help='JSON file with list of participants')
     parser.add_argument('--no-seed-bonus', action='store_true', help='Disable upset bonus')
-    parser.add_argument('--max-simulations', type=int, default=100000,
-                       help='Maximum number of simulations. If total outcomes exceeds this, '
-                            'Monte Carlo sampling is used. Default: 100000')
-    parser.add_argument('--seed', type=int, default=None,
-                       help='Random seed for reproducible Monte Carlo results')
+    parser.add_argument('--max-simulations', type=int, default=1000000,
+                       help='Maximum simulations. Uses Monte Carlo if total outcomes exceeds this. Default: 1000000')
+    parser.add_argument('--max-scenarios', type=int, default=DEFAULT_MAX_SCENARIOS,
+                       help=f'Maximum scenarios to keep per participant (for both winning and losing). Default: {DEFAULT_MAX_SCENARIOS}')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducible results')
+    parser.add_argument('--config', default=None, help='Path to scoring-config.json file')
+    parser.add_argument('--star-bonuses', default=None, help='Path to starBonuses.json file')
+    parser.add_argument('--timing', action='store_true', help='Enable timing profiling of simulation steps')
+    parser.add_argument('--timing-output', default='timing_results.csv', help='Output CSV file for timing results')
     
     args = parser.parse_args()
     
+    # Load scoring configuration
+    load_scoring_config(args.config)
+    
     # Set random seed if provided
     if args.seed is not None:
-        np.random.seed(args.seed)
+        random.seed(args.seed)
         print(f"Using random seed: {args.seed}")
     
-    # Set up paths
-    year = args.year
-    base_dir = args.base_dir
+    # Load seed probabilities from default location
+    load_seed_probabilities()
+    print(f"Probability method: {SEED_PROB_METHOD}")
     
-    bracket_structure_path = os.path.join(base_dir, 'brackets', 'bracket-structure.xlsx')
-    results_path = os.path.join(base_dir, f'results-bracket-march-madness-{year}.xlsx')
-    brackets_dir = os.path.join(base_dir, f'brackets')
-    teams_file = os.path.join(base_dir, f'ThisYearTeams{year}.csv')
-    participants_path = os.path.join(base_dir, 'participants.json')
+    # Load star bonuses if provided
+    bonus_stars = {}
+    if args.star_bonuses:
+        bonus_stars = load_star_bonuses(args.star_bonuses, args.config)
+    else:
+        # Try to find starBonuses.json in same directory as results
+        results_dir = os.path.dirname(args.results)
+        default_star_path = os.path.join(results_dir, 'starBonuses.json')
+        if os.path.exists(default_star_path):
+            bonus_stars = load_star_bonuses(default_star_path, args.config)
     
     # Get participants
     if args.participants:
@@ -336,42 +3882,195 @@ def main():
     elif args.participants_file:
         with open(args.participants_file) as f:
             participants = json.load(f)
-    elif os.path.exists(participants_path):
-        with open(participants_path, 'r') as file:
-            participants = json.load(file)
     else:
         # Try to find participants from bracket files
         participants = []
-        if os.path.exists(brackets_dir):
-            for f in os.listdir(brackets_dir):
-                if f.endswith(f'-bracket-march-madness-{year}.xlsx'):
-                    name = f.replace(f'-bracket-march-madness-{year}.xlsx', '')
+        if os.path.exists(args.brackets_dir):
+            for f in os.listdir(args.brackets_dir):
+                if f.endswith('.json') and f != 'results.json' and not f.startswith('win'):
+                    # Extract participant name as first word (split by - or _)
+                    name_without_ext = f.replace('.json', '')
+                    # Split by - or _ and take first part as participant name
+                    import re
+                    parts = re.split(r'[-_]', name_without_ext)
+                    name = parts[0]
                     participants.append(name)
         
         if not participants:
             print("Error: No participants specified. Use --participants or --participants-file")
             return
     
-    print(f"Calculating win probabilities for {len(participants)} participants...")
+    print(f"\nCalculating win probabilities for {len(participants)} participants...")
     print(f"Participants: {participants}")
     
+    # Convert bonus_stars keys to match participant names (case-insensitive lookup)
+    participant_bonuses = {}
+    for name in participants:
+        name_lower = name.lower()
+        if name_lower in bonus_stars:
+            participant_bonuses[name] = bonus_stars[name_lower]
+    
+    if participant_bonuses:
+        print(f"Star bonuses applied: {participant_bonuses}")
+    
     # Calculate probabilities
-    probabilities = calculate_win_probabilities(
-        bracket_structure_path=bracket_structure_path,
-        results_bracket_path=results_path,
-        brackets_dir=brackets_dir,
+    (win_probabilities, lose_probabilities, average_places, 
+     winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs, timing_data) = calculate_win_probabilities(
+        results_path=args.results,
+        brackets_dir=args.brackets_dir,
         participants=participants,
-        teams_file=teams_file,
+        teams_file=args.teams or '',
         apply_seed_bonus=not args.no_seed_bonus,
-        max_simulations=args.max_simulations
+        max_simulations=args.max_simulations,
+        max_scenarios=args.max_scenarios,
+        bonus_stars=participant_bonuses,
+        enable_timing=args.timing
     )
     
-    # Save to JSON
-    output_path = os.path.join(base_dir, args.output)
-    with open(output_path, 'w') as f:
-        json.dump(probabilities, f, indent=2)
+    # Save to JSON (include all probabilities, scenarios, and preferences)
+    output_data = {
+        'win_probabilities': win_probabilities,
+        'lose_probabilities': lose_probabilities,
+        'average_places': average_places,
+        'winning_scenarios': winning_scenarios,
+        'losing_scenarios': losing_scenarios,
+        'next_game_preferences': next_game_prefs,
+        'next_game_lose_preferences': next_game_lose_prefs
+    }
     
-    print(f"\nWin probabilities saved to {output_path}")
+    with open(args.output, 'w') as f:
+        json.dump(output_data, f, indent=2)
+    
+    print(f"\nResults saved to {args.output}")
+    
+    # Write timing results if enabled
+    if args.timing and timing_data:
+        num_sims = timing_data.get('num_simulations', 1)
+        
+        # Calculate totals
+        step_times = {
+            'step1_generate_outcomes': timing_data.get('step1_generate_outcomes', 0),
+            'step2_calculate_probabilities': timing_data.get('step2_calculate_probabilities', 0),
+            'step3_calculate_scores': timing_data.get('step3_calculate_scores', 0),
+            'step4_determine_winners': timing_data.get('step4_determine_winners', 0),
+            'step5_accumulate_results': timing_data.get('step5_accumulate_results', 0),
+            'step6_merge_and_generate': timing_data.get('step6_merge_and_generate', 0),
+        }
+        
+        # Step 1 sub-timings
+        step1_sub_times = {
+            'step1a_champion_stratified': timing_data.get('step1a_champion_stratified', 0),
+            'step1b_next_game_stratified': timing_data.get('step1b_next_game_stratified', 0),
+            'step1c_random_outcomes': timing_data.get('step1c_random_outcomes', 0),
+            'step1d_combine': timing_data.get('step1d_combine', 0),
+            'step1e_mapping': timing_data.get('step1e_mapping', 0),
+            'step1f_expand': timing_data.get('step1f_expand', 0),
+        }
+        
+        # Step 6 sub-timings
+        step6_sub_times = {
+            'step6a_prefilter': timing_data.get('step6a_prefilter', 0),
+            'step6b_merge_loop': timing_data.get('step6b_merge_loop', 0),
+            'step6c_decode': timing_data.get('step6c_decode', 0),
+        }
+        
+        total_time = sum(step_times.values())
+        
+        # Prepare CSV rows
+        step_names = {
+            'step1_generate_outcomes': 'generate_all_outcome_strings',
+            'step2_calculate_probabilities': 'calculate_all_outcome_probabilities',
+            'step3_calculate_scores': 'calculate_all_scores_batched',
+            'step4_determine_winners': 'determine_winners_and_losers',
+            'step5_accumulate_results': 'accumulate_results',
+            'step6_merge_and_generate': 'merge_and_generate_final_brackets',
+        }
+        
+        step1_sub_names = {
+            'step1a_champion_stratified': 'champion_stratified_outcomes',
+            'step1b_next_game_stratified': 'next_game_stratified_outcomes',
+            'step1c_random_outcomes': 'random_outcomes_batch',
+            'step1d_combine': 'combine_outcome_lists',
+            'step1e_mapping': 'build_bitstring_mapping',
+            'step1f_expand': 'expand_to_full_bitstrings',
+        }
+        
+        step6_sub_names = {
+            'step6a_prefilter': 'prefilter_unmergeable',
+            'step6b_merge_loop': 'merge_loop',
+            'step6c_decode': 'decode_outcomes',
+        }
+        
+        rows = []
+        for step_key, func_name in step_names.items():
+            step_num = step_key.split('_')[0].replace('step', '')
+            t = step_times[step_key]
+            avg_ms = (t / num_sims) * 1000 if num_sims > 0 else 0
+            pct = (t / total_time * 100) if total_time > 0 else 0
+            rows.append({
+                'Step': step_num,
+                'Function': func_name,
+                'Total Time (s)': f'{t:.4f}',
+                'Avg Time/Sim (ms)': f'{avg_ms:.6f}',
+                '% of Total': f'{pct:.1f}%'
+            })
+            
+            # Add sub-timings for Step 1
+            if step_key == 'step1_generate_outcomes':
+                for sub_key, sub_name in step1_sub_names.items():
+                    sub_t = step1_sub_times[sub_key]
+                    sub_avg_ms = (sub_t / num_sims) * 1000 if num_sims > 0 else 0
+                    sub_pct = (sub_t / total_time * 100) if total_time > 0 else 0
+                    rows.append({
+                        'Step': f'  {sub_key.split("_")[0].replace("step", "")}',
+                        'Function': f'  -> {sub_name}',
+                        'Total Time (s)': f'{sub_t:.4f}',
+                        'Avg Time/Sim (ms)': f'{sub_avg_ms:.6f}',
+                        '% of Total': f'{sub_pct:.1f}%'
+                    })
+            
+            # Add sub-timings for Step 6
+            if step_key == 'step6_merge_and_generate':
+                for sub_key, sub_name in step6_sub_names.items():
+                    sub_t = step6_sub_times[sub_key]
+                    sub_avg_ms = (sub_t / num_sims) * 1000 if num_sims > 0 else 0
+                    sub_pct = (sub_t / total_time * 100) if total_time > 0 else 0
+                    rows.append({
+                        'Step': f'  {sub_key.split("_")[0].replace("step", "")}',
+                        'Function': f'  -> {sub_name}',
+                        'Total Time (s)': f'{sub_t:.4f}',
+                        'Avg Time/Sim (ms)': f'{sub_avg_ms:.6f}',
+                        '% of Total': f'{sub_pct:.1f}%'
+                    })
+        
+        # Add total row
+        avg_total_ms = (total_time / num_sims) * 1000 if num_sims > 0 else 0
+        rows.append({
+            'Step': 'Total',
+            'Function': '',
+            'Total Time (s)': f'{total_time:.4f}',
+            'Avg Time/Sim (ms)': f'{avg_total_ms:.6f}',
+            '% of Total': '100.0%'
+        })
+        
+        # Write CSV
+        with open(args.timing_output, 'w', newline='', encoding='utf-8') as f:
+            fieldnames = ['Step', 'Function', 'Total Time (s)', 'Avg Time/Sim (ms)', '% of Total']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        
+        print(f"Timing results saved to {args.timing_output}")
+        
+        # Also print timing summary
+        print("\n" + "=" * 70)
+        print("TIMING SUMMARY")
+        print("=" * 70)
+        print(f"{'Step':<6} {'Function':<40} {'Time (s)':<12} {'Avg (ms)':<12} {'%':<8}")
+        print("-" * 70)
+        for row in rows:
+            print(f"{row['Step']:<6} {row['Function']:<40} {row['Total Time (s)']:<12} {row['Avg Time/Sim (ms)']:<12} {row['% of Total']:<8}")
+        print("=" * 70)
 
 
 if __name__ == '__main__':

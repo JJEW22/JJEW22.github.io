@@ -1,9 +1,12 @@
 test-results
 node_modules
 
-# python
-__pychache__
+#python
+__pycache__/
 *.pyc
+
+# secrets
+secrets.json
 
 # Output
 .output
