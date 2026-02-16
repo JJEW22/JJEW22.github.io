@@ -8,6 +8,7 @@
     } from './BracketStructure.js';
     import BracketDisplay from './BracketDisplay.svelte';
     import MarchMadnessRules from './MarchMadnessRules.svelte';
+    import SubmissionInstructions from './SubmissionInstructions.svelte';
     
     // Configuration
     const YEAR = '2026';
@@ -343,6 +344,10 @@
             interactive={true}
             on:selectWinner={handleSelectWinner}
         />
+        
+        <div class="rules-section">
+            <SubmissionInstructions />
+        </div>
         
         <div class="rules-section">
             <MarchMadnessRules configPath={SCORING_CONFIG_FILE} />

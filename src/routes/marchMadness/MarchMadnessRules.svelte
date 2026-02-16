@@ -48,6 +48,36 @@
         <h2 class="rules-title">Its the Rules</h2>
         
         <section class="rules-section">
+            <h3>The Wager</h3>
+            <p class="rules-description">We are doing the standard cheesecake wager (or maybe multiple depending on # people). The 2 people who have a chance of winning going into the last match pick the cake types/flavors. Prizes are determined by the following</p>
+            <table class="scoring-table">
+                <thead>
+                    <tr>
+                        <th>Place</th>
+                        <th>Prize</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="round-name">1st</td>
+                        <td class="round-name">Incredible trophy, Don't pay</td>
+                    </tr>
+                    <tr>
+                        <td class="round-name">2nd</td>
+                        <td class="round-name">Don't pay</td>
+                    </tr>
+                    <tr>
+                        <td class="round-name">Everyone Else</td>
+                        <td class="round-name">Pay 1 share of the cake + $1.50 towards trophy</td>
+                    </tr>
+                    <tr>
+                        <td class="round-name">last</td>
+                        <td class="round-name">Procure the trophy for the winner no later than May 1st, pay 1 share of cake and remainder of trophy</td>
+                    </tr>
+                </tbody>
+            </table>
+            </section>
+            <section class="rules-section">
             <h3>Base Points per Round</h3>
             <p class="rules-description">{config.description.baseScoring}</p>
             <h3>Underdog Points</h3>
@@ -110,7 +140,7 @@
                 </tbody>
             </table>
             <p class="rules-note">
-                <strong>Formula:</strong> (Winner Seed − Lower Seed) × Seed Factor
+                <strong>Formula:</strong> (Winning Seed − Lower Seed) × Seed Factor
             </p>
         </section>
         

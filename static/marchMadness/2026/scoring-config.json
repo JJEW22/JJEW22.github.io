@@ -10,13 +10,12 @@
     "Final Four",
     "Championship"
   ],
-  "starBonus": [25, 20, 15, 10, 5],
+  "starBonus": [25, 20, 15, 10],
   "scoreDiffBuckets": [5, 10],
   "description": {
     "baseScoring": "Points are awarded for each correct pick based on the round.",
-    "underdogPoints": "Additional points are awarded for correctly picking upsets. The bonus is can be calculated from how much of an upset it was and in what round it was. The exact formula is: (winner seed - expected winner seed) × seed factor for that round.",
+    "underdogPoints": "Additional points are awarded for correctly picking upsets. The bonus is calculated from how much of an upset it was and in what round it was. The exact formula is: (winner seed - lower seed) × seed factor for that round.",
     "tiebreaker": "In case of a tie, the participant who correctly picked more games in later rounds wins.",
-    "starBonus": "description of star bonus",
-    "scoreDiffBuckets": "Buckets for categorizing score differentials. [5, 10] creates categories: 0-5 (close), 6-10 (moderate), >10 (blowout)"
+    "starBonus": "Star bonuses are small bonuses given based on some characteristic of your submitted bracket. They work the exact same as last year a small change to the way they are scored. There will be bonuses awarded each round and there is a separate prize for the person who won the most start bonuses. Include jayhawk in your submission email. The amount of points a star bonus contributes is determined based on the number of people that won it"
   }
 }

@@ -106,8 +106,8 @@
     },
     {
         "name": "well duh",
-        "round": "3",
-        "reason": "Correctly predicted the most not close games (win by more than 10)",
+        "round": 3,
+        "reason": "Correctly predicted the most not close games (wins by more than 10)",
         "Winners": []
     },
     {
