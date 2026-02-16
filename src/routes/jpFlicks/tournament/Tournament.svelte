@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     
     // Props
-    export let dataPath = '/tournamentData.json';
+    export let dataPath = '/marchMadness/2026/finalTournamentResults.json';
     export let savePath = '/tournamentResults.json';
     export let editable = true;
     
@@ -10,7 +10,7 @@
     let tournament = null;
     let loading = true;
     let error = null;
-    let activeTab = 'tournament'; // 'schedule', 'tournament'
+    let activeTab = 'tournament'; // 'tournament', 'rules'
     let hasUnsavedChanges = false;
     let saveStatus = null; // 'saving', 'saved', 'error'
     
@@ -102,14 +102,28 @@
         const nextRoundIndex = roundIndex + 1;
         if (nextRoundIndex >= tournament.bracket.rounds.length) return;
         
-        // Figure out which match in the next round this feeds into
-        const nextMatchIndex = Math.floor(matchIndex / 2);
-        const nextMatch = tournament.bracket.rounds[nextRoundIndex].matches[nextMatchIndex];
+        const currentRound = tournament.bracket.rounds[roundIndex];
+        const nextRound = tournament.bracket.rounds[nextRoundIndex];
         
+        // Figure out which match in the next round this feeds into
+        let nextMatchIndex;
+        let slotInMatch; // 0 = team1, 1 = team2
+        
+        if (currentRound.matches.length === nextRound.matches.length) {
+            // 1:1 mapping (e.g., QF to SF with byes) - each match feeds into corresponding match as team2
+            nextMatchIndex = matchIndex;
+            slotInMatch = 1; // Winner goes to team2 slot (team1 has the bye)
+        } else {
+            // Standard bracket: 2 matches feed into 1
+            nextMatchIndex = Math.floor(matchIndex / 2);
+            slotInMatch = matchIndex % 2; // Even = team1, Odd = team2
+        }
+        
+        const nextMatch = nextRound.matches[nextMatchIndex];
         if (!nextMatch) return;
         
         // Determine if winner goes to team1 or team2 slot
-        if (matchIndex % 2 === 0) {
+        if (slotInMatch === 0) {
             nextMatch.team1 = { name: currentMatch.winner, source: currentMatch.id, seed: null };
         } else {
             nextMatch.team2 = { name: currentMatch.winner, source: currentMatch.id, seed: null };
@@ -175,15 +189,40 @@
         
         // Populate bracket based on number of groups and format
         if (tournament.groups.length === 1) {
-            // Single group/league: 1st vs 4th, 2nd vs 3rd (if 4 advance)
-            // Or 1st vs 2nd if only 2 advance
-            if (advancementCount >= 4 && firstRound.matches.length >= 2) {
+            // Single group/league format
+            
+            // Check for 6-team advancement with byes (Champions League style)
+            if (advancementCount === 6 && tournament.bracket.rounds.length >= 3) {
+                // Format: QF (3v6, 4v5), SF (1 vs QF1 winner, 2 vs QF2 winner), Final
+                const qfRound = tournament.bracket.rounds[0];
+                const sfRound = tournament.bracket.rounds[1];
+                
+                // Quarterfinals: 3rd vs 6th, 4th vs 5th
+                if (qfRound && qfRound.matches.length >= 2) {
+                    qfRound.matches[0].team1 = { name: allQualifiers[2]?.name || 'TBD', source: 'League 3rd', seed: 3 };
+                    qfRound.matches[0].team2 = { name: allQualifiers[5]?.name || 'TBD', source: 'League 6th', seed: 6 };
+                    qfRound.matches[1].team1 = { name: allQualifiers[3]?.name || 'TBD', source: 'League 4th', seed: 4 };
+                    qfRound.matches[1].team2 = { name: allQualifiers[4]?.name || 'TBD', source: 'League 5th', seed: 5 };
+                }
+                
+                // Semifinals: 1st gets bye vs QF1 winner, 2nd gets bye vs QF2 winner
+                if (sfRound && sfRound.matches.length >= 2) {
+                    sfRound.matches[0].team1 = { name: allQualifiers[0]?.name || 'TBD', source: 'League 1st (BYE)', seed: 1 };
+                    // team2 will be populated when QF1 winner is determined
+                    sfRound.matches[1].team1 = { name: allQualifiers[1]?.name || 'TBD', source: 'League 2nd (BYE)', seed: 2 };
+                    // team2 will be populated when QF2 winner is determined
+                }
+            }
+            // 4-team advancement: 1v4, 2v3 semifinals
+            else if (advancementCount >= 4 && firstRound.matches.length >= 2) {
                 // Semifinals: 1v4, 2v3
                 firstRound.matches[0].team1 = { name: allQualifiers[0]?.name || 'TBD', source: 'League', seed: 1 };
                 firstRound.matches[0].team2 = { name: allQualifiers[3]?.name || 'TBD', source: 'League', seed: 4 };
                 firstRound.matches[1].team1 = { name: allQualifiers[1]?.name || 'TBD', source: 'League', seed: 2 };
                 firstRound.matches[1].team2 = { name: allQualifiers[2]?.name || 'TBD', source: 'League', seed: 3 };
-            } else if (advancementCount >= 2 && firstRound.matches.length >= 1) {
+            } 
+            // 2-team advancement: straight to final
+            else if (advancementCount >= 2 && firstRound.matches.length >= 1) {
                 // Final: 1v2
                 firstRound.matches[0].team1 = { name: allQualifiers[0]?.name || 'TBD', source: 'League', seed: 1 };
                 firstRound.matches[0].team2 = { name: allQualifiers[1]?.name || 'TBD', source: 'League', seed: 2 };
@@ -231,12 +270,17 @@
         }
         
         tournament = tournament; // Trigger reactivity
+        // Force deep reactivity update on bracket
+        if (tournament.bracket) {
+            tournament.bracket = { ...tournament.bracket };
+        }
     }
     
     // Check and populate bracket when group stage completes
     function checkAndPopulateBracket() {
         if (isGroupStageComplete() && tournament.format.groupStage && tournament.format.knockoutStage) {
             populateBracketFromGroups();
+            tournament = tournament; // Ensure reactivity update
         }
     }
     
@@ -405,6 +449,75 @@
         return team.name || 'TBD';
     }
     
+    // Get team info (player1, player2) by team name
+    function getTeamInfo(teamName) {
+        if (!tournament.teams) return null;
+        return tournament.teams.find(t => t.name === teamName) || null;
+    }
+    
+    // Get unique board names from schedule (Home first, then others alphabetically)
+    function getBoards() {
+        if (!tournament.schedule) return [];
+        const boards = new Set();
+        tournament.schedule.forEach(slot => {
+            slot.matches.forEach(match => {
+                if (match.board) boards.add(match.board);
+            });
+        });
+        return Array.from(boards).sort((a, b) => {
+            if (a === 'Home') return -1;
+            if (b === 'Home') return 1;
+            return a.localeCompare(b);
+        });
+    }
+    
+    // Find group match data by team names
+    function findGroupMatch(team1, team2) {
+        if (!tournament.groups) return null;
+        for (let groupIndex = 0; groupIndex < tournament.groups.length; groupIndex++) {
+            const group = tournament.groups[groupIndex];
+            for (let matchIndex = 0; matchIndex < group.matches.length; matchIndex++) {
+                const match = group.matches[matchIndex];
+                if ((match.team1 === team1 && match.team2 === team2) ||
+                    (match.team1 === team2 && match.team2 === team1)) {
+                    return { match, groupIndex, matchIndex, swapped: match.team1 !== team1 };
+                }
+            }
+        }
+        return null;
+    }
+    
+    // Find bracket match by matchId
+    function findBracketMatch(matchId) {
+        if (!tournament.bracket || !matchId) return null;
+        
+        if (matchId === 'third' && tournament.bracket.thirdPlaceMatch) {
+            return { match: tournament.bracket.thirdPlaceMatch, type: 'thirdPlace' };
+        }
+        
+        for (let roundIndex = 0; roundIndex < tournament.bracket.rounds.length; roundIndex++) {
+            const round = tournament.bracket.rounds[roundIndex];
+            for (let matchIndex = 0; matchIndex < round.matches.length; matchIndex++) {
+                if (round.matches[matchIndex].id === matchId) {
+                    return { match: round.matches[matchIndex], roundIndex, matchIndex, type: 'bracket' };
+                }
+            }
+        }
+        return null;
+    }
+    
+    // Get match for a specific schedule slot and board
+    function getScheduleMatch(slotIndex, board) {
+        const slot = tournament.schedule[slotIndex];
+        if (!slot) return null;
+        return slot.matches.find(m => m.board === board) || null;
+    }
+    
+    // Check if a schedule match is a group match
+    function isGroupStageMatch(scheduleMatch) {
+        return scheduleMatch && !scheduleMatch.matchId;
+    }
+
     // Find schedule info for a group match
     function getGroupMatchSchedule(team1, team2, groupName) {
         if (!tournament.schedule) return null;
@@ -539,13 +652,6 @@
         
         <!-- Tab Navigation -->
         <nav class="tab-nav">
-            <button 
-                class="tab-btn" 
-                class:active={activeTab === 'schedule'}
-                on:click={() => selectTab('schedule')}
-            >
-                🕐 Schedule
-            </button>
             {#if (tournament.format.groupStage && tournament.groups?.length > 0) || (tournament.format.knockoutStage && tournament.bracket)}
                 <button 
                     class="tab-btn" 
@@ -555,48 +661,23 @@
                     🏆 Tournament
                 </button>
             {/if}
+            <button 
+                class="tab-btn" 
+                class:active={activeTab === 'rules'}
+                on:click={() => selectTab('rules')}
+            >
+                📋 Rules
+            </button>
         </nav>
         
         <!-- Tab Content -->
         <div class="tab-content">
-            <!-- Schedule Tab -->
-            {#if activeTab === 'schedule'}
-                <div class="schedule-view">
-                    <h2>Match Schedule</h2>
-                    
-                    {#each tournament.schedule as timeSlot, slotIndex}
-                        <div class="time-slot" id="schedule-slot-{slotIndex}">
-                            <div class="time-header">
-                                <span class="time">{timeSlot.time}</span>
-                                <span class="stage-badge">{timeSlot.stage}</span>
-                            </div>
-                            <div class="slot-matches">
-                                {#each timeSlot.matches as match}
-                                    <div class="schedule-match">
-                                        <span class="board">Board {match.board}</span>
-                                        <span class="matchup">
-                                            <span class="team">{match.team1}</span>
-                                            <span class="vs">vs</span>
-                                            <span class="team">{match.team2}</span>
-                                        </span>
-                                        {#if match.group}
-                                            <span class="group-tag">{match.group}</span>
-                                        {/if}
-                                    </div>
-                                {/each}
-                            </div>
-                        </div>
-                    {/each}
-                </div>
-            
             <!-- Tournament Tab (Groups + Bracket) -->
-            {:else if activeTab === 'tournament'}
+            {#if activeTab === 'tournament'}
                 <div class="tournament-view">
                     <!-- Group Stage Section -->
                     {#if tournament.format.groupStage && tournament.groups?.length > 0}
                         <div class="groups-view">
-                            <h2>{tournament.groups.length > 1 ? 'Group Standings' : 'Standings'}</h2>
-                            
                             <!-- Group Stage Status -->
                             {#if tournament.format.knockoutStage}
                                 <div class="group-stage-status">
@@ -617,119 +698,205 @@
                                 </div>
                             {/if}
                             
-                            <div class="groups-container" class:single-group={tournament.groups.length === 1}>
-                                {#each tournament.groups as group, groupIndex}
-                                    {@const standings = calculateStandings(group)}
-                                    <div class="group-card">
-                                        <h3>{group.name}</h3>
-                                        
-                                        <table class="standings-table">
-                                            <thead>
-                                                <tr>
-                                                    <th class="pos">#</th>
-                                                    <th class="name">Player</th>
-                                                    <th class="stat">P</th>
-                                                    <th class="stat">W</th>
-                                                    <th class="stat">D</th>
-                                            <th class="stat">L</th>
-                                            <th class="stat">+/-</th>
-                                            <th class="stat pts">Pts</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {#each standings as team, i}
-                                            <tr class:qualifies={i < tournament.format.groupAdvancement}>
-                                                <td class="pos">{i + 1}</td>
-                                                <td class="name">{team.name}</td>
-                                                <td class="stat">{team.played}</td>
-                                                <td class="stat">{team.wins}</td>
-                                                <td class="stat">{team.draws}</td>
-                                                <td class="stat">{team.losses}</td>
-                                                <td class="stat diff" class:positive={team.pointsDiff > 0} class:negative={team.pointsDiff < 0}>
-                                                    {team.pointsDiff > 0 ? '+' : ''}{team.pointsDiff}
-                                                </td>
-                                                <td class="stat pts">{team.points}</td>
-                                            </tr>
-                                        {/each}
-                                    </tbody>
-                                </table>
-                                
-                <!-- Group Matches -->
-                                <div class="group-matches">
-                                    <h4>Matches</h4>
-                                    {#each group.matches as match, matchIndex}
-                                        {@const scheduleInfo = getGroupMatchSchedule(match.team1, match.team2, group.name)}
-                                        <div class="group-match" class:completed={match.completed}>
-                                            <span class="team" class:winner={match.completed && match.score1 > match.score2}>
-                                                {match.team1}
-                                            </span>
-                                            
-                                            {#if editingMatch?.type === 'group' && editingMatch?.groupIndex === groupIndex && editingMatch?.matchIndex === matchIndex}
-                                                <!-- Editing mode -->
-                                                <div class="score-edit">
-                                                    <input 
-                                                        type="number" 
-                                                        min="0" 
-                                                        bind:value={editingMatch.score1}
-                                                        class="score-input"
-                                                    />
-                                                    <span>-</span>
-                                                    <input 
-                                                        type="number" 
-                                                        min="0" 
-                                                        bind:value={editingMatch.score2}
-                                                        class="score-input"
-                                                    />
-                                                    <button class="edit-btn save" on:click={saveMatchScore}>✓</button>
-                                                    <button class="edit-btn cancel" on:click={cancelEditing}>✕</button>
-                                                </div>
-                                            {:else}
-                                                <!-- Display mode -->
-                                                <div class="match-center">
-                                                    {#if scheduleInfo}
-                                                        <button 
-                                                            class="schedule-link"
-                                                            on:click={() => scrollToSchedule(scheduleInfo.slotIndex)}
-                                                            title="View in schedule"
-                                                        >
-                                                            🕐 {scheduleInfo.time} • Board {scheduleInfo.board}
-                                                        </button>
-                                                    {/if}
-                                                    <span 
-                                                        class="score" 
-                                                        class:editable={editable}
-                                                        on:click={() => editable && startEditing('group', { groupIndex, matchIndex }, match.score1, match.score2)}
-                                                        on:keydown={(e) => e.key === 'Enter' && editable && startEditing('group', { groupIndex, matchIndex }, match.score1, match.score2)}
-                                                        role={editable ? "button" : "text"}
-                                                        tabindex={editable ? 0 : -1}
-                                                    >
-                                                        {#if match.completed}
-                                                            {match.score1} - {match.score2}
-                                                        {:else}
-                                                            vs
-                                                        {/if}
-                                                    </span>
-                                                    {#if editable && match.completed}
-                                                        <button 
-                                                            class="clear-btn" 
-                                                            on:click={() => clearMatchResult('group', { groupIndex, matchIndex })}
-                                                            title="Clear result"
-                                                        >🗑</button>
-                                                    {/if}
-                                                </div>
+                            <!-- Side by side layout: Standings + Schedule -->
+                            <div class="standings-schedule-container">
+                                <!-- Left: Standings Table -->
+                                <div class="standings-section">
+                                    <h2>{tournament.groups.length > 1 ? 'Group Standings' : 'Standings'}</h2>
+                                    {#each tournament.groups as group, groupIndex}
+                                        {@const standings = calculateStandings(group)}
+                                        <div class="group-card">
+                                            {#if tournament.groups.length > 1}
+                                                <h3>{group.name}</h3>
                                             {/if}
                                             
-                                            <span class="team" class:winner={match.completed && match.score2 > match.score1}>
-                                                {match.team2}
-                                            </span>
+                                            <table class="standings-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="pos">#</th>
+                                                        <th class="name">Team</th>
+                                                        <th class="player">Player 1</th>
+                                                        <th class="player">Player 2</th>
+                                                        <th class="stat">W</th>
+                                                        <th class="stat">D</th>
+                                                        <th class="stat">L</th>
+                                                        <th class="stat">+/-</th>
+                                                        <th class="stat pts">Pts</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {#each standings as team, i}
+                                                        {@const teamInfo = getTeamInfo(team.name)}
+                                                        <tr class:qualifies={i < tournament.format.groupAdvancement}>
+                                                            <td class="pos">{i + 1}</td>
+                                                            <td class="name">{team.name}</td>
+                                                            <td class="player">{teamInfo?.player1 || '—'}</td>
+                                                            <td class="player">{teamInfo?.player2 || '—'}</td>
+                                                            <td class="stat">{team.wins}</td>
+                                                            <td class="stat">{team.draws}</td>
+                                                            <td class="stat">{team.losses}</td>
+                                                            <td class="stat diff" class:positive={team.pointsDiff > 0} class:negative={team.pointsDiff < 0}>
+                                                                {team.pointsDiff > 0 ? '+' : ''}{team.pointsDiff}
+                                                            </td>
+                                                            <td class="stat pts">{team.points}</td>
+                                                        </tr>
+                                                    {/each}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     {/each}
                                 </div>
+                                
+                                <!-- Right: Schedule Table -->
+                                <div class="schedule-section">
+                                    <h2>Schedule</h2>
+                                    <table class="schedule-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="time-col">Time</th>
+                                                {#each getBoards() as board}
+                                                    <th class="board-col">{board} Board</th>
+                                                {/each}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each tournament.schedule as timeSlot, slotIndex}
+                                                <tr class="schedule-row" class:knockout-row={timeSlot.stage !== 'Group Stage' && !timeSlot.stage.includes('Float')}>
+                                                    <td class="time-cell">
+                                                        <span class="time-value">{timeSlot.time}</span>
+                                                        {#if timeSlot.stage !== 'Group Stage'}
+                                                            <span class="stage-label">{timeSlot.stage}</span>
+                                                        {/if}
+                                                    </td>
+                                                    {#each getBoards() as board}
+                                                        {@const scheduleMatch = getScheduleMatch(slotIndex, board)}
+                                                        <td class="match-cell">
+                                                            {#if scheduleMatch}
+                                                                {#if isGroupStageMatch(scheduleMatch)}
+                                                                    <!-- Group stage match -->
+                                                                    {@const groupMatchData = findGroupMatch(scheduleMatch.team1, scheduleMatch.team2)}
+                                                                    {#if groupMatchData}
+                                                                        {@const { match, groupIndex, matchIndex, swapped } = groupMatchData}
+                                                                        <div class="schedule-match-cell" class:completed={match.completed}>
+                                                                            {#if editingMatch?.type === 'group' && editingMatch?.groupIndex === groupIndex && editingMatch?.matchIndex === matchIndex}
+                                                                                <!-- Editing mode -->
+                                                                                <div class="cell-edit">
+                                                                                    <div class="edit-row">
+                                                                                        <span class="edit-team">{swapped ? match.team2 : match.team1}</span>
+                                                                                        <input type="number" min="0" bind:value={editingMatch.score1} class="score-input-small" />
+                                                                                    </div>
+                                                                                    <div class="edit-row">
+                                                                                        <span class="edit-team">{swapped ? match.team1 : match.team2}</span>
+                                                                                        <input type="number" min="0" bind:value={editingMatch.score2} class="score-input-small" />
+                                                                                    </div>
+                                                                                    <div class="edit-buttons">
+                                                                                        <button class="edit-btn save" on:click={saveMatchScore}>✓</button>
+                                                                                        <button class="edit-btn cancel" on:click={cancelEditing}>✕</button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            {:else}
+                                                                                <!-- Display mode -->
+                                                                                <div 
+                                                                                    class="cell-display"
+                                                                                    class:editable={editable}
+                                                                                    on:click={() => editable && startEditing('group', { groupIndex, matchIndex }, match.score1, match.score2)}
+                                                                                    on:keydown={(e) => e.key === 'Enter' && editable && startEditing('group', { groupIndex, matchIndex }, match.score1, match.score2)}
+                                                                                    role={editable ? "button" : "text"}
+                                                                                    tabindex={editable ? 0 : -1}
+                                                                                >
+                                                                                    <span class="team-name" class:winner={match.completed && (swapped ? match.score2 > match.score1 : match.score1 > match.score2)}>{swapped ? match.team2 : match.team1}</span>
+                                                                                    {#if match.completed}
+                                                                                        <span class="match-score">{swapped ? match.score2 : match.score1} - {swapped ? match.score1 : match.score2}</span>
+                                                                                    {:else}
+                                                                                        <span class="vs">vs</span>
+                                                                                    {/if}
+                                                                                    <span class="team-name" class:winner={match.completed && (swapped ? match.score1 > match.score2 : match.score2 > match.score1)}>{swapped ? match.team1 : match.team2}</span>
+                                                                                </div>
+                                                                                {#if editable && match.completed}
+                                                                                    <button 
+                                                                                        class="clear-btn-small" 
+                                                                                        on:click|stopPropagation={() => clearMatchResult('group', { groupIndex, matchIndex })}
+                                                                                        title="Clear result"
+                                                                                    >✕</button>
+                                                                                {/if}
+                                                                            {/if}
+                                                                        </div>
+                                                                    {/if}
+                                                                {:else}
+                                                                    <!-- Bracket match -->
+                                                                    {@const bracketMatchData = findBracketMatch(scheduleMatch.matchId)}
+                                                                    {#if bracketMatchData}
+                                                                        {@const { match, roundIndex, matchIndex, type } = bracketMatchData}
+                                                                        <div class="schedule-match-cell bracket-cell" class:completed={match.winner}>
+                                                                            {#if (type === 'bracket' && editingMatch?.type === 'bracket' && editingMatch?.roundIndex === roundIndex && editingMatch?.matchIndex === matchIndex) || (type === 'thirdPlace' && editingMatch?.type === 'thirdPlace')}
+                                                                                <!-- Editing mode -->
+                                                                                <div class="cell-edit">
+                                                                                    <div class="edit-row">
+                                                                                        <span class="edit-team">{getTeamDisplayName(match.team1)}</span>
+                                                                                        <input type="number" min="0" bind:value={editingMatch.score1} class="score-input-small" />
+                                                                                    </div>
+                                                                                    <div class="edit-row">
+                                                                                        <span class="edit-team">{getTeamDisplayName(match.team2)}</span>
+                                                                                        <input type="number" min="0" bind:value={editingMatch.score2} class="score-input-small" />
+                                                                                    </div>
+                                                                                    <div class="edit-buttons">
+                                                                                        <button class="edit-btn save" on:click={saveMatchScore}>✓</button>
+                                                                                        <button class="edit-btn cancel" on:click={cancelEditing}>✕</button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            {:else}
+                                                                                <!-- Display mode -->
+                                                                                {@const canEdit = editable && isNextMatch(match)}
+                                                                                <div 
+                                                                                    class="cell-display"
+                                                                                    class:editable={canEdit}
+                                                                                    on:click={() => canEdit && startEditing(type, type === 'bracket' ? { roundIndex, matchIndex } : {}, match.score1, match.score2)}
+                                                                                    on:keydown={(e) => e.key === 'Enter' && canEdit && startEditing(type, type === 'bracket' ? { roundIndex, matchIndex } : {}, match.score1, match.score2)}
+                                                                                    role={canEdit ? "button" : "text"}
+                                                                                    tabindex={canEdit ? 0 : -1}
+                                                                                >
+                                                                                    <span class="team-name" class:winner={match.winner === match.team1?.name} class:tbd={!match.team1?.name || match.team1.name === 'TBD'}>{getTeamDisplayName(match.team1)}</span>
+                                                                                    {#if match.score1 !== null && match.score2 !== null}
+                                                                                        <span class="match-score">{match.score1} - {match.score2}</span>
+                                                                                    {:else}
+                                                                                        <span class="vs">vs</span>
+                                                                                    {/if}
+                                                                                    <span class="team-name" class:winner={match.winner === match.team2?.name} class:tbd={!match.team2?.name || match.team2.name === 'TBD'}>{getTeamDisplayName(match.team2)}</span>
+                                                                                </div>
+                                                                                {#if editable && match.winner}
+                                                                                    <button 
+                                                                                        class="clear-btn-small" 
+                                                                                        on:click|stopPropagation={() => clearMatchResult(type, type === 'bracket' ? { roundIndex, matchIndex } : {})}
+                                                                                        title="Clear result"
+                                                                                    >✕</button>
+                                                                                {/if}
+                                                                            {/if}
+                                                                        </div>
+                                                                    {:else}
+                                                                        <!-- Match ID not found yet (bracket not populated) -->
+                                                                        <div class="schedule-match-cell bracket-cell pending">
+                                                                            <div class="cell-display">
+                                                                                <span class="team-name tbd">{scheduleMatch.team1}</span>
+                                                                                <span class="vs">vs</span>
+                                                                                <span class="team-name tbd">{scheduleMatch.team2}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    {/if}
+                                                                {/if}
+                                                            {:else}
+                                                                <!-- Empty cell -->
+                                                                <div class="empty-cell">—</div>
+                                                            {/if}
+                                                        </td>
+                                                    {/each}
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        {/each}
-                    </div>
-                </div>
-                {/if}
+                        </div>
+                    {/if}
                 
                 <!-- Bracket Section (below groups) -->
                 {#if tournament.format.knockoutStage && tournament.bracket}
@@ -821,6 +988,98 @@
                                 </div>
                             {/each}
                             
+                            <!-- Bronze Final (as a column in the bracket) -->
+                            {#if tournament.bracket.thirdPlaceMatch}
+                                {@const thirdPlaceSchedule = getBracketMatchSchedule('third')}
+                                <div class="bracket-round bronze-round">
+                                    <h3 class="round-title">Bronze Final</h3>
+                                    <div class="round-matches">
+                                        <div class="bracket-match" class:next-match={isNextMatch(tournament.bracket.thirdPlaceMatch)} class:completed={tournament.bracket.thirdPlaceMatch.winner}>
+                                            {#if thirdPlaceSchedule}
+                                                <button 
+                                                    class="bracket-schedule-link"
+                                                    on:click={() => scrollToSchedule(thirdPlaceSchedule.slotIndex)}
+                                                    title="View in schedule"
+                                                >
+                                                    🕐 {thirdPlaceSchedule.time} • Board {thirdPlaceSchedule.board}
+                                                </button>
+                                            {/if}
+                                            {#if editingMatch?.type === 'thirdPlace'}
+                                                <!-- Editing mode -->
+                                                <div class="bracket-match-edit">
+                                                    <div class="edit-team">
+                                                        <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team1)}</span>
+                                                        <input 
+                                                            type="number" 
+                                                            min="0" 
+                                                            bind:value={editingMatch.score1}
+                                                            class="score-input"
+                                                        />
+                                                    </div>
+                                                    <div class="edit-team">
+                                                        <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team2)}</span>
+                                                        <input 
+                                                            type="number" 
+                                                            min="0" 
+                                                            bind:value={editingMatch.score2}
+                                                            class="score-input"
+                                                        />
+                                                    </div>
+                                                    <div class="edit-actions">
+                                                        <button class="edit-btn save" on:click={saveMatchScore}>✓ Save</button>
+                                                        <button class="edit-btn cancel" on:click={cancelEditing}>✕ Cancel</button>
+                                                    </div>
+                                                </div>
+                                            {:else}
+                                                <!-- Display mode -->
+                                                <div 
+                                                    class="team-slot" 
+                                                    class:winner={tournament.bracket.thirdPlaceMatch.winner === tournament.bracket.thirdPlaceMatch.team1?.name}
+                                                    class:loser={tournament.bracket.thirdPlaceMatch.winner && tournament.bracket.thirdPlaceMatch.winner !== tournament.bracket.thirdPlaceMatch.team1?.name}
+                                                    class:clickable={editable && isNextMatch(tournament.bracket.thirdPlaceMatch)}
+                                                    on:click={() => editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
+                                                    on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
+                                                    role={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? "button" : "text"}
+                                                    tabindex={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? 0 : -1}
+                                                >
+                                                    <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team1)}</span>
+                                                    {#if tournament.bracket.thirdPlaceMatch.score1 !== null}
+                                                        <span class="team-score">{tournament.bracket.thirdPlaceMatch.score1}</span>
+                                                    {/if}
+                                                </div>
+                                                <div 
+                                                    class="team-slot" 
+                                                    class:winner={tournament.bracket.thirdPlaceMatch.winner === tournament.bracket.thirdPlaceMatch.team2?.name}
+                                                    class:loser={tournament.bracket.thirdPlaceMatch.winner && tournament.bracket.thirdPlaceMatch.winner !== tournament.bracket.thirdPlaceMatch.team2?.name}
+                                                    class:clickable={editable && isNextMatch(tournament.bracket.thirdPlaceMatch)}
+                                                    on:click={() => editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
+                                                    on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
+                                                    role={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? "button" : "text"}
+                                                    tabindex={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? 0 : -1}
+                                                >
+                                                    <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team2)}</span>
+                                                    {#if tournament.bracket.thirdPlaceMatch.score2 !== null}
+                                                        <span class="team-score">{tournament.bracket.thirdPlaceMatch.score2}</span>
+                                                    {/if}
+                                                </div>
+                                                {#if editable && tournament.bracket.thirdPlaceMatch.winner}
+                                                    <button 
+                                                        class="clear-btn bracket-clear" 
+                                                        on:click={() => clearMatchResult('thirdPlace', {})}
+                                                        title="Clear result"
+                                                    >🗑</button>
+                                                {/if}
+                                            {/if}
+                                        </div>
+                                    </div>
+                                    {#if tournament.bracket.thirdPlaceMatch.winner}
+                                        <div class="bronze-winner">
+                                            🥉 {tournament.bracket.thirdPlaceMatch.winner}
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/if}
+                            
                             <!-- Champion display -->
                             {#if tournament.bracket.rounds.length > 0}
                                 {@const finalMatch = tournament.bracket.rounds[tournament.bracket.rounds.length - 1].matches[0]}
@@ -832,98 +1091,63 @@
                                 {/if}
                             {/if}
                         </div>
-                        
-                        <!-- 3rd Place Match -->
-                        {#if tournament.bracket.thirdPlaceMatch}
-                            {@const thirdPlaceSchedule = getBracketMatchSchedule('third')}
-                            <div class="third-place-section">
-                                <h3>🥉 3rd Place Match</h3>
-                                {#if thirdPlaceSchedule}
-                                    <button 
-                                        class="schedule-link"
-                                        on:click={() => scrollToSchedule(thirdPlaceSchedule.slotIndex)}
-                                        title="View in schedule"
-                                    >
-                                        🕐 {thirdPlaceSchedule.time} • Board {thirdPlaceSchedule.board}
-                                    </button>
-                                {/if}
-                                <div class="third-place-match" class:next-match={isNextMatch(tournament.bracket.thirdPlaceMatch)} class:completed={tournament.bracket.thirdPlaceMatch.winner}>
-                                    {#if editingMatch?.type === 'thirdPlace'}
-                                        <!-- Editing mode -->
-                                        <div class="bracket-match-edit">
-                                            <div class="edit-team">
-                                                <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team1)}</span>
-                                                <input 
-                                                    type="number" 
-                                                    min="0" 
-                                                    bind:value={editingMatch.score1}
-                                                    class="score-input"
-                                                />
-                                            </div>
-                                            <div class="edit-team">
-                                                <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team2)}</span>
-                                                <input 
-                                                    type="number" 
-                                                    min="0" 
-                                                    bind:value={editingMatch.score2}
-                                                    class="score-input"
-                                                />
-                                            </div>
-                                            <div class="edit-actions">
-                                                <button class="edit-btn save" on:click={saveMatchScore}>✓ Save</button>
-                                                <button class="edit-btn cancel" on:click={cancelEditing}>✕ Cancel</button>
-                                            </div>
-                                        </div>
-                                    {:else}
-                                        <!-- Display mode -->
-                                        <div 
-                                            class="team-slot" 
-                                            class:winner={tournament.bracket.thirdPlaceMatch.winner === tournament.bracket.thirdPlaceMatch.team1?.name}
-                                            class:loser={tournament.bracket.thirdPlaceMatch.winner && tournament.bracket.thirdPlaceMatch.winner !== tournament.bracket.thirdPlaceMatch.team1?.name}
-                                            class:clickable={editable && isNextMatch(tournament.bracket.thirdPlaceMatch)}
-                                            on:click={() => editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
-                                            on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
-                                            role={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? "button" : "text"}
-                                            tabindex={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? 0 : -1}
-                                        >
-                                            <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team1)}</span>
-                                            {#if tournament.bracket.thirdPlaceMatch.score1 !== null}
-                                                <span class="team-score">{tournament.bracket.thirdPlaceMatch.score1}</span>
-                                            {/if}
-                                        </div>
-                                        <div 
-                                            class="team-slot" 
-                                            class:winner={tournament.bracket.thirdPlaceMatch.winner === tournament.bracket.thirdPlaceMatch.team2?.name}
-                                            class:loser={tournament.bracket.thirdPlaceMatch.winner && tournament.bracket.thirdPlaceMatch.winner !== tournament.bracket.thirdPlaceMatch.team2?.name}
-                                            class:clickable={editable && isNextMatch(tournament.bracket.thirdPlaceMatch)}
-                                            on:click={() => editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
-                                            on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(tournament.bracket.thirdPlaceMatch) && startEditing('thirdPlace', {}, tournament.bracket.thirdPlaceMatch.score1, tournament.bracket.thirdPlaceMatch.score2)}
-                                            role={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? "button" : "text"}
-                                            tabindex={editable && isNextMatch(tournament.bracket.thirdPlaceMatch) ? 0 : -1}
-                                        >
-                                            <span class="team-name">{getTeamDisplayName(tournament.bracket.thirdPlaceMatch.team2)}</span>
-                                            {#if tournament.bracket.thirdPlaceMatch.score2 !== null}
-                                                <span class="team-score">{tournament.bracket.thirdPlaceMatch.score2}</span>
-                                            {/if}
-                                        </div>
-                                        {#if editable && tournament.bracket.thirdPlaceMatch.winner}
-                                            <button 
-                                                class="clear-btn bracket-clear" 
-                                                on:click={() => clearMatchResult('thirdPlace', {})}
-                                                title="Clear result"
-                                            >🗑</button>
-                                        {/if}
-                                    {/if}
-                                </div>
-                                {#if tournament.bracket.thirdPlaceMatch.winner}
-                                    <div class="third-place-winner">
-                                        🥉 {tournament.bracket.thirdPlaceMatch.winner}
-                                    </div>
-                                {/if}
-                            </div>
-                        {/if}
                     </div>
                 {/if}
+                </div>
+            {/if}
+            
+            <!-- Rules Tab -->
+            {#if activeTab === 'rules'}
+                <div class="rules-view">
+                    <h2>Tournament Rules</h2>
+                    
+                    <div class="rules-container">
+                        <section class="rules-section">
+                            <h3>📋 Format</h3>
+                            <ul>
+                                <li><strong>Group Stage:</strong> All 10 players compete in a single league table, each playing 3 matches</li>
+                                <li><strong>Advancement:</strong> Top 6 players advance to the knockout stage</li>
+                                <li><strong>Knockout Stage:</strong> 1st and 2nd place receive byes to the semifinals; 3rd plays 6th and 4th plays 5th in quarterfinals</li>
+                            </ul>
+                        </section>
+                        
+                        <section class="rules-section">
+                            <h3>🎯 Scoring</h3>
+                            <ul>
+                                <li><strong>Win:</strong> 3 points</li>
+                                <li><strong>Draw:</strong> 1 point</li>
+                                <li><strong>Loss:</strong> 0 points</li>
+                                <li><strong>Tiebreaker:</strong> Point differential, then total points scored</li>
+                            </ul>
+                            <h4>League score</h4>
+                            For placement in this tournament you will earn half the follwing points for your team. If your partner in the league isn't in the tournament you earn the full (not half)
+                            <ul>
+                                <li><strong>1st:</strong> 5 points</li>
+                                <li><strong>2nd:</strong> 4 point</li>
+                                <li><strong>3rd:</strong> 3 points</li>
+                                <li><strong>4th:</strong> 2 points</li>
+                                <li><strong>5th&6th:</strong>1 point</li>
+                            </ul>
+                        </section>
+                        
+                        <section class="rules-section">
+                            <h3>🎮 Match Rules</h3>
+                            <ul>
+                                <li>Each match consists of rounds played until one player reaches the target score</li>
+                                <li>20s count as 20 points</li>
+                                <li>Standard crokinole rules apply</li>
+                            </ul>
+                        </section>
+                        
+                        <section class="rules-section">
+                            <h3>📍 Boards</h3>
+                            <ul>
+                                <li><strong>Home Board:</strong> Primary playing surface</li>
+                                <li><strong>Anish Board:</strong> Secondary playing surface</li>
+                                <li>Players will not play back-to-back matches on different boards</li>
+                            </ul>
+                        </section>
+                    </div>
                 </div>
             {/if}
         </div>
@@ -932,7 +1156,7 @@
 
 <style>
     .tournament-container {
-        max-width: 1200px;
+        max-width: 1400px;
         margin: 0 auto;
         padding: 1rem;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -1004,93 +1228,52 @@
         color: white;
     }
     
-    /* Schedule View */
-    .schedule-view h2 {
+    /* Rules View */
+    .rules-view h2 {
         margin-bottom: 1.5rem;
         color: #1f2937;
     }
     
-    .time-slot {
-        margin-bottom: 1.5rem;
-        background: #f9fafb;
-        border-radius: 12px;
-        overflow: hidden;
+    .rules-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
     }
     
-    .time-header {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 0.75rem 1rem;
-        background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
-        color: white;
-    }
-    
-    .time {
-        font-size: 1.1rem;
-        font-weight: 600;
-    }
-    
-    .stage-badge {
-        background: rgba(255,255,255,0.2);
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.85rem;
-    }
-    
-    .slot-matches {
-        padding: 0.75rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    
-    .schedule-match {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 0.75rem 1rem;
+    .rules-section {
         background: white;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 1.5rem;
     }
     
-    .board {
-        background: #e5e7eb;
-        padding: 0.25rem 0.75rem;
-        border-radius: 4px;
-        font-size: 0.85rem;
-        font-weight: 500;
+    .rules-section h3 {
+        margin: 0 0 1rem 0;
+        color: #1f2937;
+        font-size: 1.1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .rules-section ul {
+        margin: 0;
+        padding-left: 1.25rem;
+    }
+    
+    .rules-section li {
+        margin-bottom: 0.75rem;
         color: #4b5563;
+        line-height: 1.5;
     }
     
-    .matchup {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.75rem;
+    .rules-section li:last-child {
+        margin-bottom: 0;
     }
     
-    .matchup .team {
-        font-weight: 500;
+    .rules-section li strong {
         color: #1f2937;
     }
-    
-    .matchup .vs {
-        color: #9ca3af;
-        font-size: 0.85rem;
-    }
-    
-    .group-tag {
-        background: #dbeafe;
-        color: #1d4ed8;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-    
+
     /* Groups View */
     .groups-view h2 {
         margin-bottom: 1.5rem;
@@ -1112,6 +1295,9 @@
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         overflow: hidden;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
     }
     
     .group-card h3 {
@@ -1126,6 +1312,15 @@
         width: 100%;
         border-collapse: collapse;
         font-size: 0.9rem;
+        flex: 1;
+    }
+    
+    .standings-table tbody {
+        display: table-row-group;
+    }
+    
+    .standings-table tr:last-child td {
+        border-bottom: none;
     }
     
     .standings-table th {
@@ -1142,6 +1337,11 @@
         padding-left: 0.75rem;
     }
     
+    .standings-table th.player {
+        text-align: left;
+        font-size: 0.8rem;
+    }
+    
     .standings-table td {
         padding: 0.6rem 0.4rem;
         text-align: center;
@@ -1152,6 +1352,12 @@
         text-align: left;
         padding-left: 0.75rem;
         font-weight: 500;
+    }
+    
+    .standings-table td.player {
+        text-align: left;
+        color: #6b7280;
+        font-size: 0.85rem;
     }
     
     .standings-table td.pos {
@@ -1217,6 +1423,314 @@
         background: #0052a3;
     }
     
+    /* Side by Side Layout */
+    .standings-schedule-container {
+        display: grid;
+        grid-template-columns: minmax(300px, 500px) 1fr;
+        gap: 2rem;
+        align-items: stretch;
+    }
+    
+    .standings-section {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .standings-section h2 {
+        margin: 0 0 1rem 0;
+        font-size: 1.25rem;
+        color: #1f2937;
+    }
+    
+    .schedule-section {
+        min-width: 0;
+    }
+    
+    .schedule-section h2 {
+        margin: 0 0 1rem 0;
+        font-size: 1.25rem;
+        color: #1f2937;
+    }
+    
+    /* Schedule Table */
+    .schedule-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        table-layout: fixed;
+    }
+    
+    .schedule-table th {
+        background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+        color: white;
+        padding: 0.5rem 0.35rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-align: center;
+    }
+    
+    .schedule-table th.time-col {
+        width: 120px;
+        text-align: left;
+        padding-left: 0.5rem;
+    }
+    
+    .schedule-table th.board-col {
+        /* Equal width for all board columns - calculated automatically with table-layout: fixed */
+    }
+    
+    .schedule-row {
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .schedule-row:last-child {
+        border-bottom: none;
+    }
+    
+    .schedule-row.knockout-row {
+        background: #fef3c7;
+    }
+    
+    .schedule-row:hover {
+        background: #f9fafb;
+    }
+    
+    .schedule-row.knockout-row:hover {
+        background: #fde68a;
+    }
+    
+    .time-cell {
+        padding: 0.35rem 0.5rem;
+        vertical-align: middle;
+        border-right: 1px solid #e5e7eb;
+        width: 120px;
+    }
+    
+    .time-value {
+        display: block;
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 0.8rem;
+    }
+    
+    .stage-label {
+        display: block;
+        font-size: 0.65rem;
+        color: #6b7280;
+        margin-top: 0.15rem;
+        white-space: nowrap;
+    }
+    
+    .match-cell {
+        padding: 0.2rem;
+        vertical-align: middle;
+        border-right: 1px solid #e5e7eb;
+        position: relative;
+        height: 36px;
+    }
+    
+    .match-cell:last-child {
+        border-right: none;
+    }
+    
+    .schedule-match-cell {
+        background: #f9fafb;
+        border-radius: 4px;
+        position: relative;
+        height: 100%;
+    }
+    
+    .schedule-match-cell.completed {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+    }
+    
+    .schedule-match-cell.bracket-cell {
+        background: #fef9c3;
+        border: 1px solid #fde047;
+    }
+    
+    .schedule-match-cell.bracket-cell.completed {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+    }
+    
+    .schedule-match-cell.bracket-cell.pending {
+        background: #f3f4f6;
+        border: 1px dashed #9ca3af;
+    }
+    
+    .cell-display {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.3rem 0.5rem;
+        font-size: 0.8rem;
+        height: 100%;
+        box-sizing: border-box;
+        gap: 0.25rem;
+    }
+    
+    .cell-display .team-name {
+        font-weight: 500;
+        color: #374151;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .cell-display .team-name:first-of-type {
+        text-align: left;
+    }
+    
+    .cell-display .team-name:last-of-type {
+        text-align: right;
+    }
+    
+    .cell-display .team-name.winner {
+        color: #065f46;
+        font-weight: 600;
+    }
+    
+    .cell-display .team-name.tbd {
+        color: #9ca3af;
+        font-style: italic;
+    }
+    
+    .cell-display .vs {
+        color: #9ca3af;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+    
+    .cell-display .match-score {
+        font-weight: 700;
+        color: #1f2937;
+        background: #e5e7eb;
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+    
+    .schedule-match-cell.completed .cell-display .match-score {
+        background: #a7f3d0;
+        color: #065f46;
+    }
+    
+    .empty-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #d1d5db;
+        font-size: 1rem;
+        height: 100%;
+    }
+    
+    .cell-display.editable {
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+    
+    .cell-display.editable:hover {
+        background: rgba(0, 102, 204, 0.1);
+    }
+    
+    .cell-edit {
+        padding: 0.25rem;
+    }
+    
+    .edit-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .edit-row .edit-team {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #374151;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .score-input-small {
+        width: 40px;
+        padding: 0.2rem 0.3rem;
+        border: 2px solid #0066cc;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .score-input-small:focus {
+        outline: none;
+        border-color: #0052a3;
+        box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+    }
+    
+    .edit-buttons {
+        display: flex;
+        gap: 0.25rem;
+        justify-content: center;
+        margin-top: 0.25rem;
+    }
+    
+    .clear-btn-small {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: none;
+        background: #ef4444;
+        color: white;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    
+    .schedule-match-cell:hover .clear-btn-small {
+        opacity: 1;
+    }
+    
+    /* Responsive for side-by-side layout */
+    @media (max-width: 900px) {
+        .standings-schedule-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .standings-section {
+            position: static;
+        }
+        
+        .schedule-table th.board-col {
+            min-width: 140px;
+        }
+        
+        .team-row .team-name {
+            max-width: 100px;
+        }
+    }
+
     .group-matches {
         padding: 1rem;
         background: #f9fafb;
@@ -1627,57 +2141,21 @@
         background: #dbeafe;
     }
     
-    /* 3rd Place Match */
-    .third-place-section {
-        margin-top: 2rem;
-        padding: 1.5rem;
-        background: #f9fafb;
-        border-radius: 12px;
-        text-align: center;
+    /* Bronze Final */
+    .bronze-round {
+        align-self: flex-end;
     }
     
-    .third-place-section h3 {
-        margin: 0 0 1rem 0;
-        color: #78716c;
-        font-size: 1rem;
+    .bronze-round .round-matches {
+        justify-content: flex-end;
     }
     
-    .third-place-match {
-        display: inline-flex;
-        flex-direction: column;
-        background: white;
-        border: 2px solid #d6d3d1;
-        border-radius: 8px;
-        min-width: 200px;
-        position: relative;
-    }
-    
-    .third-place-match.next-match {
-        border-color: #f59e0b;
-        box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
-    }
-    
-    .third-place-match.completed {
-        border-color: #a8a29e;
-    }
-    
-    .third-place-match .team-slot {
-        padding: 0.75rem 1rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    
-    .third-place-match .team-slot:last-child {
-        border-bottom: none;
-    }
-    
-    .third-place-winner {
+    .bronze-winner {
         margin-top: 1rem;
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 600;
         color: #78716c;
+        text-align: center;
     }
     
     /* Responsive */

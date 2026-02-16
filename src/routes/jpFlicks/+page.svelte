@@ -3,7 +3,9 @@
     import * as XLSX from 'xlsx';
     import Collapsible from '$lib/Collapsible.svelte';
     import HallOfFame from '$lib/HallOfFame.svelte';
-    import jpflicksImage from '$lib/assets/favicon.svg';
+    import brownJPFlicksLogo from '$lib/assets/brownJPFlicksLogo.svg';
+    import patternColorLogo from '$lib/assets/colorJPFlicksCollisionLogo-pattern.svg';
+    import patternBrownLogo from '$lib/assets/brownJPFlicksCollisionLogo-pattern.svg';
     import '../../app.css';
     
     // Data storage
@@ -13,7 +15,20 @@
     let dataReady = false;
     let team_names = []; // will store the name of all teams
     let teams_info = undefined; // will store all the teams info
+    let tournamentPoints = {}; // will store tournament points per team
     $: teamsWithRanking = undefined;
+    
+    // Page background element
+    let pageBackground;
+    
+    // Set background on mount - smaller icons with more whitespace, diagonal pattern
+    $: if (pageBackground) {
+        pageBackground.style.backgroundImage = `url(${patternColorLogo}), url(${patternBrownLogo})`;
+        // Offset the second logo diagonally (not a perfect grid)
+        pageBackground.style.backgroundPosition = '0 0, 90px 60px';
+        pageBackground.style.backgroundSize = '150px 150px, 150px 150px';
+        pageBackground.style.backgroundRepeat = 'repeat';
+    }
 
     const WIN_SCORE = 2;
     const TIES_SCORE = 1;
@@ -21,10 +36,19 @@
     const SERIES_WIN_SCORE = 1;
     const UNPLAYED_STRING = "UNPLAYED"
     const WONT_PLAY_STRING = "XXX"
-    const SESSION_COUNT = 11
+    const SESSION_COUNT = 6
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
+    
+    // Adjustment constant for games per session calculation (C in the algorithm)
+    const GAMES_PER_SESSION_ADJUSTMENT = 0.1;
+    
+    // Team that will be adjusted last to ensure even total (players not on other teams)
+    const LAST_TEAM_FOR_ADJUSTMENT = 'Kalice';
+
+    // Tournament points file
+    const TOURNAMENT_POINTS_FILE = '/marchMadness/2026/tournamentPoints.json'
 
     // file information
     const HOME_GAMES_PAGE_NAME = "HomeGames"
@@ -45,6 +69,629 @@
     const PLAYER1_TEAM2 = 'player1_team2'
     const PLAYER2_TEAM2 = 'player2_team2'
 
+    // Get the date of the next Thursday (or today if Thursday) for consistent seeding
+    function getThursdaySeed() {
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0 = Sunday, 4 = Thursday
+        
+        let thursday;
+        if (dayOfWeek === 4) {
+            // Today is Thursday
+            thursday = today;
+        } else {
+            // Calculate days until next Thursday
+            const daysUntilThursday = (4 - dayOfWeek + 7) % 7 || 7;
+            thursday = new Date(today);
+            thursday.setDate(today.getDate() + daysUntilThursday);
+        }
+        
+        // Return as YYYYMMDD number for seed
+        return thursday.getFullYear() * 10000 + 
+               (thursday.getMonth() + 1) * 100 + 
+               thursday.getDate();
+    }
+    
+    // Seeded random number generator (mulberry32)
+    function seededRandom(seed) {
+        return function() {
+            let t = seed += 0x6D2B79F5;
+            t = Math.imul(t ^ t >>> 15, t | 1);
+            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+    
+    // Get the current Thursday seed
+    const thursdaySeed = getThursdaySeed();
+    const random = seededRandom(thursdaySeed);
+    console.log('ðŸ—“ï¸ THURSDAY SEED:', thursdaySeed);
+
+    /**
+     * Compute the number of games each team should play this week.
+     * 
+     * Algorithm:
+     * 1. Calculate X = (remaining games) / SESSION_COUNT for each team
+     * 2. Add adjustment C to get X + C
+     * 3. Probabilistically round: decimal part = probability of rounding up
+     * 4. Ensure each team plays at least 1 game
+     * 5. Cap players on multiple teams to 3 games total (unless their X values sum > 3)
+     * 6. Adjust last team (Kalice) to ensure total is even
+     * 
+     * @param {Array} games - Array of all unplayed games
+     * @param {Array} teamsInfo - Array of team info with player1, player2, teamName
+     * @param {Function} randomFn - Seeded random function
+     * @returns {Object} - Map of teamName -> number of games to play
+     */
+    function computeGamesPerTeam(games, teamsInfo, randomFn) {
+        if (!games || !teamsInfo || games.length === 0) return {};
+        
+        // Step 1: Count remaining games per team
+        const remainingGamesPerTeam = {};
+        games.forEach(game => {
+            if (!game.played) {
+                remainingGamesPerTeam[game.team1] = (remainingGamesPerTeam[game.team1] || 0) + 1;
+                remainingGamesPerTeam[game.team2] = (remainingGamesPerTeam[game.team2] || 0) + 1;
+            }
+        });
+        
+        // Step 2: Calculate X + C for each team and probabilistically round
+        const gamesPerTeam = {};
+        const teamXValues = {}; // Store X values for multi-team cap calculation
+        
+        Object.keys(remainingGamesPerTeam).forEach(teamName => {
+            const remaining = remainingGamesPerTeam[teamName];
+            const X = remaining / SESSION_COUNT;
+            teamXValues[teamName] = X;
+            
+            const adjusted = X + GAMES_PER_SESSION_ADJUSTMENT;
+            const floor = Math.floor(adjusted);
+            const decimal = adjusted - floor;
+            
+            // Probabilistic rounding: decimal is probability of rounding up
+            const roundedGames = randomFn() < decimal ? floor + 1 : floor;
+            
+            // Ensure at least 1 game per team
+            gamesPerTeam[teamName] = Math.max(1, roundedGames);
+        });
+        
+        // Step 3: Build player -> teams mapping
+        const playerTeams = {};
+        teamsInfo.forEach(team => {
+            const p1 = team.player1?.toLowerCase();
+            const p2 = team.player2?.toLowerCase();
+            
+            if (p1) {
+                if (!playerTeams[p1]) playerTeams[p1] = [];
+                playerTeams[p1].push(team.teamName);
+            }
+            if (p2) {
+                if (!playerTeams[p2]) playerTeams[p2] = [];
+                playerTeams[p2].push(team.teamName);
+            }
+        });
+        
+        // Step 4: Cap multi-team players at 3 games (unless X1 + X2 > 3)
+        Object.entries(playerTeams).forEach(([player, teams]) => {
+            if (teams.length > 1) {
+                const totalGames = teams.reduce((sum, t) => sum + (gamesPerTeam[t] || 0), 0);
+                const totalX = teams.reduce((sum, t) => sum + (teamXValues[t] || 0), 0);
+                
+                const cap = Math.max(3, Math.ceil(totalX));
+                
+                if (totalGames > cap) {
+                    // Need to reduce - find team with lowest X value (excluding last team)
+                    const sortedTeams = teams
+                        .filter(t => t !== LAST_TEAM_FOR_ADJUSTMENT)
+                        .sort((a, b) => (teamXValues[a] || 0) - (teamXValues[b] || 0));
+                    
+                    let excess = totalGames - cap;
+                    for (const teamToReduce of sortedTeams) {
+                        if (excess <= 0) break;
+                        const currentGames = gamesPerTeam[teamToReduce];
+                        const reduction = Math.min(excess, currentGames - 1); // Keep at least 1
+                        if (reduction > 0) {
+                            gamesPerTeam[teamToReduce] -= reduction;
+                            excess -= reduction;
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Step 5: Compute max games per player for rebalancing checks
+        // Formula: MAX(1 + n, CEIL(X_1 + X_2 + ... + X_n)) where n = number of teams
+        const maxGamesPerPlayer = {};
+        Object.entries(playerTeams).forEach(([player, teams]) => {
+            const n = teams.length;
+            const totalX = teams.reduce((sum, t) => sum + (teamXValues[t] || 0), 0);
+            maxGamesPerPlayer[player] = Math.max(1 + n, Math.ceil(totalX));
+        });
+        
+        // Step 6: Calculate total and adjust last team for even sum
+        let totalGames = Object.values(gamesPerTeam).reduce((sum, g) => sum + g, 0);
+        
+        if (totalGames % 2 !== 0) {
+            // Adjust Kalice to make it even
+            if (gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT] !== undefined) {
+                // Decide whether to add or subtract based on their X value
+                const kaliceX = teamXValues[LAST_TEAM_FOR_ADJUSTMENT] || 0;
+                const kaliceCurrent = gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT];
+                
+                if (kaliceCurrent > kaliceX + GAMES_PER_SESSION_ADJUSTMENT) {
+                    // Current is higher than expected, reduce by 1
+                    gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT] = Math.max(1, kaliceCurrent - 1);
+                } else {
+                    // Add 1
+                    gamesPerTeam[LAST_TEAM_FOR_ADJUSTMENT] = kaliceCurrent + 1;
+                }
+            }
+        }
+        
+        // Recalculate total for logging
+        totalGames = Object.values(gamesPerTeam).reduce((sum, g) => sum + g, 0);
+        
+        return { gamesPerTeam, remainingGamesPerTeam, teamXValues, totalGames, maxGamesPerPlayer };
+    }
+
+    /**
+     * Select specific games for this week that satisfy the games-per-team constraints.
+     * 
+     * Algorithm:
+     * 1. First, find a matching to give each team their first game (no team plays twice in matching)
+     *    - Even teams: perfect matching
+     *    - Odd teams: near-perfect matching, leftover team gets 2 games
+     * 2. Then assign additional games for teams needing 2+ games
+     *    - Constraint: No player should face the same opponent twice
+     *      (i.e., if Team A plays Team B, Team A can't also play Team C if B and C share a player)
+     * 
+     * @param {Object} gamesPerTeam - Map of teamName -> number of games to play this week
+     * @param {Array} unplayedGames - Array of unplayed games
+     * @param {Function} randomFn - Seeded random function
+     * @param {Object} teamXValues - Map of teamName -> X value (remaining games / sessions)
+     * @param {Object} maxGamesPerPlayer - Map of playerName -> max games allowed
+     * @returns {Set} - Set of game IDs that are selected for this week
+     */
+    function selectGamesForWeek(gamesPerTeam, unplayedGames, randomFn, teamXValues = {}, maxGamesPerPlayer = {}) {
+        if (!gamesPerTeam || !unplayedGames || unplayedGames.length === 0) return new Set();
+        
+        const selectedGameIds = new Set();
+        const selectedGames = []; // Keep track of actual game objects for constraint checking
+        
+        // Track remaining games needed per team
+        const remainingNeeded = { ...gamesPerTeam };
+        
+        // Track which team pairings have been scheduled (to prevent full series in one day)
+        const scheduledPairings = new Set();
+        
+        function getPairingKey(team1, team2) {
+            return [team1, team2].sort().join('-');
+        }
+        
+        // Helper: Get players for a team from a game object
+        function getPlayersForTeam(game, teamName) {
+            if (game.team1 === teamName) {
+                return [game[PLAYER1_TEAM1]?.toLowerCase(), game[PLAYER2_TEAM1]?.toLowerCase()].filter(Boolean);
+            } else if (game.team2 === teamName) {
+                return [game[PLAYER1_TEAM2]?.toLowerCase(), game[PLAYER2_TEAM2]?.toLowerCase()].filter(Boolean);
+            }
+            return [];
+        }
+        
+        // Helper: Get opponent team name from a game
+        function getOpponentTeam(game, myTeam) {
+            return game.team1 === myTeam ? game.team2 : game.team1;
+        }
+        
+        // Helper: Get opponent players from a game
+        function getOpponentPlayers(game, myTeam) {
+            return getPlayersForTeam(game, getOpponentTeam(game, myTeam));
+        }
+        
+        // Helper: Check if two teams share any players
+        function teamsSharePlayers(game1, team1, game2, team2) {
+            const players1 = getPlayersForTeam(game1, getOpponentTeam(game1, team1));
+            const players2 = getPlayersForTeam(game2, getOpponentTeam(game2, team2));
+            return players1.some(p => players2.includes(p));
+        }
+        
+        // CONSTRAINT #2: Check if adding a game would complete a series (both home & away)
+        function violatesSeriesConstraint(game) {
+            const pairingKey = getPairingKey(game.team1, game.team2);
+            return scheduledPairings.has(pairingKey);
+        }
+        
+        // CONSTRAINT #3: Check if adding a game violates the no-shared-opponent constraint
+        function violatesSharedOpponentConstraint(newGame, teamName) {
+            const newOpponentPlayers = getOpponentPlayers(newGame, teamName);
+            
+            // Check against all games already selected for this team
+            for (const existingGame of selectedGames) {
+                if (existingGame.team1 !== teamName && existingGame.team2 !== teamName) continue;
+                
+                const existingOpponentPlayers = getOpponentPlayers(existingGame, teamName);
+                
+                // Check if any opponent player is shared
+                if (newOpponentPlayers.some(p => existingOpponentPlayers.includes(p))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Helper: Select a game and update tracking
+        function selectGame(game) {
+            const gameId = getGameId(game);
+            selectedGameIds.add(gameId);
+            selectedGames.push(game);
+            remainingNeeded[game.team1]--;
+            remainingNeeded[game.team2]--;
+            scheduledPairings.add(getPairingKey(game.team1, game.team2));
+        }
+        
+        // PHASE 1: Find initial matching (each team plays at most 1 game)
+        console.log('ðŸŽ¯ GAME SELECTION - PHASE 1: Initial Matching');
+        const teams = Object.keys(gamesPerTeam);
+        const numTeams = teams.length;
+        
+        // Shuffle available games for randomness (assign random values once, then sort)
+        let availableGames = [...unplayedGames]
+            .map(game => ({ game, sortKey: randomFn() }))
+            .sort((a, b) => a.sortKey - b.sortKey)
+            .map(item => item.game);
+        
+        // Greedy matching: iterate through shuffled games, add if neither team is matched yet
+        const matchedTeams = new Set();
+        
+        for (const game of availableGames) {
+            if (remainingNeeded[game.team1] > 0 && remainingNeeded[game.team2] > 0 &&
+                !matchedTeams.has(game.team1) && !matchedTeams.has(game.team2)) {
+                
+                selectGame(game);
+                matchedTeams.add(game.team1);
+                matchedTeams.add(game.team2);
+                console.log(`  Phase 1: ${game.team1} vs ${game.team2} (${game.isHome ? 'Home' : 'Away'})`);
+            }
+            
+            // Stop if we've matched all teams we can
+            if (matchedTeams.size >= numTeams - (numTeams % 2)) break;
+        }
+        console.log(`  Phase 1 complete: ${selectedGameIds.size} games, ${matchedTeams.size}/${numTeams} teams matched`);
+        
+        // For odd number of teams, the unmatched team should get a second game
+        if (numTeams % 2 === 1) {
+            const unmatchedTeam = teams.find(t => !matchedTeams.has(t));
+            if (unmatchedTeam && remainingNeeded[unmatchedTeam] > 0) {
+                console.log(`  Odd teams: Finding game for unmatched team ${unmatchedTeam}`);
+                // Find a game for the unmatched team
+                const validGames = availableGames.filter(game => {
+                    if (selectedGameIds.has(getGameId(game))) return false;
+                    const isTeamInGame = game.team1 === unmatchedTeam || game.team2 === unmatchedTeam;
+                    const otherTeam = game.team1 === unmatchedTeam ? game.team2 : game.team1;
+                    return isTeamInGame && remainingNeeded[otherTeam] > 0;
+                });
+                
+                if (validGames.length > 0) {
+                    const randomIndex = Math.floor(randomFn() * validGames.length);
+                    const game = validGames[randomIndex];
+                    selectGame(game);
+                    console.log(`  Phase 1 (odd): ${game.team1} vs ${game.team2} (${game.isHome ? 'Home' : 'Away'})`);
+                }
+            }
+        }
+        
+        // PHASE 2: Assign remaining games respecting constraints (with relaxation)
+        console.log('ðŸŽ¯ GAME SELECTION - PHASE 2: Additional games (with constraints)');
+        const phase2Start = selectedGameIds.size;
+        let iterations = 0;
+        const maxIterations = 1000;
+        let phase2ConstraintRelaxed = false;
+        
+        while (iterations < maxIterations) {
+            iterations++;
+            
+            // Find teams that still need games
+            const teamsNeedingGames = Object.entries(remainingNeeded)
+                .filter(([team, needed]) => needed > 0)
+                .map(([team]) => team);
+            
+            if (teamsNeedingGames.length === 0) break;
+            
+            // Find valid games with all constraints
+            let validGames = availableGames.filter(game => {
+                if (selectedGameIds.has(getGameId(game))) return false;
+                if (remainingNeeded[game.team1] <= 0 || remainingNeeded[game.team2] <= 0) return false;
+                
+                // CONSTRAINT #2: No full series in one day
+                if (violatesSeriesConstraint(game)) return false;
+                
+                // CONSTRAINT #3: No shared opponent (can be relaxed)
+                if (!phase2ConstraintRelaxed) {
+                    if (violatesSharedOpponentConstraint(game, game.team1)) return false;
+                    if (violatesSharedOpponentConstraint(game, game.team2)) return false;
+                }
+                
+                return true;
+            });
+            
+            // If no valid games and constraint not yet relaxed, try relaxing
+            if (validGames.length === 0 && !phase2ConstraintRelaxed) {
+                console.log('  Phase 2: No valid games with all constraints, relaxing shared-opponent constraint...');
+                phase2ConstraintRelaxed = true;
+                
+                // Try again with relaxed constraint
+                validGames = availableGames.filter(game => {
+                    if (selectedGameIds.has(getGameId(game))) return false;
+                    if (remainingNeeded[game.team1] <= 0 || remainingNeeded[game.team2] <= 0) return false;
+                    
+                    // CONSTRAINT #2: No full series in one day (never relaxed)
+                    if (violatesSeriesConstraint(game)) return false;
+                    
+                    return true;
+                });
+            }
+            
+            if (validGames.length === 0) {
+                console.warn('  Phase 2: Could not find any valid games even with relaxed constraints.');
+                console.log(`  Teams still needing games: ${teamsNeedingGames.join(', ')}`);
+                break;
+            }
+            
+            // Select a random valid game
+            const randomIndex = Math.floor(randomFn() * validGames.length);
+            const game = validGames[randomIndex];
+            selectGame(game);
+            const relaxedNote = phase2ConstraintRelaxed ? ' [RELAXED]' : '';
+            console.log(`  Phase 2: ${game.team1} vs ${game.team2} (${game.isHome ? 'Home' : 'Away'})${relaxedNote}`);
+        }
+        console.log(`  Phase 2 complete: ${selectedGameIds.size - phase2Start} additional games added${phase2ConstraintRelaxed ? ' (constraint was relaxed)' : ''}`);
+        
+        // PHASE 3: Check if we need more games and add them with weighted selection
+        console.log('ðŸŽ¯ GAME SELECTION - PHASE 3: Weighted selection to reach expected count');
+        const phase3Start = selectedGameIds.size;
+        const sumOfX = Object.values(teamXValues).reduce((sum, x) => sum + x, 0);
+        const expectedGames = Math.round((sumOfX + GAMES_PER_SESSION_ADJUSTMENT * numTeams) / 2);
+        
+        console.log(`  Expected: ${expectedGames}, Current: ${selectedGameIds.size} (sum X = ${sumOfX.toFixed(2)}, C = ${GAMES_PER_SESSION_ADJUSTMENT}, teams = ${numTeams})`);
+        
+        if (selectedGameIds.size < expectedGames) {
+            console.log(`  Need ${expectedGames - selectedGameIds.size} more games...`);
+            
+            // Helper: Weighted random selection
+            function weightedRandomSelect(games, weights) {
+                const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+                if (totalWeight === 0) return null;
+                
+                let random = randomFn() * totalWeight;
+                for (let i = 0; i < games.length; i++) {
+                    random -= weights[i];
+                    if (random <= 0) return games[i];
+                }
+                return games[games.length - 1];
+            }
+            
+            // Helper: Count games per player from selected games
+            function countPlayerGamesFromSelected(playerName) {
+                const playerLower = playerName.toLowerCase();
+                let count = 0;
+                selectedGames.forEach(game => {
+                    const players = [
+                        game[PLAYER1_TEAM1]?.toLowerCase(),
+                        game[PLAYER2_TEAM1]?.toLowerCase(),
+                        game[PLAYER1_TEAM2]?.toLowerCase(),
+                        game[PLAYER2_TEAM2]?.toLowerCase()
+                    ];
+                    if (players.includes(playerLower)) count++;
+                });
+                return count;
+            }
+            
+            // CONSTRAINT #1: Check if adding a game would exceed any player's max
+            function wouldExceedPlayerMax(game) {
+                const players = [
+                    game[PLAYER1_TEAM1],
+                    game[PLAYER2_TEAM1],
+                    game[PLAYER1_TEAM2],
+                    game[PLAYER2_TEAM2]
+                ].filter(Boolean);
+                
+                for (const player of players) {
+                    const playerLower = player.toLowerCase();
+                    const currentGames = countPlayerGamesFromSelected(playerLower);
+                    const maxGames = maxGamesPerPlayer[playerLower] || 999;
+                    if (currentGames >= maxGames) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            let phase3ConstraintRelaxed = false;
+            
+            while (selectedGameIds.size < expectedGames) {
+                // Find valid games with all constraints
+                let validGames = unplayedGames.filter(game => {
+                    if (selectedGameIds.has(getGameId(game))) return false;
+                    
+                    // CONSTRAINT #1: Max games per player (never relaxed)
+                    if (wouldExceedPlayerMax(game)) return false;
+                    
+                    // CONSTRAINT #2: No full series in one day (never relaxed)
+                    if (violatesSeriesConstraint(game)) return false;
+                    
+                    // CONSTRAINT #3: No shared opponent (can be relaxed)
+                    if (!phase3ConstraintRelaxed) {
+                        if (violatesSharedOpponentConstraint(game, game.team1)) return false;
+                        if (violatesSharedOpponentConstraint(game, game.team2)) return false;
+                    }
+                    
+                    return true;
+                });
+                
+                // If no valid games and constraint not yet relaxed, try relaxing
+                if (validGames.length === 0 && !phase3ConstraintRelaxed) {
+                    console.log('  Phase 3: No valid games with all constraints, relaxing shared-opponent constraint...');
+                    phase3ConstraintRelaxed = true;
+                    
+                    // Try again with relaxed constraint
+                    validGames = unplayedGames.filter(game => {
+                        if (selectedGameIds.has(getGameId(game))) return false;
+                        
+                        // CONSTRAINT #1: Max games per player (never relaxed)
+                        if (wouldExceedPlayerMax(game)) return false;
+                        
+                        // CONSTRAINT #2: No full series in one day (never relaxed)
+                        if (violatesSeriesConstraint(game)) return false;
+                        
+                        return true;
+                    });
+                }
+                
+                if (validGames.length === 0) {
+                    console.warn('  Phase 3: No more valid games to add even with relaxed constraints.');
+                    break;
+                }
+                
+                // Calculate weights: X_i * X_j for each game
+                const weights = validGames.map(game => {
+                    const x1 = teamXValues[game.team1] || 0;
+                    const x2 = teamXValues[game.team2] || 0;
+                    return x1 * x2;
+                });
+                
+                // Select game using weighted random
+                const selectedGame = weightedRandomSelect(validGames, weights);
+                if (!selectedGame) {
+                    console.warn('  Weighted selection returned null.');
+                    break;
+                }
+                
+                selectGame(selectedGame);
+                const relaxedNote = phase3ConstraintRelaxed ? ' [RELAXED]' : '';
+                console.log(`  Phase 3: ${selectedGame.team1} vs ${selectedGame.team2} (weight: ${(teamXValues[selectedGame.team1] || 0).toFixed(2)} * ${(teamXValues[selectedGame.team2] || 0).toFixed(2)})${relaxedNote}`);
+            }
+            
+            console.log(`  Phase 3 complete: ${selectedGameIds.size - phase3Start} additional games added${phase3ConstraintRelaxed ? ' (constraint was relaxed)' : ''}`);
+        } else {
+            console.log('  No additional games needed');
+        }
+        
+        console.log(`ðŸŽ¯ GAME SELECTION COMPLETE: ${selectedGameIds.size} total games`);
+        
+        return selectedGameIds;
+    }
+
+    /**
+     * Assign flex order (1 through n) to each team for rebalancing priority.
+     * Lower flex number = higher priority for rebalancing.
+     * 
+     * Sorting criteria:
+     * 1. Fewer scheduled games this week (teams with 1 game before teams with 2)
+     * 2. Tiebreaker: More games remaining in season
+     * 3. Tiebreaker: Random (using seeded random)
+     * 
+     * @param {Object} gamesPerTeam - Map of teamName -> number of games scheduled this week
+     * @param {Object} remainingGamesPerTeam - Map of teamName -> total remaining games in season
+     * @param {Function} randomFn - Seeded random function
+     * @returns {Object} - Map of teamName -> flex score (1 to n)
+     */
+    function assignFlexOrder(gamesPerTeam, remainingGamesPerTeam, randomFn) {
+        if (!gamesPerTeam) return {};
+        
+        // Create array of teams with their sorting criteria
+        const teams = Object.keys(gamesPerTeam).map(teamName => ({
+            teamName,
+            scheduledGames: gamesPerTeam[teamName] || 0,
+            remainingGames: remainingGamesPerTeam[teamName] || 0,
+            randomValue: randomFn() // For tiebreaking
+        }));
+        
+        // Sort by criteria
+        teams.sort((a, b) => {
+            // 1. Fewer scheduled games first (ascending)
+            if (a.scheduledGames !== b.scheduledGames) {
+                return a.scheduledGames - b.scheduledGames;
+            }
+            // 2. More remaining games first (descending)
+            if (a.remainingGames !== b.remainingGames) {
+                return b.remainingGames - a.remainingGames;
+            }
+            // 3. Random tiebreaker
+            return a.randomValue - b.randomValue;
+        });
+        
+        // Assign flex scores (1 to n)
+        const flexOrder = {};
+        teams.forEach((team, index) => {
+            flexOrder[team.teamName] = index + 1;
+        });
+        
+        return flexOrder;
+    }
+
+    /**
+     * Log all weekly schedule information to console.
+     * Called after all calculations are complete.
+     */
+    function logWeeklySchedule(gamesPerTeam, remainingGamesPerTeam, teamXValues, totalGamesTarget, selectedGameIds, flexOrder, unplayedGames) {
+        console.log('╔════════════════════════════════════════════════════════════════╗');
+        console.log('â•‘            WEEKLY CROKINOLE SCHEDULE                           â•‘');
+        console.log('║════════════════════════════════════════════════════════════════â•');
+        console.log('');
+        console.log('Thursday seed:', thursdaySeed);
+        console.log('Sessions remaining:', SESSION_COUNT);
+        console.log('');
+        
+        // Team breakdown with flex scores
+        console.log('┌─────────────────────────────────────────────────────────────────┐');
+        console.log('│ TEAM BREAKDOWN                                                  │');
+        console.log('├─────────────────────────────────────────────────────────────────┤');
+        Object.entries(gamesPerTeam)
+            .sort((a, b) => (flexOrder[a[0]] || 999) - (flexOrder[b[0]] || 999))
+            .forEach(([team, games]) => {
+                const X = teamXValues[team]?.toFixed(2) || '?';
+                const remaining = remainingGamesPerTeam[team] || 0;
+                const flex = flexOrder[team] || '?';
+                console.log(`│ ${team.padEnd(15)} | ${games} game(s) this week | ${remaining.toString().padStart(2)} remaining | X=${X} | Flex: ${flex}`);
+            });
+        console.log('└─────────────────────────────────────────────────────────────────┘');
+        console.log('');
+        console.log(`Target games this week: ${totalGamesTarget} (${totalGamesTarget % 2 === 0 ? 'even ✔' : 'odd ✗'})`);
+        console.log('');
+        
+        // Selected games
+        console.log('┌─────────────────────────────────────────────────────────────────┐');
+        console.log('│ SELECTED GAMES FOR THIS WEEK                                    │');
+        console.log('├─────────────────────────────────────────────────────────────────┤');
+        const selectedGamesArray = unplayedGames.filter(g => selectedGameIds.has(getGameId(g)));
+        if (selectedGamesArray.length === 0) {
+            console.log('│ No games selected                                               │');
+        } else {
+            selectedGamesArray.forEach(game => {
+                const flex1 = flexOrder[game.team1] || '?';
+                const flex2 = flexOrder[game.team2] || '?';
+                const board = game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING;
+                console.log(`│ ${game.team1} (Flex:${flex1}) vs ${game.team2} (Flex:${flex2}) @ ${board}`);
+            });
+        }
+        console.log('└─────────────────────────────────────────────────────────────────┘');
+        console.log(`Total selected: ${selectedGameIds.size} games`);
+        console.log('');
+        
+        // Flex order
+        console.log('┌─────────────────────────────────────────────────────────────────┐');
+        console.log('│ FLEX ORDER (Rebalancing Priority)                               │');
+        console.log('├─────────────────────────────────────────────────────────────────┤');
+        Object.entries(flexOrder)
+            .sort((a, b) => a[1] - b[1])
+            .forEach(([team, flex]) => {
+                const scheduled = gamesPerTeam[team] || 0;
+                const remaining = remainingGamesPerTeam[team] || 0;
+                console.log(`│ ${flex.toString().padStart(2)}. ${team.padEnd(15)} (${scheduled} scheduled, ${remaining} remaining)`);
+            });
+        console.log('└─────────────────────────────────────────────────────────────────┘');
+        console.log('');
+    }
+
     // Configuration
     const config = {
         fileName: FILE_NAME, // Your Excel file name
@@ -52,6 +699,7 @@
     };
     
     onMount(async () => {
+        await loadTournamentPoints();
         await loadExcelData();
         // Add smooth scrolling to all anchor links
         const links = document.querySelectorAll('a[href^="#"]');
@@ -132,6 +780,27 @@
             window.removeEventListener('scroll', handleScroll);
         };
     });
+
+    async function loadTournamentPoints() {
+        try {
+            const response = await fetch(TOURNAMENT_POINTS_FILE);
+            if (response.ok) {
+                tournamentPoints = await response.json();
+                console.log('Tournament points loaded:', tournamentPoints);
+            } else {
+                console.log('No tournament points file found, using empty object');
+                tournamentPoints = {};
+            }
+        } catch (err) {
+            console.log('Error loading tournament points, using empty object:', err);
+            tournamentPoints = {};
+        }
+    }
+
+    // Helper function to get tournament points for a team
+    function getTournamentPoints(teamName) {
+        return tournamentPoints[teamName] || 0;
+    }
 
     async function loadExcelData() {
         loading = true;
@@ -236,11 +905,15 @@
             console.log('TEAMS INFO!');
             console.log(teams_info);
 
-            let teamsWithScores = teams_info.map(team => ({
-                ...team,
-                score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins),
-                gamesPlayed: team.wins + team.ties + team.losses
-            }));
+            let teamsWithScores = teams_info.map(team => {
+                const tourneyPts = getTournamentPoints(team.teamName);
+                return {
+                    ...team,
+                    tournamentPoints: tourneyPts,
+                    score: (WIN_SCORE * team.wins) + (TIES_SCORE * team.ties) + (SERIES_WIN_SCORE * team.seriesWins) + tourneyPts,
+                    gamesPlayed: team.wins + team.ties + team.losses
+                };
+            });
             
             let ranking = teamsWithScores.sort((a, b) => {
                 if (a.score !== b.score) {
@@ -345,7 +1018,9 @@
         } else if (combined_score < 0) {
             team_info.seriesLosses += 1
         } else {
-            throw new Error("Given a series that ended in a tie");
+            // Tie - add 0.5 to wins for each team
+            team_info.seriesWins += 0.5
+            team_info.seriesLosses += 0.5
         }
     }
 
@@ -481,6 +1156,292 @@
     let filteredGames = [];
     let hiddenTeams = new Set(); // Teams to hide from the display
     let teamGameCounts = {};
+    let rebalancedGameIds = new Set(); // Track games added through rebalancing
+    
+    // Generate a unique ID for a game (for tracking suggestions)
+    function getGameId(game) {
+        return `${game.team1}-${game.team2}-${game.isHome}`;
+    }
+    
+    // Check if a game is scheduled for this week (original or rebalanced)
+    function isGameSuggested(game) {
+        const gameId = getGameId(game);
+        return selectedGamesThisWeek.has(gameId) || rebalancedGameIds.has(gameId);
+    }
+    
+    // Check if a game was added through rebalancing (for different styling if needed)
+    function isGameRebalanced(game) {
+        return rebalancedGameIds.has(getGameId(game));
+    }
+    
+    /**
+     * Rebalance the schedule when players are hidden.
+     * Adds replacement games for teams that lost scheduled games due to hidden players.
+     */
+    function rebalanceSchedule() {
+        rebalancedGameIds = new Set();
+        
+        if (!dataReady || !allGames.length || hiddenTeams.size === 0) {
+            return;
+        }
+        
+        const unplayedGames = allGames.filter(g => !g.played);
+        
+        // Step 1: Find removed edges (scheduled games that are now invalid)
+        const removedEdges = [];
+        unplayedGames.forEach(game => {
+            if (!selectedGamesThisWeek.has(getGameId(game))) return; // Not a scheduled game
+            
+            const team1Hidden = hiddenTeams.has(game.team1);
+            const team2Hidden = hiddenTeams.has(game.team2);
+            
+            if (team1Hidden || team2Hidden) {
+                removedEdges.push({
+                    game,
+                    team1Hidden,
+                    team2Hidden
+                });
+            }
+        });
+        
+        if (removedEdges.length === 0) return;
+        
+        // Step 2: Filter removed edges and count games needed per team
+        const gamesNeeded = {}; // teamName -> count of replacement games needed
+        
+        removedEdges.forEach(edge => {
+            // If both teams hidden, ignore
+            if (edge.team1Hidden && edge.team2Hidden) return;
+            
+            // The present team needs a replacement
+            if (!edge.team1Hidden) {
+                gamesNeeded[edge.game.team1] = (gamesNeeded[edge.game.team1] || 0) + 1;
+            }
+            if (!edge.team2Hidden) {
+                gamesNeeded[edge.game.team2] = (gamesNeeded[edge.game.team2] || 0) + 1;
+            }
+        });
+        
+        if (Object.keys(gamesNeeded).length === 0) return;
+        
+        console.log('🔄 REBALANCING DEBUG 🔄');
+        console.log('Games needed:', gamesNeeded);
+        
+        // Track which games have been used as replacements
+        const usedGameIds = new Set();
+        
+        // Track which opponent pairings have been made (to prevent same opponent twice)
+        // Key: "teamA-teamB" (sorted alphabetically), Value: true
+        const usedPairings = new Set();
+        
+        function getPairingKey(teamA, teamB) {
+            return [teamA, teamB].sort().join('-');
+        }
+        
+        // Helper: Find available games between two teams
+        function getAvailableGameBetween(teamA, teamB) {
+            // Check if this pairing has already been used
+            if (usedPairings.has(getPairingKey(teamA, teamB))) return null;
+            
+            return unplayedGames.find(game => {
+                const gameId = getGameId(game);
+                // Not already scheduled or used as replacement
+                if (selectedGamesThisWeek.has(gameId) || usedGameIds.has(gameId)) return false;
+                // Not involving hidden teams
+                if (hiddenTeams.has(game.team1) || hiddenTeams.has(game.team2)) return false;
+                // Is between these two teams
+                return (game.team1 === teamA && game.team2 === teamB) ||
+                       (game.team1 === teamB && game.team2 === teamA);
+            });
+        }
+        
+        // Helper: Get players for a team
+        function getPlayersForTeam(teamName) {
+            const teamInfo = teams_info?.find(t => t.teamName === teamName);
+            if (!teamInfo) return [];
+            return [teamInfo.player1?.toLowerCase(), teamInfo.player2?.toLowerCase()].filter(Boolean);
+        }
+        
+        // Helper: Count scheduled games for a player (original + rebalanced so far)
+        function countPlayerGames(playerName) {
+            const playerLower = playerName.toLowerCase();
+            let count = 0;
+            
+            // Count original scheduled games (that aren't cancelled due to hidden teams)
+            unplayedGames.forEach(game => {
+                if (!selectedGamesThisWeek.has(getGameId(game))) return;
+                if (hiddenTeams.has(game.team1) || hiddenTeams.has(game.team2)) return;
+                
+                const players = [
+                    game[PLAYER1_TEAM1]?.toLowerCase(),
+                    game[PLAYER2_TEAM1]?.toLowerCase(),
+                    game[PLAYER1_TEAM2]?.toLowerCase(),
+                    game[PLAYER2_TEAM2]?.toLowerCase()
+                ];
+                if (players.includes(playerLower)) count++;
+            });
+            
+            // Count rebalanced games assigned so far
+            rebalancedGameIds.forEach(gameId => {
+                const game = unplayedGames.find(g => getGameId(g) === gameId);
+                if (!game) return;
+                
+                const players = [
+                    game[PLAYER1_TEAM1]?.toLowerCase(),
+                    game[PLAYER2_TEAM1]?.toLowerCase(),
+                    game[PLAYER1_TEAM2]?.toLowerCase(),
+                    game[PLAYER2_TEAM2]?.toLowerCase()
+                ];
+                if (players.includes(playerLower)) count++;
+            });
+            
+            return count;
+        }
+        
+        // Helper: Check if adding a game to a team would exceed any player's max
+        function wouldExceedPlayerMax(teamName) {
+            const players = getPlayersForTeam(teamName);
+            for (const player of players) {
+                const currentGames = countPlayerGames(player);
+                const maxGames = maxGamesPerPlayer[player] || 999;
+                if (currentGames >= maxGames) {
+                    console.log(`  ⚠️ ${teamName}: Player ${player} at max (${currentGames}/${maxGames})`);
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Debug: Log current game counts for all players
+        console.log('ðŸŽ® REBALANCING - Player game counts:');
+        const allPlayersInGame = new Set();
+        teams_info?.forEach(team => {
+            if (team.player1) allPlayersInGame.add(team.player1.toLowerCase());
+            if (team.player2) allPlayersInGame.add(team.player2.toLowerCase());
+        });
+        allPlayersInGame.forEach(player => {
+            const count = countPlayerGames(player);
+            const max = maxGamesPerPlayer[player] || 999;
+            console.log(`  ${player}: ${count}/${max}`);
+        });
+        
+        // Step 3: Get teams sorted by flex order
+        const teamsNeedingGames = Object.keys(gamesNeeded)
+            .sort((a, b) => (flexOrder[a] || 999) - (flexOrder[b] || 999));
+        
+        console.log('Teams needing games (sorted by flex):', teamsNeedingGames);
+        
+        // Phase 1: Match teams that lost games with each other
+        console.log('--- PHASE 1: Matching teams that lost games with each other ---');
+        const teamsInNeedSet = new Set(teamsNeedingGames);
+        
+        for (const teamA of teamsNeedingGames) {
+            while (gamesNeeded[teamA] > 0) {
+                // Find best partner from teams that also need games
+                let bestPartner = null;
+                let bestGame = null;
+                
+                for (const teamB of teamsNeedingGames) {
+                    if (teamB === teamA) continue;
+                    if (gamesNeeded[teamB] <= 0) continue;
+                    
+                    const game = getAvailableGameBetween(teamA, teamB);
+                    if (game) {
+                        // Take the first valid one (already sorted by flex)
+                        bestPartner = teamB;
+                        bestGame = game;
+                        break;
+                    }
+                }
+                
+                if (bestGame) {
+                    const gameId = getGameId(bestGame);
+                    usedGameIds.add(gameId);
+                    rebalancedGameIds.add(gameId);
+                    usedPairings.add(getPairingKey(teamA, bestPartner)); // Track this pairing
+                    gamesNeeded[teamA]--;
+                    gamesNeeded[bestPartner]--;
+                    console.log(`Phase 1: Paired ${teamA} with ${bestPartner}`);
+                } else {
+                    // No partner found in Phase 1, move to Phase 2
+                    console.log(`Phase 1: No partner found for ${teamA} in Phase 1 (${gamesNeeded[teamA]} games still needed)`);
+                    break;
+                }
+            }
+        }
+        
+        // Log remaining games needed after Phase 1
+        const remainingAfterPhase1 = Object.entries(gamesNeeded).filter(([t, c]) => c > 0);
+        console.log('--- END PHASE 1 ---');
+        console.log('Games still needed after Phase 1:', Object.fromEntries(remainingAfterPhase1));
+        
+        // Phase 2: Match remaining teams with teams that didn't lose games
+        console.log('--- PHASE 2: Matching with teams that did not lose games ---');
+        const teamsGivenGamesInPhase2 = new Set();
+        
+        for (const teamA of teamsNeedingGames) {
+            while (gamesNeeded[teamA] > 0) {
+                // Find best partner from teams NOT in the needing set
+                let bestPartner = null;
+                let bestGame = null;
+                
+                // Get all teams sorted by flex (any team that isn't hidden and hasn't been given a replacement game in phase 2)
+                const otherTeams = Object.keys(flexOrder)
+                    .filter(t => t !== teamA && !hiddenTeams.has(t))
+                    .sort((a, b) => (flexOrder[a] || 999) - (flexOrder[b] || 999));
+                
+                for (const teamB of otherTeams) {
+                    // Skip if already given a game in phase 2
+                    if (teamsGivenGamesInPhase2.has(teamB)) continue;
+                    
+                    // Skip if adding a game would exceed any of teamB's players' max games
+                    if (wouldExceedPlayerMax(teamB)) {
+                        console.log(`Phase 2: Skipping ${teamB} - player(s) at max games`);
+                        continue;
+                    }
+                    
+                    const game = getAvailableGameBetween(teamA, teamB);
+                    if (game) {
+                        bestPartner = teamB;
+                        bestGame = game;
+                        break;
+                    }
+                }
+                
+                if (bestGame) {
+                    const gameId = getGameId(bestGame);
+                    usedGameIds.add(gameId);
+                    rebalancedGameIds.add(gameId);
+                    usedPairings.add(getPairingKey(teamA, bestPartner)); // Track this pairing
+                    gamesNeeded[teamA]--;
+                    teamsGivenGamesInPhase2.add(bestPartner);
+                    console.log(`Phase 2: Paired ${teamA} with ${bestPartner}`);
+                } else {
+                    // No partner found at all
+                    console.log(`Could not find replacement for ${teamA} (${gamesNeeded[teamA]} games still needed)`);
+                    break;
+                }
+            }
+        }
+        
+        console.log('--- END PHASE 2 ---');
+        const remainingAfterPhase2 = Object.entries(gamesNeeded).filter(([t, c]) => c > 0);
+        if (remainingAfterPhase2.length > 0) {
+            console.log('⚠️ Games still needed after Phase 2 (unfulfilled):', Object.fromEntries(remainingAfterPhase2));
+        } else {
+            console.log('âœ… All replacement games found!');
+        }
+        
+        console.log('Rebalanced games:', [...rebalancedGameIds]);
+        rebalancedGameIds = new Set(rebalancedGameIds); // Trigger reactivity
+    }
+    
+    // Get the opponent team for a game given the player's perspective
+    function getOpponentTeamForPlayer(game, searchName) {
+        const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                             game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+        return playerInTeam1 ? game.team2 : game.team1;
+    }
     
     // Filter games based on player name
     function filterGamesByPlayer() {
@@ -491,22 +1452,56 @@
         }
         
         const searchName = playerName.toLowerCase().trim();
+        const showAll = searchName === 'all';
         
-        // Filter games where the player is involved and not yet played
-        filteredGames = allGames.filter(game => {
-            if (game.played) return false;
-            
-            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
-                                 game[PLAYER1_TEAM2].toLowerCase().includes(searchName);
-            const playerInTeam2 = game[PLAYER2_TEAM1].toLowerCase().includes(searchName) || 
-                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
-            
-            return playerInTeam1 || playerInTeam2;
-        });
+        let playerGames;
+        
+        if (showAll) {
+            // Show all scheduled games (original + rebalanced)
+            playerGames = allGames.filter(game => {
+                if (game.played) return false;
+                return isGameSuggested(game);
+            });
+        } else {
+            // Filter games where the player is involved and not yet played
+            playerGames = allGames.filter(game => {
+                if (game.played) return false;
+                
+                const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                     game[PLAYER1_TEAM2].toLowerCase().includes(searchName);
+                const playerInTeam2 = game[PLAYER2_TEAM1].toLowerCase().includes(searchName) || 
+                                     game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+                
+                return playerInTeam1 || playerInTeam2;
+            });
+        }
         
         // Apply hidden teams filter
-        filteredGames = filteredGames.filter(game => {
+        filteredGames = playerGames.filter(game => {
             return !hiddenTeams.has(game.team1) && !hiddenTeams.has(game.team2);
+        });
+        
+        // Sort games:
+        // 1. Scheduled games (suggested) at the top
+        // 2. Non-scheduled games sorted by opponent's flex score (lowest first)
+        filteredGames = filteredGames.sort((a, b) => {
+            const aSuggested = isGameSuggested(a);
+            const bSuggested = isGameSuggested(b);
+            
+            // Scheduled games first
+            if (aSuggested && !bSuggested) return -1;
+            if (!aSuggested && bSuggested) return 1;
+            
+            // For non-scheduled games, sort by opponent's flex score (lowest first)
+            if (!aSuggested && !bSuggested && !showAll) {
+                const aOpponent = getOpponentTeamForPlayer(a, searchName);
+                const bOpponent = getOpponentTeamForPlayer(b, searchName);
+                const aFlex = flexOrder[aOpponent] || 999;
+                const bFlex = flexOrder[bOpponent] || 999;
+                return aFlex - bFlex;
+            }
+            
+            return 0;
         });
         
         // Count games per team
@@ -517,23 +1512,35 @@
     function updateTeamCounts() {
         teamGameCounts = {};
         const searchName = playerName.toLowerCase().trim();
+        const showAll = searchName === 'all';
         
         // First pass: count all games including hidden ones
         allGames.forEach(game => {
             if (game.played) return;
             
-            // Check which team the player is on
-            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
-                                 game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
-            const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
-                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+            // Skip games involving hidden teams
+            if (hiddenTeams.has(game.team1) || hiddenTeams.has(game.team2)) return;
             
-            if (playerInTeam1 || playerInTeam2) {
-                if (playerInTeam1) {
+            if (showAll) {
+                // For "all", count scheduled games by team (excluding hidden)
+                if (isGameSuggested(game)) {
                     teamGameCounts[game.team1] = (teamGameCounts[game.team1] || 0) + 1;
-                }
-                if (playerInTeam2) {
                     teamGameCounts[game.team2] = (teamGameCounts[game.team2] || 0) + 1;
+                }
+            } else {
+                // Check which team the player is on
+                const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                     game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+                const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
+                                     game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+                
+                if (playerInTeam1 || playerInTeam2) {
+                    if (playerInTeam1) {
+                        teamGameCounts[game.team1] = (teamGameCounts[game.team1] || 0) + 1;
+                    }
+                    if (playerInTeam2) {
+                        teamGameCounts[game.team2] = (teamGameCounts[game.team2] || 0) + 1;
+                    }
                 }
             }
         });
@@ -547,8 +1554,65 @@
             hiddenTeams.add(teamName);
         }
         hiddenTeams = new Set(hiddenTeams); // Trigger reactivity
+        rebalanceSchedule(); // Rebalance after hiding/showing teams
         filterGamesByPlayer(); // Re-filter games
     }
+    
+    // Get all unique players from all games (for the player toggle buttons)
+    function getAllPlayers() {
+        if (!teams_info) return [];
+        
+        const playersSet = new Set();
+        teams_info.forEach(team => {
+            if (team.player1) playersSet.add(team.player1);
+            if (team.player2) playersSet.add(team.player2);
+        });
+        
+        return Array.from(playersSet).sort();
+    }
+    
+    // Get teams for a specific player
+    function getTeamsForPlayer(playerNameToFind) {
+        if (!teams_info) return [];
+        
+        const playerLower = playerNameToFind.toLowerCase();
+        return teams_info
+            .filter(team => 
+                team.player1?.toLowerCase() === playerLower || 
+                team.player2?.toLowerCase() === playerLower
+            )
+            .map(team => team.teamName);
+    }
+    
+    // Check if a player is "hidden" (all their teams are hidden)
+    function isPlayerHidden(playerNameToCheck) {
+        const teams = getTeamsForPlayer(playerNameToCheck);
+        if (teams.length === 0) return false;
+        return teams.every(team => hiddenTeams.has(team));
+    }
+    
+    // Toggle all teams for a player
+    function togglePlayerFilter(playerNameToToggle) {
+        const teams = getTeamsForPlayer(playerNameToToggle);
+        const allHidden = isPlayerHidden(playerNameToToggle);
+        
+        if (allHidden) {
+            // Show all teams for this player
+            teams.forEach(team => hiddenTeams.delete(team));
+        } else {
+            // Hide all teams for this player
+            teams.forEach(team => hiddenTeams.add(team));
+        }
+        
+        hiddenTeams = new Set(hiddenTeams); // Trigger reactivity
+        rebalanceSchedule(); // Rebalance after hiding/showing teams
+        filterGamesByPlayer(); // Re-filter games
+    }
+    
+    // Reactive: Get all players for display (only after data is loaded)
+    $: allPlayers = dataReady && teams_info ? getAllPlayers() : [];
+    $: if (dataReady) console.log('ðŸŽ¯ ALL PLAYERS DEBUG ðŸŽ¯', allPlayers);
+    $: if (dataReady) console.log('ðŸŽ¯ TEAMS INFO DEBUG ðŸŽ¯', teams_info);
     
     // Get player's team for a specific game
     function getPlayerTeam(game) {
@@ -568,6 +1632,7 @@
     // Reset filters
     function resetFilters() {
         hiddenTeams.clear();
+        rebalancedGameIds = new Set(); // Clear rebalanced games
         filterGamesByPlayer();
     }
 
@@ -584,6 +1649,121 @@
     
     // Total games count
     $: shownGames = filteredGames.length;
+    
+    // Check if we're in "all" mode
+    $: isAllMode = playerName.toLowerCase().trim() === 'all';
+    
+    // Total unplayed games in the season
+    $: totalUnplayedGames = allGames.filter(g => !g.played).length;
+
+    // Filter played games for the player, organized by team
+    $: playedGames = (() => {
+        if (!playerName || !allGames.length) return [];
+        
+        const searchName = playerName.toLowerCase().trim();
+        if (!searchName) return [];
+        
+        return allGames.filter(game => {
+            if (!game.played) return false;
+            
+            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+            const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+            
+            return playerInTeam1 || playerInTeam2;
+        });
+    })();
+
+    // Group played games by the player's team, then by opponent (series), with series score
+    $: playedGamesByTeam = (() => {
+        if (!playedGames.length) return {};
+        
+        const searchName = playerName.toLowerCase().trim();
+        // First collect all games per team
+        const gamesByTeam = {};
+        
+        function makeResultObj(playerResult) {
+            if (playerResult > 0) {
+                return { text: 'W', class: 'win', diff: `+${playerResult}`, numericDiff: playerResult };
+            } else if (playerResult < 0) {
+                return { text: 'L', class: 'loss', diff: `${playerResult}`, numericDiff: playerResult };
+            } else {
+                return { text: 'D', class: 'draw', diff: '0', numericDiff: 0 };
+            }
+        }
+        
+        playedGames.forEach((game) => {
+            const playerInTeam1 = game[PLAYER1_TEAM1].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
+            const playerInTeam2 = game[PLAYER1_TEAM2].toLowerCase().includes(searchName) || 
+                                 game[PLAYER2_TEAM2].toLowerCase().includes(searchName);
+            
+            if (playerInTeam1) {
+                const playerTeam = game.team1;
+                if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
+                gamesByTeam[playerTeam].push({
+                    opponentTeam: game.team2,
+                    result: makeResultObj(game.result),
+                    board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
+                });
+            }
+            
+            if (playerInTeam2) {
+                const playerTeam = game.team2;
+                if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
+                gamesByTeam[playerTeam].push({
+                    opponentTeam: game.team1,
+                    result: makeResultObj(-game.result),
+                    board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
+                });
+            }
+        });
+        
+        // Now group each team's games by opponent to form series
+        const grouped = {};
+        Object.entries(gamesByTeam).forEach(([teamName, games]) => {
+            const byOpponent = {};
+            games.forEach(game => {
+                if (!byOpponent[game.opponentTeam]) {
+                    byOpponent[game.opponentTeam] = [];
+                }
+                byOpponent[game.opponentTeam].push(game);
+            });
+            
+            // Build series array
+            const series = Object.entries(byOpponent).map(([opponent, opGames]) => {
+                const seriesTotal = opGames.reduce((sum, g) => sum + g.result.numericDiff, 0);
+                let seriesResult;
+                if (opGames.length >= 2) {
+                    // Full series played
+                    if (seriesTotal > 0) {
+                        seriesResult = { text: 'W', class: 'win', diff: `+${seriesTotal}` };
+                    } else if (seriesTotal < 0) {
+                        seriesResult = { text: 'L', class: 'loss', diff: `${seriesTotal}` };
+                    } else {
+                        seriesResult = { text: 'D', class: 'draw', diff: '0' };
+                    }
+                } else {
+                    // Only 1 game played so far, series incomplete
+                    seriesResult = { text: '—', class: 'pending', diff: `${seriesTotal > 0 ? '+' : ''}${seriesTotal}` };
+                }
+                return {
+                    opponent,
+                    games: opGames,
+                    seriesScore: seriesTotal,
+                    seriesResult,
+                    isComplete: opGames.length >= 2
+                };
+            });
+            
+            // Sort: complete series first, then incomplete
+            series.sort((a, b) => (b.isComplete ? 1 : 0) - (a.isComplete ? 1 : 0));
+            grouped[teamName] = series;
+        });
+        
+        return grouped;
+    })();
 
     function gameInGames(games, team1, team2, isHome) {
         let gameExists = false;
@@ -661,6 +1841,75 @@
     $: if (dataReady) {
         allGames = generateGamesData();
     }
+    
+    // Compute weekly schedule when data is ready
+    let weeklyGamesPerTeam = {};
+    let remainingGamesPerTeam = {};
+    let selectedGamesThisWeek = new Set();
+    let flexOrder = {};
+    let maxGamesPerPlayer = {};
+    
+    $: if (dataReady && allGames.length > 0 && teams_info) {
+        const unplayedGames = allGames.filter(g => !g.played);
+        const randomFn = seededRandom(thursdaySeed);
+        
+        // Step 1: Compute how many games each team should play
+        const result = computeGamesPerTeam(unplayedGames, teams_info, randomFn);
+        const targetGamesPerTeam = result.gamesPerTeam;
+        remainingGamesPerTeam = result.remainingGamesPerTeam;
+        maxGamesPerPlayer = result.maxGamesPerPlayer;
+        
+        // Step 2: Select specific games for this week
+        selectedGamesThisWeek = selectGamesForWeek(targetGamesPerTeam, unplayedGames, seededRandom(thursdaySeed + 1), result.teamXValues, result.maxGamesPerPlayer);
+        
+        // Step 2.5: Calculate actual games per team from selected games
+        const actualGamesPerTeam = {};
+        unplayedGames.forEach(game => {
+            if (selectedGamesThisWeek.has(`${game.team1}-${game.team2}-${game.isHome}`)) {
+                actualGamesPerTeam[game.team1] = (actualGamesPerTeam[game.team1] || 0) + 1;
+                actualGamesPerTeam[game.team2] = (actualGamesPerTeam[game.team2] || 0) + 1;
+            }
+        });
+        weeklyGamesPerTeam = actualGamesPerTeam;
+        
+        // Step 3: Assign flex order for rebalancing (using actual scheduled games, not targets)
+        flexOrder = assignFlexOrder(actualGamesPerTeam, remainingGamesPerTeam, seededRandom(thursdaySeed + 2));
+        
+        // Step 4: Log everything to console
+        logWeeklySchedule(
+            actualGamesPerTeam, 
+            remainingGamesPerTeam, 
+            result.teamXValues, 
+            result.totalGames, 
+            selectedGamesThisWeek, 
+            flexOrder, 
+            unplayedGames
+        );
+        
+        // Calculate actual games per player from selected games
+        const actualGamesPerPlayer = {};
+        unplayedGames.forEach(game => {
+            if (selectedGamesThisWeek.has(`${game.team1}-${game.team2}-${game.isHome}`)) {
+                const players = [
+                    game[PLAYER1_TEAM1]?.toLowerCase(),
+                    game[PLAYER2_TEAM1]?.toLowerCase(),
+                    game[PLAYER1_TEAM2]?.toLowerCase(),
+                    game[PLAYER2_TEAM2]?.toLowerCase()
+                ].filter(Boolean);
+                players.forEach(player => {
+                    actualGamesPerPlayer[player] = (actualGamesPerPlayer[player] || 0) + 1;
+                });
+            }
+        });
+        
+        console.log('ðŸŽ® GAMES PER PLAYER:');
+        Object.keys(maxGamesPerPlayer).sort().forEach(player => {
+            const actual = actualGamesPerPlayer[player] || 0;
+            const max = maxGamesPerPlayer[player];
+            const status = actual >= max ? '⚠️ AT MAX' : '✔';
+            console.log(`  ${player}: ${actual} scheduled (max: ${max}) ${status}`);
+        });
+    }
 
 </script>
 
@@ -668,9 +1917,11 @@
     <title>JP Flicks</title>
     <meta name="description" content="Crokinole better than ever">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta property="og:image" content="{jpflicksImage}">
+    <meta property="og:image" content={brownJPFlicksLogo}>
+    <link rel="icon" type="image/svg+xml" href={brownJPFlicksLogo}>
 </svelte:head>
 
+<div class="page-background" bind:this={pageBackground}>
 <div class="container">
     <nav class="breadcrumb">
         <a href="/">← Back to Home</a>
@@ -749,12 +2000,12 @@
                         <td>January 8th</td>
                     </tr>
                     <tr>
-                        <td>Off for Spring Break</td>
-                        <td>March 5th</td>
+                        <td><b>Final Tournament</b></td>
+                        <td>April 2th</td>
                     </tr>
                     <tr>
-                        <td><b>Final Tournament</b></td>
-                        <td>March 26th</td>
+                        <td><b>Final Day Of League</b></td>
+                        <td>April 9th</td>
                     </tr>
                 </tbody>
             </table>
@@ -766,13 +2017,13 @@
                 <li>Tieing a game awards 1 point</li>
                 <li>Losing a game awards 0 points</li>
                 <li>Winning a series (combined score of both games against a team) awards 1 bonus point</li>
-                <li>In the event of a tie in a series there will be 20s shootout</li>
+                <li>In the event of a tie in a series each team is awarded 0.5 points</li>
             </ul>
             
-            <h3 id="tournaments-section">Tournaments</h3>
+            <h3 id="tournaments-section"> <a href="/jpFlicks/tournament">Tournaments</a></h3>
             This year we have 2 tournaments! Anyone including (those not in the league) can compete so if you can only come for 1 day these are the ones to do it! 
             The exact format of the tournament will depend on the number of players but it will follow a round robin + elimination set up.
-            League points up for grabs (half awarded to each player in the team)
+            League points up for grabs (half awarded to each player in the team unless only 1 member of the team is present)
                 <div class="table-wrapper">
                     <table class="basic-table">
                 <thead>
@@ -785,27 +2036,27 @@
                 <tbody>
                     <tr>
                         <td><b>1st</b></td>
+                        <td>5 pts</td>
                         <td>6 pts</td>
-                        <td>10 pts</td>
                     </tr>
                     <tr>
                         <td><b>2nd</b></td>
                         <td>4 pts</td>
-                        <td>8 pts</td>
+                        <td>5 pts</td>
                     </tr>
                     <tr>
                         <td><b>3rd</b></td>
-                        <td>2 pts</td>
-                        <td>6 pts</td>
+                        <td>3 pts</td>
+                        <td>4 pts</td>
                     </tr>
                     <tr>
                         <td><b>4th</b></td>
                         <td>2 pts</td>
-                        <td>4 pts</td>
+                        <td>3 pts</td>
                     </tr>
                     <tr>
-                        <td><b>5th-8th</b></td>
-                        <td>0 pts</td>
+                        <td><b>5th-6th</b></td>
+                        <td>1 pts</td>
                         <td>2 pts</td>
                     </tr>
                 </tbody>
@@ -872,15 +2123,36 @@
         {#if playerName && (shownGames > 0 || hiddenTeams.size > 0)}
             <div class="summary-section">
                 <div class="total-games">
-                    Showing <strong>{shownGames}</strong> out of {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
-                        return accumulator + currentValue;
-                    })} Total games to play. On average you need to play {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {return accumulator + currentValue;}) / SESSION_COUNT} games per session to complete all your games by the end of the season.
+                    {#if isAllMode}
+                        Showing <strong>{shownGames}</strong> scheduled games out of {totalUnplayedGames} total matchups remaining this season.
+                    {:else}
+                        Showing <strong>{shownGames}</strong> out of {Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
+                            return accumulator + currentValue;
+                        })} Total games to play. On average you need to play {(Object.values(teamGameCounts).reduce((accumulator, currentValue) => {return accumulator + currentValue;}) / SESSION_COUNT).toFixed(2)} games per session to complete all your games by the end of the season.
+                    {/if}
                     {#if hiddenTeams.size > 0 && shownGames === 0}
                         <span class="filtered-warning"> (All games filtered out)</span>
                     {/if}
                 </div>
                 
                 <div class="team-summary">
+                    <h4>Filter by player:</h4>
+                    <div class="player-pills">
+                        {#each allPlayers as player}
+                            <button 
+                                class="player-pill"
+                                class:hidden={isPlayerHidden(player)}
+                                on:click={() => togglePlayerFilter(player)}
+                                title="Click to {isPlayerHidden(player) ? 'show' : 'hide'} all games with {player}"
+                            >
+                                {player}
+                                {#if isPlayerHidden(player)}
+                                    <span class="pill-icon">✕</span>
+                                {/if}
+                            </button>
+                        {/each}
+                    </div>
+                    
                     <h4>Games by team:</h4>
                     <div class="team-pills">
                         {#each Object.entries(teamGameCounts) as [team, count]}
@@ -890,7 +2162,11 @@
                                 on:click={() => toggleTeamFilter(team)}
                                 title="Click to {hiddenTeams.has(team) ? 'show' : 'hide'} games with {team}"
                             >
-                                {team}: {count} {count === 1 ? 'game' : 'games'} ({count / SESSION_COUNT} Avg)
+                                {#if isAllMode}
+                                    {team}: {count} {count === 1 ? 'game' : 'games'} this week ({((remainingGamesPerTeam[team] || 0) / SESSION_COUNT).toFixed(2)} Avg) | Flex: {flexOrder[team] || '?'}
+                                {:else}
+                                    {team}: {count} {count === 1 ? 'game' : 'games'} ({(count / SESSION_COUNT).toFixed(2)} Avg) | Flex: {flexOrder[team] || '?'}
+                                {/if}
                                 {#if hiddenTeams.has(team)}
                                     <span class="pill-icon">✕</span>
                                 {/if}
@@ -942,8 +2218,11 @@
                             {@const playerTeam = getPlayerTeam(game)}
                             {@const opponentTeam = getOpponentTeam(game)}
                             {@const isTeam1 = playerTeam === game.team1}
-                            <tr>
-                                <td class="team-name">
+                            {@const suggested = isGameSuggested(game)}
+                            {@const rebalanced = isGameRebalanced(game)}
+                            <tr class:suggested-game={suggested && !rebalanced} class:rebalanced-game={rebalanced}>
+                                <td class="team-name" class:suggested-cell={suggested && !rebalanced} class:rebalanced-cell={rebalanced}>
+                                    {#if rebalanced}<span class="rebalanced-star">🔄</span>{:else if suggested}<span class="suggested-star">⭐</span>{/if}
                                     <button 
                                         class="team-link"
                                         on:click={() => toggleTeamFilter(playerTeam)}
@@ -952,15 +2231,15 @@
                                         {playerTeam}
                                     </button>
                                 </td>
-                                <td>
+                                <td class:suggested-cell={suggested && !rebalanced} class:rebalanced-cell={rebalanced}>
                                     {#if isTeam1}
                                         {game[PLAYER1_TEAM1] === playerName ? game[PLAYER2_TEAM1] : game[PLAYER1_TEAM1]}
                                     {:else}
                                         {game[PLAYER1_TEAM2] === playerName ? game[PLAYER2_TEAM2] : game[PLAYER1_TEAM2]}
                                     {/if}
                                 </td>
-                                <td class="vs">vs</td>
-                                <td class="team-name">
+                                <td class="vs" class:suggested-cell={suggested && !rebalanced} class:rebalanced-cell={rebalanced}>vs</td>
+                                <td class="team-name" class:suggested-cell={suggested && !rebalanced} class:rebalanced-cell={rebalanced}>
                                     <button 
                                         class="team-link"
                                         on:click={() => toggleTeamFilter(opponentTeam)}
@@ -969,9 +2248,9 @@
                                         {opponentTeam}
                                     </button>
                                 </td>
-                                <td>{isTeam1 ? game[PLAYER1_TEAM2] : game[PLAYER1_TEAM1]}</td>
-                                <td>{isTeam1 ? game[PLAYER2_TEAM2] : game[PLAYER2_TEAM1]}</td>
-                                <td>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td>
+                                <td class:suggested-cell={suggested && !rebalanced} class:rebalanced-cell={rebalanced}>{isTeam1 ? game[PLAYER1_TEAM2] : game[PLAYER1_TEAM1]}</td>
+                                <td class:suggested-cell={suggested && !rebalanced} class:rebalanced-cell={rebalanced}>{isTeam1 ? game[PLAYER2_TEAM2] : game[PLAYER2_TEAM1]}</td>
+                                <td class:suggested-cell={suggested && !rebalanced} class:rebalanced-cell={rebalanced}>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td>
                             </tr>
                         {/each}
                     </tbody>
@@ -989,6 +2268,55 @@
                 No games found for "{playerName}"
             </div>
             {/if}
+        {/if}
+        
+        <!-- Played Games Section -->
+        {#if playerName && playedGames.length > 0}
+            <div class="played-games-section">
+                <h3>Completed Games ({playedGames.length})</h3>
+                
+                {#each Object.entries(playedGamesByTeam) as [teamName, seriesList]}
+                    {@const totalGames = seriesList.reduce((sum, s) => sum + s.games.length, 0)}
+                    <div class="team-games-group">
+                        <h4>{teamName} ({totalGames} {totalGames === 1 ? 'game' : 'games'})</h4>
+                        <div class="games-table-wrapper">
+                            <table class="games-table played-games-table">
+                                <thead>
+                                    <tr>
+                                        <th>Result</th>
+                                        <th>Your Team</th>
+                                        <th>vs</th>
+                                        <th>Opponent</th>
+                                        <th>+/-</th>
+                                        <th>Board</th>
+                                        <th>Series</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {#each seriesList as series}
+                                        {#each series.games as game, gameIdx}
+                                            <tr class:series-group-border={gameIdx === 0 && seriesList.indexOf(series) > 0}>
+                                                <td class="result-cell {game.result.class}">{game.result.text}</td>
+                                                <td class="team-name">{teamName}</td>
+                                                <td class="vs">vs</td>
+                                                <td class="team-name">{game.opponentTeam}</td>
+                                                <td class="diff-cell {game.result.class}">{game.result.diff}</td>
+                                                <td>{game.board}</td>
+                                                {#if gameIdx === 0}
+                                                    <td class="series-cell {series.seriesResult.class}" rowspan={series.games.length}>
+                                                        <span class="series-result-text">{series.seriesResult.text}</span>
+                                                        <span class="series-diff">{series.seriesResult.diff}</span>
+                                                    </td>
+                                                {/if}
+                                            </tr>
+                                        {/each}
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {/each}
+            </div>
         {/if}
     </div>
 </div>
@@ -1023,7 +2351,10 @@
             GP {getSortIndicator('gamesPlayed')}
         </th>
         <th class="sortable numeric" on:click={() => sortTable('seriesWins')}>
-            Series W {getSortIndicator('seriesWins')}
+            Series {getSortIndicator('seriesWins')}
+        </th>
+        <th class="sortable numeric" on:click={() => sortTable('tournamentPoints')}>
+            TP {getSortIndicator('tournamentPoints')}
         </th>
         <th class="sortable numeric" on:click={() => sortTable('wins')}>
             W {getSortIndicator('wins')}
@@ -1066,7 +2397,8 @@
             </td>
             <td class="team-name">{team.teamName}</td>
             <td class="numeric">{team.gamesPlayed}</td>
-            <td class="numeric">{team.seriesWins}</td>
+            <td class="numeric">{team.seriesWins}-{team.seriesLosses}</td>
+            <td class="numeric">{team.tournamentPoints}</td>
             <td class="numeric">{team.wins}</td>
             <td class="numeric">{team.ties}</td>
             <td class="numeric">{team.losses}</td>
@@ -1083,20 +2415,28 @@
     </div>
     
     <div class="table-legend">
-    <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>+/-:</strong> Point Differential</p>
+    <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>TP:</strong> Tournament Points | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>+/-:</strong> Point Differential</p>
 </div>
 <HallOfFame />
 </div>
         {/if}
     </main>
 </div>
+</div>
 
 <style>
+    /* Page background with repeating logo pattern */
+    .page-background {
+        min-height: 100vh;
+        background-color: #4a9b9b;
+        background-repeat: repeat;
+        padding: 1rem 0;
+    }
 
    /* Center tables on ALL screen sizes - more specific selector */
     .table-wrapper,
     :global(.mobile-friendly) .table-wrapper {
-        max-width: 600px;
+        max-width: 850px;
         margin: 1rem auto;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -1106,7 +2446,7 @@
     @media (max-width: 768px) {
         .table-wrapper,
         :global(.mobile-friendly) .table-wrapper {
-            max-width: 600px;
+            max-width: 850px;
             margin: 1rem auto;
             padding: 0 1rem;
             overflow-x: auto;
@@ -1136,7 +2476,7 @@
     /* Optional: Add horizontal scroll indicator */
     .table-wrapper[data-scrollable]::after,
     :global(.mobile-friendly) .table-wrapper[data-scrollable]::after {
-        content: '← Swipe to see more →';
+        content: '← Swipe to see more ↑';
         display: block;
         text-align: center;
         padding: 0.5rem;
@@ -1698,6 +3038,35 @@
         margin-bottom: 1rem;
     }
     
+    .player-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .player-pill {
+        padding: 0.4rem 0.8rem;
+        background: #059669;
+        color: white;
+        border: none;
+        border-radius: 16px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+        position: relative;
+    }
+    
+    .player-pill:hover {
+        background: #047857;
+        transform: translateY(-1px);
+    }
+    
+    .player-pill.hidden {
+        background: #9ca3af;
+        text-decoration: line-through;
+    }
+    
     .team-pill {
         padding: 0.5rem 1rem;
         background: #2c5aa0;
@@ -1776,6 +3145,44 @@
     
     .games-table tbody tr:hover {
         background: #f9fafb;
+    }
+    
+    /* Suggested game styles */
+    .suggested-game {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-left: 4px solid #f59e0b;
+    }
+    
+    .suggested-game:hover {
+        background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+    }
+    
+    .suggested-star {
+        margin-right: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    .suggested-cell {
+        font-weight: 600;
+    }
+    
+    /* Rebalanced game styles (replacement games) */
+    .rebalanced-game {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .rebalanced-game:hover {
+        background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+    }
+    
+    .rebalanced-star {
+        margin-right: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    .rebalanced-cell {
+        font-weight: 600;
     }
     
     .team-name {
@@ -1905,6 +3312,15 @@
             gap: 0.4rem;
         }
         
+        .player-pills {
+            gap: 0.4rem;
+        }
+        
+        .player-pill {
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+        }
+        
         .team-pill {
             font-size: 0.8rem;
             padding: 0.4rem 0.8rem;
@@ -1919,5 +3335,115 @@
         .games-table td {
             padding: 0.5rem;
         }
+    }
+    
+    /* Played Games Section Styles */
+    .played-games-section {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 2px solid #e5e7eb;
+    }
+    
+    .played-games-section h3 {
+        margin: 0 0 1.5rem 0;
+        color: #1a202c;
+        font-size: 1.25rem;
+    }
+    
+    .team-games-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .team-games-group h4 {
+        margin: 0 0 0.75rem 0;
+        color: #4a5568;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    
+    .played-games-table {
+        min-width: 400px;
+    }
+    
+    .result-cell {
+        font-weight: 700;
+        text-align: center;
+        width: 60px;
+    }
+    
+    .result-cell.win {
+        color: #059669;
+        background-color: #d1fae5;
+    }
+    
+    .result-cell.loss {
+        color: #dc2626;
+        background-color: #fee2e2;
+    }
+    
+    .result-cell.draw {
+        color: #d97706;
+        background-color: #fef3c7;
+    }
+    
+    .diff-cell {
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .diff-cell.win {
+        color: #059669;
+    }
+    
+    .diff-cell.loss {
+        color: #dc2626;
+    }
+    
+    .diff-cell.draw {
+        color: #d97706;
+    }
+    
+    /* Series grouping styles */
+    .series-group-border td {
+        border-top: 2px solid #cbd5e1;
+    }
+    
+    .series-cell {
+        text-align: center;
+        vertical-align: middle;
+        font-weight: 700;
+        border-left: 2px solid #e5e7eb;
+        min-width: 70px;
+    }
+    
+    .series-cell.win {
+        background-color: #d1fae5;
+        color: #059669;
+    }
+    
+    .series-cell.loss {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    
+    .series-cell.draw {
+        background-color: #fef3c7;
+        color: #d97706;
+    }
+    
+    .series-cell.pending {
+        background-color: #f3f4f6;
+        color: #6b7280;
+    }
+    
+    .series-result-text {
+        display: block;
+        font-size: 1rem;
+    }
+    
+    .series-diff {
+        display: block;
+        font-size: 0.8rem;
+        opacity: 0.85;
     }
 </style>

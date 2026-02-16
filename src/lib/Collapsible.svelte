@@ -209,7 +209,7 @@
     }
     
     .content-wrapper.expanded {
-        max-height: 2000px; /* Adjust based on your needs */
+        max-height: 10000px; /* Increased to accommodate more content */
         transition: max-height 0.3s ease-in;
     }
     

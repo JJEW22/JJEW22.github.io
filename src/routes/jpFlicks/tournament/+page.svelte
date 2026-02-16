@@ -7,7 +7,7 @@
 </svelte:head>
 
 <main>
-    <Tournament dataPath="/tournamentData6Player.json" />
+    <Tournament dataPath="/marchMadness/2026/finalTournamentResults.json" />
 </main>
 
 <style>
