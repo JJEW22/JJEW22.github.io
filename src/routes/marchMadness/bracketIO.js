@@ -1,4 +1,5 @@
 // Bracket I/O utilities for loading and saving bracket files
+// Supports both JSON (preferred) and Excel formats
 
 /**
  * Region positioning for Final Four matchups
@@ -114,7 +115,7 @@ export function initializeBracket(teamsList) {
                     team2: team2,
                     winner: null,
                     region: regionName,
-                    parentGames: null,  // Round 1 has no parents
+                    parentGames: null,
                     gameId: `r1-${regionName}-${seed1}v${seed2}`
                 });
             }
@@ -130,7 +131,7 @@ export function initializeBracket(teamsList) {
         gameId: `r2-${i}`
     }));
     
-    // Round 3 (Sweet 16) - parents are pairs of Round 2 games
+    // Round 3 (Sweet 16)
     bracket.round3 = Array(8).fill(null).map((_, i) => ({
         team1: null,
         team2: null,
@@ -139,7 +140,7 @@ export function initializeBracket(teamsList) {
         gameId: `r3-${i}`
     }));
     
-    // Round 4 (Elite 8) - parents are pairs of Round 3 games
+    // Round 4 (Elite 8)
     bracket.round4 = Array(4).fill(null).map((_, i) => ({
         team1: null,
         team2: null,
@@ -148,7 +149,7 @@ export function initializeBracket(teamsList) {
         gameId: `r4-${i}`
     }));
     
-    // Round 5 (Final Four) - parents are pairs of Round 4 games
+    // Round 5 (Final Four)
     bracket.round5 = [
         { 
             team1: null, 
@@ -166,7 +167,7 @@ export function initializeBracket(teamsList) {
         }
     ];
     
-    // Round 6 (Championship) - parents are the two semifinals
+    // Round 6 (Championship)
     bracket.round6 = [{
         team1: null,
         team2: null,
@@ -176,6 +177,206 @@ export function initializeBracket(teamsList) {
     }];
     
     return bracket;
+}
+
+/**
+ * Load bracket from JSON file
+ * @param {string} path - Path to JSON file
+ * @param {Object} teams - Teams lookup object (optional, for enriching data)
+ * @returns {Promise<Object>} - Bracket object
+ */
+export async function loadBracketFromJSON(path, teams = null) {
+    const response = await fetch(path);
+    
+    if (!response.ok) {
+        throw new Error(`Failed to load bracket JSON: ${response.status}`);
+    }
+    
+    const bracket = await response.json();
+    
+    // Optionally enrich team data with full team info
+    if (teams) {
+        enrichBracketTeams(bracket, teams);
+    }
+    
+    // Add parentGames references for UI navigation
+    addParentGameReferences(bracket);
+    
+    return bracket;
+}
+
+/**
+ * Enrich bracket team data with full team info from teams lookup
+ */
+function enrichBracketTeams(bracket, teams) {
+    const enrichTeam = (team) => {
+        if (!team || !team.name) return team;
+        const fullTeam = teams[team.name];
+        if (fullTeam) {
+            return { ...team, ...fullTeam };
+        }
+        return team;
+    };
+    
+    const enrichGame = (game) => {
+        if (!game) return game;
+        game.team1 = enrichTeam(game.team1);
+        game.team2 = enrichTeam(game.team2);
+        game.winner = enrichTeam(game.winner);
+        return game;
+    };
+    
+    for (let round = 1; round <= 6; round++) {
+        const roundKey = `round${round}`;
+        if (bracket[roundKey]) {
+            bracket[roundKey].forEach(enrichGame);
+        }
+    }
+    
+    if (bracket.winner) {
+        bracket.winner = enrichTeam(bracket.winner);
+    }
+}
+
+/**
+ * Add parentGames references for UI navigation between rounds
+ */
+function addParentGameReferences(bracket) {
+    // Round 2 parents are Round 1 game pairs
+    if (bracket.round2) {
+        bracket.round2.forEach((game, i) => {
+            if (game && bracket.round1) {
+                game.parentGames = [bracket.round1[i * 2], bracket.round1[i * 2 + 1]];
+            }
+        });
+    }
+    
+    // Round 3 parents are Round 2 game pairs
+    if (bracket.round3) {
+        bracket.round3.forEach((game, i) => {
+            if (game && bracket.round2) {
+                game.parentGames = [bracket.round2[i * 2], bracket.round2[i * 2 + 1]];
+            }
+        });
+    }
+    
+    // Round 4 parents are Round 3 game pairs
+    if (bracket.round4) {
+        bracket.round4.forEach((game, i) => {
+            if (game && bracket.round3) {
+                game.parentGames = [bracket.round3[i * 2], bracket.round3[i * 2 + 1]];
+            }
+        });
+    }
+    
+    // Round 5 (Final Four)
+    if (bracket.round5 && bracket.round4) {
+        if (bracket.round5[0]) {
+            bracket.round5[0].parentGames = [bracket.round4[0], bracket.round4[1]];
+        }
+        if (bracket.round5[1]) {
+            bracket.round5[1].parentGames = [bracket.round4[2], bracket.round4[3]];
+        }
+    }
+    
+    // Round 6 (Championship)
+    if (bracket.round6 && bracket.round6[0] && bracket.round5) {
+        bracket.round6[0].parentGames = [bracket.round5[0], bracket.round5[1]];
+    }
+}
+
+/**
+ * Save bracket to JSON file (triggers download)
+ * @param {Object} bracket - Bracket object to save
+ * @param {string} filename - Filename for download
+ */
+export function saveBracketToJSON(bracket, filename = 'bracket.json') {
+    // Create clean version without circular references (parentGames)
+    const cleanBracket = cleanBracketForExport(bracket);
+    
+    const jsonStr = JSON.stringify(cleanBracket, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Clean bracket for export (remove circular refs, keep only essential data)
+ */
+function cleanBracketForExport(bracket) {
+    const cleanTeam = (team) => {
+        if (!team) return null;
+        return {
+            name: team.name,
+            seed: team.seed,
+            region: team.region || ''
+        };
+    };
+    
+    const cleanGame = (game) => {
+        if (!game) return null;
+        return {
+            team1: cleanTeam(game.team1),
+            team2: cleanTeam(game.team2),
+            winner: cleanTeam(game.winner),
+            gameId: game.gameId || '',
+            region: game.region || ''
+        };
+    };
+    
+    return {
+        round1: bracket.round1?.map(cleanGame) || [],
+        round2: bracket.round2?.map(cleanGame) || [],
+        round3: bracket.round3?.map(cleanGame) || [],
+        round4: bracket.round4?.map(cleanGame) || [],
+        round5: bracket.round5?.map(cleanGame) || [],
+        round6: bracket.round6?.map(cleanGame) || [],
+        winner: cleanTeam(bracket.winner)
+    };
+}
+
+/**
+ * Load bracket from path, trying JSON first, then Excel
+ * @param {string} basePath - Base path without extension
+ * @param {Object} teams - Teams lookup object
+ * @param {Array} teamsList - List of team objects (for Excel fallback)
+ * @returns {Promise<Object>} - Bracket object
+ */
+export async function loadBracketFromPath(basePath, teams = null, teamsList = null) {
+    // Remove any existing extension
+    const pathWithoutExt = basePath.replace(/\.(json|xlsx|csv)$/, '');
+    
+    // Try JSON first (preferred format)
+    try {
+        const jsonPath = `${pathWithoutExt}.json`;
+        const response = await fetch(jsonPath, { method: 'HEAD' });
+        if (response.ok) {
+            return await loadBracketFromJSON(jsonPath, teams);
+        }
+    } catch (e) {
+        // JSON not found, try Excel
+    }
+    
+    // Fall back to Excel
+    try {
+        const xlsxPath = `${pathWithoutExt}.xlsx`;
+        const response = await fetch(xlsxPath);
+        if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer();
+            return await loadBracketFromExcel(arrayBuffer, teams, teamsList);
+        }
+    } catch (e) {
+        // Excel not found either
+    }
+    
+    throw new Error(`Bracket not found at ${basePath} (tried .json and .xlsx)`);
 }
 
 /**
@@ -219,6 +420,71 @@ export function findTeam(name, teams) {
 }
 
 /**
+ * Load bracket from Excel ArrayBuffer
+ * @param {ArrayBuffer} arrayBuffer - Excel file contents
+ * @param {Object} teams - Teams lookup
+ * @param {Array} teamsList - Teams list for initialization
+ * @returns {Promise<Object>} - Bracket object
+ */
+export async function loadBracketFromExcel(arrayBuffer, teams, teamsList) {
+    const ExcelJSModule = await import('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/+esm');
+    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+    
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
+    
+    const sheet = workbook.getWorksheet('madness') || workbook.worksheets[0];
+    if (!sheet) {
+        throw new Error('No worksheet found in Excel file');
+    }
+    
+    // Initialize bracket with teams
+    const bracket = initializeBracket(teamsList);
+    
+    // Extract from each region
+    // East (top-left)
+    extractRegionWinners(sheet, bracket, 0, {
+        r2Rows: [8, 12, 16, 20, 24, 28, 32, 36],
+        s16Rows: [10, 18, 26, 34],
+        e8Rows: [14, 30],
+        f4Row: 22,
+        r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
+    }, teams);
+    
+    // West (bottom-left)
+    extractRegionWinners(sheet, bracket, 8, {
+        r2Rows: [43, 47, 51, 55, 59, 63, 67, 71],
+        s16Rows: [45, 53, 61, 69],
+        e8Rows: [49, 65],
+        f4Row: 57,
+        r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
+    }, teams);
+    
+    // South (top-right)
+    extractRegionWinners(sheet, bracket, 16, {
+        r2Rows: [8, 12, 16, 20, 24, 28, 32, 36],
+        s16Rows: [10, 18, 26, 34],
+        e8Rows: [14, 30],
+        f4Row: 22,
+        r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
+    }, teams);
+    
+    // Midwest (bottom-right)
+    extractRegionWinners(sheet, bracket, 24, {
+        r2Rows: [43, 47, 51, 55, 59, 63, 67, 71],
+        s16Rows: [45, 53, 61, 69],
+        e8Rows: [49, 65],
+        f4Row: 57,
+        r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
+    }, teams);
+    
+    // Championship
+    extractChampionship(sheet, bracket, teams);
+    
+    return bracket;
+}
+
+/**
  * Extract region winners from Excel sheet and populate bracket
  */
 function extractRegionWinners(sheet, bracket, startIndex, config, teams) {
@@ -242,17 +508,17 @@ function extractRegionWinners(sheet, bracket, startIndex, config, teams) {
         }
     }
     
-    // Round 2 winners (read from Sweet 16 cells)
+    // Round 2 winners (Sweet 16)
+    const r2StartIndex = Math.floor(startIndex / 2);
     for (let i = 0; i < 4; i++) {
         const row = s16Rows[i];
         const winnerName = getCellValue(sheet, s16Col, row);
         if (winnerName) {
             const winner = findTeam(winnerName, teams);
             if (winner) {
-                const r2GameIndex = Math.floor(startIndex / 2) + i;
-                bracket.round2[r2GameIndex].winner = winner;
-                const r3GameIndex = Math.floor(startIndex / 4) + Math.floor(i / 2);
-                if (i % 2 === 0) {
+                bracket.round2[r2StartIndex + i].winner = winner;
+                const r3GameIndex = Math.floor((r2StartIndex + i) / 2);
+                if ((r2StartIndex + i) % 2 === 0) {
                     bracket.round3[r3GameIndex].team1 = winner;
                 } else {
                     bracket.round3[r3GameIndex].team2 = winner;
@@ -261,139 +527,74 @@ function extractRegionWinners(sheet, bracket, startIndex, config, teams) {
         }
     }
     
-    // Sweet 16 winners (read from Elite 8 cells)
+    // Round 3 winners (Elite 8)
+    const r3StartIndex = Math.floor(startIndex / 4);
     for (let i = 0; i < 2; i++) {
         const row = e8Rows[i];
         const winnerName = getCellValue(sheet, e8Col, row);
         if (winnerName) {
             const winner = findTeam(winnerName, teams);
             if (winner) {
-                const s16GameIndex = Math.floor(startIndex / 4) + i;
-                bracket.round3[s16GameIndex].winner = winner;
-                const e8GameIndex = Math.floor(startIndex / 8);
-                if (i === 0) {
-                    bracket.round4[e8GameIndex].team1 = winner;
+                bracket.round3[r3StartIndex + i].winner = winner;
+                const r4GameIndex = Math.floor((r3StartIndex + i) / 2);
+                if ((r3StartIndex + i) % 2 === 0) {
+                    bracket.round4[r4GameIndex].team1 = winner;
                 } else {
-                    bracket.round4[e8GameIndex].team2 = winner;
+                    bracket.round4[r4GameIndex].team2 = winner;
                 }
             }
         }
     }
     
-    // Elite 8 winner (read from Final Four cell)
+    // Round 4 winner (Final Four qualifier)
+    const r4GameIndex = Math.floor(startIndex / 8);
     const f4WinnerName = getCellValue(sheet, f4Col, f4Row);
     if (f4WinnerName) {
         const winner = findTeam(f4WinnerName, teams);
         if (winner) {
-            const e8GameIndex = Math.floor(startIndex / 8);
-            bracket.round4[e8GameIndex].winner = winner;
-            const semifinalIndex = e8GameIndex < 2 ? 0 : 1;
-            const teamSlot = e8GameIndex % 2 === 0 ? 'team1' : 'team2';
-            bracket.round5[semifinalIndex][teamSlot] = winner;
+            bracket.round4[r4GameIndex].winner = winner;
+            const r5GameIndex = Math.floor(r4GameIndex / 2);
+            if (r4GameIndex % 2 === 0) {
+                bracket.round5[r5GameIndex].team1 = winner;
+            } else {
+                bracket.round5[r5GameIndex].team2 = winner;
+            }
         }
     }
 }
 
 /**
- * Load bracket from Excel file
- * @param {string} path - Path to the Excel file
- * @param {Object} teams - Teams lookup object
- * @param {Array} teamsList - List of team objects
- * @returns {Promise<Object>} - Loaded bracket
+ * Extract championship results from Excel
  */
-export async function loadBracketFromExcel(path, teams, teamsList) {
-    const ExcelJSModule = await import('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/+esm');
-    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+function extractChampionship(sheet, bracket, teams) {
+    // Left semifinal winner (O39)
+    const leftWinner = getCellValue(sheet, 'O', 39);
+    if (leftWinner) {
+        const winner = findTeam(leftWinner, teams);
+        if (winner) {
+            bracket.round5[0].winner = winner;
+            bracket.round6[0].team1 = winner;
+        }
+    }
     
-    const response = await fetch(path);
-    if (!response.ok) throw new Error(`Failed to fetch bracket: ${response.status}`);
+    // Right semifinal winner (W39)
+    const rightWinner = getCellValue(sheet, 'W', 39);
+    if (rightWinner) {
+        const winner = findTeam(rightWinner, teams);
+        if (winner) {
+            bracket.round5[1].winner = winner;
+            bracket.round6[0].team2 = winner;
+        }
+    }
     
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(arrayBuffer);
-    
-    const sheet = workbook.getWorksheet('madness');
-    if (!sheet) throw new Error('Could not find "madness" sheet');
-    
-    // Initialize bracket with teams
-    const bracket = initializeBracket(teamsList);
-    
-    // Extract winners from each region
-    // East Region (left side, top)
-    extractRegionWinners(sheet, bracket, 0, {
-        r2Rows: [8, 12, 16, 20, 24, 28, 32, 36],
-        s16Rows: [10, 18, 26, 34],
-        e8Rows: [14, 30],
-        f4Row: 22,
-        r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
-    }, teams);
-    
-    // West Region (left side, bottom)
-    extractRegionWinners(sheet, bracket, 8, {
-        r2Rows: [43, 47, 51, 55, 59, 63, 67, 71],
-        s16Rows: [45, 53, 61, 69],
-        e8Rows: [49, 65],
-        f4Row: 57,
-        r2Col: 'E', s16Col: 'H', e8Col: 'K', f4Col: 'N'
-    }, teams);
-    
-    // South Region (right side, top)
-    extractRegionWinners(sheet, bracket, 16, {
-        r2Rows: [8, 12, 16, 20, 24, 28, 32, 36],
-        s16Rows: [10, 18, 26, 34],
-        e8Rows: [14, 30],
-        f4Row: 22,
-        r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
-    }, teams);
-    
-    // Midwest Region (right side, bottom)
-    extractRegionWinners(sheet, bracket, 24, {
-        r2Rows: [43, 47, 51, 55, 59, 63, 67, 71],
-        s16Rows: [45, 53, 61, 69],
-        e8Rows: [49, 65],
-        f4Row: 57,
-        r2Col: 'AJ', s16Col: 'AG', e8Col: 'AD', f4Col: 'AA'
-    }, teams);
-    
-    // Championship
-    const champ1 = getCellValue(sheet, 'O', 39);
-    const champ2 = getCellValue(sheet, 'W', 39);
+    // Champion (R44)
     const champion = getCellValue(sheet, 'R', 44);
-    
-    if (champ1) {
-        const team = findTeam(champ1, teams);
-        bracket.round5[0].winner = team;
-        bracket.round6[0].team1 = team;
-    }
-    if (champ2) {
-        const team = findTeam(champ2, teams);
-        bracket.round5[1].winner = team;
-        bracket.round6[0].team2 = team;
-    }
     if (champion) {
-        bracket.round6[0].winner = findTeam(champion, teams);
-        bracket.winner = findTeam(champion, teams);
-    }
-    
-    return bracket;
-}
-
-/**
- * Load bracket from path (auto-detects format)
- * @param {string} path - Path to the bracket file
- * @param {Object} teams - Teams lookup object
- * @param {Array} teamsList - List of team objects
- * @returns {Promise<Object>} - Loaded bracket
- */
-export async function loadBracketFromPath(path, teams, teamsList) {
-    if (path.endsWith('.xlsx')) {
-        return await loadBracketFromExcel(path, teams, teamsList);
-    } else if (path.endsWith('.csv')) {
-        // CSV loading not yet implemented
-        console.log('CSV bracket loading not yet implemented');
-        return initializeBracket(teamsList);
-    } else {
-        throw new Error('Unsupported file format. Use .xlsx or .csv');
+        const winner = findTeam(champion, teams);
+        if (winner) {
+            bracket.round6[0].winner = winner;
+            bracket.winner = winner;
+        }
     }
 }
 
@@ -425,19 +626,6 @@ export async function saveBracketToExcel(bracket) {
     sheet.getCell('AJ3').value = 'Second Round';
     sheet.getCell('AL3').value = 'First Round';
     
-    // Date headers
-    sheet.getCell('B4').value = 'March 20-21';
-    sheet.getCell('E4').value = 'March 22-23';
-    sheet.getCell('H4').value = 'March 27-28';
-    sheet.getCell('K4').value = 'March 29-30';
-    sheet.getCell('N4').value = 'April 5';
-    sheet.getCell('R4').value = 'April 7';
-    sheet.getCell('AA4').value = 'April 5';
-    sheet.getCell('AD4').value = 'March 30-31';
-    sheet.getCell('AG4').value = 'March 28-29';
-    sheet.getCell('AJ4').value = 'March 22-23';
-    sheet.getCell('AL4').value = 'March 20-21';
-    
     const getTeamName = (team) => team ? team.name : '';
     const getWinnerName = (game) => game && game.winner ? game.winner.name : '';
     
@@ -466,7 +654,6 @@ export async function saveBracketToExcel(bracket) {
     sheet.getCell('K14').value = getWinnerName(bracket.round3[0]);
     sheet.getCell('K30').value = getWinnerName(bracket.round3[1]);
     sheet.getCell('N22').value = getWinnerName(bracket.round4[0]);
-    sheet.getCell('K22').value = 'East';
     
     // === WEST REGION (Bottom Left) ===
     const westR1 = bracket.round1.slice(8, 16);
@@ -493,7 +680,6 @@ export async function saveBracketToExcel(bracket) {
     sheet.getCell('K49').value = getWinnerName(bracket.round3[2]);
     sheet.getCell('K65').value = getWinnerName(bracket.round3[3]);
     sheet.getCell('N57').value = getWinnerName(bracket.round4[1]);
-    sheet.getCell('K57').value = 'Midwest';
     
     // === SOUTH REGION (Top Right) ===
     const southR1 = bracket.round1.slice(16, 24);
@@ -520,7 +706,6 @@ export async function saveBracketToExcel(bracket) {
     sheet.getCell('AD14').value = getWinnerName(bracket.round3[4]);
     sheet.getCell('AD30').value = getWinnerName(bracket.round3[5]);
     sheet.getCell('AA22').value = getWinnerName(bracket.round4[2]);
-    sheet.getCell('AD22').value = 'South';
     
     // === MIDWEST REGION (Bottom Right) ===
     const midwestR1 = bracket.round1.slice(24, 32);
@@ -547,17 +732,11 @@ export async function saveBracketToExcel(bracket) {
     sheet.getCell('AD49').value = getWinnerName(bracket.round3[6]);
     sheet.getCell('AD65').value = getWinnerName(bracket.round3[7]);
     sheet.getCell('AA57').value = getWinnerName(bracket.round4[3]);
-    sheet.getCell('AD57').value = 'West';
     
     // === CHAMPIONSHIP ===
     sheet.getCell('O39').value = getWinnerName(bracket.round5[0]);
     sheet.getCell('W39').value = getWinnerName(bracket.round5[1]);
     sheet.getCell('R44').value = bracket.winner ? bracket.winner.name : '';
-    sheet.getCell('R46').value = 'National Champions';
-    
-    sheet.getCell('S50').value = 'Tie-Breaker';
-    sheet.getCell('S51').value = '';
-    sheet.getCell('R54').value = 'Total Points in Championship Game';
     
     // Generate and download
     const buffer = await workbook.xlsx.writeBuffer();
@@ -589,7 +768,6 @@ export function getEliminatedTeams(resultsBracket) {
         
         games.forEach(game => {
             if (game && game.winner) {
-                // The team that didn't win is eliminated
                 if (game.team1 && game.team1.name !== game.winner.name) {
                     eliminated.add(game.team1.name);
                 }

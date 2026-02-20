@@ -1,0 +1,149 @@
+[
+    {
+        "name": "Golden Boy",
+        "round": 0,
+        "reason": "has the most potential",
+        "Winners": []
+    },
+    {
+        "name": "Shortest Stick",
+        "round": 0,
+        "reason": "has the lowest probability of winning at the beginning",
+        "Winners": []
+    },
+    {
+        "name": "Nerd or Loner",
+        "round": 0,
+        "reason": "awarded for finding something in the rules before the first game, if no one finds it jack wins",
+        "Winners": []
+    },
+    {
+        "name": "Best Friends",
+        "round": 1,
+        "reason": "Awarded to the people with the most similar brackets",
+        "Winners": []
+    },
+        {
+        "name": "Dom/Sub",
+        "round": 2, 
+        "halfway": true,
+        "reason": "Awarded to the person whose winning (most) most implies someone elses losing (sub)",
+        "Winners": [[], []]
+    },
+    {
+        "name": "Fallen From Grace",
+        "round": 2,
+        "reason": "worst ratio of 1st round picks/ 2nd round picks",
+        "Winners": []
+    },
+    {
+        "name": "Fortified",
+        "round": 2,
+        "reason": "Person whose probability of winning changed the least from the first round to now",
+        "Winners": []
+    },
+    {
+        "name": "Cheater",
+        "round": 3,
+        "reason": "Typical had my teams going the furthest (qr code to my venmo)",
+        "Winners": [],
+        "image": "/marchMadness/2026/badges/Venmo_QR_code.png"
+    },
+    {
+        "name": "More than fair",
+        "round": 1,
+        "halfway": true,
+        "reason": "All named brackets (use snow white image)",
+        "Winners": []
+    },
+    {
+        "name": "balanced",
+        "round": 1,
+        "reason": "Person who's number of picks was closest to 50%",
+        "Winners": []
+    },
+    {
+        "name": "Unicorn",
+        "round": 5,
+        "reason": "Submitted something to happen that never has",
+        "Winners": []
+    },
+    {
+        "name": "the Independent",
+        "round": 5,
+        "reason": "Lowest absolute different between left and right half of the bracket",
+        "Winners": []
+    },
+    {
+        "name": "Lone wolf/sheep",
+        "round": 4,
+        "reason": "Has the bracket most (dis)similar to everyone else",
+        "Winners": []
+    },
+    {
+        "name": "Another Life",
+        "round": 6,
+        "reason": "By another metric you won, picking the most games (logo is mario 1 up)",
+        "Winners": []
+    },
+    {
+        "name": "Pants Coin",
+        "round": 6,
+        "reason": "luckily have the least point differential for correctly picked games",
+        "Winners": []
+    },
+    {
+        "name": "Joever/hard hat",
+        "round": "unknown",
+        "reason": "awarded to the first person eliminated (picture of joe biden, and the maga hat)",
+        "Winners": []
+    },
+    {
+        "name": "Flash/Flash",
+        "round": "unknown",
+        "reason": "First and last to 750 points (the flash and flash from zootopia pictures)",
+        "Winners": [[],[]]
+    },
+    {
+        "name": "well duh",
+        "round": 3,
+        "reason": "Correctly predicted the most not close games (wins by more than 10)",
+        "Winners": []
+    },
+    {
+        "name": "Scatt er gories",
+        "round": 0,
+        "reason": "was the only person to pick your champion to win (scategories logo picture)",
+        "Winners": []
+    },
+    {
+        "name": "Believer",
+        "round": "unknown",
+        "reason": "correctly picked THE lowest seed to advance to a round (can be won multiple times) (shrek picture)",
+        "Winners": []
+    },
+    {
+        "name": "Dustin",
+        "round": 3,
+        "reason": "awarded for least underdog points received compared to potential (picture of dustin)",
+        "Winners": []
+    },
+    {
+        "name": "Husky",
+        "round": 4,
+        "reason": "best performance of east - south",
+        "Winners": []
+    },
+    {
+        "name": "Down/Left/Up/Right",
+        "round": 4,
+        "reason": "best performance in each division (each piece of a playstation D pad)",
+        "Winners": [[],[],[],[]]
+    },
+    {
+        "name": "heartbreaker/heartbroken",
+        "round": "unknown",
+        "reason": "correctly/ incorrectly had a game where they were the only one to pick a team (before final 4) (hammer and broken heart logo)",
+        "Winners": []
+    }
+]
