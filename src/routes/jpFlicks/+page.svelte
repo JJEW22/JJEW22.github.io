@@ -36,10 +36,16 @@
     const SERIES_WIN_SCORE = 1;
     const UNPLAYED_STRING = "UNPLAYED"
     const WONT_PLAY_STRING = "XXX"
-    const SESSION_COUNT = 4
+    const FORFEIT_WIN_STRING = "F"
+    const FORFEIT_LOSS_STRING = "-F"
+    const SESSION_COUNT = 6
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
+    
+    // Forfeit constants
+    const FORFEIT_THRESHOLD = 1.5; // Games per session threshold that triggers forfeits
+    const FORFEIT_POINT_DIFF = 55; // Point differential for forfeited games
     
     // Adjustment constant for games per session calculation (C in the algorithm)
     const GAMES_PER_SESSION_ADJUSTMENT = 0.1;
@@ -633,62 +639,62 @@
      * Called after all calculations are complete.
      */
     function logWeeklySchedule(gamesPerTeam, remainingGamesPerTeam, teamXValues, totalGamesTarget, selectedGameIds, flexOrder, unplayedGames) {
-        console.log('╔════════════════════════════════════════════════════════════════╗');
+        console.log('â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—');
         console.log('â•‘            WEEKLY CROKINOLE SCHEDULE                           â•‘');
-        console.log('║════════════════════════════════════════════════════════════════â•');
+        console.log('â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
         console.log('');
         console.log('Thursday seed:', thursdaySeed);
         console.log('Sessions remaining:', SESSION_COUNT);
         console.log('');
         
         // Team breakdown with flex scores
-        console.log('┌─────────────────────────────────────────────────────────────────┐');
-        console.log('│ TEAM BREAKDOWN                                                  │');
-        console.log('├─────────────────────────────────────────────────────────────────┤');
+        console.log('â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”');
+        console.log('â”‚ TEAM BREAKDOWN                                                  â”‚');
+        console.log('â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤');
         Object.entries(gamesPerTeam)
             .sort((a, b) => (flexOrder[a[0]] || 999) - (flexOrder[b[0]] || 999))
             .forEach(([team, games]) => {
                 const X = teamXValues[team]?.toFixed(2) || '?';
                 const remaining = remainingGamesPerTeam[team] || 0;
                 const flex = flexOrder[team] || '?';
-                console.log(`│ ${team.padEnd(15)} | ${games} game(s) this week | ${remaining.toString().padStart(2)} remaining | X=${X} | Flex: ${flex}`);
+                console.log(`â”‚ ${team.padEnd(15)} | ${games} game(s) this week | ${remaining.toString().padStart(2)} remaining | X=${X} | Flex: ${flex}`);
             });
-        console.log('└─────────────────────────────────────────────────────────────────┘');
+        console.log('â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜');
         console.log('');
-        console.log(`Target games this week: ${totalGamesTarget} (${totalGamesTarget % 2 === 0 ? 'even ✔' : 'odd ✗'})`);
+        console.log(`Target games this week: ${totalGamesTarget} (${totalGamesTarget % 2 === 0 ? 'even ✔' : 'odd âœ—'})`);
         console.log('');
         
         // Selected games
-        console.log('┌─────────────────────────────────────────────────────────────────┐');
-        console.log('│ SELECTED GAMES FOR THIS WEEK                                    │');
-        console.log('├─────────────────────────────────────────────────────────────────┤');
+        console.log('â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”');
+        console.log('â”‚ SELECTED GAMES FOR THIS WEEK                                    â”‚');
+        console.log('â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤');
         const selectedGamesArray = unplayedGames.filter(g => selectedGameIds.has(getGameId(g)));
         if (selectedGamesArray.length === 0) {
-            console.log('│ No games selected                                               │');
+            console.log('â”‚ No games selected                                               â”‚');
         } else {
             selectedGamesArray.forEach(game => {
                 const flex1 = flexOrder[game.team1] || '?';
                 const flex2 = flexOrder[game.team2] || '?';
                 const board = game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING;
-                console.log(`│ ${game.team1} (Flex:${flex1}) vs ${game.team2} (Flex:${flex2}) @ ${board}`);
+                console.log(`â”‚ ${game.team1} (Flex:${flex1}) vs ${game.team2} (Flex:${flex2}) @ ${board}`);
             });
         }
-        console.log('└─────────────────────────────────────────────────────────────────┘');
+        console.log('â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜');
         console.log(`Total selected: ${selectedGameIds.size} games`);
         console.log('');
         
         // Flex order
-        console.log('┌─────────────────────────────────────────────────────────────────┐');
-        console.log('│ FLEX ORDER (Rebalancing Priority)                               │');
-        console.log('├─────────────────────────────────────────────────────────────────┤');
+        console.log('â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”');
+        console.log('â”‚ FLEX ORDER (Rebalancing Priority)                               â”‚');
+        console.log('â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤');
         Object.entries(flexOrder)
             .sort((a, b) => a[1] - b[1])
             .forEach(([team, flex]) => {
                 const scheduled = gamesPerTeam[team] || 0;
                 const remaining = remainingGamesPerTeam[team] || 0;
-                console.log(`│ ${flex.toString().padStart(2)}. ${team.padEnd(15)} (${scheduled} scheduled, ${remaining} remaining)`);
+                console.log(`â”‚ ${flex.toString().padStart(2)}. ${team.padEnd(15)} (${scheduled} scheduled, ${remaining} remaining)`);
             });
-        console.log('└─────────────────────────────────────────────────────────────────┘');
+        console.log('â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜');
         console.log('');
     }
 
@@ -994,8 +1000,18 @@
         return (typeof game_value === "string") && ((game_value === UNPLAYED_STRING) || (game_value === WONT_PLAY_STRING));
     }
 
+    function isForfeit(game_value) {
+        return game_value === FORFEIT_WIN_STRING || game_value === FORFEIT_LOSS_STRING;
+    }
+
+    function forfeitToScore(game_value) {
+        if (game_value === FORFEIT_WIN_STRING) return FORFEIT_POINT_DIFF;
+        if (game_value === FORFEIT_LOSS_STRING) return -FORFEIT_POINT_DIFF;
+        return 0;
+    }
+
     function isValidGame(game_value) {
-        return (typeof game_value === "number") || (game_value === UNPLAYED_STRING);
+        return (typeof game_value === "number") || (game_value === UNPLAYED_STRING) || isForfeit(game_value);
     }
 
     function update_team_for_game(team_info, score) {
@@ -1030,16 +1046,20 @@
             throw new Error(`Given a result that is undefined | Home: ${home_result}, Away: ${away_result}`)
         }
 
+        // Convert forfeit strings to numeric values
+        const homeScore = isForfeit(home_result) ? forfeitToScore(home_result) : home_result;
+        const awayScore = isForfeit(away_result) ? forfeitToScore(away_result) : away_result;
+
         if (!isUnplayed(home_result)) {
-            update_team_for_game(team_info, home_result)
+            update_team_for_game(team_info, homeScore)
         }
 
         if (!isUnplayed(away_result)) {
-            update_team_for_game(team_info, away_result)
+            update_team_for_game(team_info, awayScore)
         }
 
         if (!isUnplayed(home_result) && !isUnplayed(away_result)) {
-            update_series(team_info, home_result, away_result);
+            update_series(team_info, homeScore, awayScore);
         }
         
         
@@ -1675,6 +1695,7 @@
         });
     })();
 
+    // Group played games by the player's team with all display data pre-computed
     // Group played games by the player's team, then by opponent (series), with series score
     $: playedGamesByTeam = (() => {
         if (!playedGames.length) return {};
@@ -1683,13 +1704,14 @@
         // First collect all games per team
         const gamesByTeam = {};
         
-        function makeResultObj(playerResult) {
+        function makeResultObj(playerResult, gameIsForfeit) {
+            const forfeitSuffix = gameIsForfeit ? ' (F)' : '';
             if (playerResult > 0) {
-                return { text: 'W', class: 'win', diff: `+${playerResult}`, numericDiff: playerResult };
+                return { text: 'W', class: 'win', diff: `+${playerResult}${forfeitSuffix}`, numericDiff: playerResult };
             } else if (playerResult < 0) {
-                return { text: 'L', class: 'loss', diff: `${playerResult}`, numericDiff: playerResult };
+                return { text: 'L', class: 'loss', diff: `${playerResult}${forfeitSuffix}`, numericDiff: playerResult };
             } else {
-                return { text: 'D', class: 'draw', diff: '0', numericDiff: 0 };
+                return { text: 'D', class: 'draw', diff: `0${forfeitSuffix}`, numericDiff: 0 };
             }
         }
         
@@ -1704,7 +1726,7 @@
                 if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
                 gamesByTeam[playerTeam].push({
                     opponentTeam: game.team2,
-                    result: makeResultObj(game.result),
+                    result: makeResultObj(game.result, game.isForfeit),
                     board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
                 });
             }
@@ -1714,7 +1736,7 @@
                 if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
                 gamesByTeam[playerTeam].push({
                     opponentTeam: game.team1,
-                    result: makeResultObj(-game.result),
+                    result: makeResultObj(-game.result, game.isForfeit),
                     board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
                 });
             }
@@ -1803,6 +1825,7 @@
                     if (team1Info === undefined || team2Info === undefined) {
                         throw Error(`undefined teamInfo ${team1Info} ${team2Info}`);
                     }
+                    const resultValue = isForfeit(game_value) ? forfeitToScore(game_value) : game_value;
                     games.push({
                     team1: team1Info[TEAM_NAME],
                     player1_team1: team1Info[PLAYER_ONE],
@@ -1812,7 +1835,8 @@
                     player2_team2: team2Info[PLAYER_TWO],
                     played: !isUnplayed(game_value),
                     isHome: isHomeGame,
-                    result: game_value
+                    result: resultValue,
+                    isForfeit: isForfeit(game_value)
                     })
             }
             }
@@ -1909,6 +1933,112 @@
             const status = actual >= max ? '⚠️ AT MAX' : '✔';
             console.log(`  ${player}: ${actual} scheduled (max: ${max}) ${status}`);
         });
+    }
+
+    /**
+     * Compute forfeit information for hidden (absent) teams.
+     * 
+     * For each hidden team:
+     * 1. Calculate games/session = remaining games / SESSION_COUNT
+     * 2. If > FORFEIT_THRESHOLD, forfeit ceil(games/session - FORFEIT_THRESHOLD) games
+     * 3. Forfeit priority: scheduled (starred) games against present teams first,
+     *    then random unplayed games against present teams
+     */
+    let forfeitData = [];
+    
+    $: if (dataReady && allGames.length > 0 && isAllMode) {
+        const forfeitRandom = seededRandom(thursdaySeed + 100);
+        const unplayedGames = allGames.filter(g => !g.played);
+        const newForfeitData = [];
+        
+        // For each hidden team, check if they need to forfeit
+        hiddenTeams.forEach(hiddenTeam => {
+            const remaining = remainingGamesPerTeam[hiddenTeam] || 0;
+            const gamesPerSession = remaining / SESSION_COUNT;
+            
+            if (gamesPerSession <= FORFEIT_THRESHOLD) return; // No forfeits needed
+            
+            const numForfeits = Math.ceil(gamesPerSession - FORFEIT_THRESHOLD);
+            
+            // Find scheduled games for this team against present (non-hidden) teams
+            const scheduledAgainstPresent = unplayedGames.filter(game => {
+                if (!selectedGamesThisWeek.has(getGameId(game))) return false;
+                const isInGame = game.team1 === hiddenTeam || game.team2 === hiddenTeam;
+                if (!isInGame) return false;
+                const opponent = game.team1 === hiddenTeam ? game.team2 : game.team1;
+                return !hiddenTeams.has(opponent);
+            });
+            
+            // Shuffle scheduled games using seeded random
+            const shuffledScheduled = [...scheduledAgainstPresent]
+                .map(g => ({ game: g, sortKey: forfeitRandom() }))
+                .sort((a, b) => a.sortKey - b.sortKey)
+                .map(item => item.game);
+            
+            const forfeitedGames = [];
+            const forfeitedOpponents = new Set();
+            
+            if (numForfeits <= shuffledScheduled.length) {
+                // Pick N random from scheduled
+                shuffledScheduled.slice(0, numForfeits).forEach(game => {
+                    const opponent = game.team1 === hiddenTeam ? game.team2 : game.team1;
+                    forfeitedGames.push(game);
+                    forfeitedOpponents.add(opponent);
+                });
+            } else {
+                // Forfeit all scheduled first
+                shuffledScheduled.forEach(game => {
+                    const opponent = game.team1 === hiddenTeam ? game.team2 : game.team1;
+                    forfeitedGames.push(game);
+                    forfeitedOpponents.add(opponent);
+                });
+                
+                // Then pick random unplayed games against present teams (not already forfeited to)
+                const additionalNeeded = numForfeits - shuffledScheduled.length;
+                const additionalCandidates = unplayedGames.filter(game => {
+                    if (selectedGamesThisWeek.has(getGameId(game))) return false; // Already handled above
+                    const isInGame = game.team1 === hiddenTeam || game.team2 === hiddenTeam;
+                    if (!isInGame) return false;
+                    const opponent = game.team1 === hiddenTeam ? game.team2 : game.team1;
+                    if (hiddenTeams.has(opponent)) return false; // Opponent not present
+                    if (forfeitedOpponents.has(opponent)) return false; // Already forfeiting to this team
+                    return true;
+                });
+                
+                const shuffledAdditional = [...additionalCandidates]
+                    .map(g => ({ game: g, sortKey: forfeitRandom() }))
+                    .sort((a, b) => a.sortKey - b.sortKey)
+                    .map(item => item.game);
+                
+                shuffledAdditional.slice(0, additionalNeeded).forEach(game => {
+                    forfeitedGames.push(game);
+                    const opponent = game.team1 === hiddenTeam ? game.team2 : game.team1;
+                    forfeitedOpponents.add(opponent);
+                });
+            }
+            
+            if (forfeitedGames.length > 0) {
+                newForfeitData.push({
+                    team: hiddenTeam,
+                    gamesPerSession: gamesPerSession,
+                    numForfeits: numForfeits,
+                    actualForfeits: forfeitedGames.length,
+                    games: forfeitedGames.map(game => {
+                        const opponent = game.team1 === hiddenTeam ? game.team2 : game.team1;
+                        const wasScheduled = selectedGamesThisWeek.has(getGameId(game));
+                        return {
+                            opponent,
+                            board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING,
+                            wasScheduled
+                        };
+                    })
+                });
+            }
+        });
+        
+        forfeitData = newForfeitData;
+    } else {
+        forfeitData = [];
     }
 
 </script>
@@ -2062,6 +2192,44 @@
                 </tbody>
             </table>
                 </div> 
+        </div>
+        
+        <div class="subsection">
+            <h3>Forfeits</h3>
+            <p>
+                As the season winds down, teams that miss sessions may be required to forfeit games. 
+                If a team's remaining games divided by the number of sessions left exceeds <b>1.5 games per session</b>, 
+                that team will forfeit a number of games equal to the amount they are over the threshold (rounded up).
+            </p>
+            <p>
+                <b>Example:</b> A team needs to average 3.1 games per session to finish on time. Since the threshold is 1.5, 
+                they are 1.6 over — so they forfeit <b>2 games</b> for missing that session.
+            </p>
+            <h3>Who do you forfeit against?</h3>
+            <p>
+                Forfeits are assigned based on the week's schedule (the ⭐ starred games in the Games Finder), 
+                but only against teams that <b>were present</b> that session.
+            </p>
+            <ul>
+                <li>If the number of forfeits is <b>less than or equal to</b> the number of scheduled games against present teams, 
+                    the forfeited games are <b>randomly chosen</b> from those scheduled matchups.</li>
+                <li>If the number of forfeits <b>exceeds</b> the scheduled games against present teams, 
+                    all of those scheduled games are forfeited first. The remaining forfeits are then assigned <b>randomly</b> 
+                    from other unplayed games against present teams (excluding teams already forfeited to that session).</li>
+            </ul>
+            <h3>Forfeit scoring</h3>
+            <p>
+                A forfeited game is scored as a <b>55 point differential</b> in favor of the opponent. 
+                Series scoring works the same as usual — the forfeit score counts toward the combined series total just like any other game result.
+            </p>
+            <p>
+                <b>Note:</b> Forfeited games can be made up during a future session, as long as you have already played 
+                all of your scheduled games for that session first.
+            </p>
+            <p>
+                <b>Note:</b> Teams that are present but do not play all of their scheduled games will also be forced to forfeit. 
+                If a team doesn't play N of their scheduled games, they will forfeit N - 1 of those unplayed games.
+            </p>
         </div>
         
     </Collapsible>
@@ -2268,6 +2436,59 @@
                 No games found for "{playerName}"
             </div>
             {/if}
+        {/if}
+        
+        <!-- Forfeit Section (only in all mode with hidden teams) -->
+        {#if isAllMode && forfeitData.length > 0}
+            <div class="forfeit-section">
+                <h3>⚠️ Forfeits This Session ({forfeitData.reduce((sum, f) => sum + f.actualForfeits, 0)} total)</h3>
+                <p class="forfeit-description">
+                    The following absent teams exceed the <strong>{FORFEIT_THRESHOLD}</strong> games/session threshold 
+                    and must forfeit games (scored as <strong>{FORFEIT_POINT_DIFF}</strong> point differential).
+                </p>
+                
+                {#each forfeitData as forfeit}
+                    <div class="forfeit-team-group">
+                        <div class="forfeit-team-header">
+                            <span class="forfeit-team-name">{forfeit.team}</span>
+                            <span class="forfeit-team-stats">
+                                {forfeit.gamesPerSession.toFixed(2)} games/session → 
+                                <strong>{forfeit.actualForfeits} {forfeit.actualForfeits === 1 ? 'forfeit' : 'forfeits'}</strong>
+                            </span>
+                        </div>
+                        <div class="games-table-wrapper">
+                            <table class="games-table forfeit-table">
+                                <thead>
+                                    <tr>
+                                        <th>Forfeiting Team</th>
+                                        <th></th>
+                                        <th>Opponent (Wins)</th>
+                                        <th>Board</th>
+                                        <th>Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {#each forfeit.games as game}
+                                        <tr>
+                                            <td class="team-name forfeit-loser">{forfeit.team}</td>
+                                            <td class="vs">vs</td>
+                                            <td class="team-name forfeit-winner">{game.opponent}</td>
+                                            <td>{game.board}</td>
+                                            <td class="forfeit-source">
+                                                {#if game.wasScheduled}
+                                                    <span class="source-scheduled">⭐ Scheduled</span>
+                                                {:else}
+                                                    <span class="source-random">🎲 Random</span>
+                                                {/if}
+                                            </td>
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {/each}
+            </div>
         {/if}
         
         <!-- Played Games Section -->
@@ -3445,5 +3666,79 @@
         display: block;
         font-size: 0.8rem;
         opacity: 0.85;
+    }
+    
+    /* Forfeit Section Styles */
+    .forfeit-section {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 2px solid #fca5a5;
+    }
+    
+    .forfeit-section h3 {
+        margin: 0 0 0.5rem 0;
+        color: #991b1b;
+        font-size: 1.25rem;
+    }
+    
+    .forfeit-description {
+        color: #6b7280;
+        margin: 0 0 1.5rem 0;
+        font-size: 0.95rem;
+    }
+    
+    .forfeit-team-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .forfeit-team-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+    }
+    
+    .forfeit-team-name {
+        font-weight: 700;
+        font-size: 1.05rem;
+        color: #991b1b;
+    }
+    
+    .forfeit-team-stats {
+        font-size: 0.9rem;
+        color: #6b7280;
+    }
+    
+    .forfeit-table {
+        min-width: 400px;
+    }
+    
+    .forfeit-table thead th {
+        background: #991b1b;
+    }
+    
+    .forfeit-loser {
+        color: #dc2626;
+    }
+    
+    .forfeit-winner {
+        color: #059669;
+    }
+    
+    .forfeit-source {
+        text-align: center;
+    }
+    
+    .source-scheduled {
+        font-size: 0.85rem;
+        color: #b45309;
+        font-weight: 500;
+    }
+    
+    .source-random {
+        font-size: 0.85rem;
+        color: #6b7280;
+        font-weight: 500;
     }
 </style>
