@@ -46,6 +46,7 @@
     // Forfeit constants
     const FORFEIT_THRESHOLD = 1.5; // Games per session threshold that triggers forfeits
     const FORFEIT_POINT_DIFF = 55; // Point differential for forfeited games
+    const FORFEIT_RATE = 0.75; // Each additional 0.75 above threshold = 1 more forfeit
     
     // Adjustment constant for games per session calculation (C in the algorithm)
     const GAMES_PER_SESSION_ADJUSTMENT = 0.1;
@@ -926,6 +927,10 @@
                     return -1 * (a.score - b.score);
                 }
 
+                if (a.forfeitLosses !== b.forfeitLosses) {
+                    return a.forfeitLosses - b.forfeitLosses;
+                }
+
                 if (a.pointDiff !== b.pointDiff) {
                     return -1 * (a.pointDiff - b.pointDiff);
                 }
@@ -1052,10 +1057,17 @@
 
         if (!isUnplayed(home_result)) {
             update_team_for_game(team_info, homeScore)
+            // Track forfeit losses (only when this team lost by forfeit)
+            if (home_result === FORFEIT_LOSS_STRING) {
+                team_info.forfeitLosses += 1;
+            }
         }
 
         if (!isUnplayed(away_result)) {
             update_team_for_game(team_info, awayScore)
+            if (away_result === FORFEIT_LOSS_STRING) {
+                team_info.forfeitLosses += 1;
+            }
         }
 
         if (!isUnplayed(home_result) && !isUnplayed(away_result)) {
@@ -1078,6 +1090,7 @@
                 pointDiff: 0,
                 seriesWins: 0,
                 seriesLosses: 0,
+                forfeitLosses: 0,
             }
             function compare_names(row) {
                 return row.teamName.toLowerCase() === val.teamName.toLowerCase();
@@ -1940,7 +1953,7 @@
      * 
      * For each hidden team:
      * 1. Calculate games/session = remaining games / SESSION_COUNT
-     * 2. If > FORFEIT_THRESHOLD, forfeit ceil(games/session - FORFEIT_THRESHOLD) games
+     * 2. If > FORFEIT_THRESHOLD, forfeit 1 + floor((games/session - FORFEIT_THRESHOLD) / FORFEIT_RATE) games
      * 3. Forfeit priority: scheduled (starred) games against present teams first,
      *    then random unplayed games against present teams
      */
@@ -1958,7 +1971,7 @@
             
             if (gamesPerSession <= FORFEIT_THRESHOLD) return; // No forfeits needed
             
-            const numForfeits = Math.ceil(gamesPerSession - FORFEIT_THRESHOLD);
+            const numForfeits = 1 + Math.floor((gamesPerSession - FORFEIT_THRESHOLD) / FORFEIT_RATE);
             
             // Find scheduled games for this team against present (non-hidden) teams
             const scheduledAgainstPresent = unplayedGames.filter(game => {
@@ -2199,11 +2212,11 @@
             <p>
                 As the season winds down, teams that miss sessions may be required to forfeit games. 
                 If a team's remaining games divided by the number of sessions left exceeds <b>1.5 games per session</b>, 
-                that team will forfeit a number of games equal to the amount they are over the threshold (rounded up).
+                that team will forfeit <b>1 game</b> for being over the threshold, plus <b>1 additional game for every 0.75</b> they are above it.
             </p>
             <p>
-                <b>Example:</b> A team needs to average 3.1 games per session to finish on time. Since the threshold is 1.5, 
-                they are 1.6 over — so they forfeit <b>2 games</b> for missing that session.
+                <b>Example:</b> A team needs to average 3.0 games per session to finish on time. Since the threshold is 1.5, 
+                they are 1.5 over — 1 + floor(1.5 / 0.75) = 1 + 2 = so they forfeit <b>3 games</b> for missing that session.
             </p>
             <h3>Who do you forfeit against?</h3>
             <p>
@@ -2589,6 +2602,9 @@
         <th class="sortable numeric highlight" on:click={() => sortTable('ranking')}>
             Score {getSortIndicator('ranking')}
         </th>
+        <th class="sortable numeric" on:click={() => sortTable('forfeitLosses')}>
+            FF {getSortIndicator('forfeitLosses')}
+        </th>
         <th class="sortable numeric" on:click={() => sortTable('pointDiff')}>
             +/- {getSortIndicator('pointDiff')}
         </th>
@@ -2624,6 +2640,7 @@
             <td class="numeric">{team.ties}</td>
             <td class="numeric">{team.losses}</td>
             <td class="numeric highlight">{team.score}</td>
+            <td class="numeric {team.forfeitLosses > 0 ? 'negative' : ''}">{team.forfeitLosses}</td>
             <td class="numeric {team.pointDiff >= 0 ? 'positive' : 'negative'}">
                 {team.pointDiff > 0 ? '+' : ''}{team.pointDiff}
             </td>
@@ -2636,7 +2653,7 @@
     </div>
     
     <div class="table-legend">
-    <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>TP:</strong> Tournament Points | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>+/-:</strong> Point Differential</p>
+    <p><strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>TP:</strong> Tournament Points | <strong>W:</strong> Wins | <strong>D:</strong> Draws | <strong>L:</strong> Losses | <strong>FF:</strong> Forfeit Losses | <strong>+/-:</strong> Point Differential</p>
 </div>
 <HallOfFame />
 </div>
