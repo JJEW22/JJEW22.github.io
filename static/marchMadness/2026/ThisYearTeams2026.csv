@@ -16,8 +16,7 @@ UCF,10,East
 UConn,2,East
 Furman,15,East
 Florida,1,South
-Prairie View A&M,16,South
-Lehigh,16,South
+Prairie View A&M/Lehigh,16,South
 Clemson,8,South
 Iowa,9,South
 Vanderbilt,5,South
@@ -41,8 +40,7 @@ High Point,12,West
 Arkansas,4,West
 Hawai'i,13,West
 BYU,6,West
-Texas,11,West
-NC State,11,West
+Texas/NC State,11,West
 Gonzaga,3,West
 Kennesaw State,14,West
 Miami (FL),7,West
@@ -50,8 +48,7 @@ Missouri,10,West
 Purdue,2,West
 Queens,15,West
 Michigan,1,Midwest
-UMBC,16,Midwest
-Howard,16,Midwest
+UMBC/Howard,16,Midwest
 Georgia,8,Midwest
 Saint Louis,9,Midwest
 Texas Tech,5,Midwest
@@ -59,8 +56,7 @@ Akron,12,Midwest
 Alabama,4,Midwest
 Hofstra,13,Midwest
 Tennessee,6,Midwest
-Miami (OH),11,Midwest
-SMU,11,Midwest
+Miami (OH)/SMU,11,Midwest
 Virginia,3,Midwest
 Wright State,14,Midwest
 Kentucky,7,Midwest
