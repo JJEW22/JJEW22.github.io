@@ -56,8 +56,8 @@ export async function loadScoringConfig(configPath = '/marchMadness/2026/scoring
 // Region positioning
 export const regionPositions = {
     topLeft: 'East',
-    bottomLeft: 'West',
-    topRight: 'South',
+    bottomLeft: 'South',
+    topRight: 'West',
     bottomRight: 'Midwest'
 };
 
@@ -167,7 +167,7 @@ export const BRACKET_STRUCTURE = {
     // Index 0-7: East, 8-15: West, 16-23: South, 24-31: Midwest
     round1: {
         gamesPerRegion: 8,
-        regions: ['East', 'West', 'South', 'Midwest'],
+        regions: ['East', 'South', 'West', 'Midwest'],
         // Maps to round 2: games 0,1 -> r2[0], games 2,3 -> r2[1], etc.
         advancesTo: (gameIndex) => Math.floor(gameIndex / 2)
     },

@@ -8,7 +8,6 @@
     } from './BracketStructure.js';
     import BracketDisplay from './BracketDisplay.svelte';
     import MarchMadnessRules from './MarchMadnessRules.svelte';
-    import SubmissionInstructions from './SubmissionInstructions.svelte';
     
     // Configuration
     const YEAR = '2026';
@@ -146,9 +145,11 @@
      * Download bracket as Excel file
      */
     async function downloadExcel() {
-        const ExcelJS = await import('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/+esm');
-        
-        const workbook = new ExcelJS.Workbook();
+        try {
+            const ExcelJSModule = await import('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/+esm');
+            const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+            
+            const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet('madness');
         
         // Header
@@ -321,6 +322,10 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Error generating Excel file:', err);
+            alert('Failed to generate Excel file. Check the console for details.');
+        }
     }
 </script>
 
@@ -344,10 +349,6 @@
             interactive={true}
             on:selectWinner={handleSelectWinner}
         />
-        
-        <div class="rules-section">
-            <SubmissionInstructions />
-        </div>
         
         <div class="rules-section">
             <MarchMadnessRules configPath={SCORING_CONFIG_FILE} />

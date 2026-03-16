@@ -1,29 +1,10 @@
 // Bracket I/O utilities for loading and saving bracket files
 // Supports both JSON (preferred) and Excel formats
 
-/**
- * Region positioning for Final Four matchups
- */
-export const regionPositions = {
-    topLeft: 'East',
-    bottomLeft: 'West', 
-    topRight: 'South',
-    bottomRight: 'Midwest'
-};
+import { regionPositions, matchupPairs } from './BracketStructure.js';
 
-/**
- * Standard tournament matchups
- */
-export const matchupPairs = [
-    [1, 16],
-    [8, 9],
-    [5, 12],
-    [4, 13],
-    [6, 11],
-    [3, 14],
-    [7, 10],
-    [2, 15]
-];
+// Re-export so existing imports from bracketIO.js continue to work
+export { regionPositions, matchupPairs };
 
 /**
  * Load teams from CSV file

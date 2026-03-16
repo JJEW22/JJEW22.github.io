@@ -662,6 +662,8 @@ Examples:
                        choices=['strict', 'warning', 'none'],
                        default='strict',
                        help='Team name validation mode: strict (error on mismatch, default), warning (warn and continue), none (skip validation)')
+    parser.add_argument('--name-map',
+                       help='Path to a JSON file mapping odds team names to base team names. Format: {"odds name": "base name", ...}')
     
     args = parser.parse_args()
     
@@ -713,6 +715,33 @@ Examples:
     elif args.base_teams and not os.path.exists(args.base_teams):
         print(f"\nError: Base teams file not found: {args.base_teams}")
         sys.exit(1)
+    
+    # Apply manual name mappings if provided (before validation)
+    if args.name_map:
+        if not os.path.exists(args.name_map):
+            print(f"Error: Name map file not found: {args.name_map}")
+            sys.exit(1)
+        
+        with open(args.name_map, 'r', encoding='utf-8') as f:
+            manual_map = json.load(f)
+        
+        print(f"\nApplying {len(manual_map)} manual name mappings:")
+        applied = 0
+        for odds_name, base_name in manual_map.items():
+            if odds_name in championship_probs:
+                championship_probs[base_name] = championship_probs.pop(odds_name)
+                applied += 1
+                print(f"  '{odds_name}' -> '{base_name}'")
+            
+            # Also apply to game_odds
+            if game_odds:
+                for game in game_odds:
+                    if game.get('home_team') == odds_name:
+                        game['home_team'] = base_name
+                    if game.get('away_team') == odds_name:
+                        game['away_team'] = base_name
+        
+        print(f"  Applied {applied} of {len(manual_map)} mappings to championship odds")
     
     # Validate and preprocess if base teams provided and validation not disabled
     name_mapping = {}
