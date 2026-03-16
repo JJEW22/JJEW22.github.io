@@ -23,7 +23,7 @@
             description: "Create and manage March Madness tournament brackets",
             link: "/marchMadness",
             image: 'none',
-            display: false  // Hide this project (not ready yet)
+            display: true  // Show this project
         },
     ];
 
@@ -535,4 +535,3 @@ function getProjectImage(project, index) {
         }
     }
 </style>
-
