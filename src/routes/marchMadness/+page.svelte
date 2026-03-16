@@ -17,8 +17,8 @@
     </nav>
     
     <main>
-        <h1>🏀 March Madness Bracket</h1>
-        
+        <h1>🏀 March Madness Bracket 2026 🏀</h1>
+        <p class="rules-hint">⬇️ rules are below ⬇️</p>
         {#if bracketMode === 'create'}
             <BracketCreate />
         {:else if bracketMode === 'results'}
@@ -63,4 +63,13 @@
         color: #1a1a1a;
         text-align: center;
     }
+
+    .rules-hint {
+        text-align: center;
+        color: #6b7280;
+        font-size: 0.95rem;
+        font-style: italic;
+        margin: 0 0 1.5rem 0;
+    }
+    
 </style>
