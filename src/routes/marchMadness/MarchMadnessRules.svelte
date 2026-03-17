@@ -49,7 +49,7 @@
         
         <section class="rules-section">
             <h3>The Wager</h3>
-            <p class="rules-description">We are doing the standard cheesecake wager (or maybe multiple depending on # people). The 2 people who have a chance of winning going into the last match pick the cake types/flavors. Prizes are determined by the following</p>
+            <p class="rules-description">We are doing the standard cheesecake wager (or maybe multiple depending on # people). The 2 people who have a chance of winning going into the last match pick the cake types/flavors and the cake(s) will be eaten at the final game on April 6th. Prizes are determined by the following</p>
             <table class="scoring-table">
                 <thead>
                     <tr>
