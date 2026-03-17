@@ -14,7 +14,7 @@
     {
         "name": "Nerd or Loner",
         "round": 0,
-        "reason": "awarded for finding something in the rules before the first game, if no one finds it jack wins",
+        "reason": "awarded for finding something in the rules before brackets are due, if no one finds it jack wins",
         "Winners": []
     },
     {
@@ -27,7 +27,7 @@
         "name": "Dom/Sub",
         "round": 2, 
         "halfway": true,
-        "reason": "Awarded to the person whose winning (most) most implies someone elses losing (sub)",
+        "reason": "Awarded to the person whose winning (Dom) most implies someone elses losing (sub)",
         "Winners": [[], []]
     },
     {
@@ -45,7 +45,8 @@
     {
         "name": "Cheater",
         "round": 3,
-        "reason": "Typical had my teams going the furthest (qr code to my venmo)",
+        "reason": "Typical had my teams going the furthest",
+        "pictureDesc": "qr code to my venmo",
         "Winners": [],
         "image": "/marchMadness/2026/badges/Venmo_QR_code.png"
     },
@@ -83,7 +84,8 @@
     {
         "name": "Another Life",
         "round": 6,
-        "reason": "By another metric you won, picking the most games (logo is mario 1 up)",
+        "reason": "By another metric you won, picking the most games",
+        "pictureDesc": "(logo is mario 1 up)",
         "Winners": []
     },
     {
@@ -95,13 +97,15 @@
     {
         "name": "Joever/hard hat",
         "round": "unknown",
-        "reason": "awarded to the first person eliminated (picture of joe biden, and the maga hat)",
+        "reason": "awarded to the first person eliminated from winning or losing",
+        "pictureDesc": "picture of joe biden, and the maga hat",
         "Winners": []
     },
     {
         "name": "Flash/Flash",
         "round": "unknown",
-        "reason": "First and last to 750 points (the flash and flash from zootopia pictures)",
+        "reason": "First and last to 750 points",
+        "pictureDesc": "the flash and flash from zootopia pictures",
         "Winners": [[],[]]
     },
     {
@@ -113,13 +117,15 @@
     {
         "name": "Scatt er gories",
         "round": 0,
-        "reason": "was the only person to pick your champion to win (scategories logo picture)",
+        "reason": "was the only person to pick your champion to win",
+        "pictureDesc": "scategories logo picture",
         "Winners": []
     },
     {
         "name": "Believer",
         "round": "unknown",
-        "reason": "correctly picked THE lowest seed to advance to a round (can be won multiple times) (shrek picture)",
+        "reason": "correctly picked the team who is THE lowest seed to advance to a round (can be won multiple times)",
+        "pictureDesc": " shrek picture",
         "Winners": []
     },
     {
@@ -143,7 +149,8 @@
     {
         "name": "heartbreaker/heartbroken",
         "round": "unknown",
-        "reason": "correctly/ incorrectly had a game where they were the only one to pick a team (before final 4) (hammer and broken heart logo)",
+        "reason": "correctly/ incorrectly had a game where they were the only one to pick a team (before final 4)",
+        "pictureDesc": "hammer and broken heart logo",
         "Winners": []
     }
 ]

@@ -1,0 +1,1102 @@
+{
+  "round1": [
+    {
+      "team1": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
+      "team2": {
+        "name": "American/Mt. St. Mary",
+        "seed": 16,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
+      "gameId": "r1-0",
+      "region": "East",
+      "score1": 85,
+      "score2": 81
+    },
+    {
+      "team1": {
+        "name": "MIssissippi St.",
+        "seed": 8,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Baylor",
+        "seed": 9,
+        "region": "East"
+      },
+      "winner": {
+        "name": "MIssissippi St.",
+        "seed": 8,
+        "region": "East"
+      },
+      "gameId": "r1-1",
+      "region": "East",
+      "score1": 65,
+      "score2": 56
+    },
+    {
+      "team1": {
+        "name": "Oregon",
+        "seed": 5,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Liberty",
+        "seed": 12,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Oregon",
+        "seed": 5,
+        "region": "East"
+      },
+      "gameId": "r1-2",
+      "region": "East",
+      "score1": 72,
+      "score2": 64
+    },
+    {
+      "team1": {
+        "name": "Arizona",
+        "seed": 4,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Akron",
+        "seed": 13,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Arizona",
+        "seed": 4,
+        "region": "East"
+      },
+      "gameId": "r1-3",
+      "region": "East",
+      "score1": 69,
+      "score2": 65
+    },
+    {
+      "team1": {
+        "name": "BYU",
+        "seed": 6,
+        "region": "East"
+      },
+      "team2": {
+        "name": "VCU",
+        "seed": 11,
+        "region": "East"
+      },
+      "winner": {
+        "name": "BYU",
+        "seed": 6,
+        "region": "East"
+      },
+      "gameId": "r1-4",
+      "region": "East",
+      "score1": 86,
+      "score2": 68
+    },
+    {
+      "team1": {
+        "name": "Wisconsin",
+        "seed": 3,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Montana",
+        "seed": 14,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Montana",
+        "seed": 14,
+        "region": "East"
+      },
+      "gameId": "r1-5",
+      "region": "East",
+      "score1": 48,
+      "score2": 67
+    },
+    {
+      "team1": {
+        "name": "Saint Mary's",
+        "seed": 7,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Vanderbilt",
+        "seed": 10,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Saint Mary's",
+        "seed": 7,
+        "region": "East"
+      },
+      "gameId": "r1-6",
+      "region": "East",
+      "score1": 78,
+      "score2": 76
+    },
+    {
+      "team1": {
+        "name": "Alabama",
+        "seed": 2,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Robert Morris",
+        "seed": 15,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Alabama",
+        "seed": 2,
+        "region": "East"
+      },
+      "gameId": "r1-7",
+      "region": "East",
+      "score1": 65,
+      "score2": 62
+    },
+    {
+      "team1": {
+        "name": "Florida",
+        "seed": 1,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Northfolk st.",
+        "seed": 16,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Florida",
+        "seed": 1,
+        "region": "West"
+      },
+      "gameId": "r1-8",
+      "region": "West",
+      "score1": 71,
+      "score2": 63
+    },
+    {
+      "team1": {
+        "name": "Gonzaga",
+        "seed": 8,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Oklahoma",
+        "seed": 9,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Gonzaga",
+        "seed": 8,
+        "region": "West"
+      },
+      "gameId": "r1-9",
+      "region": "West",
+      "score1": 81,
+      "score2": 61
+    },
+    {
+      "team1": {
+        "name": "Clemson",
+        "seed": 5,
+        "region": "West"
+      },
+      "team2": {
+        "name": "McNeese",
+        "seed": 12,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Clemson",
+        "seed": 5,
+        "region": "West"
+      },
+      "gameId": "r1-10",
+      "region": "West",
+      "score1": 65,
+      "score2": 47
+    },
+    {
+      "team1": {
+        "name": "Purdue",
+        "seed": 4,
+        "region": "West"
+      },
+      "team2": {
+        "name": "High Point",
+        "seed": 13,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Purdue",
+        "seed": 4,
+        "region": "West"
+      },
+      "gameId": "r1-11",
+      "region": "West",
+      "score1": 71,
+      "score2": 53
+    },
+    {
+      "team1": {
+        "name": "Illinois",
+        "seed": 6,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Texas/Xavier",
+        "seed": 11,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Illinois",
+        "seed": 6,
+        "region": "West"
+      },
+      "gameId": "r1-12",
+      "region": "West",
+      "score1": 78,
+      "score2": 70
+    },
+    {
+      "team1": {
+        "name": "Texas Tech.",
+        "seed": 3,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Troy",
+        "seed": 14,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Texas Tech.",
+        "seed": 3,
+        "region": "West"
+      },
+      "gameId": "r1-13",
+      "region": "West",
+      "score1": 79,
+      "score2": 60
+    },
+    {
+      "team1": {
+        "name": "UCLA",
+        "seed": 7,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Utah St.",
+        "seed": 10,
+        "region": "West"
+      },
+      "winner": {
+        "name": "UCLA",
+        "seed": 7,
+        "region": "West"
+      },
+      "gameId": "r1-14",
+      "region": "West",
+      "score1": 73,
+      "score2": 72
+    },
+    {
+      "team1": {
+        "name": "Tennesse",
+        "seed": 2,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Wofford",
+        "seed": 15,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Tennesse",
+        "seed": 2,
+        "region": "West"
+      },
+      "gameId": "r1-15",
+      "region": "West",
+      "score1": 89,
+      "score2": 83
+    },
+    {
+      "team1": {
+        "name": "Auburn",
+        "seed": 1,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Bama St./St. Fransis U",
+        "seed": 16,
+        "region": "South"
+      },
+      "winner": {
+        "name": "Auburn",
+        "seed": 1,
+        "region": "South"
+      },
+      "gameId": "r1-16",
+      "region": "South",
+      "score1": 87,
+      "score2": 73
+    },
+    {
+      "team1": {
+        "name": "Louisville",
+        "seed": 8,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Creighton",
+        "seed": 9,
+        "region": "South"
+      },
+      "winner": {
+        "name": "Louisville",
+        "seed": 8,
+        "region": "South"
+      },
+      "gameId": "r1-17",
+      "region": "South",
+      "score1": 75,
+      "score2": 66
+    },
+    {
+      "team1": {
+        "name": "Michigan",
+        "seed": 5,
+        "region": "South"
+      },
+      "team2": {
+        "name": "UC San Diego",
+        "seed": 12,
+        "region": "South"
+      },
+      "winner": {
+        "name": "Michigan",
+        "seed": 5,
+        "region": "South"
+      },
+      "gameId": "r1-18",
+      "region": "South",
+      "score1": 69,
+      "score2": 62
+    },
+    {
+      "team1": {
+        "name": "Texas A&M",
+        "seed": 4,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Yale",
+        "seed": 13,
+        "region": "South"
+      },
+      "winner": {
+        "name": "Texas A&M",
+        "seed": 4,
+        "region": "South"
+      },
+      "gameId": "r1-19",
+      "region": "South",
+      "score1": 95,
+      "score2": 84
+    },
+    {
+      "team1": {
+        "name": "Ole Miss",
+        "seed": 6,
+        "region": "South"
+      },
+      "team2": {
+        "name": "SD St./UNC",
+        "seed": 11,
+        "region": "South"
+      },
+      "winner": {
+        "name": "Ole Miss",
+        "seed": 6,
+        "region": "South"
+      },
+      "gameId": "r1-20",
+      "region": "South",
+      "score1": 68,
+      "score2": 65
+    },
+    {
+      "team1": {
+        "name": "Iowa St.",
+        "seed": 3,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Lipscomb",
+        "seed": 14,
+        "region": "South"
+      },
+      "winner": {
+        "name": "Iowa St.",
+        "seed": 3,
+        "region": "South"
+      },
+      "gameId": "r1-21",
+      "region": "South",
+      "score1": 77,
+      "score2": 73
+    },
+    {
+      "team1": {
+        "name": "Marquette",
+        "seed": 7,
+        "region": "South"
+      },
+      "team2": {
+        "name": "New Mexico",
+        "seed": 10,
+        "region": "South"
+      },
+      "winner": null,
+      "gameId": "r1-22",
+      "region": "South"
+    },
+    {
+      "team1": {
+        "name": "Michigan St.",
+        "seed": 2,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Bryant",
+        "seed": 15,
+        "region": "South"
+      },
+      "winner": {
+        "name": "Michigan St.",
+        "seed": 2,
+        "region": "South"
+      },
+      "gameId": "r1-23",
+      "region": "South",
+      "score1": 76,
+      "score2": 64
+    },
+    {
+      "team1": {
+        "name": "Houston",
+        "seed": 1,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "SIU Edwardsville",
+        "seed": 16,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "Houston",
+        "seed": 1,
+        "region": "Midwest"
+      },
+      "gameId": "r1-24",
+      "region": "Midwest",
+      "score1": 84,
+      "score2": 75
+    },
+    {
+      "team1": {
+        "name": "UConn",
+        "seed": 8,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Georgia",
+        "seed": 9,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "UConn",
+        "seed": 8,
+        "region": "Midwest"
+      },
+      "gameId": "r1-25",
+      "region": "Midwest",
+      "score1": 90,
+      "score2": 88
+    },
+    {
+      "team1": {
+        "name": "Memphis",
+        "seed": 5,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Colorado St.",
+        "seed": 12,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "Memphis",
+        "seed": 5,
+        "region": "Midwest"
+      },
+      "gameId": "r1-26",
+      "region": "Midwest",
+      "score1": 88,
+      "score2": 73
+    },
+    {
+      "team1": {
+        "name": "Maryland",
+        "seed": 4,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Grand Canyon",
+        "seed": 13,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "Maryland",
+        "seed": 4,
+        "region": "Midwest"
+      },
+      "gameId": "r1-27",
+      "region": "Midwest",
+      "score1": 82,
+      "score2": 78
+    },
+    {
+      "team1": {
+        "name": "Missouri",
+        "seed": 6,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Drake",
+        "seed": 11,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "Missouri",
+        "seed": 6,
+        "region": "Midwest"
+      },
+      "gameId": "r1-28",
+      "region": "Midwest",
+      "score1": 94,
+      "score2": 81
+    },
+    {
+      "team1": {
+        "name": "Kentucky",
+        "seed": 3,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "UNC Wilmington",
+        "seed": 14,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "Kentucky",
+        "seed": 3,
+        "region": "Midwest"
+      },
+      "gameId": "r1-29",
+      "region": "Midwest",
+      "score1": 67,
+      "score2": 49
+    },
+    {
+      "team1": {
+        "name": "Kansas",
+        "seed": 7,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Arkansas",
+        "seed": 10,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "Kansas",
+        "seed": 7,
+        "region": "Midwest"
+      },
+      "gameId": "r1-30",
+      "region": "Midwest",
+      "score1": 74,
+      "score2": 54
+    },
+    {
+      "team1": {
+        "name": "St. Johns",
+        "seed": 2,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Omaha",
+        "seed": 15,
+        "region": "Midwest"
+      },
+      "winner": {
+        "name": "St. Johns",
+        "seed": 2,
+        "region": "Midwest"
+      },
+      "gameId": "r1-31",
+      "region": "Midwest",
+      "score1": 93,
+      "score2": 81
+    }
+  ],
+  "round2": [
+    {
+      "team1": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
+      "team2": {
+        "name": "MIssissippi St.",
+        "seed": 8,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
+      "gameId": "r2-0",
+      "region": "",
+      "score1": 83,
+      "score2": 76
+    },
+    {
+      "team1": {
+        "name": "Oregon",
+        "seed": 5,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Arizona",
+        "seed": 4,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Oregon",
+        "seed": 5,
+        "region": "East"
+      },
+      "gameId": "r2-1",
+      "region": "",
+      "score1": 87,
+      "score2": 84
+    },
+    {
+      "team1": {
+        "name": "BYU",
+        "seed": 6,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Montana",
+        "seed": 14,
+        "region": "East"
+      },
+      "winner": {
+        "name": "BYU",
+        "seed": 6,
+        "region": "East"
+      },
+      "gameId": "r2-2",
+      "region": "",
+      "score1": 66,
+      "score2": 58
+    },
+    {
+      "team1": {
+        "name": "Saint Mary's",
+        "seed": 7,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Alabama",
+        "seed": 2,
+        "region": "East"
+      },
+      "winner": {
+        "name": "Saint Mary's",
+        "seed": 7,
+        "region": "East"
+      },
+      "gameId": "r2-3",
+      "region": "",
+      "score1": 89,
+      "score2": 79
+    },
+    {
+      "team1": {
+        "name": "Florida",
+        "seed": 1,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Gonzaga",
+        "seed": 8,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Florida",
+        "seed": 1,
+        "region": "West"
+      },
+      "gameId": "r2-4",
+      "region": "",
+      "score1": 67,
+      "score2": 59
+    },
+    {
+      "team1": {
+        "name": "Clemson",
+        "seed": 5,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Purdue",
+        "seed": 4,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Clemson",
+        "seed": 5,
+        "region": "West"
+      },
+      "gameId": "r2-5",
+      "region": "",
+      "score1": 92,
+      "score2": 88
+    },
+    {
+      "team1": {
+        "name": "Illinois",
+        "seed": 6,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Texas Tech.",
+        "seed": 3,
+        "region": "West"
+      },
+      "winner": {
+        "name": "Illinois",
+        "seed": 6,
+        "region": "West"
+      },
+      "gameId": "r2-6",
+      "region": "",
+      "score1": 77,
+      "score2": 68
+    },
+    {
+      "team1": {
+        "name": "UCLA",
+        "seed": 7,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Tennesse",
+        "seed": 2,
+        "region": "West"
+      },
+      "winner": {
+        "name": "UCLA",
+        "seed": 7,
+        "region": "West"
+      },
+      "gameId": "r2-7",
+      "region": "",
+      "score1": 79,
+      "score2": 67
+    },
+    {
+      "team1": {
+        "name": "Auburn",
+        "seed": 1,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Louisville",
+        "seed": 8,
+        "region": "South"
+      },
+      "winner": null,
+      "gameId": "r2-8",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Michigan",
+        "seed": 5,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Texas A&M",
+        "seed": 4,
+        "region": "South"
+      },
+      "winner": null,
+      "gameId": "r2-9",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Ole Miss",
+        "seed": 6,
+        "region": "South"
+      },
+      "team2": {
+        "name": "Iowa St.",
+        "seed": 3,
+        "region": "South"
+      },
+      "winner": null,
+      "gameId": "r2-10",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": {
+        "name": "Michigan St.",
+        "seed": 2,
+        "region": "South"
+      },
+      "winner": null,
+      "gameId": "r2-11",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Houston",
+        "seed": 1,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "UConn",
+        "seed": 8,
+        "region": "Midwest"
+      },
+      "winner": null,
+      "gameId": "r2-12",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Memphis",
+        "seed": 5,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Maryland",
+        "seed": 4,
+        "region": "Midwest"
+      },
+      "winner": null,
+      "gameId": "r2-13",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Missouri",
+        "seed": 6,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Kentucky",
+        "seed": 3,
+        "region": "Midwest"
+      },
+      "winner": null,
+      "gameId": "r2-14",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Kansas",
+        "seed": 7,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "St. Johns",
+        "seed": 2,
+        "region": "Midwest"
+      },
+      "winner": null,
+      "gameId": "r2-15",
+      "region": ""
+    }
+  ],
+  "round3": [
+    {
+      "team1": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Oregon",
+        "seed": 5,
+        "region": "East"
+      },
+      "winner": null,
+      "gameId": "r3-0",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "BYU",
+        "seed": 6,
+        "region": "East"
+      },
+      "team2": {
+        "name": "Saint Mary's",
+        "seed": 7,
+        "region": "East"
+      },
+      "winner": null,
+      "gameId": "r3-1",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Florida",
+        "seed": 1,
+        "region": "West"
+      },
+      "team2": {
+        "name": "Clemson",
+        "seed": 5,
+        "region": "West"
+      },
+      "winner": null,
+      "gameId": "r3-2",
+      "region": ""
+    },
+    {
+      "team1": {
+        "name": "Illinois",
+        "seed": 6,
+        "region": "West"
+      },
+      "team2": {
+        "name": "UCLA",
+        "seed": 7,
+        "region": "West"
+      },
+      "winner": null,
+      "gameId": "r3-3",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r3-4",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r3-5",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r3-6",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r3-7",
+      "region": ""
+    }
+  ],
+  "round4": [
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r4-0",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r4-1",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r4-2",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r4-3",
+      "region": ""
+    }
+  ],
+  "round5": [
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r5-0",
+      "region": ""
+    },
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r5-1",
+      "region": ""
+    }
+  ],
+  "round6": [
+    {
+      "team1": null,
+      "team2": null,
+      "winner": null,
+      "gameId": "r6-0",
+      "region": ""
+    }
+  ],
+  "winner": null
+}

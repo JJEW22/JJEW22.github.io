@@ -17,6 +17,45 @@ from openpyxl import load_workbook
 # Constants matching bracketStructure.js
 REGION_ORDER = ['East', 'West', 'South', 'Midwest']
 
+def load_region_order(config_path=None):
+    """
+    Load region order from regionPositions.json if available.
+    The JSON maps position -> region name: {"topLeft": "South", ...}
+    Region order must be: [topLeft, bottomLeft, topRight, bottomRight]
+    """
+    global REGION_ORDER
+    
+    search_paths = []
+    if config_path:
+        search_paths.append(config_path)
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    search_paths.extend([
+        os.path.join(script_dir, 'regionPositions.json'),
+        os.path.join(script_dir, '2026', 'regionPositions.json'),
+        os.path.join(script_dir, '..', 'static', 'marchMadness', '2026', 'regionPositions.json'),
+        'regionPositions.json',
+    ])
+    
+    for path in search_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    positions = json.load(f)
+                REGION_ORDER = [
+                    positions['topLeft'],
+                    positions['bottomLeft'],
+                    positions['topRight'],
+                    positions['bottomRight']
+                ]
+                print(f"Loaded region order from {path}: {REGION_ORDER}")
+                return True
+            except Exception as e:
+                print(f"Warning: Could not load region positions from {path}: {e}")
+    
+    print(f"Using default region order: {REGION_ORDER}")
+    return False
+
 MATCHUP_PAIRS = [
     (1, 16), (8, 9), (5, 12), (4, 13),
     (6, 11), (3, 14), (7, 10), (2, 15)
@@ -763,8 +802,13 @@ def main():
                        help='File pattern when converting directory (default: *.xlsx)')
     parser.add_argument('--score', '-s', action='store_true',
                        help='Extract game scores (for results bracket only). Errors if scores are missing for completed games.')
+    parser.add_argument('--region-positions',
+                       help='Path to regionPositions.json (maps topLeft/bottomLeft/topRight/bottomRight to region names)')
     
     args = parser.parse_args()
+    
+    # Load region order before processing
+    load_region_order(args.region_positions)
     
     if os.path.isdir(args.input):
         # Convert entire directory
