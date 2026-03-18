@@ -201,7 +201,8 @@
             if (isSplitAward) {
                 // Split award: check each sublist
                 const awardNames = award.name.split('/');
-                const splitImages = award.images || awardNames.map(splitName => {
+                // Use subImages if provided, otherwise fall back to slug-based paths
+                const splitImages = award.subImages || awardNames.map(splitName => {
                     const splitSlug = splitName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
                     return `/marchMadness/${YEAR}/badges/${splitSlug}.png`;
                 });
@@ -299,7 +300,17 @@
         console.log('Total awards to prepare:', awards.length);
         
         return awards.map(award => {
-            const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners?.[0]);
+            // Split detection: name contains "/" AND Winners is array of arrays (or empty arrays)
+            // Check both populated and empty Winners structures
+            const nameHasSlash = award.name.includes('/');
+            const winnersIsArrayOfArrays = Array.isArray(award.Winners) && award.Winners.length > 0 && Array.isArray(award.Winners[0]);
+            const isSplitAward = nameHasSlash && winnersIsArrayOfArrays;
+            
+            // If award has a single image specified, use it as the display image
+            // and DON'T treat as split display (even if it's a split award for scoring)
+            const hasCustomImage = !!award.image;
+            const useSplitDisplay = isSplitAward && !hasCustomImage;
+            
             const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
             
             // Use image from JSON if provided, otherwise generate path from slug
@@ -309,7 +320,7 @@
             console.log(`  Badge slug: "${badgeSlug}"`);
             console.log(`  Image from JSON: "${award.image || '(not set)'}"`);
             console.log(`  Final image path: "${imagePath}"`);
-            console.log(`  Is split: ${isSplitAward}`);
+            console.log(`  Is split (scoring): ${isSplitAward}, Use split display: ${useSplitDisplay}`);
             console.log(`  Winners:`, award.Winners);
             
             // Test if image exists
@@ -318,14 +329,14 @@
             img.onerror = () => console.log(`  ✗ Image failed to load: ${imagePath}`);
             img.src = imagePath;
             
-            if (isSplitAward) {
+            if (useSplitDisplay) {
                 const awardNames = award.name.split('/');
                 const totalWinners = getTotalWinnerCount(award);
                 const hasAnyWinners = award.Winners.some(list => Array.isArray(list) && list.length > 0);
                 const revealed = isAwardRevealed(award);
                 
-                // For split awards, check for images array or generate from split names
-                const splitImages = award.images || awardNames.map(splitName => {
+                // For split display, use subImages for individual badge images
+                const splitImages = award.subImages || awardNames.map(splitName => {
                     const splitSlug = splitName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
                     return `/marchMadness/${YEAR}/badges/${splitSlug}.png`;
                 });
@@ -352,13 +363,26 @@
                     revealed
                 };
             } else {
+                // Non-split display (single image) — but may still be a split award for scoring
                 const revealed = isAwardRevealed(award);
+                let totalWinners, hasWinners;
+                
+                if (isSplitAward) {
+                    // Split award with custom image — use split scoring logic
+                    totalWinners = getTotalWinnerCount(award);
+                    hasWinners = award.Winners.some(list => Array.isArray(list) && list.length > 0);
+                } else {
+                    totalWinners = award.Winners?.length || 0;
+                    hasWinners = award.Winners && award.Winners.length > 0;
+                }
+                
                 return {
                     ...award,
                     isSplit: false,
+                    isSplitScoring: isSplitAward,  // Track for winner formatting
                     imagePath: imagePath,
-                    totalWinnersForPoints: revealed ? (award.Winners?.length || 0) : 0,
-                    hasWinners: revealed && award.Winners && award.Winners.length > 0,
+                    totalWinnersForPoints: revealed ? totalWinners : 0,
+                    hasWinners: revealed && hasWinners,
                     revealed
                 };
             }
@@ -369,7 +393,7 @@
      * Get display string for split award winners
      */
     function formatSplitWinners(award) {
-        if (!award.isSplit) return award.Winners?.join(', ') || '';
+        if (!award.isSplit && !award.isSplitScoring) return award.Winners?.join(', ') || '';
         
         const parts = [];
         const awardNames = award.splitNames || award.name.split('/');
@@ -1831,9 +1855,9 @@
                                 <th>Correct Picks</th>
                                 <th>Underdog</th>
                                 <th>Possible</th>
-                                <th>Win %</th>
-                                <th>Lose %</th>
-                                <th>Avg Place</th>
+                                <th>Win %*</th>
+                                <th>Lose %*</th>
+                                <th>Avg Place*</th>
                                 <th title="Sum of score differentials for correct picks (tiebreaker)">{getDiffColumnHeader()}</th>
                                 <th>Submitter</th>
                                 <th>Champion</th>
@@ -1899,6 +1923,8 @@
                             {/each}
                         </tbody>
                     </table>
+                    
+                    <p class="table-footnote">*Probabilities and average place are calculated from a stratified sample of up to 10 million outcomes, or all outcomes if fewer than 10 million remain.</p>
                     
                     {#if standings.length === 0}
                         <p class="no-data">No brackets loaded yet. Add participant bracket files to see standings.</p>
@@ -2247,7 +2273,7 @@
                                                 
                                                 {#if award.hasWinners}
                                                     <div class="badge-winners">
-                                                        {#if award.isSplit}
+                                                        {#if award.isSplit || award.isSplitScoring}
                                                             {formatSplitWinners(award)}
                                                         {:else}
                                                             {award.Winners.join(', ')}
@@ -2879,6 +2905,13 @@
         border-radius: 12px;
         vertical-align: middle;
         margin-left: 0.5em;
+    }
+    
+    .table-footnote {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-top: 0.5rem;
+        font-style: italic;
     }
     
     .stars-view {

@@ -3,7 +3,8 @@
         "name": "Golden Boy",
         "round": 0,
         "reason": "has the most potential points to start",
-        "Winners": ["Alice"]
+        "Winners": ["Alice"],
+        "image": "/marchMadness/2026/badges/GoldenBoy.png"
     },
     {
         "name": "Shortest Stick",
@@ -66,7 +67,7 @@
         "reason": "All named brackets ",
         "pictureDesc": "snow white",
         "manual": true,
-        "Winners": ["Jack", "Sandy", "Nick"]
+        "Winners": ["Jack", "Sandy", "Nick", "Josh"]
     },
     {
         "name": "balanced",
@@ -91,7 +92,7 @@
         "name": "Lone wolf/sheep",
         "round": 4,
         "reason": "Has the bracket most (dis)similar to everyone else",
-        "Winners": []
+        "Winners": [[], []]
     },
     {
         "name": "Another Life",
@@ -151,7 +152,14 @@
         "name": "Down/Left/Up/Right",
         "round": 4,
         "reason": "best performance in each division (each piece of a playstation D pad)",
-        "Winners": [[],[],[],[]]
+        "Winners": [[],[],[],[]],
+        "image": "/marchMadness/2026/badges/DPad.png",
+        "subimages":[
+            "/marchMadness/2026/badges/DPadDown.png",
+            "/marchMadness/2026/badges/DPadLeft.png",
+            "/marchMadness/2026/badges/DPadUp.png",
+            "/marchMadness/2026/badges/DPadRight.png"
+        ]
     },
     {
         "name": "heartbreaker/heartbroken",
