@@ -150,6 +150,93 @@ def validate_team_names(
     return name_mapping, True
 
 
+def merge_first_four_teams(
+    championship_probs: Dict[str, float],
+    base_teams: Dict[str, dict],
+    game_odds: Optional[List[dict]] = None
+) -> Tuple[Dict[str, float], int]:
+    """
+    Merge First Four combo teams (names containing '/') in the odds data.
+    
+    For base teams like "Prairie View A&M/Lehigh", finds both component teams
+    in the odds data, sums their probabilities, and creates a single entry
+    under the combo name.
+    
+    Args:
+        championship_probs: Dict of team_name -> probability (modified in place)
+        base_teams: Dict of team_name -> {seed, region} from base teams CSV
+        game_odds: Optional list of game odds dicts (modified in place)
+    
+    Returns:
+        Tuple of (updated championship_probs, number of merges performed)
+    """
+    merges = 0
+    
+    # Find all combo teams in base_teams
+    combo_teams = {name: info for name, info in base_teams.items() if '/' in name}
+    
+    if not combo_teams:
+        return championship_probs, 0
+    
+    print(f"\nMerging First Four combo teams ({len(combo_teams)} found):")
+    
+    for combo_name, info in combo_teams.items():
+        components = [c.strip() for c in combo_name.split('/')]
+        
+        # Look up each component in championship_probs
+        component_probs = []
+        found_components = []
+        missing_components = []
+        
+        for component in components:
+            if component in championship_probs:
+                component_probs.append(championship_probs[component])
+                found_components.append(component)
+            else:
+                # Try case-insensitive lookup
+                matched = False
+                for odds_name in list(championship_probs.keys()):
+                    if odds_name.lower() == component.lower():
+                        component_probs.append(championship_probs[odds_name])
+                        found_components.append(odds_name)
+                        matched = True
+                        break
+                if not matched:
+                    component_probs.append(0.0)
+                    missing_components.append(component)
+        
+        # Sum probabilities
+        merged_prob = sum(component_probs)
+        
+        # Report
+        prob_details = ', '.join(
+            f"{comp}={prob:.6f}" 
+            for comp, prob in zip(components, component_probs)
+        )
+        print(f"  {combo_name}: {prob_details} -> {merged_prob:.6f}")
+        if missing_components:
+            print(f"    (not found in odds, using 0: {', '.join(missing_components)})")
+        
+        # Remove individual entries and add combo entry
+        for comp in found_components:
+            championship_probs.pop(comp, None)
+        championship_probs[combo_name] = merged_prob
+        
+        # Handle game_odds if present
+        if game_odds:
+            for game in game_odds:
+                for comp in found_components:
+                    if game.get('home_team') == comp:
+                        game['home_team'] = combo_name
+                    if game.get('away_team') == comp:
+                        game['away_team'] = combo_name
+        
+        merges += 1
+    
+    print(f"  Merged {merges} combo teams")
+    return championship_probs, merges
+
+
 def load_seed_probabilities(filepath: str = None) -> bool:
     """Load seed probability data from CSV file."""
     global SEED_PROBABILITIES
@@ -598,7 +685,7 @@ def create_probability_csv(
         writer.writeheader()
         for row in output_rows:
             for col in PROB_COLUMNS:
-                row[col] = f"{row[col]:.6f}"
+                row[col] = f"{row[col]:.8f}"
             writer.writerow(row)
     
     print(f"\nWrote {len(output_rows)} teams to {output_path}")
@@ -761,10 +848,27 @@ Examples:
         else:
             print(f"  Championship probs sum: {probs_sum:.6f} ✓")
         
-        # Validate team names
+        # Expand First Four combo teams for validation
+        # e.g. "Texas/NC State" -> "Texas" and "NC State" as separate entries
+        expanded_base_teams = {}
+        combo_team_map = {}  # component_name -> combo_name
+        for team_name, info in base_teams.items():
+            if '/' in team_name:
+                components = [c.strip() for c in team_name.split('/')]
+                for component in components:
+                    expanded_base_teams[component] = info
+                    combo_team_map[component] = team_name
+            else:
+                expanded_base_teams[team_name] = info
+        
+        if combo_team_map:
+            combo_names = set(combo_team_map.values())
+            print(f"\n  Expanded {len(combo_names)} First Four combo teams into {len(combo_team_map)} individual teams for matching")
+        
+        # Validate team names against the EXPANDED list (68 individual teams)
         name_mapping, validation_passed = validate_team_names(
             list(championship_probs.keys()),
-            base_teams,
+            expanded_base_teams,
             args.validation
         )
         
@@ -788,6 +892,13 @@ Examples:
                         game['home_team'] = name_mapping[game['home_team']]
                     if game.get('away_team') in name_mapping:
                         game['away_team'] = name_mapping[game['away_team']]
+        
+        # Merge First Four combo teams back together (after fuzzy matching)
+        # Now "Texas" and "NC State" are properly matched, merge into "Texas/NC State"
+        if combo_team_map:
+            championship_probs, num_merges = merge_first_four_teams(
+                championship_probs, base_teams, game_odds
+            )
         
         # Filter to only teams in base_teams
         filtered_probs = {name: prob for name, prob in championship_probs.items() 

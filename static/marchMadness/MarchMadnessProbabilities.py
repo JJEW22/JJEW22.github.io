@@ -3850,6 +3850,7 @@ def main():
     parser.add_argument('--star-bonuses', default=None, help='Path to starBonuses.json file')
     parser.add_argument('--timing', action='store_true', help='Enable timing profiling of simulation steps')
     parser.add_argument('--timing-output', default='timing_results.csv', help='Output CSV file for timing results')
+    parser.add_argument('--exclude', nargs='+', default=[], help='List of participant names to exclude from calculations')
     
     args = parser.parse_args()
     
@@ -3867,7 +3868,9 @@ def main():
     
     # Load star bonuses if provided
     bonus_stars = {}
-    if args.star_bonuses:
+    if args.star_bonuses and args.star_bonuses.lower() == 'none':
+        print("Star bonuses disabled (--star-bonuses none)")
+    elif args.star_bonuses:
         bonus_stars = load_star_bonuses(args.star_bonuses, args.config)
     else:
         # Try to find starBonuses.json in same directory as results
@@ -3881,7 +3884,14 @@ def main():
         participants = args.participants
     elif args.participants_file:
         with open(args.participants_file) as f:
-            participants = json.load(f)
+            data = json.load(f)
+        # Handle both array format ["alice", "bob"] and object format {"alice": "Display Name", ...}
+        if isinstance(data, list):
+            participants = data
+        elif isinstance(data, dict):
+            participants = list(data.keys())
+        else:
+            participants = data
     else:
         # Try to find participants from bracket files
         participants = []
@@ -3899,6 +3909,15 @@ def main():
         if not participants:
             print("Error: No participants specified. Use --participants or --participants-file")
             return
+    
+    # Exclude specified participants
+    if args.exclude:
+        excluded = set(e.lower() for e in args.exclude)
+        before_count = len(participants)
+        participants = [p for p in participants if p.lower() not in excluded]
+        excluded_count = before_count - len(participants)
+        if excluded_count > 0:
+            print(f"\nExcluded {excluded_count} participant(s): {', '.join(args.exclude)}")
     
     print(f"\nCalculating win probabilities for {len(participants)} participants...")
     print(f"Participants: {participants}")

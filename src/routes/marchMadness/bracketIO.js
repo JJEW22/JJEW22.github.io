@@ -334,30 +334,57 @@ export async function loadBracketFromPath(basePath, teams = null, teamsList = nu
     // Remove any existing extension
     const pathWithoutExt = basePath.replace(/\.(json|xlsx|csv)$/, '');
     
-    // Try JSON first (preferred format)
-    try {
-        const jsonPath = `${pathWithoutExt}.json`;
-        const response = await fetch(jsonPath, { method: 'HEAD' });
-        if (response.ok) {
-            return await loadBracketFromJSON(jsonPath, teams);
+    // Generate case variants of the path
+    const lastSlash = pathWithoutExt.lastIndexOf('/');
+    const dir = lastSlash >= 0 ? pathWithoutExt.substring(0, lastSlash) : '';
+    const filename = lastSlash >= 0 ? pathWithoutExt.substring(lastSlash + 1) : pathWithoutExt;
+    
+    // Generate filename variants (case)
+    const caseVariants = [filename];
+    const lower = filename.toLowerCase();
+    const dashIdx = filename.indexOf('-');
+    const namePart = dashIdx >= 0 ? filename.substring(0, dashIdx) : filename;
+    const rest = dashIdx >= 0 ? filename.substring(dashIdx) : '';
+    const nameCapitalized = namePart.charAt(0).toUpperCase() + namePart.slice(1).toLowerCase() + rest;
+    
+    if (lower !== filename) caseVariants.push(lower);
+    if (nameCapitalized !== filename && !caseVariants.includes(nameCapitalized)) caseVariants.push(nameCapitalized);
+    
+    // Also try alternate filename pattern: swap "bracket-march-madness" with "march-madness-bracket"
+    const allVariants = [];
+    for (const variant of caseVariants) {
+        allVariants.push(variant);
+        if (variant.includes('-bracket-march-madness-')) {
+            allVariants.push(variant.replace('-bracket-march-madness-', '-march-madness-bracket-'));
+        } else if (variant.includes('-march-madness-bracket-')) {
+            allVariants.push(variant.replace('-march-madness-bracket-', '-bracket-march-madness-'));
         }
-    } catch (e) {
-        // JSON not found, try Excel
     }
     
-    // Fall back to Excel
-    try {
-        const xlsxPath = `${pathWithoutExt}.xlsx`;
-        const response = await fetch(xlsxPath);
-        if (response.ok) {
-            const arrayBuffer = await response.arrayBuffer();
-            return await loadBracketFromExcel(arrayBuffer, teams, teamsList);
-        }
-    } catch (e) {
-        // Excel not found either
+    for (const variant of allVariants) {
+        const variantPath = dir ? `${dir}/${variant}` : variant;
+        
+        // Try JSON first
+        try {
+            const jsonPath = `${variantPath}.json`;
+            const response = await fetch(jsonPath, { method: 'HEAD' });
+            if (response.ok) {
+                return await loadBracketFromJSON(jsonPath, teams);
+            }
+        } catch (e) {}
+        
+        // Fall back to Excel
+        try {
+            const xlsxPath = `${variantPath}.xlsx`;
+            const response = await fetch(xlsxPath);
+            if (response.ok) {
+                const arrayBuffer = await response.arrayBuffer();
+                return await loadBracketFromExcel(arrayBuffer, teams, teamsList);
+            }
+        } catch (e) {}
     }
     
-    throw new Error(`Bracket not found at ${basePath} (tried .json and .xlsx)`);
+    throw new Error(`Bracket not found at ${basePath} (tried .json and .xlsx with variants: ${allVariants.join(', ')})`);
 }
 
 /**

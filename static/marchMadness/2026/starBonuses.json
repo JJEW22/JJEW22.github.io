@@ -2,20 +2,29 @@
     {
         "name": "Golden Boy",
         "round": 0,
-        "reason": "has the most potential",
-        "Winners": []
+        "reason": "has the most potential points to start",
+        "Winners": ["Alice"]
     },
     {
         "name": "Shortest Stick",
         "round": 0,
         "reason": "has the lowest probability of winning at the beginning",
-        "Winners": []
+        "manual": true,
+        "Winners": ["Nick"]
     },
     {
         "name": "Nerd or Loner",
         "round": 0,
-        "reason": "awarded for finding something in the rules before brackets are due, if no one finds it jack wins",
-        "Winners": []
+        "reason": "awarded for finding something in the rules before brackets are due, if no one finds it jack wins but he feels lonely",
+        "manual": true,
+        "Winners": ["Anish"]
+    },
+    {
+        "name": "Scatt er gories",
+        "round": 0,
+        "reason": "was the only person to pick your champion to win",
+        "pictureDesc": "scategories logo picture",
+        "Winners": ["Alice", "Nick", "Sandy", "Dustin", "Kato"]
     },
     {
         "name": "Best Friends",
@@ -39,13 +48,13 @@
     {
         "name": "Fortified",
         "round": 2,
-        "reason": "Person whose probability of winning changed the least from the first round to now",
+        "reason": "Person whose probability of winning changed the least from the beginning to end of 2nd round",
         "Winners": []
     },
     {
         "name": "Cheater",
         "round": 3,
-        "reason": "Typical had my teams going the furthest",
+        "reason": "Has my teams going the furthest: positive for (Kansas, Arkansas) and negative for (missouri)",
         "pictureDesc": "qr code to my venmo",
         "Winners": [],
         "image": "/marchMadness/2026/badges/Venmo_QR_code.png"
@@ -54,19 +63,22 @@
         "name": "More than fair",
         "round": 1,
         "halfway": true,
-        "reason": "All named brackets (use snow white image)",
-        "Winners": []
+        "reason": "All named brackets ",
+        "pictureDesc": "snow white",
+        "manual": true,
+        "Winners": ["Jack", "Sandy", "Nick"]
     },
     {
         "name": "balanced",
         "round": 1,
-        "reason": "Person who's number of picks was closest to 50%",
+        "reason": "Person who's first round number of picks was closest to 50%",
         "Winners": []
     },
     {
         "name": "Unicorn",
         "round": 5,
         "reason": "Submitted something to happen that never has",
+        "manual": true,
         "Winners": []
     },
     {
@@ -115,23 +127,18 @@
         "Winners": []
     },
     {
-        "name": "Scatt er gories",
-        "round": 0,
-        "reason": "was the only person to pick your champion to win",
-        "pictureDesc": "scategories logo picture",
-        "Winners": []
-    },
-    {
         "name": "Believer",
         "round": "unknown",
         "reason": "correctly picked the team who is THE lowest seed to advance to a round (can be won multiple times)",
+        "repeatable": true,
         "pictureDesc": " shrek picture",
         "Winners": []
     },
     {
         "name": "Dustin",
         "round": 3,
-        "reason": "awarded for least underdog points received compared to potential (picture of dustin)",
+        "reason": "awarded for least underdog points received compared to potential",
+        "pictureDesc": "dustin",
         "Winners": []
     },
     {

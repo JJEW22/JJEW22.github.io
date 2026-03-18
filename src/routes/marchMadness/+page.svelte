@@ -3,7 +3,7 @@
     import BracketResults from './BracketResults.svelte';
     import '../../app.css';
 
-    const bracketMode = 'create' // either create or results
+    const bracketMode = 'results' // either create or results
 </script>
 
 <svelte:head>
@@ -71,5 +71,5 @@
         font-style: italic;
         margin: 0 0 1.5rem 0;
     }
-    
+
 </style>

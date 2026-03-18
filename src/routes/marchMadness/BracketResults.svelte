@@ -35,8 +35,9 @@
     // Data
     let teams = {};  // Map of team name -> team data
     let teamsList = [];
-    let participants = [];  // List of participant names
+    let participants = [];  // List of participant names (submitter keys)
     let participantBrackets = {};  // Map of name -> bracket
+    let participantDisplayNames = {};  // Map of submitter name -> bracket display name
     let resultsBracket = null;
     let standings = [];
     let selectedParticipant = null;
@@ -128,6 +129,9 @@
         for (const award of starBonuses) {
             if (!award.Winners || award.Winners.length === 0) continue;
             
+            // Only count points for awards whose round has been reached
+            if (!isAwardRevealed(award)) continue;
+            
             // Check if this is a split award (name contains "/")
             const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners[0]);
             
@@ -188,6 +192,9 @@
         
         for (const award of starBonuses) {
             if (!award.Winners || award.Winners.length === 0) continue;
+            
+            // Only show earned badges for awards whose round has been reached
+            if (!isAwardRevealed(award)) continue;
             
             const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners[0]);
             
@@ -315,6 +322,7 @@
                 const awardNames = award.name.split('/');
                 const totalWinners = getTotalWinnerCount(award);
                 const hasAnyWinners = award.Winners.some(list => Array.isArray(list) && list.length > 0);
+                const revealed = isAwardRevealed(award);
                 
                 // For split awards, check for images array or generate from split names
                 const splitImages = award.images || awardNames.map(splitName => {
@@ -339,16 +347,19 @@
                     splitNames: awardNames,
                     splitImages: splitImages,
                     imagePath: imagePath,
-                    totalWinnersForPoints: totalWinners,
-                    hasWinners: hasAnyWinners
+                    totalWinnersForPoints: revealed ? totalWinners : 0,
+                    hasWinners: revealed && hasAnyWinners,
+                    revealed
                 };
             } else {
+                const revealed = isAwardRevealed(award);
                 return {
                     ...award,
                     isSplit: false,
                     imagePath: imagePath,
-                    totalWinnersForPoints: award.Winners?.length || 0,
-                    hasWinners: award.Winners && award.Winners.length > 0
+                    totalWinnersForPoints: revealed ? (award.Winners?.length || 0) : 0,
+                    hasWinners: revealed && award.Winners && award.Winners.length > 0,
+                    revealed
                 };
             }
         });
@@ -374,7 +385,74 @@
     }
     
     /**
-     * Group star bonuses by round
+     * Detect the current round from the results bracket.
+     * Returns:
+     *   0   = no games played
+     *   0.5 = some round 1 games decided
+     *   1   = all round 1 complete, no round 2
+     *   1.5 = some round 2 games decided
+     *   etc.
+     */
+    function detectCurrentRound() {
+        if (!resultsBracket) return 0;
+        
+        let lastCompleteRound = 0;
+        
+        for (let roundNum = 1; roundNum <= 6; roundNum++) {
+            const roundKey = `round${roundNum}`;
+            const games = resultsBracket[roundKey] || [];
+            const totalGames = games.length;
+            if (totalGames === 0) break;
+            
+            const decidedGames = games.filter((g, idx) => {
+                if (!g || !g.winner) return false;
+                const winnerName = g.winner.name || g.winner;
+                const decided = winnerName && winnerName !== 'TBD' && winnerName !== '';
+                if (decided) {
+                    console.log(`🔍 Round ${roundNum} Game ${idx} DECIDED:`, {
+                        winner: g.winner,
+                        winnerName,
+                        team1: g.team1?.name || g.team1,
+                        team2: g.team2?.name || g.team2
+                    });
+                }
+                return decided;
+            }).length;
+            
+            console.log(`🔍 Round ${roundNum}: ${decidedGames}/${totalGames} decided`);
+            
+            if (decidedGames === totalGames) {
+                lastCompleteRound = roundNum;
+            } else if (decidedGames >= totalGames / 2) {
+                return lastCompleteRound + 0.5;
+            } else {
+                break;
+            }
+        }
+        return lastCompleteRound;
+    }
+    
+    // Reactive: current round based on results bracket
+    $: detectedRound = resultsBracket ? detectCurrentRound() : 0;
+    
+    /**
+     * Get display name for the current round value
+     */
+    function getCurrentRoundDisplay(round) {
+        if (round === 0) return '0 rounds complete';
+        if (round === 1) return '1 round complete';
+        if (round % 1 !== 0) {
+            const complete = Math.floor(round);
+            return `${complete}.5 rounds complete`;
+        }
+        return `${round} rounds complete`;
+    }
+    
+    /**
+     * Group star bonuses by round, filtering to only show awards
+     * whose round has been reached (round <= currentRound).
+     * Round 0 (pre-tournament) awards are always shown.
+     * "unknown" round awards are shown once the tournament starts.
      */
     function getStarBonusesByRound() {
         const grouped = {};
@@ -386,6 +464,29 @@
             grouped[round].push(award);
         }
         return grouped;
+    }
+    
+    /**
+     * Check if an award's winners should be revealed based on current round.
+     * Round 0 awards: always revealed
+     * Numeric round awards: revealed when detectedRound >= that round
+     * Halfway awards: revealed when detectedRound >= round - 0.5
+     * "unknown" round awards: revealed once tournament starts (detectedRound >= 0.5)
+     */
+    function isAwardRevealed(award) {
+        const round = String(award.round);
+        const roundNum = parseFloat(round);
+        const isHalfway = award.halfway === true;
+        
+        if (round === 'unknown') {
+            return detectedRound >= 0.5;
+        } else if (!isNaN(roundNum)) {
+            if (isHalfway) {
+                return detectedRound >= roundNum - 0.5;
+            }
+            return detectedRound >= roundNum;
+        }
+        return true;
     }
     
     /**
@@ -520,17 +621,34 @@
     }
     
     async function loadParticipants() {
-        // Load participant list from a config file or directory listing
+        // Load participant list from a config file
+        // Supports both formats:
+        //   Array: ["alice", "bob"]
+        //   Object: {"alice": "Alice's Bracket", "bob": null}
         try {
             const response = await fetch(`/marchMadness/${YEAR}/participants.json`);
             if (response.ok) {
-                participants = await response.json();
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    // Old format: array of names
+                    participants = data;
+                    participantDisplayNames = {};
+                    data.forEach(name => { participantDisplayNames[name] = name; });
+                } else {
+                    // New format: object mapping submitter -> bracket name
+                    participants = Object.keys(data);
+                    participantDisplayNames = {};
+                    for (const [submitter, bracketName] of Object.entries(data)) {
+                        participantDisplayNames[submitter] = bracketName || submitter;
+                    }
+                }
             } else {
-                // Default participants for testing
                 participants = ['player1', 'player2'];
+                participantDisplayNames = { player1: 'player1', player2: 'player2' };
             }
         } catch (e) {
             participants = ['player1', 'player2'];
+            participantDisplayNames = { player1: 'player1', player2: 'player2' };
         }
     }
     
@@ -606,55 +724,108 @@
     }
     
     async function loadAllBrackets() {
+        // Generate all possible paths for each participant
+        const participantPaths = {};
         for (const name of participants) {
-            try {
-                const bracket = await loadBracketForParticipant(name);
-                if (bracket) {
-                    participantBrackets[name] = bracket;
-                }
-            } catch (e) {
-                console.error(`Failed to load bracket for ${name}:`, e);
+            participantPaths[name] = generateBracketPaths(name);
+        }
+        
+        // Phase 1: Try all JSON paths in parallel
+        const unresolved = new Set(participants);
+        await tryLoadBatchByExtension(participantPaths, unresolved, 'json');
+        
+        // Phase 2: For any not found, try XLSX
+        if (unresolved.size > 0) {
+            await tryLoadBatchByExtension(participantPaths, unresolved, 'xlsx');
+        }
+        
+        // Phase 3: For any still not found, try CSV
+        if (unresolved.size > 0) {
+            await tryLoadBatchByExtension(participantPaths, unresolved, 'csv');
+        }
+        
+        if (unresolved.size > 0) {
+            for (const name of unresolved) {
+                console.warn(`No bracket found for ${name}`);
             }
         }
     }
     
-    async function loadBracketForParticipant(name) {
-        // Try JSON first (preferred format)
-        try {
-            const jsonResponse = await fetch(`${BRACKETS_PATH}/${name}-bracket-march-madness-${YEAR}.json`);
-            if (jsonResponse.ok) {
-                const bracket = await jsonResponse.json();
-                // Add parentGames references for UI navigation
-                addParentGameReferences(bracket);
-                return bracket;
+    function generateBracketPaths(name) {
+        // Generate all case × pattern variants (without extension)
+        const variants = [name];
+        const lower = name.toLowerCase();
+        const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+        if (lower !== name) variants.push(lower);
+        if (capitalized !== name && capitalized !== lower) variants.push(capitalized);
+        
+        const patterns = [
+            (v) => `${v}-bracket-march-madness-${YEAR}`,
+            (v) => `${v}-march-madness-bracket-${YEAR}`,
+        ];
+        
+        const paths = [];
+        for (const variant of variants) {
+            for (const pattern of patterns) {
+                paths.push(`${BRACKETS_PATH}/${pattern(variant)}`);
             }
-        } catch (e) {
-            console.log(`No JSON bracket for ${name}`);
+        }
+        return paths;
+    }
+    
+    async function tryLoadBatchByExtension(participantPaths, unresolved, ext) {
+        // Build fetch promises for all unresolved participants
+        const fetchPromises = [];
+        
+        for (const name of unresolved) {
+            const paths = participantPaths[name];
+            for (const basePath of paths) {
+                fetchPromises.push({
+                    name,
+                    path: `${basePath}.${ext}`,
+                    ext
+                });
+            }
         }
         
-        // Try CSV
-        try {
-            const csvResponse = await fetch(`${BRACKETS_PATH}/${name}-bracket-march-madness-${YEAR}.csv`);
-            if (csvResponse.ok) {
-                const csvText = await csvResponse.text();
-                return parseBracketCSV(csvText);
-            }
-        } catch (e) {
-            console.log(`No CSV bracket for ${name}`);
-        }
+        // Fetch all in parallel
+        const results = await Promise.allSettled(
+            fetchPromises.map(async ({ name, path, ext }) => {
+                const response = await fetch(path);
+                if (!response.ok) throw new Error('Not found');
+                return { name, path, ext, response };
+            })
+        );
         
-        // Try to load Excel using ExcelJS
-        try {
-            const xlsxResponse = await fetch(`${BRACKETS_PATH}/${name}-bracket-march-madness-${YEAR}.xlsx`);
-            if (xlsxResponse.ok) {
-                const arrayBuffer = await xlsxResponse.arrayBuffer();
-                return await parseBracketExcel(arrayBuffer);
+        // Process results - take the first successful one per participant
+        for (const result of results) {
+            if (result.status !== 'fulfilled') continue;
+            const { name, path, ext, response } = result.value;
+            
+            if (!unresolved.has(name)) continue; // Already resolved
+            
+            try {
+                let bracket;
+                if (ext === 'json') {
+                    bracket = await response.json();
+                    addParentGameReferences(bracket);
+                } else if (ext === 'csv') {
+                    const csvText = await response.text();
+                    bracket = parseBracketCSV(csvText);
+                } else if (ext === 'xlsx') {
+                    const arrayBuffer = await response.arrayBuffer();
+                    bracket = await parseBracketExcel(arrayBuffer);
+                }
+                
+                if (bracket) {
+                    participantBrackets[name] = bracket;
+                    unresolved.delete(name);
+                    console.log(`Loaded bracket for ${name} from ${path}`);
+                }
+            } catch (e) {
+                console.warn(`Error parsing bracket for ${name} from ${path}:`, e);
             }
-        } catch (e) {
-            console.log(`No Excel bracket for ${name}`);
         }
-        
-        return null;
     }
     
     // Add parentGames references for UI navigation between rounds
@@ -1097,7 +1268,9 @@
             const totalScore = scoreResult.totalScore + starPoints;
             
             standings.push({
-                name,
+                name: participantDisplayNames[name] || name,
+                submitter: name,
+                champion: bracket.winner ? bracket.winner.name : '—',
                 score: totalScore,
                 baseScore: scoreResult.totalScore,
                 starPoints: starPoints,
@@ -1662,11 +1835,13 @@
                                 <th>Lose %</th>
                                 <th>Avg Place</th>
                                 <th title="Sum of score differentials for correct picks (tiebreaker)">{getDiffColumnHeader()}</th>
+                                <th>Submitter</th>
+                                <th>Champion</th>
                             </tr>
                         </thead>
                         <tbody>
                             {#each standings as entry}
-                                <tr class:highlight={selectedParticipant === entry.name}>
+                                <tr class:highlight={selectedParticipant === entry.submitter}>
                                     <td class="rank">
                                         {#if entry.rank === 1}🥇
                                         {:else if entry.rank === 2}🥈
@@ -1675,7 +1850,7 @@
                                         {/if}
                                     </td>
                                     <td class="name">
-                                        <button class="name-btn" on:click={() => selectParticipant(entry.name)}>
+                                        <button class="name-btn" on:click={() => selectParticipant(entry.submitter)}>
                                             {entry.name}
                                         </button>
                                     </td>
@@ -1718,6 +1893,8 @@
                                             -
                                         {/if}
                                     </td>
+                                    <td class="submitter">{entry.submitter}</td>
+                                    <td class="champion">{entry.champion}</td>
                                 </tr>
                             {/each}
                         </tbody>
@@ -1730,7 +1907,7 @@
                     <!-- Results Bracket Display -->
                     {#if resultsBracket}
                         <div class="results-bracket-section">
-                            <h2>Tournament Results</h2>
+                            <h2>Tournament Results <span class="current-round-badge">{getCurrentRoundDisplay(detectedRound)}</span></h2>
                             <BracketView 
                                 bracketPath={`${RESULTS_FILE}.json`}
                                 resultsPath={`${RESULTS_FILE}.json`}
@@ -1751,7 +1928,7 @@
                         <select id="participant-select" bind:value={selectedParticipant} on:change={() => selectedScenario = null}>
                             <option value={null}>-- Choose --</option>
                             {#each Object.keys(participantBrackets) as name}
-                                <option value={name}>{name}</option>
+                                <option value={name}>{participantDisplayNames[name] || name}{participantDisplayNames[name] && participantDisplayNames[name] !== name ? ` (${name})` : ''}</option>
                             {/each}
                         </select>
                         
@@ -2193,6 +2370,7 @@
         cursor: pointer;
         font-size: inherit;
         padding: 0;
+        text-align: left;
     }
     
     .name-btn:hover {
@@ -2692,6 +2870,17 @@
     }
     
     /* Stars view */
+    .current-round-badge {
+        font-size: 0.6em;
+        font-weight: 500;
+        background: #e0f2fe;
+        color: #0369a1;
+        padding: 0.2em 0.6em;
+        border-radius: 12px;
+        vertical-align: middle;
+        margin-left: 0.5em;
+    }
+    
     .stars-view {
         max-width: 1000px;
         margin: 0 auto;

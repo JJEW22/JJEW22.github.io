@@ -1,76 +1,354 @@
 {
-  "fetched_at": "2026-03-15T19:57:00.684626",
+  "fetched_at": "2026-03-18T12:28:20.032780",
   "regions": "us",
   "championship_probs": {
-    "Michigan Wolverines": 0.17355816323036233,
-    "Duke Blue Devils": 0.18087772891404347,
-    "Arizona Wildcats": 0.142506223483077,
-    "Florida Gators": 0.09912099544489582,
-    "Houston Cougars": 0.06758249689424715,
-    "UConn Huskies": 0.034311113807848556,
-    "Iowa State Cyclones": 0.037800379618816195,
-    "Illinois Fighting Illini": 0.03717037329183593,
-    "Purdue Boilermakers": 0.025343436335342678,
-    "Kansas Jayhawks": 0.01559596082174934,
-    "Arkansas Razorbacks": 0.013275133318512832,
-    "Michigan St Spartans": 0.01559596082174934,
-    "Gonzaga Bulldogs": 0.014115331629811113,
-    "St. John's Red Storm": 0.012459343002850032,
-    "Wisconsin Badgers": 0.010421599988365214,
-    "Vanderbilt Commodores": 0.010620106654810266,
-    "Virginia Cavaliers": 0.009956349988884623,
-    "Alabama Crimson Tide": 0.005823034980444272,
-    "Louisville Cardinals": 0.007125311174153852,
-    "Tennessee Volunteers": 0.007483967776879717,
-    "Nebraska Cornhuskers": 0.007360469958779392,
-    "Kentucky Wildcats": 0.005210799994182607,
-    "Texas Tech Red Raiders": 0.006229671501425016,
-    "BYU Cougars": 0.004032951894231747,
-    "North Carolina Tar Heels": 0.004032951894231747,
-    "UCLA Bruins": 0.004032951894231747,
-    "NC State Wolfpack": 0.002777362886064951,
-    "Clemson Tigers": 0.0031724358428309473,
-    "Iowa Hawkeyes": 0.0031724358428309473,
-    "Saint Mary's Gaels": 0.002777362886064951,
-    "Miami Hurricanes": 0.0026145631858266777,
-    "Utah State Aggies": 0.002340212379339093,
-    "Saint Louis Billikens": 0.0019342778816219912,
-    "Villanova Wildcats": 0.002340212379339093,
-    "Ohio State Buckeyes": 0.002340212379339093,
-    "Missouri Tigers": 0.0017799061432642903,
-    "Texas A&M Aggies": 0.0020219604691841847,
-    "UCF Knights": 0.0019342778816219912,
-    "Georgia Bulldogs": 0.0014360736622731204,
-    "Santa Clara Broncos": 0.0012722318297262725,
-    "VCU Rams": 0.0013491968526982189,
-    "South Florida Bulls": 0.0008910197353216764,
-    "SMU Mustangs": 0.001113441037199279,
-    "TCU Horned Frogs": 0.0012722318297262725,
-    "Northern Iowa Panthers": 0.000557137746067988,
-    "High Point Panthers": 0.000557137746067988,
-    "Hofstra Pride": 0.000557137746067988,
-    "Akron Zips": 0.0008910197353216764,
-    "Texas Longhorns": 0.0009898901009809836,
-    "Miami (OH) RedHawks": 0.0004952747940284601,
-    "Tennessee St Tigers": 0.00037151797393139357,
-    "LIU Sharks": 0.00037151797393139357,
-    "Queens University Royals": 0.0004457770132940548,
-    "Troy Trojans": 0.0004457770132940548,
-    "Furman Paladins": 0.0004457770132940548,
-    "Wright St Raiders": 0.0004457770132940548,
-    "Siena Saints": 0.0004457770132940548,
-    "McNeese Cowboys": 0.000557137746067988,
-    "Hawai'i Rainbow Warriors": 0.00037151797393139357,
-    "Cal Baptist Lancers": 0.0004457770132940548,
-    "Pennsylvania Quakers": 0.0004952747940284601,
-    "Lehigh Mountain Hawks": 0.0002786732972023186,
-    "Idaho Vandals": 0.0002786732972023186,
-    "UMBC Retrievers": 0.0002786732972023186,
-    "Howard Bison": 0.0002786732972023186,
-    "Prairie View Panthers": 0.0002786732972023186,
-    "Kennesaw St Owls": 0.00029724408869920776,
-    "North Dakota St Bison": 0.0004952747940284601,
-    "UC Irvine Anteaters": 0.000742664801035683
+    "Duke Blue Devils": 0.1842146801626386,
+    "Arizona Wildcats": 0.1623150328705767,
+    "Michigan Wolverines": 0.1663874530501252,
+    "Florida Gators": 0.094738978369357,
+    "Houston Cougars": 0.06447513805692351,
+    "Iowa State Cyclones": 0.04220190854634994,
+    "Illinois Fighting Illini": 0.03464335776192905,
+    "UConn Huskies": 0.03094806626732329,
+    "Purdue Boilermakers": 0.029757756026272394,
+    "Arkansas Razorbacks": 0.01423990779171317,
+    "Kansas Jayhawks": 0.013816101012197895,
+    "Michigan St Spartans": 0.014690537785121813,
+    "Gonzaga Bulldogs": 0.013816101012197895,
+    "St. John's Red Storm": 0.01137796553945709,
+    "Wisconsin Badgers": 0.009512725287087076,
+    "Vanderbilt Commodores": 0.01084628490677218,
+    "Virginia Cavaliers": 0.01040854246658855,
+    "Alabama Crimson Tide": 0.005688982769728545,
+    "Louisville Cardinals": 0.005759565682504334,
+    "Tennessee Volunteers": 0.00648353343589175,
+    "Nebraska Cornhuskers": 0.007186083498604478,
+    "Kentucky Wildcats": 0.00485586813817834,
+    "Texas Tech Red Raiders": 0.00648353343589175,
+    "BYU Cougars": 0.003554525222127483,
+    "North Carolina Tar Heels": 0.0033017140398993554,
+    "UCLA Bruins": 0.00435479356482035,
+    "Clemson Tigers": 0.0024355770934409724,
+    "Iowa Hawkeyes": 0.0033017140398993554,
+    "Saint Mary's Gaels": 0.003082476719852917,
+    "Miami Hurricanes": 0.0024355770934409724,
+    "Utah State Aggies": 0.0022042782241683254,
+    "Saint Louis Billikens": 0.0014945943142622323,
+    "Villanova Wildcats": 0.0019294305652944692,
+    "Ohio State Buckeyes": 0.0024355770934409724,
+    "Missouri Tigers": 0.0018524381245405,
+    "Texas A&M Aggies": 0.0018524381245405,
+    "UCF Knights": 0.0014945943142622323,
+    "Texas Longhorns": 0.0016543870064499263,
+    "Georgia Bulldogs": 0.0014945943142622323,
+    "Santa Clara Broncos": 0.0013240758528518233,
+    "VCU Rams": 0.0014041772353594957,
+    "South Florida Bulls": 0.000927329192988113,
+    "SMU Mustangs": 0.0011588142636291794,
+    "TCU Horned Frogs": 0.0012526200593897714,
+    "Northern Iowa Panthers": 0.0005798413614911932,
+    "High Point Panthers": 0.0005798413614911932,
+    "Hofstra Pride": 0.0005798413614911932,
+    "Akron Zips": 0.000927329192988113,
+    "Miami (OH) RedHawks": 0.000515457466144625,
+    "Tennessee St Tigers": 0.0003866574995917452,
+    "LIU Sharks": 0.0003866574995917452,
+    "Queens University Royals": 0.00046394262843278965,
+    "Troy Trojans": 0.00046394262843278965,
+    "Furman Paladins": 0.00046394262843278965,
+    "Wright St Raiders": 0.00046394262843278965,
+    "Siena Saints": 0.00046394262843278965,
+    "McNeese Cowboys": 0.0005798413614911932,
+    "Hawai'i Rainbow Warriors": 0.0003866574995917452,
+    "Cal Baptist Lancers": 0.00046394262843278965,
+    "Pennsylvania Quakers": 0.000515457466144625,
+    "Lehigh Mountain Hawks": 0.00029002936024606353,
+    "Idaho Vandals": 0.00029002936024606353,
+    "Howard Bison": 0.00029002936024606353,
+    "Prairie View Panthers": 0.00029002936024606353,
+    "Kennesaw St Owls": 0.00030935691990527077,
+    "North Dakota St Bison": 0.000515457466144625
   },
-  "game_odds": null
+  "game_odds": [
+    {
+      "home_team": "Lehigh Mountain Hawks",
+      "away_team": "Prairie View Panthers",
+      "commence_time": "2026-03-18T22:40:00Z",
+      "home_prob": 0.5968239129873741,
+      "away_prob": 0.4031760870126257
+    },
+    {
+      "home_team": "Wake Forest Demon Deacons",
+      "away_team": "Navy Midshipmen",
+      "commence_time": "2026-03-18T23:00:00Z",
+      "home_prob": 0.8436472227417636,
+      "away_prob": 0.15635277725823638
+    },
+    {
+      "home_team": "Utah Valley Wolverines",
+      "away_team": "GW Revolutionaries",
+      "commence_time": "2026-03-19T00:00:00Z",
+      "home_prob": 0.5431816778813507,
+      "away_prob": 0.4568183221186493
+    },
+    {
+      "home_team": "Illinois St Redbirds",
+      "away_team": "Kent State Golden Flashes",
+      "commence_time": "2026-03-19T00:00:00Z",
+      "home_prob": 0.6836224094970994,
+      "away_prob": 0.3163775905029006
+    },
+    {
+      "home_team": "Bradley Braves",
+      "away_team": "Dayton Flyers",
+      "commence_time": "2026-03-19T01:00:00Z",
+      "home_prob": 0.4616876687971875,
+      "away_prob": 0.5383123312028125
+    },
+    {
+      "home_team": "New Mexico Lobos",
+      "away_team": "Sam Houston St Bearkats",
+      "commence_time": "2026-03-19T01:00:00Z",
+      "home_prob": 0.8668496448436193,
+      "away_prob": 0.13315035515638063
+    },
+    {
+      "home_team": "SMU Mustangs",
+      "away_team": "Miami (OH) RedHawks",
+      "commence_time": "2026-03-19T01:15:00Z",
+      "home_prob": 0.7202540004037183,
+      "away_prob": 0.2797459995962817
+    },
+    {
+      "home_team": "Nevada Wolf Pack",
+      "away_team": "Murray St Racers",
+      "commence_time": "2026-03-19T02:00:00Z",
+      "home_prob": 0.7697387200517611,
+      "away_prob": 0.23026127994823878
+    },
+    {
+      "home_team": "California Golden Bears",
+      "away_team": "UIC Flames",
+      "commence_time": "2026-03-19T03:00:00Z",
+      "home_prob": 0.6940572598368304,
+      "away_prob": 0.30594274016316947
+    },
+    {
+      "home_team": "Colorado St Rams",
+      "away_team": "Saint Joseph's Hawks",
+      "commence_time": "2026-03-19T03:00:00Z",
+      "home_prob": 0.7101667482214777,
+      "away_prob": 0.2898332517785222
+    },
+    {
+      "home_team": "Ohio State Buckeyes",
+      "away_team": "TCU Horned Frogs",
+      "commence_time": "2026-03-19T16:15:00Z",
+      "home_prob": 0.5647655905472534,
+      "away_prob": 0.4352344094527466
+    },
+    {
+      "home_team": "Nebraska Cornhuskers",
+      "away_team": "Troy Trojans",
+      "commence_time": "2026-03-19T16:40:00Z",
+      "home_prob": 0.873701821372166,
+      "away_prob": 0.12629817862783396
+    },
+    {
+      "home_team": "Louisville Cardinals",
+      "away_team": "South Florida Bulls",
+      "commence_time": "2026-03-19T17:30:00Z",
+      "home_prob": 0.6366322676938618,
+      "away_prob": 0.3633677323061383
+    },
+    {
+      "home_team": "Wisconsin Badgers",
+      "away_team": "High Point Panthers",
+      "commence_time": "2026-03-19T17:50:00Z",
+      "home_prob": 0.7994385916132212,
+      "away_prob": 0.2005614083867789
+    },
+    {
+      "home_team": "Duke Blue Devils",
+      "away_team": "Siena Saints",
+      "commence_time": "2026-03-19T18:50:50Z",
+      "home_prob": 0.9766732068890343,
+      "away_prob": 0.02332679311096577
+    },
+    {
+      "home_team": "Vanderbilt Commodores",
+      "away_team": "McNeese Cowboys",
+      "commence_time": "2026-03-19T19:15:00Z",
+      "home_prob": 0.8396080700064965,
+      "away_prob": 0.16039192999350355
+    },
+    {
+      "home_team": "Michigan St Spartans",
+      "away_team": "North Dakota St Bison",
+      "commence_time": "2026-03-19T20:05:59Z",
+      "home_prob": 0.9097134213835811,
+      "away_prob": 0.09028657861641878
+    },
+    {
+      "home_team": "Arkansas Razorbacks",
+      "away_team": "Hawai'i Rainbow Warriors",
+      "commence_time": "2026-03-19T20:25:05Z",
+      "home_prob": 0.8991465557428192,
+      "away_prob": 0.10085344425718075
+    },
+    {
+      "home_team": "North Carolina Tar Heels",
+      "away_team": "VCU Rams",
+      "commence_time": "2026-03-19T22:50:00Z",
+      "home_prob": 0.5755743377675248,
+      "away_prob": 0.4244256622324752
+    },
+    {
+      "home_team": "Michigan Wolverines",
+      "away_team": "Howard Bison",
+      "commence_time": "2026-03-19T23:10:42Z",
+      "home_prob": 0.9831657376544075,
+      "away_prob": 0.016834262345592564
+    },
+    {
+      "home_team": "BYU Cougars",
+      "away_team": "Texas Longhorns",
+      "commence_time": "2026-03-19T23:25:00Z",
+      "home_prob": 0.56016411321453,
+      "away_prob": 0.4398358867854701
+    },
+    {
+      "home_team": "Saint Mary's Gaels",
+      "away_team": "Texas A&M Aggies",
+      "commence_time": "2026-03-19T23:35:00Z",
+      "home_prob": 0.5960885396870093,
+      "away_prob": 0.4039114603129908
+    },
+    {
+      "home_team": "Illinois Fighting Illini",
+      "away_team": "Pennsylvania Quakers",
+      "commence_time": "2026-03-20T01:25:00Z",
+      "home_prob": 0.9553242430995535,
+      "away_prob": 0.0446757569004465
+    },
+    {
+      "home_team": "Georgia Bulldogs",
+      "away_team": "Saint Louis Billikens",
+      "commence_time": "2026-03-20T01:45:00Z",
+      "home_prob": 0.5629381912967769,
+      "away_prob": 0.43706180870322303
+    },
+    {
+      "home_team": "Gonzaga Bulldogs",
+      "away_team": "Kennesaw St Owls",
+      "commence_time": "2026-03-20T02:00:00Z",
+      "home_prob": 0.9421128798842259,
+      "away_prob": 0.057887120115774245
+    },
+    {
+      "home_team": "Houston Cougars",
+      "away_team": "Idaho Vandals",
+      "commence_time": "2026-03-20T02:10:00Z",
+      "home_prob": 0.9571418001553772,
+      "away_prob": 0.04285819984462284
+    },
+    {
+      "home_team": "Kentucky Wildcats",
+      "away_team": "Santa Clara Broncos",
+      "commence_time": "2026-03-20T16:15:00Z",
+      "home_prob": 0.5815988964709041,
+      "away_prob": 0.41840110352909576
+    },
+    {
+      "home_team": "Texas Tech Red Raiders",
+      "away_team": "Akron Zips",
+      "commence_time": "2026-03-20T16:40:00Z",
+      "home_prob": 0.7395117769253597,
+      "away_prob": 0.2604882230746403
+    },
+    {
+      "home_team": "Arizona Wildcats",
+      "away_team": "LIU Sharks",
+      "commence_time": "2026-03-20T17:35:00Z",
+      "home_prob": 0.9791241699579012,
+      "away_prob": 0.020875830042098868
+    },
+    {
+      "home_team": "Virginia Cavaliers",
+      "away_team": "Wright St Raiders",
+      "commence_time": "2026-03-20T17:50:03Z",
+      "home_prob": 0.9261076276643424,
+      "away_prob": 0.07389237233565754
+    },
+    {
+      "home_team": "Iowa State Cyclones",
+      "away_team": "Tennessee St Tigers",
+      "commence_time": "2026-03-20T18:50:00Z",
+      "home_prob": 0.9554711910208069,
+      "away_prob": 0.044528808979193216
+    },
+    {
+      "home_team": "Alabama Crimson Tide",
+      "away_team": "Hofstra Pride",
+      "commence_time": "2026-03-20T19:15:56Z",
+      "home_prob": 0.8520598156600413,
+      "away_prob": 0.14794018433995876
+    },
+    {
+      "home_team": "Villanova Wildcats",
+      "away_team": "Utah State Aggies",
+      "commence_time": "2026-03-20T20:10:00Z",
+      "home_prob": 0.4670200435497403,
+      "away_prob": 0.5329799564502598
+    },
+    {
+      "home_team": "Clemson Tigers",
+      "away_team": "Iowa Hawkeyes",
+      "commence_time": "2026-03-20T22:50:00Z",
+      "home_prob": 0.4449378705650819,
+      "away_prob": 0.555062129434918
+    },
+    {
+      "home_team": "St. John's Red Storm",
+      "away_team": "Northern Iowa Panthers",
+      "commence_time": "2026-03-20T23:10:00Z",
+      "home_prob": 0.8076875613275228,
+      "away_prob": 0.19231243867247713
+    },
+    {
+      "home_team": "UCLA Bruins",
+      "away_team": "UCF Knights",
+      "commence_time": "2026-03-20T23:25:00Z",
+      "home_prob": 0.6759400239604123,
+      "away_prob": 0.32405997603958775
+    },
+    {
+      "home_team": "Purdue Boilermakers",
+      "away_team": "Queens University Royals",
+      "commence_time": "2026-03-20T23:35:00Z",
+      "home_prob": 0.9610604805302403,
+      "away_prob": 0.03893951946975974
+    },
+    {
+      "home_team": "Kansas Jayhawks",
+      "away_team": "Cal Baptist Lancers",
+      "commence_time": "2026-03-21T01:45:00Z",
+      "home_prob": 0.8861476563078517,
+      "away_prob": 0.11385234369214818
+    },
+    {
+      "home_team": "UConn Huskies",
+      "away_team": "Furman Paladins",
+      "commence_time": "2026-03-21T02:00:00Z",
+      "home_prob": 0.9411722298320238,
+      "away_prob": 0.05882777016797636
+    },
+    {
+      "home_team": "Miami Hurricanes",
+      "away_team": "Missouri Tigers",
+      "commence_time": "2026-03-21T02:10:00Z",
+      "home_prob": 0.5420375940456329,
+      "away_prob": 0.4579624059543671
+    }
+  ]
 }

@@ -46,6 +46,11 @@ export async function loadScoringConfig(configPath = '/marchMadness/2026/scoring
         
         configLoaded = true;
         console.log('Loaded scoring config:', { SCORE_FOR_ROUND, SEED_FACTOR, ROUND_NAMES, STAR_BONUS, SCORE_DIFF_BUCKETS });
+        
+        // Also load region positions from the same directory
+        const configDir = configPath.substring(0, configPath.lastIndexOf('/'));
+        await loadRegionPositions(`${configDir}/regionPositions.json`);
+        
         return true;
     } catch (err) {
         console.warn('Error loading scoring config, using defaults:', err);
@@ -53,13 +58,37 @@ export async function loadScoringConfig(configPath = '/marchMadness/2026/scoring
     }
 }
 
-// Region positioning
-export const regionPositions = {
+// Region positioning - defaults match 2026 bracket layout
+// Also loaded from regionPositions.json if available (for Python script compatibility)
+export let regionPositions = {
     topLeft: 'East',
     bottomLeft: 'South',
     topRight: 'West',
     bottomRight: 'Midwest'
 };
+
+/**
+ * Load region positions from a JSON config file.
+ * This ensures a single source of truth shared with Python scripts.
+ */
+export async function loadRegionPositions(configPath = '/marchMadness/2026/regionPositions.json') {
+    try {
+        const response = await fetch(configPath);
+        if (response.ok) {
+            const positions = await response.json();
+            // Mutate the existing object (don't reassign) so imports stay in sync
+            if (positions.topLeft) regionPositions.topLeft = positions.topLeft;
+            if (positions.bottomLeft) regionPositions.bottomLeft = positions.bottomLeft;
+            if (positions.topRight) regionPositions.topRight = positions.topRight;
+            if (positions.bottomRight) regionPositions.bottomRight = positions.bottomRight;
+            console.log('Loaded region positions:', regionPositions);
+            return true;
+        }
+    } catch (e) {
+        console.log('Using default region positions');
+    }
+    return false;
+}
 
 // Standard tournament matchups: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
 export const matchupPairs = [
@@ -167,7 +196,7 @@ export const BRACKET_STRUCTURE = {
     // Index 0-7: East, 8-15: West, 16-23: South, 24-31: Midwest
     round1: {
         gamesPerRegion: 8,
-        regions: ['East', 'South', 'West', 'Midwest'],
+        regions: ['East', 'West', 'South', 'Midwest'],
         // Maps to round 2: games 0,1 -> r2[0], games 2,3 -> r2[1], etc.
         advancesTo: (gameIndex) => Math.floor(gameIndex / 2)
     },
