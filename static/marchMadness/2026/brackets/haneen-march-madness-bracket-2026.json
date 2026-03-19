@@ -1159,7 +1159,11 @@
         "seed": 2,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
       "gameId": "r5-0",
       "region": ""
     },
@@ -1185,7 +1189,11 @@
   ],
   "round6": [
     {
-      "team1": null,
+      "team1": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
       "team2": {
         "name": "Michigan",
         "seed": 1,
