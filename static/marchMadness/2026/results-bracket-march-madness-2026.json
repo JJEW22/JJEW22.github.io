@@ -26,7 +26,11 @@
         "seed": 9,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "TCU",
+        "seed": 9,
+        "region": "East"
+      },
       "gameId": "r1-1",
       "region": "East"
     },
@@ -484,7 +488,11 @@
   "round2": [
     {
       "team1": null,
-      "team2": null,
+      "team2": {
+        "name": "TCU",
+        "seed": 9,
+        "region": "East"
+      },
       "winner": null,
       "gameId": "r2-0",
       "region": ""

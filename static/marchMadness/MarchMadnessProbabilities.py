@@ -1573,21 +1573,43 @@ def build_team_probability_matrix(results_bracket: dict, teams_data: dict) -> Li
         team_names.append(None)
     
     # Build probability matrix
+    # Matrix[team_idx][round_reached] = P(team reaches that round)
+    # round_reached=1 means they were in R1 (everyone, so prob=1.0)
+    # round_reached=2 means they reached R32 = prob_r32
+    # round_reached=7 means they won championship = prob_win
     prob_matrix = []
     for team_idx in range(64):
         team_name = team_names[team_idx]
-        team_probs = [1.0] * 8  # Index 0-7, we use 1-7
+        team_probs = [1.0] * 8  # Index 0-7, default 1.0
         
         if team_name and team_name in teams_data:
             team_data = teams_data[team_name]
-            for round_reached in range(2, 8):
-                col = prob_columns[round_reached]
-                if col and col in team_data:
-                    team_probs[round_reached] = team_data[col]
-                else:
-                    team_probs[round_reached] = 1.0  # Default if missing
+            team_probs[1] = 1.0  # Everyone is in R1
+            team_probs[2] = float(team_data.get('prob_r32', 1.0))
+            team_probs[3] = float(team_data.get('prob_r16', 1.0))
+            team_probs[4] = float(team_data.get('prob_r8', 1.0))
+            team_probs[5] = float(team_data.get('prob_r4', 1.0))
+            team_probs[6] = float(team_data.get('prob_r2', 1.0))
+            team_probs[7] = float(team_data.get('prob_win', 1.0))
+            
+            # Ensure no zeros (would make log -inf)
+            for r in range(1, 8):
+                if team_probs[r] <= 0:
+                    team_probs[r] = 1e-10
         
         prob_matrix.append(team_probs)
+    
+    # Print probability table for debugging
+    print("\n    === TEAM PROBABILITY TABLE ===")
+    print(f"    {'#':<4} {'Game':<6} {'Slot':<6} {'Team':<25} {'R1':>6} {'R32':>10} {'S16':>10} {'E8':>10} {'F4':>10} {'Finals':>10} {'Win':>10}")
+    print(f"    {'-'*4} {'-'*6} {'-'*6} {'-'*25} {'-'*6} {'-'*10} {'-'*10} {'-'*10} {'-'*10} {'-'*10} {'-'*10}")
+    for idx in range(64):
+        name = team_names[idx] or '(unknown)'
+        p = prob_matrix[idx]
+        game_num = idx // 2
+        slot = 'team1' if idx % 2 == 0 else 'team2'
+        print(f"    {idx:<4} {game_num:<6} {slot:<6} {name:<25} {p[1]:>6.4f} {p[2]:>10.6f} {p[3]:>10.6f} {p[4]:>10.6f} {p[5]:>10.6f} {p[6]:>10.6f} {p[7]:>10.8f}")
+    print(f"    === END PROBABILITY TABLE ===\n")
     
     return prob_matrix, team_names
 
@@ -1780,24 +1802,26 @@ def compute_rounds_reached_topdown(outcome_int: int) -> List[int]:
 
 def calculate_probability_fast(outcome_int: int, prob_matrix: List[List[float]]) -> float:
     """
-    Calculate probability of an outcome using precomputed probability matrix.
+    Calculate LOG probability of an outcome using precomputed probability matrix.
     
     Args:
         outcome_int: 63-bit integer representing the outcome
         prob_matrix: 64x8 matrix of probabilities
         
     Returns:
-        Probability of this outcome
+        Log probability of this outcome (natural log)
     """
     rounds_reached = compute_rounds_reached_topdown(outcome_int)
     
-    probability = 1.0
+    log_probability = 0.0
     for team_idx in range(64):
         round_reached = rounds_reached[team_idx]
         prob = prob_matrix[team_idx][round_reached]
-        probability *= prob
+        if prob <= 0:
+            return float('-inf')  # Impossible outcome
+        log_probability += np.log(prob)
     
-    return probability
+    return log_probability
 
 
 def calculate_all_probabilities_fast(
@@ -1806,9 +1830,11 @@ def calculate_all_probabilities_fast(
     teams_data: dict,
     has_prob_data: bool,
     base_probability: float
-) -> List[float]:
+) -> Tuple[List[float], List[float], float]:
     """
     Calculate probabilities for all outcomes using fast top-down method.
+    Uses log-space internally to avoid floating point underflow,
+    then converts back to real probabilities via log-sum-exp normalization.
     
     Args:
         full_outcome_strings: List of 63-bit outcome strings
@@ -1818,10 +1844,15 @@ def calculate_all_probabilities_fast(
         base_probability: Uniform probability for fallback
         
     Returns:
-        List of probabilities (one per outcome)
+        Tuple of (shifted_probabilities, log_probabilities, max_log_prob)
+        - shifted_probabilities: exp(log_P - max_log_P), proportional to real probs
+        - log_probabilities: raw log(P) values for each outcome
+        - max_log_prob: the log shift value used
     """
     if not has_prob_data:
-        return [base_probability] * len(full_outcome_strings)
+        n = len(full_outcome_strings)
+        log_base = np.log(base_probability) if base_probability > 0 else float('-inf')
+        return [base_probability] * n, [log_base] * n, log_base
     
     # Build probability matrix
     print("    Building probability matrix...")
@@ -1831,17 +1862,37 @@ def calculate_all_probabilities_fast(
     print("    Converting outcomes to integers...")
     outcome_ints = [int(outcome, 2) for outcome in full_outcome_strings]
     
-    # Calculate probabilities
-    print("    Calculating probabilities...")
-    probabilities = []
+    # Calculate log-probabilities
+    print("    Calculating log-probabilities...")
+    log_probabilities = []
     total = len(outcome_ints)
     
     for i, outcome_int in enumerate(outcome_ints):
-        prob = calculate_probability_fast(outcome_int, prob_matrix)
-        probabilities.append(prob)
+        log_prob = calculate_probability_fast(outcome_int, prob_matrix)
+        log_probabilities.append(log_prob)
         print_progress(i, total, "    Computing probs")
     
-    return probabilities
+    # Convert from log-space to real probabilities using log-sum-exp
+    log_probs_array = np.array(log_probabilities)
+    
+    # Filter out -inf (impossible outcomes)
+    valid_mask = np.isfinite(log_probs_array)
+    if not np.any(valid_mask):
+        print("    WARNING: All outcomes have zero probability!")
+        n = len(full_outcome_strings)
+        return [base_probability] * n, log_probabilities, float('-inf')
+    
+    max_log_prob = np.max(log_probs_array[valid_mask])
+    
+    # Compute shifted probabilities: exp(log_P - max_log_P)
+    shifted_probs = np.where(valid_mask, np.exp(log_probs_array - max_log_prob), 0.0)
+    
+    probabilities = shifted_probs.tolist()
+    
+    prob_sum = sum(probabilities)
+    print(f"    Log-sum-exp complete. Max log-prob: {max_log_prob:.2f}, prob sum (shifted): {prob_sum:.6f}")
+    
+    return probabilities, log_probabilities, float(max_log_prob)
 
 
 def create_hypothetical_bracket(results_bracket: dict, remaining_games: List[Tuple[str, int]], 
@@ -2953,7 +3004,9 @@ def process_outcomes(
     remaining_games: List[Tuple[str, int]],
     max_scenarios: int,
     outcome_type: str = "winning",
-    return_timing: bool = False
+    return_timing: bool = False,
+    outcome_to_log_prob: Optional[Dict[str, float]] = None,
+    log_shift: Optional[float] = None
 ) -> Union[Dict[str, List[dict]], Tuple[Dict[str, List[dict]], Dict[str, float]]]:
     """
     Process raw outcomes: merge similar ones and keep top N.
@@ -2965,6 +3018,7 @@ def process_outcomes(
         max_scenarios: Maximum scenarios to keep per participant
         outcome_type: Type of outcome for logging ("winning" or "losing")
         return_timing: If True, return (processed, timing_dict)
+        outcome_to_log_prob: Optional dict mapping outcome string to log probability
         
     Returns:
         Dict mapping participant name to list of scenario dicts with probability
@@ -2998,9 +3052,64 @@ def process_outcomes(
         scenarios = []
         for outcome_str, probability in top:
             games = decode_merged_outcome_to_games(results_bracket, remaining_games, outcome_str)
+            
+            # Track base (pre-normalization) probability and constituent outcomes
+            # Find all original outcomes that were merged into this one
+            base_outcomes = []
+            if outcome_str in outcomes:
+                # Unmerged outcome - single source
+                base_outcomes.append({
+                    'outcome': outcome_str,
+                    'probability': outcomes[outcome_str]
+                })
+            else:
+                # Merged outcome (contains '?') - find all source outcomes
+                for orig_outcome, orig_prob in outcomes.items():
+                    if len(orig_outcome) == len(outcome_str):
+                        match = all(
+                            oc == mc or mc == '?' 
+                            for oc, mc in zip(orig_outcome, outcome_str)
+                        )
+                        if match:
+                            base_outcomes.append({
+                                'outcome': orig_outcome,
+                                'probability': orig_prob
+                            })
+            
+            # Look up log probability for this outcome
+            log_prob = None
+            if outcome_to_log_prob:
+                if outcome_str in outcome_to_log_prob:
+                    log_prob = outcome_to_log_prob[outcome_str]
+                elif '?' not in outcome_str:
+                    log_prob = outcome_to_log_prob.get(outcome_str)
+            
+            # baseProbability = exp(logProbability) = the true (unshifted) probability
+            # For merged outcomes, sum the true probabilities of constituents
+            base_probability = None
+            if log_prob is not None:
+                try:
+                    base_probability = float(np.exp(log_prob))
+                except (OverflowError, FloatingPointError):
+                    base_probability = 0.0
+            elif base_outcomes:
+                # Merged: sum true probs of constituents
+                bp_sum = 0.0
+                for bo in base_outcomes:
+                    bo_log = outcome_to_log_prob.get(bo['outcome']) if outcome_to_log_prob else None
+                    if bo_log is not None:
+                        try:
+                            bp_sum += float(np.exp(bo_log))
+                        except (OverflowError, FloatingPointError):
+                            pass
+                base_probability = bp_sum if bp_sum > 0 else None
+            
             scenarios.append({
                 'outcome': outcome_str,
                 'probability': probability,
+                'baseProbability': base_probability,  # True probability (scientific notation)
+                'logProbability': log_prob,  # Raw log probability
+                'baseOutcomes': base_outcomes if len(base_outcomes) > 1 else [],
                 'games': games
             })
         total_decode_time += time.time() - t_decode_start
@@ -3490,7 +3599,7 @@ def calculate_win_probabilities(
         win_probabilities = {name: (1.0 if name == winner else 0.0) for name in name_to_bracket.keys()}
         lose_probabilities = {name: (1.0 if name == loser else 0.0) for name in name_to_bracket.keys()}
         average_places = {name: float(i + 1) for i, (name, _) in enumerate(sorted_scores)}
-        return win_probabilities, lose_probabilities, average_places, {}, {}, {}, {}, None  # Empty scenarios and prefs since tournament is over
+        return win_probabilities, lose_probabilities, average_places, {}, {}, {}, {}, None, 1.0, 0.0  # Empty scenarios and prefs since tournament is over
     
     # Determine simulation approach
     total_possible = 2 ** num_remaining
@@ -3636,10 +3745,24 @@ def calculate_win_probabilities(
         
         # Combine all outcomes
         t_sub = time.time()
-        outcome_strings = champion_outcomes + next_game_outcomes + random_outcomes
+        outcome_strings_raw = champion_outcomes + next_game_outcomes + random_outcomes
+        
+        # Deduplicate: keep unique outcomes only
+        seen = set()
+        outcome_strings = []
+        duplicates = 0
+        for o in outcome_strings_raw:
+            if o not in seen:
+                seen.add(o)
+                outcome_strings.append(o)
+            else:
+                duplicates += 1
+        
         num_simulations = len(outcome_strings)
         t_combine = time.time() - t_sub
-        print(f"  Total after stratification: {num_simulations:,} ({t_combine:.2f}s)")
+        if duplicates > 0:
+            print(f"  Removed {duplicates:,} duplicate outcomes")
+        print(f"  Total after stratification: {num_simulations:,} unique outcomes ({t_combine:.2f}s)")
     else:
         # Exhaustive enumeration
         outcome_strings = generate_all_outcome_strings(
@@ -3678,14 +3801,128 @@ def calculate_win_probabilities(
     # Using fast top-down method with full 63-bit outcome strings
     print("Step 2: Calculating outcome probabilities (fast method)...")
     t_start = time.time()
-    outcome_probabilities = calculate_all_probabilities_fast(
+    outcome_probabilities, outcome_log_probabilities, max_log_prob = calculate_all_probabilities_fast(
         full_outcome_strings, results_bracket, teams_data,
         has_prob_data, base_probability
     )
     t_step2 = time.time() - t_start
     print(f"  Calculated {len(outcome_probabilities):,} probabilities")
+    print(f"  Log shift (max log-prob): {max_log_prob:.4f}")
     if enable_timing:
         timing_data['step2_calculate_probabilities'] = t_step2
+    
+    # Build mapping from short outcome string to log probability
+    outcome_to_log_prob = {}
+    for i, outcome in enumerate(outcome_strings):
+        outcome_to_log_prob[outcome] = outcome_log_probabilities[i]
+    
+    # DIAGNOSTIC: Compare probability function's interpretation vs decoder's interpretation
+    # for the first outcome to verify they agree on what the bitstring means
+    if len(outcome_strings) > 0 and len(full_outcome_strings) > 0:
+        print("\n  === DIAGNOSTIC: Bit interpretation check ===")
+        diag_short = outcome_strings[0]
+        diag_full = full_outcome_strings[0]
+        
+        # Method 1: What the probability function thinks (topdown from full 63-bit string)
+        diag_int = int(diag_full, 2)
+        rounds_reached = compute_rounds_reached_topdown(diag_int)
+        
+        # Method 2: What the decoder thinks (create hypothetical bracket)
+        diag_bracket = create_hypothetical_bracket(results_bracket, remaining_games, diag_short)
+        
+        # Get team names from prob matrix
+        _, prob_team_names = build_team_probability_matrix(results_bracket, teams_data)
+        
+        # Compare: for each team, what round does each method say they reached?
+        print(f"  Short outcome (first 20 chars): {diag_short[:20]}...")
+        print(f"  Full outcome  (first 20 chars): {diag_full[:20]}...")
+        
+        # Find champion according to each method
+        # Prob function: team with rounds_reached=7
+        prob_champion = [prob_team_names[i] for i in range(64) if rounds_reached[i] == 7]
+        # Decoder: bracket winner
+        decode_champion = get_team_name(diag_bracket.get('winner'))
+        print(f"  Prob function champion: {prob_champion}")
+        print(f"  Decoder champion:       {decode_champion}")
+        
+        if prob_champion and decode_champion and prob_champion[0] != decode_champion:
+            print(f"  *** MISMATCH DETECTED! ***")
+            # Print first 8 R1 games for comparison
+            print(f"  R1 comparison (first 8 games):")
+            for g in range(min(8, 32)):
+                prob_winner_idx = g * 2 if rounds_reached[g*2] > rounds_reached[g*2+1] else g*2+1
+                prob_winner = prob_team_names[prob_winner_idx]
+                decode_game = diag_bracket.get('round1', [])[g] if g < len(diag_bracket.get('round1', [])) else None
+                decode_winner = get_winner_name(decode_game) if decode_game else "?"
+                bit_val = diag_full[g]  # R1 bit position
+                print(f"    Game {g}: bit={bit_val} | prob says: {prob_winner} | decoder says: {decode_winner} | teams: {prob_team_names[g*2]} vs {prob_team_names[g*2+1]}")
+        else:
+            print(f"  Champions match ✓")
+        print(f"  === END DIAGNOSTIC ===\n")
+    
+    # DIAGNOSTIC: Pick a random outcome and log full probability breakdown + decoded bracket
+    if len(outcome_strings) > 0 and len(full_outcome_strings) > 0:
+        diag_idx = random.randint(0, len(outcome_strings) - 1)
+        diag_short = outcome_strings[diag_idx]
+        diag_full = full_outcome_strings[diag_idx]
+        diag_log_prob = outcome_log_probabilities[diag_idx]
+        diag_shifted_prob = outcome_probabilities[diag_idx]
+        
+        print(f"\n  === DIAGNOSTIC: Random sample #{diag_idx} ===")
+        print(f"  Short outcome: {diag_short}")
+        print(f"  Full outcome:  {diag_full}")
+        print(f"  Log probability: {diag_log_prob:.4f}")
+        print(f"  Shifted probability: {diag_shifted_prob:.10e}")
+        
+        # Decode to bracket
+        diag_bracket = create_hypothetical_bracket(results_bracket, remaining_games, diag_short)
+        diag_champion = get_team_name(diag_bracket.get('winner'))
+        print(f"  Champion: {diag_champion}")
+        
+        # Get rounds reached from probability function
+        diag_int = int(diag_full, 2)
+        diag_rounds = compute_rounds_reached_topdown(diag_int)
+        diag_prob_matrix, diag_team_names = build_team_probability_matrix(results_bracket, teams_data)
+        
+        # Print per-team breakdown
+        round_names = {1: 'R1 exit', 2: 'R32', 3: 'S16', 4: 'E8', 5: 'F4', 6: 'Finals', 7: 'Champion'}
+        print(f"\n  {'#':<4} {'Team':<25} {'Round Reached':<15} {'Prob Used':>12} {'Log Prob':>12}")
+        print(f"  {'-'*4} {'-'*25} {'-'*15} {'-'*12} {'-'*12}")
+        
+        total_log = 0.0
+        for idx in range(64):
+            name = diag_team_names[idx] or '(unknown)'
+            rr = diag_rounds[idx]
+            rr_name = round_names.get(rr, f'R{rr}')
+            prob_used = diag_prob_matrix[idx][rr]
+            log_p = np.log(prob_used) if prob_used > 0 else float('-inf')
+            total_log += log_p
+            print(f"  {idx:<4} {name:<25} {rr_name:<15} {prob_used:>12.8f} {log_p:>12.4f}")
+        
+        print(f"\n  Sum of log probs: {total_log:.4f}")
+        print(f"  Reported log prob: {diag_log_prob:.4f}")
+        if abs(total_log - diag_log_prob) > 0.01:
+            print(f"  *** LOG PROB MISMATCH: diff = {total_log - diag_log_prob:.6f} ***")
+        
+        # Save the decoded bracket as test output
+        results_dir = os.path.dirname(results_path) if results_path else '.'
+        test_output_path = os.path.join(results_dir, 'test-diagnostic-bracket.json')
+        try:
+            with open(test_output_path, 'w') as f:
+                json.dump({
+                    'sample_index': diag_idx,
+                    'short_outcome': diag_short,
+                    'full_outcome': diag_full,
+                    'log_probability': diag_log_prob,
+                    'shifted_probability': diag_shifted_prob,
+                    'champion': diag_champion,
+                    'bracket': diag_bracket
+                }, f, indent=2)
+            print(f"\n  Saved diagnostic bracket to {test_output_path}")
+        except Exception as e:
+            print(f"\n  Could not save diagnostic bracket: {e}")
+        
+        print(f"  === END RANDOM SAMPLE DIAGNOSTIC ===\n")
     
     # Step 3: Calculate scores for all participants across all outcomes
     # Using XNOR-based fast scoring with full 63-bit outcome strings
@@ -3807,7 +4044,9 @@ def calculate_win_probabilities(
         remaining_games, 
         max_scenarios,
         outcome_type="winning",
-        return_timing=True
+        return_timing=True,
+        outcome_to_log_prob=outcome_to_log_prob,
+        log_shift=max_log_prob
     )
     
     # Process losing outcomes: merge similar ones and keep top N
@@ -3818,7 +4057,9 @@ def calculate_win_probabilities(
         remaining_games, 
         max_scenarios,
         outcome_type="losing",
-        return_timing=True
+        return_timing=True,
+        outcome_to_log_prob=outcome_to_log_prob,
+        log_shift=max_log_prob
     )
     
     t_step6 = time.time() - t_start
@@ -3829,7 +4070,7 @@ def calculate_win_probabilities(
         timing_data['step6b_merge_loop'] = winning_timing['merge_loop'] + losing_timing['merge_loop']
         timing_data['step6c_decode'] = winning_timing['decode'] + losing_timing['decode']
     
-    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs, timing_data
+    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs, timing_data, total_probability_sum, max_log_prob
 
 
 def main():
@@ -3934,7 +4175,7 @@ def main():
     
     # Calculate probabilities
     (win_probabilities, lose_probabilities, average_places, 
-     winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs, timing_data) = calculate_win_probabilities(
+     winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs, timing_data, total_probability_sum, max_log_prob) = calculate_win_probabilities(
         results_path=args.results,
         brackets_dir=args.brackets_dir,
         participants=participants,
@@ -3947,6 +4188,10 @@ def main():
     )
     
     # Save to JSON (include all probabilities, scenarios, and preferences)
+    # Compute true total_base_probability_sum = exp(log_shift) * sum(shifted_probs)
+    # This is the sum of all true (unshifted) probabilities across all sampled outcomes
+    true_total_base_probability_sum = float(np.exp(max_log_prob)) * total_probability_sum if np.isfinite(max_log_prob) else total_probability_sum
+    
     output_data = {
         'win_probabilities': win_probabilities,
         'lose_probabilities': lose_probabilities,
@@ -3954,7 +4199,10 @@ def main():
         'winning_scenarios': winning_scenarios,
         'losing_scenarios': losing_scenarios,
         'next_game_preferences': next_game_prefs,
-        'next_game_lose_preferences': next_game_lose_prefs
+        'next_game_lose_preferences': next_game_lose_prefs,
+        'total_base_probability_sum': true_total_base_probability_sum,
+        'log_shift': max_log_prob,
+        'shifted_probability_sum': total_probability_sum
     }
     
     with open(args.output, 'w') as f:
