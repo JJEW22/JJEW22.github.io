@@ -11,21 +11,21 @@
         "round": 0,
         "reason": "has the lowest probability of winning at the beginning",
         "manual": true,
-        "Winners": ["Nick"]
+        "Winners": ["Dustin"]
     },
     {
         "name": "Nerd or Loner",
         "round": 0,
         "reason": "awarded for finding something in the rules before brackets are due, if no one finds it jack wins but he feels lonely",
         "manual": true,
-        "Winners": ["Anish"]
+        "Winners": ["Anish", "John", "Ethan"]
     },
     {
         "name": "Scatt er gories",
         "round": 0,
         "reason": "was the only person to pick your champion to win",
         "pictureDesc": "scategories logo picture",
-        "Winners": ["Alice", "Nick", "Sandy", "Dustin", "Kato"]
+        "Winners": ["Alice", "Nick", "Sandy", "Dustin", "Ben", "Aidan"]
     },
     {
         "name": "Best Friends",
@@ -67,7 +67,7 @@
         "reason": "All named brackets ",
         "pictureDesc": "snow white",
         "manual": true,
-        "Winners": ["Jack", "Sandy", "Nick", "Josh"]
+        "Winners": ["Jack", "Sandy", "Nick", "Josh", "Brian", "Ethan", "Kendall", "Ben", "Tyler", "Haneen", "Manu"]
     },
     {
         "name": "balanced",
