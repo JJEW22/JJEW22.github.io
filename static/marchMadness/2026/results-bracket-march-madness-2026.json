@@ -11,7 +11,11 @@
         "seed": 16,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
       "gameId": "r1-0",
       "region": "East"
     },
@@ -94,7 +98,11 @@
         "seed": 14,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "Michigan State",
+        "seed": 3,
+        "region": "East"
+      },
       "gameId": "r1-5",
       "region": "East"
     },
@@ -169,7 +177,11 @@
         "seed": 12,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Vanderbilt",
+        "seed": 5,
+        "region": "South"
+      },
       "gameId": "r1-10",
       "region": "South"
     },
@@ -312,7 +324,11 @@
         "seed": 13,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Arkansas",
+        "seed": 4,
+        "region": "West"
+      },
       "gameId": "r1-19",
       "region": "West"
     },
@@ -499,7 +515,11 @@
   ],
   "round2": [
     {
-      "team1": null,
+      "team1": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
       "team2": {
         "name": "TCU",
         "seed": 9,
@@ -522,7 +542,11 @@
         "seed": 6,
         "region": "East"
       },
-      "team2": null,
+      "team2": {
+        "name": "Michigan State",
+        "seed": 3,
+        "region": "East"
+      },
       "winner": null,
       "gameId": "r2-2",
       "region": ""
@@ -542,7 +566,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Vanderbilt",
+        "seed": 5,
+        "region": "South"
+      },
       "team2": {
         "name": "Nebraska",
         "seed": 4,
@@ -579,7 +607,11 @@
         "seed": 12,
         "region": "West"
       },
-      "team2": null,
+      "team2": {
+        "name": "Arkansas",
+        "seed": 4,
+        "region": "West"
+      },
       "winner": null,
       "gameId": "r2-9",
       "region": ""
