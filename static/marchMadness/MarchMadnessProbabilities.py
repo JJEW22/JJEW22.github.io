@@ -3006,7 +3006,8 @@ def process_outcomes(
     outcome_type: str = "winning",
     return_timing: bool = False,
     outcome_to_log_prob: Optional[Dict[str, float]] = None,
-    log_shift: Optional[float] = None
+    log_shift: Optional[float] = None,
+    skip_merge: bool = False
 ) -> Union[Dict[str, List[dict]], Tuple[Dict[str, List[dict]], Dict[str, float]]]:
     """
     Process raw outcomes: merge similar ones and keep top N.
@@ -3037,11 +3038,16 @@ def process_outcomes(
         
         print(f"  Processing {name}: {len(outcomes)} raw {outcome_type} outcomes")
         
-        # Merge similar outcomes (using round-by-round approach)
-        merged, merge_timing = merge_outcomes(outcomes, remaining_games, return_timing=True)
-        total_prefilter_time += merge_timing['prefilter']
-        total_merge_time += merge_timing['merge_loop']
-        print(f"    After merging: {len(merged)} outcomes")
+        # Merge similar outcomes (skip if using Monte Carlo — merges are unlikely with sampled data)
+        if skip_merge:
+            merged = outcomes
+            merge_timing = {'prefilter': 0.0, 'merge_loop': 0.0}
+            print(f"    Skipping merge (Monte Carlo mode)")
+        else:
+            merged, merge_timing = merge_outcomes(outcomes, remaining_games, return_timing=True)
+            total_prefilter_time += merge_timing['prefilter']
+            total_merge_time += merge_timing['merge_loop']
+            print(f"    After merging: {len(merged)} outcomes")
         
         # Get top scenarios
         top = get_top_scenarios(merged, max_scenarios)
@@ -4056,7 +4062,8 @@ def calculate_win_probabilities(
         outcome_type="winning",
         return_timing=True,
         outcome_to_log_prob=outcome_to_log_prob,
-        log_shift=max_log_prob
+        log_shift=max_log_prob,
+        skip_merge=use_monte_carlo
     )
     
     # Process losing outcomes: merge similar ones and keep top N
@@ -4069,7 +4076,8 @@ def calculate_win_probabilities(
         outcome_type="losing",
         return_timing=True,
         outcome_to_log_prob=outcome_to_log_prob,
-        log_shift=max_log_prob
+        log_shift=max_log_prob,
+        skip_merge=use_monte_carlo
     )
     
     t_step6 = time.time() - t_start
