@@ -75,7 +75,11 @@
         "seed": 11,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "Louisville",
+        "seed": 6,
+        "region": "East"
+      },
       "gameId": "r1-4",
       "region": "East"
     },
@@ -180,7 +184,11 @@
         "seed": 13,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Nebraska",
+        "seed": 4,
+        "region": "South"
+      },
       "gameId": "r1-11",
       "region": "South"
     },
@@ -285,7 +293,11 @@
         "seed": 12,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "High Point",
+        "seed": 12,
+        "region": "West"
+      },
       "gameId": "r1-18",
       "region": "West"
     },
@@ -505,7 +517,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Louisville",
+        "seed": 6,
+        "region": "East"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r2-2",
@@ -527,7 +543,11 @@
     },
     {
       "team1": null,
-      "team2": null,
+      "team2": {
+        "name": "Nebraska",
+        "seed": 4,
+        "region": "South"
+      },
       "winner": null,
       "gameId": "r2-5",
       "region": ""
@@ -554,7 +574,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "High Point",
+        "seed": 12,
+        "region": "West"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r2-9",
