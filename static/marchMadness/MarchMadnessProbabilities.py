@@ -2940,7 +2940,7 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
                 'either_teams': all_teams,
                 'either_seeds': all_seeds
             }
-        elif outcome_char == '0':
+        elif outcome_char == '1':
             winner = team1
             loser = team2
             game_results.append({
@@ -2961,7 +2961,7 @@ def decode_merged_outcome_to_games(results_bracket: dict, remaining_games: List[
                 # Include the list of teams if winner came from either
                 'winnerEitherTeams': team1.get('either_teams') if team1_is_either else None
             })
-        else:  # '1'
+        else:  # '0'
             winner = team2
             loser = team1
             game_results.append({
@@ -3860,70 +3860,6 @@ def calculate_win_probabilities(
             print(f"  Champions match ✓")
         print(f"  === END DIAGNOSTIC ===\n")
     
-    # DIAGNOSTIC: Pick a random outcome and log full probability breakdown + decoded bracket
-    if len(outcome_strings) > 0 and len(full_outcome_strings) > 0:
-        diag_idx = random.randint(0, len(outcome_strings) - 1)
-        diag_short = outcome_strings[diag_idx]
-        diag_full = full_outcome_strings[diag_idx]
-        diag_log_prob = outcome_log_probabilities[diag_idx]
-        diag_shifted_prob = outcome_probabilities[diag_idx]
-        
-        print(f"\n  === DIAGNOSTIC: Random sample #{diag_idx} ===")
-        print(f"  Short outcome: {diag_short}")
-        print(f"  Full outcome:  {diag_full}")
-        print(f"  Log probability: {diag_log_prob:.4f}")
-        print(f"  Shifted probability: {diag_shifted_prob:.10e}")
-        
-        # Decode to bracket
-        diag_bracket = create_hypothetical_bracket(results_bracket, remaining_games, diag_short)
-        diag_champion = get_team_name(diag_bracket.get('winner'))
-        print(f"  Champion: {diag_champion}")
-        
-        # Get rounds reached from probability function
-        diag_int = int(diag_full, 2)
-        diag_rounds = compute_rounds_reached_topdown(diag_int)
-        diag_prob_matrix, diag_team_names = build_team_probability_matrix(results_bracket, teams_data)
-        
-        # Print per-team breakdown
-        round_names = {1: 'R1 exit', 2: 'R32', 3: 'S16', 4: 'E8', 5: 'F4', 6: 'Finals', 7: 'Champion'}
-        print(f"\n  {'#':<4} {'Team':<25} {'Round Reached':<15} {'Prob Used':>12} {'Log Prob':>12}")
-        print(f"  {'-'*4} {'-'*25} {'-'*15} {'-'*12} {'-'*12}")
-        
-        total_log = 0.0
-        for idx in range(64):
-            name = diag_team_names[idx] or '(unknown)'
-            rr = diag_rounds[idx]
-            rr_name = round_names.get(rr, f'R{rr}')
-            prob_used = diag_prob_matrix[idx][rr]
-            log_p = np.log(prob_used) if prob_used > 0 else float('-inf')
-            total_log += log_p
-            print(f"  {idx:<4} {name:<25} {rr_name:<15} {prob_used:>12.8f} {log_p:>12.4f}")
-        
-        print(f"\n  Sum of log probs: {total_log:.4f}")
-        print(f"  Reported log prob: {diag_log_prob:.4f}")
-        if abs(total_log - diag_log_prob) > 0.01:
-            print(f"  *** LOG PROB MISMATCH: diff = {total_log - diag_log_prob:.6f} ***")
-        
-        # Save the decoded bracket as test output
-        results_dir = os.path.dirname(results_path) if results_path else '.'
-        test_output_path = os.path.join(results_dir, 'test-diagnostic-bracket.json')
-        try:
-            with open(test_output_path, 'w') as f:
-                json.dump({
-                    'sample_index': diag_idx,
-                    'short_outcome': diag_short,
-                    'full_outcome': diag_full,
-                    'log_probability': diag_log_prob,
-                    'shifted_probability': diag_shifted_prob,
-                    'champion': diag_champion,
-                    'bracket': diag_bracket
-                }, f, indent=2)
-            print(f"\n  Saved diagnostic bracket to {test_output_path}")
-        except Exception as e:
-            print(f"\n  Could not save diagnostic bracket: {e}")
-        
-        print(f"  === END RANDOM SAMPLE DIAGNOSTIC ===\n")
-    
     # Step 3: Calculate scores for all participants across all outcomes
     # Using XNOR-based fast scoring with full 63-bit outcome strings
     print("Step 3: Calculating all scores (XNOR method)...")
@@ -3968,6 +3904,80 @@ def calculate_win_probabilities(
     if enable_timing:
         timing_data['step5_accumulate_results'] = t_step5
         timing_data['num_simulations'] = len(outcome_strings)
+    
+    # DIAGNOSTIC: Pick a top winning scenario for the first participant and log details
+    if raw_winning_outcomes:
+        # Find the participant with the highest win probability to diagnose
+        diag_name = max(win_probability_sum, key=lambda n: win_probability_sum[n])
+        diag_outcomes = raw_winning_outcomes[diag_name]
+        
+        if diag_outcomes:
+            # Sort by probability (descending) and pick from top 5
+            sorted_outcomes = sorted(diag_outcomes.items(), key=lambda x: x[1], reverse=True)
+            pick_idx = min(random.randint(0, 4), len(sorted_outcomes) - 1)
+            diag_short = sorted_outcomes[pick_idx][0]
+            diag_shifted_prob = sorted_outcomes[pick_idx][1]
+            
+            # Expand to full bitstring
+            diag_full = expand_to_full_bitstring(diag_short, base_bits, remaining_bit_positions)
+            diag_log_prob = outcome_to_log_prob.get(diag_short)
+            
+            print(f"\n  === DIAGNOSTIC: Top winning scenario for '{diag_name}' (#{pick_idx+1} of {len(sorted_outcomes)}) ===")
+            print(f"  Short outcome: {diag_short}")
+            print(f"  Full outcome:  {diag_full}")
+            print(f"  Log probability: {diag_log_prob}")
+            print(f"  Shifted probability: {diag_shifted_prob:.10e}")
+            
+            # Decode to bracket
+            diag_bracket = create_hypothetical_bracket(results_bracket, remaining_games, diag_short)
+            diag_champion = get_team_name(diag_bracket.get('winner'))
+            print(f"  Champion: {diag_champion}")
+            
+            # Get rounds reached from probability function
+            diag_int = int(diag_full, 2)
+            diag_rounds = compute_rounds_reached_topdown(diag_int)
+            diag_prob_matrix, diag_team_names = build_team_probability_matrix(results_bracket, teams_data)
+            
+            # Print per-team breakdown
+            round_names = {1: 'R1 exit', 2: 'R32', 3: 'S16', 4: 'E8', 5: 'F4', 6: 'Finals', 7: 'Champion'}
+            print(f"\n  {'#':<4} {'Team':<25} {'Round Reached':<15} {'Prob Used':>12} {'Log Prob':>12}")
+            print(f"  {'-'*4} {'-'*25} {'-'*15} {'-'*12} {'-'*12}")
+            
+            total_log = 0.0
+            for idx in range(64):
+                name = diag_team_names[idx] or '(unknown)'
+                rr = diag_rounds[idx]
+                rr_name = round_names.get(rr, f'R{rr}')
+                prob_used = diag_prob_matrix[idx][rr]
+                log_p = np.log(prob_used) if prob_used > 0 else float('-inf')
+                total_log += log_p
+                print(f"  {idx:<4} {name:<25} {rr_name:<15} {prob_used:>12.8f} {log_p:>12.4f}")
+            
+            print(f"\n  Sum of log probs: {total_log:.4f}")
+            print(f"  Reported log prob: {diag_log_prob}")
+            if diag_log_prob is not None and abs(total_log - diag_log_prob) > 0.01:
+                print(f"  *** LOG PROB MISMATCH: diff = {total_log - diag_log_prob:.6f} ***")
+            
+            # Save the decoded bracket as test output
+            results_dir = os.path.dirname(results_path) if results_path else '.'
+            test_output_path = os.path.join(results_dir, 'test-diagnostic-bracket.json')
+            try:
+                with open(test_output_path, 'w') as f:
+                    json.dump({
+                        'participant': diag_name,
+                        'scenario_rank': pick_idx + 1,
+                        'short_outcome': diag_short,
+                        'full_outcome': diag_full,
+                        'log_probability': diag_log_prob,
+                        'shifted_probability': diag_shifted_prob,
+                        'champion': diag_champion,
+                        'bracket': diag_bracket
+                    }, f, indent=2)
+                print(f"\n  Saved diagnostic bracket to {test_output_path}")
+            except Exception as e:
+                print(f"\n  Could not save diagnostic bracket: {e}")
+            
+            print(f"  === END DIAGNOSTIC ===\n")
     
     # Normalize probabilities (they should sum to 1, but might not due to floating point)
     if total_probability_sum > 0:
