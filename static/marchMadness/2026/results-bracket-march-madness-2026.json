@@ -215,7 +215,11 @@
         "seed": 11,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "VCU",
+        "seed": 11,
+        "region": "South"
+      },
       "gameId": "r1-12",
       "region": "South"
     },
@@ -245,7 +249,11 @@
         "seed": 10,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Texas A&M",
+        "seed": 10,
+        "region": "South"
+      },
       "gameId": "r1-14",
       "region": "South"
     },
@@ -343,7 +351,11 @@
         "seed": 11,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Texas Tech",
+        "seed": 5,
+        "region": "Midwest"
+      },
       "gameId": "r1-20",
       "region": "West"
     },
@@ -403,7 +415,11 @@
         "seed": 16,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "gameId": "r1-24",
       "region": "Midwest"
     },
@@ -581,14 +597,22 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "VCU",
+        "seed": 11,
+        "region": "South"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r2-6",
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Texas A&M",
+        "seed": 10,
+        "region": "South"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r2-7",
@@ -617,7 +641,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Texas Tech",
+        "seed": 5,
+        "region": "Midwest"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r2-10",
@@ -631,7 +659,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r2-12",
