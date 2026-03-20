@@ -154,8 +154,15 @@ def load_star_bonuses(star_bonuses_path: str, scoring_config_path: str = None) -
             points_per_winner = star_bonus_points[min(winner_count - 1, len(star_bonus_points) - 1)] if winner_count > 0 else 0
             
             for winner in winners:
-                name_lower = winner.lower()
-                participant_points[name_lower] = participant_points.get(name_lower, 0) + points_per_winner
+                if isinstance(winner, list):
+                    # This is actually a split award that wasn't detected — skip sublists
+                    for sub_winner in winner:
+                        if isinstance(sub_winner, str):
+                            name_lower = sub_winner.lower()
+                            participant_points[name_lower] = participant_points.get(name_lower, 0) + points_per_winner
+                elif isinstance(winner, str):
+                    name_lower = winner.lower()
+                    participant_points[name_lower] = participant_points.get(name_lower, 0) + points_per_winner
     
     if participant_points:
         print(f"Loaded star bonuses: {participant_points}")

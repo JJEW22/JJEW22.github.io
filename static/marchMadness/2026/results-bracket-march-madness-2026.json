@@ -234,7 +234,11 @@
         "seed": 14,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Illinois",
+        "seed": 3,
+        "region": "South"
+      },
       "gameId": "r1-13",
       "region": "South"
     },
@@ -268,7 +272,11 @@
         "seed": 15,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Houston",
+        "seed": 2,
+        "region": "South"
+      },
       "gameId": "r1-15",
       "region": "South"
     },
@@ -370,7 +378,11 @@
         "seed": 14,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Gonzaga",
+        "seed": 3,
+        "region": "West"
+      },
       "gameId": "r1-21",
       "region": "West"
     },
@@ -434,7 +446,11 @@
         "seed": 9,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Saint Louis",
+        "seed": 9,
+        "region": "Midwest"
+      },
       "gameId": "r1-25",
       "region": "Midwest"
     },
@@ -602,7 +618,11 @@
         "seed": 11,
         "region": "South"
       },
-      "team2": null,
+      "team2": {
+        "name": "Illinois",
+        "seed": 3,
+        "region": "South"
+      },
       "winner": null,
       "gameId": "r2-6",
       "region": ""
@@ -613,7 +633,11 @@
         "seed": 10,
         "region": "South"
       },
-      "team2": null,
+      "team2": {
+        "name": "Houston",
+        "seed": 2,
+        "region": "South"
+      },
       "winner": null,
       "gameId": "r2-7",
       "region": ""
@@ -646,7 +670,11 @@
         "seed": 11,
         "region": "West"
       },
-      "team2": null,
+      "team2": {
+        "name": "Gonzaga",
+        "seed": 3,
+        "region": "West"
+      },
       "winner": null,
       "gameId": "r2-10",
       "region": ""
@@ -664,7 +692,11 @@
         "seed": 1,
         "region": "Midwest"
       },
-      "team2": null,
+      "team2": {
+        "name": "Saint Louis",
+        "seed": 9,
+        "region": "Midwest"
+      },
       "winner": null,
       "gameId": "r2-12",
       "region": ""

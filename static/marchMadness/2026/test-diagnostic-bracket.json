@@ -1,11 +1,11 @@
 {
-  "participant": "Obama",
+  "participant": "Courtney",
   "scenario_rank": 5,
-  "short_outcome": "11111011110010111100001111111011000100101101011111111011000011",
-  "full_outcome": "101111011110010111100001111111011000100101101011111111011000011",
-  "log_probability": -41.13213917086607,
-  "shifted_probability": 0.001296131891893147,
-  "champion": "Illinois",
+  "short_outcome": "01110011010101111000111011010100100111011100100",
+  "full_outcome": "100111110011010111010101100101111000111011010100100111011100100",
+  "log_probability": -33.832677484828444,
+  "shifted_probability": 7.440627112292454e-06,
+  "champion": "Virginia",
   "bracket": {
     "round1": [
       {
@@ -58,8 +58,8 @@
           "region": "East"
         },
         "winner": {
-          "name": "St. John's",
-          "seed": 5,
+          "name": "Northern Iowa",
+          "seed": 12,
           "region": "East"
         },
         "gameId": "r1-2",
@@ -134,8 +134,8 @@
           "region": "East"
         },
         "winner": {
-          "name": "UCF",
-          "seed": 10,
+          "name": "UCLA",
+          "seed": 7,
           "region": "East"
         },
         "gameId": "r1-6",
@@ -172,8 +172,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Prairie View A&M/Lehigh",
+          "seed": 16,
           "region": "South"
         },
         "gameId": "r1-8",
@@ -191,8 +191,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Clemson",
-          "seed": 8,
+          "name": "Iowa",
+          "seed": 9,
           "region": "South"
         },
         "gameId": "r1-9",
@@ -229,8 +229,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Troy",
-          "seed": 13,
+          "name": "Nebraska",
+          "seed": 4,
           "region": "South"
         },
         "gameId": "r1-11",
@@ -362,8 +362,8 @@
           "region": "West"
         },
         "winner": {
-          "name": "Wisconsin",
-          "seed": 5,
+          "name": "High Point",
+          "seed": 12,
           "region": "West"
         },
         "gameId": "r1-18",
@@ -381,8 +381,8 @@
           "region": "West"
         },
         "winner": {
-          "name": "Hawai'i",
-          "seed": 13,
+          "name": "Arkansas",
+          "seed": 4,
           "region": "West"
         },
         "gameId": "r1-19",
@@ -419,8 +419,8 @@
           "region": "West"
         },
         "winner": {
-          "name": "Kennesaw State",
-          "seed": 14,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "gameId": "r1-21",
@@ -495,8 +495,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Georgia",
-          "seed": 8,
+          "name": "Saint Louis",
+          "seed": 9,
           "region": "Midwest"
         },
         "gameId": "r1-25",
@@ -514,8 +514,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Texas Tech",
-          "seed": 5,
+          "name": "Akron",
+          "seed": 12,
           "region": "Midwest"
         },
         "gameId": "r1-26",
@@ -552,8 +552,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Miami (OH)/SMU",
+          "seed": 11,
           "region": "Midwest"
         },
         "gameId": "r1-28",
@@ -590,8 +590,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Santa Clara",
-          "seed": 10,
+          "name": "Kentucky",
+          "seed": 7,
           "region": "Midwest"
         },
         "gameId": "r1-30",
@@ -639,8 +639,8 @@
       },
       {
         "team1": {
-          "name": "St. John's",
-          "seed": 5,
+          "name": "Northern Iowa",
+          "seed": 12,
           "region": "East"
         },
         "team2": {
@@ -677,8 +677,8 @@
       },
       {
         "team1": {
-          "name": "UCF",
-          "seed": 10,
+          "name": "UCLA",
+          "seed": 7,
           "region": "East"
         },
         "team2": {
@@ -696,18 +696,18 @@
       },
       {
         "team1": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Prairie View A&M/Lehigh",
+          "seed": 16,
           "region": "South"
         },
         "team2": {
-          "name": "Clemson",
-          "seed": 8,
+          "name": "Iowa",
+          "seed": 9,
           "region": "South"
         },
         "winner": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Prairie View A&M/Lehigh",
+          "seed": 16,
           "region": "South"
         },
         "gameId": "r2-4",
@@ -720,13 +720,13 @@
           "region": "South"
         },
         "team2": {
-          "name": "Troy",
-          "seed": 13,
+          "name": "Nebraska",
+          "seed": 4,
           "region": "South"
         },
         "winner": {
-          "name": "Troy",
-          "seed": 13,
+          "name": "Vanderbilt",
+          "seed": 5,
           "region": "South"
         },
         "gameId": "r2-5",
@@ -744,8 +744,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "VCU",
+          "seed": 11,
           "region": "South"
         },
         "gameId": "r2-6",
@@ -763,8 +763,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Texas A&M",
-          "seed": 10,
+          "name": "Houston",
+          "seed": 2,
           "region": "South"
         },
         "gameId": "r2-7",
@@ -782,8 +782,8 @@
           "region": "West"
         },
         "winner": {
-          "name": "Villanova",
-          "seed": 8,
+          "name": "Arizona",
+          "seed": 1,
           "region": "West"
         },
         "gameId": "r2-8",
@@ -791,18 +791,18 @@
       },
       {
         "team1": {
-          "name": "Wisconsin",
-          "seed": 5,
+          "name": "High Point",
+          "seed": 12,
           "region": "West"
         },
         "team2": {
-          "name": "Hawai'i",
-          "seed": 13,
+          "name": "Arkansas",
+          "seed": 4,
           "region": "West"
         },
         "winner": {
-          "name": "Wisconsin",
-          "seed": 5,
+          "name": "High Point",
+          "seed": 12,
           "region": "West"
         },
         "gameId": "r2-9",
@@ -815,13 +815,13 @@
           "region": "West"
         },
         "team2": {
-          "name": "Kennesaw State",
-          "seed": 14,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "winner": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "gameId": "r2-10",
@@ -839,8 +839,8 @@
           "region": "West"
         },
         "winner": {
-          "name": "Purdue",
-          "seed": 2,
+          "name": "Missouri",
+          "seed": 10,
           "region": "West"
         },
         "gameId": "r2-11",
@@ -853,13 +853,13 @@
           "region": "Midwest"
         },
         "team2": {
-          "name": "Georgia",
-          "seed": 8,
+          "name": "Saint Louis",
+          "seed": 9,
           "region": "Midwest"
         },
         "winner": {
-          "name": "Michigan",
-          "seed": 1,
+          "name": "Saint Louis",
+          "seed": 9,
           "region": "Midwest"
         },
         "gameId": "r2-12",
@@ -867,8 +867,8 @@
       },
       {
         "team1": {
-          "name": "Texas Tech",
-          "seed": 5,
+          "name": "Akron",
+          "seed": 12,
           "region": "Midwest"
         },
         "team2": {
@@ -877,8 +877,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Alabama",
-          "seed": 4,
+          "name": "Akron",
+          "seed": 12,
           "region": "Midwest"
         },
         "gameId": "r2-13",
@@ -886,8 +886,8 @@
       },
       {
         "team1": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Miami (OH)/SMU",
+          "seed": 11,
           "region": "Midwest"
         },
         "team2": {
@@ -896,8 +896,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Virginia",
+          "seed": 3,
           "region": "Midwest"
         },
         "gameId": "r2-14",
@@ -905,8 +905,8 @@
       },
       {
         "team1": {
-          "name": "Santa Clara",
-          "seed": 10,
+          "name": "Kentucky",
+          "seed": 7,
           "region": "Midwest"
         },
         "team2": {
@@ -915,8 +915,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Santa Clara",
-          "seed": 10,
+          "name": "Iowa State",
+          "seed": 2,
           "region": "Midwest"
         },
         "gameId": "r2-15",
@@ -955,8 +955,8 @@
           "region": "East"
         },
         "winner": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "gameId": "r3-1",
@@ -964,18 +964,18 @@
       },
       {
         "team1": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Prairie View A&M/Lehigh",
+          "seed": 16,
           "region": "South"
         },
         "team2": {
-          "name": "Troy",
-          "seed": 13,
+          "name": "Vanderbilt",
+          "seed": 5,
           "region": "South"
         },
         "winner": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Vanderbilt",
+          "seed": 5,
           "region": "South"
         },
         "gameId": "r3-2",
@@ -983,18 +983,18 @@
       },
       {
         "team1": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "VCU",
+          "seed": 11,
           "region": "South"
         },
         "team2": {
-          "name": "Texas A&M",
-          "seed": 10,
+          "name": "Houston",
+          "seed": 2,
           "region": "South"
         },
         "winner": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "VCU",
+          "seed": 11,
           "region": "South"
         },
         "gameId": "r3-3",
@@ -1002,18 +1002,18 @@
       },
       {
         "team1": {
-          "name": "Villanova",
-          "seed": 8,
+          "name": "Arizona",
+          "seed": 1,
           "region": "West"
         },
         "team2": {
-          "name": "Wisconsin",
-          "seed": 5,
+          "name": "High Point",
+          "seed": 12,
           "region": "West"
         },
         "winner": {
-          "name": "Villanova",
-          "seed": 8,
+          "name": "Arizona",
+          "seed": 1,
           "region": "West"
         },
         "gameId": "r3-4",
@@ -1021,18 +1021,18 @@
       },
       {
         "team1": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "team2": {
-          "name": "Purdue",
-          "seed": 2,
+          "name": "Missouri",
+          "seed": 10,
           "region": "West"
         },
         "winner": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "gameId": "r3-5",
@@ -1040,18 +1040,18 @@
       },
       {
         "team1": {
-          "name": "Michigan",
-          "seed": 1,
+          "name": "Saint Louis",
+          "seed": 9,
           "region": "Midwest"
         },
         "team2": {
-          "name": "Alabama",
-          "seed": 4,
+          "name": "Akron",
+          "seed": 12,
           "region": "Midwest"
         },
         "winner": {
-          "name": "Alabama",
-          "seed": 4,
+          "name": "Akron",
+          "seed": 12,
           "region": "Midwest"
         },
         "gameId": "r3-6",
@@ -1059,18 +1059,18 @@
       },
       {
         "team1": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Virginia",
+          "seed": 3,
           "region": "Midwest"
         },
         "team2": {
-          "name": "Santa Clara",
-          "seed": 10,
+          "name": "Iowa State",
+          "seed": 2,
           "region": "Midwest"
         },
         "winner": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Virginia",
+          "seed": 3,
           "region": "Midwest"
         },
         "gameId": "r3-7",
@@ -1085,8 +1085,8 @@
           "region": "East"
         },
         "team2": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "winner": {
@@ -1099,18 +1099,18 @@
       },
       {
         "team1": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Vanderbilt",
+          "seed": 5,
           "region": "South"
         },
         "team2": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "VCU",
+          "seed": 11,
           "region": "South"
         },
         "winner": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "Vanderbilt",
+          "seed": 5,
           "region": "South"
         },
         "gameId": "r4-1",
@@ -1118,18 +1118,18 @@
       },
       {
         "team1": {
-          "name": "Villanova",
-          "seed": 8,
+          "name": "Arizona",
+          "seed": 1,
           "region": "West"
         },
         "team2": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "winner": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "gameId": "r4-2",
@@ -1137,18 +1137,18 @@
       },
       {
         "team1": {
-          "name": "Alabama",
-          "seed": 4,
+          "name": "Akron",
+          "seed": 12,
           "region": "Midwest"
         },
         "team2": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Virginia",
+          "seed": 3,
           "region": "Midwest"
         },
         "winner": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Virginia",
+          "seed": 3,
           "region": "Midwest"
         },
         "gameId": "r4-3",
@@ -1163,33 +1163,33 @@
           "region": "East"
         },
         "team2": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "Vanderbilt",
+          "seed": 5,
           "region": "South"
         },
         "winner": {
-          "name": "Illinois",
-          "seed": 3,
-          "region": "South"
+          "name": "Duke",
+          "seed": 1,
+          "region": "East"
         },
         "gameId": "r5-0",
         "region": ""
       },
       {
         "team1": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Gonzaga",
+          "seed": 3,
           "region": "West"
         },
         "team2": {
-          "name": "Tennessee",
-          "seed": 6,
+          "name": "Virginia",
+          "seed": 3,
           "region": "Midwest"
         },
         "winner": {
-          "name": "Texas/NC State",
-          "seed": 11,
-          "region": "West"
+          "name": "Virginia",
+          "seed": 3,
+          "region": "Midwest"
         },
         "gameId": "r5-1",
         "region": ""
@@ -1198,28 +1198,28 @@
     "round6": [
       {
         "team1": {
-          "name": "Illinois",
-          "seed": 3,
-          "region": "South"
+          "name": "Duke",
+          "seed": 1,
+          "region": "East"
         },
         "team2": {
-          "name": "Texas/NC State",
-          "seed": 11,
-          "region": "West"
+          "name": "Virginia",
+          "seed": 3,
+          "region": "Midwest"
         },
         "winner": {
-          "name": "Illinois",
+          "name": "Virginia",
           "seed": 3,
-          "region": "South"
+          "region": "Midwest"
         },
         "gameId": "r6-0",
         "region": ""
       }
     ],
     "winner": {
-      "name": "Illinois",
+      "name": "Virginia",
       "seed": 3,
-      "region": "South"
+      "region": "Midwest"
     }
   }
 }
