@@ -352,9 +352,9 @@
         "region": "West"
       },
       "winner": {
-        "name": "Texas Tech",
-        "seed": 5,
-        "region": "Midwest"
+        "name": "Texas/NC State",
+        "seed": 11,
+        "region": "West"
       },
       "gameId": "r1-20",
       "region": "West"
@@ -642,9 +642,9 @@
     },
     {
       "team1": {
-        "name": "Texas Tech",
-        "seed": 5,
-        "region": "Midwest"
+        "name": "Texas/NC State",
+        "seed": 11,
+        "region": "West"
       },
       "team2": null,
       "winner": null,
