@@ -4178,7 +4178,13 @@ def main():
     
     # Exclude specified participants
     if args.exclude:
-        excluded = set(e.lower() for e in args.exclude)
+        # Support both space-separated (nargs='+') and comma-separated names
+        excluded = set()
+        for e in args.exclude:
+            for name in e.split(','):
+                name = name.strip()
+                if name:
+                    excluded.add(name.lower())
         before_count = len(participants)
         participants = [p for p in participants if p.lower() not in excluded]
         excluded_count = before_count - len(participants)
