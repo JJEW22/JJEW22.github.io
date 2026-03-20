@@ -38,7 +38,7 @@
     const WONT_PLAY_STRING = "XXX"
     const FORFEIT_WIN_STRING = "F"
     const FORFEIT_LOSS_STRING = "-F"
-    const SESSION_COUNT = 3
+    const SESSION_COUNT = 2
     
     const HOME_GAME_STRING = 'Council'
     const AWAY_GAME_STRING = 'Anish'
