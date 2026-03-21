@@ -59,7 +59,7 @@
         "round": 1,
         "reason": "Awarded to the people with the most similar brackets",
         "image": "/marchMadness/2026/badges/bestfriends.png",
-        "subimages": [
+        "subImages": [
             "/marchMadness/2026/badges/bestfriendsLeft.png",
             "/marchMadness/2026/badges/bestfriendsRight.png"
         ],
@@ -324,19 +324,24 @@
         }
     },
     {
-        "name": "Dom/Sub",
+        "name": "Top/Sub",
         "round": 2,
         "halfway": true,
-        "reason": "Awarded to the person whose winning (Dom) most implies someone elses losing (sub)",
+        "reason": "Awarded to the person whose winning (Top) most implies someone elses losing (sub)",
         "Winners": [
             [],
             []
+        ],
+        "subImages": [
+            "/marchMadness/2026/badges/top.png",
+            "/marchMadness/2026/badges/sub.png"
         ]
     },
     {
         "name": "Fallen From Grace",
         "round": 2,
         "reason": "worst ratio of 1st round picks/ 2nd round picks",
+        "image": "/marchMadness/2026/badges/devil.png",
         "Winners": []
     },
     {
@@ -381,12 +386,14 @@
         "round": 5,
         "reason": "Submitted something to happen that never has",
         "manual": true,
+        "image": "/marchMadness/2026/badges/unicorn.png",
         "Winners": []
     },
     {
         "name": "the Independent",
         "round": 5,
         "reason": "Lowest absolute different between left and right half of the bracket",
+        "image": "/marchMadness/2026/badges/independent.jpg",
         "Winners": []
     },
     {
@@ -396,6 +403,10 @@
         "Winners": [
             [],
             []
+        ],
+        "subImages": [
+            "/marchMadness/2026/badges/wolf.png",
+            "/marchMadness/2026/badges/sheep.jpeg"
         ]
     },
     {
@@ -403,12 +414,14 @@
         "round": 6,
         "reason": "By another metric you won, picking the most games",
         "pictureDesc": "(logo is mario 1 up)",
+        "image": "/marchMadness/2026/badges/1up.jpg",
         "Winners": []
     },
     {
         "name": "Pants Coin",
         "round": 6,
         "reason": "luckily have the least point differential for correctly picked games",
+        "image": "/marchMadness/2026/badges/pantsCoin.jpg",
         "Winners": []
     },
     {
@@ -419,6 +432,10 @@
         "Winners": [
             [],
             []
+        ],
+        "subImages": [
+            "/marchMadness/2026/badges/joebiden.png",
+            "/marchMadness/2026/badges/magahat.png"
         ]
     },
     {
@@ -429,12 +446,17 @@
         "Winners": [
             [],
             []
+        ],
+        "subImages": [
+            "/marchMadness/2026/badges/theflash.jpeg",
+            "/marchMadness/2026/badges/flashzootopia.jpg"
         ]
     },
     {
         "name": "well duh",
         "round": 3,
         "reason": "Correctly predicted the most not close games (wins by more than 10)",
+        "image": "/marchMadness/2026/badges/wellDuh.jpg",
         "Winners": []
     },
     {
@@ -443,6 +465,7 @@
         "reason": "correctly picked the team who is THE lowest seed to advance to a round (can be won multiple times)",
         "repeatable": true,
         "pictureDesc": " shrek picture",
+        "image": "/marchMadness/2026/badges/shrek.png",
         "Winners": [
             "John",
             "Brian",
@@ -456,19 +479,21 @@
                 "Ben",
                 "Aidan"
             ]
-        }
+        } 
     },
     {
         "name": "Dustin",
         "round": 3,
         "reason": "awarded for least underdog points received compared to potential",
         "pictureDesc": "dustin",
+        "image": "/marchMadness/2026/badges/dustin.png",
         "Winners": []
     },
     {
         "name": "Husky",
         "round": 4,
         "reason": "best performance of east - south",
+        "image": "/marchMadness/2026/badges/hoosky.png",
         "Winners": []
     },
     {
@@ -482,7 +507,7 @@
             []
         ],
         "image": "/marchMadness/2026/badges/DPad.png",
-        "subimages": [
+        "subImages": [
             "/marchMadness/2026/badges/DPadDown.png",
             "/marchMadness/2026/badges/DPadLeft.png",
             "/marchMadness/2026/badges/DPadUp.png",
@@ -494,17 +519,21 @@
         "round": "unknown",
         "reason": "correctly/ incorrectly had a game where they were the only one to pick a team (before final 4)",
         "pictureDesc": "hammer and broken heart logo",
-        "Winners": [
+        "Winners": [[],[
             "Ben",
             "Kendall",
             "Alice",
             "Nick"
-        ],
+        ]],
         "scores": {
             "💔 Ben incorrectly picked Northern Iowa (R1G2: St. John's vs Northern Iowa)": "heartbroken",
             "💔 Kendall incorrectly picked Furman (R1G7: UConn vs Furman)": "heartbroken",
             "💔 Alice incorrectly picked Prairie View A&M/Lehigh (R1G8: Florida vs Prairie View A&M/Lehigh)": "heartbroken",
             "💔 Nick incorrectly picked Wright State (R1G29: Virginia vs Wright State)": "heartbroken"
-        }
+        },
+        "subImages": [
+            "/marchMadness/2026/badges/hammer.png",
+            "/marchMadness/2026/badges/brokenheart.jpg"
+        ]
     }
 ]

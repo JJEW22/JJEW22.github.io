@@ -623,7 +623,8 @@
       },
       "winner": null,
       "gameId": "r2-0",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-21T21:15:00Z"
     },
     {
       "team1": {
@@ -638,7 +639,8 @@
       },
       "winner": null,
       "gameId": "r2-1",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T21:15:00Z"
     },
     {
       "team1": {
@@ -653,7 +655,8 @@
       },
       "winner": null,
       "gameId": "r2-2",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-21T18:45:00Z"
     },
     {
       "team1": {
@@ -668,7 +671,8 @@
       },
       "winner": null,
       "gameId": "r2-3",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-23T00:45:00Z"
     },
     {
       "team1": {
@@ -683,7 +687,8 @@
       },
       "winner": null,
       "gameId": "r2-4",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T23:10:00Z"
     },
     {
       "team1": {
@@ -698,7 +703,8 @@
       },
       "winner": null,
       "gameId": "r2-5",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T00:45:00Z"
     },
     {
       "team1": {
@@ -713,7 +719,8 @@
       },
       "winner": null,
       "gameId": "r2-6",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-21T23:50:00Z"
     },
     {
       "team1": {
@@ -728,7 +735,8 @@
       },
       "winner": null,
       "gameId": "r2-7",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-21T22:10:00Z"
     },
     {
       "team1": {
@@ -743,7 +751,8 @@
       },
       "winner": null,
       "gameId": "r2-8",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T23:50:00Z"
     },
     {
       "team1": {
@@ -758,7 +767,8 @@
       },
       "winner": null,
       "gameId": "r2-9",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T01:45:00Z"
     },
     {
       "team1": {
@@ -788,7 +798,8 @@
       },
       "winner": null,
       "gameId": "r2-11",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T16:10:00Z"
     },
     {
       "team1": {
@@ -803,7 +814,8 @@
       },
       "winner": null,
       "gameId": "r2-12",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-21T16:10:00Z"
     },
     {
       "team1": {
@@ -818,7 +830,8 @@
       },
       "winner": null,
       "gameId": "r2-13",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-23T01:45:41Z"
     },
     {
       "team1": {
@@ -833,7 +846,8 @@
       },
       "winner": null,
       "gameId": "r2-14",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T22:10:00Z"
     },
     {
       "team1": {
@@ -848,7 +862,8 @@
       },
       "winner": null,
       "gameId": "r2-15",
-      "region": ""
+      "region": "",
+      "scheduledTime": "2026-03-22T18:45:00Z"
     }
   ],
   "round3": [
