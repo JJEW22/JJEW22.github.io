@@ -31,17 +31,13 @@
         "Winners": ["Alice", "Nick", "Sandy", "Dustin", "Ben", "Aidan"]
     },
     {
-        "name": "Best Friends",
+        "name": "balanced",
         "round": 1,
-        "reason": "Awarded to the people with the most similar brackets",
-        "image": "/marchMadness/2026/badges/bestfriends.png",
-        "subimages": [
-            "/marchMadness/2026/badges/bestfriendsLeft.png",
-            "/marchMadness/2026/badges/bestfriendsRight.png"
-        ],
-        "Winners": [[], []]
+        "reason": "Person who's first round number of picks was closest to 50%",
+        "image": "/marchMadness/2026/badges/balanced.png",
+        "Winners": ["Alice"]
     },
-        {
+    {
         "name": "Dom/Sub",
         "round": 2, 
         "halfway": true,
@@ -78,13 +74,6 @@
         "image": "/marchMadness/2026/badges/Snow_White.png",
         "manual": true,
         "Winners": ["Jack", "Sandy", "Nick", "Josh", "Brian", "Ethan", "Kendall", "Ben", "Tyler", "Haneen", "Manu"]
-    },
-    {
-        "name": "balanced",
-        "round": 1,
-        "reason": "Person who's first round number of picks was closest to 50%",
-        "image": "/marchMadness/2026/badges/balanced.png",
-        "Winners": []
     },
     {
         "name": "Unicorn",

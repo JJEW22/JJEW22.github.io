@@ -560,7 +560,8 @@ def create_probability_csv(
     estimation_method: str = "shaped",
     game_odds: List[dict] = None,
     team_current_rounds: Dict[str, int] = None,
-    team_eliminated: Dict[str, bool] = None
+    team_eliminated: Dict[str, bool] = None,
+    eliminated_team_probs: Dict[str, Dict[str, float]] = None
 ):
     """
     Create a CSV file with team probabilities.
@@ -635,23 +636,30 @@ def create_probability_csv(
             current_round = team_current_rounds.get(team_name, 1)
             
             if estimation_method == "shaped" and seed > 0:
-                anchors = {'prob_win': prob_win}
-                
-                if prob_first_game is not None:
-                    round_to_col = {1: 'prob_r32', 2: 'prob_r16', 3: 'prob_r8', 
-                                  4: 'prob_r4', 5: 'prob_r2', 6: 'prob_win'}
-                    first_game_col = round_to_col.get(current_round)
-                    if first_game_col and first_game_col != 'prob_win':
-                        anchors[first_game_col] = prob_first_game
-                
-                round_probs = estimate_round_probabilities_shaped(
-                    seed=seed,
-                    anchors=anchors,
-                    current_round=current_round,
-                    interpolation="exponential"
-                )
+                # Skip estimation for assumed-lost teams (prob_win effectively 0)
+                if prob_win <= 1e-9:
+                    round_probs = {col: 0.0 for col in PROB_COLUMNS}
+                else:
+                    anchors = {'prob_win': prob_win}
+                    
+                    if prob_first_game is not None:
+                        round_to_col = {1: 'prob_r32', 2: 'prob_r16', 3: 'prob_r8', 
+                                      4: 'prob_r4', 5: 'prob_r2', 6: 'prob_win'}
+                        first_game_col = round_to_col.get(current_round)
+                        if first_game_col and first_game_col != 'prob_win':
+                            anchors[first_game_col] = prob_first_game
+                    
+                    round_probs = estimate_round_probabilities_shaped(
+                        seed=seed,
+                        anchors=anchors,
+                        current_round=current_round,
+                        interpolation="exponential"
+                    )
             else:
-                round_probs = estimate_round_probabilities_geometric(prob_win, current_round)
+                if prob_win <= 1e-9:
+                    round_probs = {col: 0.0 for col in PROB_COLUMNS}
+                else:
+                    round_probs = estimate_round_probabilities_geometric(prob_win, current_round)
         
         team_probs[team_name] = round_probs
         
@@ -674,6 +682,21 @@ def create_probability_csv(
                 for col in PROB_COLUMNS:
                     if col in team_probs[team_name]:
                         row[col] = team_probs[team_name][col]
+    
+    # Add eliminated teams back with exact 1/0 probabilities
+    if eliminated_team_probs:
+        print(f"\nAdding {len(eliminated_team_probs)} eliminated teams with exact probabilities")
+        for team_name, probs in eliminated_team_probs.items():
+            info = base_teams.get(team_name, {})
+            seed = info.get('seed', 0)
+            region = info.get('region', '')
+            row = {
+                'TEAM': team_name,
+                'SEED': seed if seed > 0 else '',
+                'Region': region,
+            }
+            row.update(probs)
+            output_rows.append(row)
     
     # Sort by prob_win descending
     output_rows.sort(key=lambda x: x['prob_win'], reverse=True)
@@ -746,9 +769,9 @@ Examples:
     parser.add_argument('--seed-probs',
                        help='Path to seed probabilities CSV (default: seed_probabilities.csv in script dir)')
     parser.add_argument('--validation',
-                       choices=['strict', 'warning', 'none'],
+                       choices=['strict', 'warning', 'none', 'assumedLost'],
                        default='strict',
-                       help='Team name validation mode: strict (error on mismatch, default), warning (warn and continue), none (skip validation)')
+                       help='Team name validation mode: strict (error on mismatch, default), warning (warn and continue), none (skip validation), assumedLost (teams not in odds assumed eliminated with 0 probability)')
     parser.add_argument('--name-map',
                        help='Path to a JSON file mapping odds team names to base team names. Format: {"odds name": "base name", ...}')
     
@@ -830,10 +853,61 @@ Examples:
         
         print(f"  Applied {applied} of {len(manual_map)} mappings to championship odds")
     
+    # Load team status from results bracket EARLY so we can exclude eliminated teams
+    team_current_rounds = {}
+    team_eliminated = {}
+    eliminated_team_probs = {}  # team_name -> {prob_r32: ..., ...} exact 1/0 values
+    
+    if args.results:
+        print(f"\nLoading tournament state from {args.results}")
+        team_current_rounds, team_eliminated = load_team_status_from_results(args.results)
+        if team_current_rounds:
+            round_counts = {}
+            for team, round_num in team_current_rounds.items():
+                if not team_eliminated.get(team, False):
+                    round_counts[round_num] = round_counts.get(round_num, 0) + 1
+            print(f"  Teams still in tournament by round:")
+            for r in sorted(round_counts.keys()):
+                round_names = {1: 'R64', 2: 'R32', 3: 'S16', 4: 'E8', 5: 'F4', 6: 'Championship'}
+                print(f"    {round_names.get(r, f'Round {r}')}: {round_counts[r]} teams")
+        
+        # Build exact probabilities for eliminated teams
+        # A team that reached round R has prob=1.0 for all rounds up to R, and 0.0 after
+        prob_columns_ordered = ['prob_r32', 'prob_r16', 'prob_r8', 'prob_r4', 'prob_r2', 'prob_win']
+        # prob_r32 corresponds to reaching round 2 (surviving R1), etc.
+        round_to_col_index = {2: 0, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5}  # round_reached -> column index
+        
+        eliminated_names = [team for team, elim in team_eliminated.items() if elim]
+        if eliminated_names:
+            print(f"\n  Removing {len(eliminated_names)} eliminated teams from odds processing:")
+            for team in sorted(eliminated_names):
+                highest_round = team_current_rounds.get(team, 1)
+                probs = {}
+                for col_idx, col in enumerate(prob_columns_ordered):
+                    # col_idx 0 = prob_r32 = reached round 2
+                    # A team that reached round R has 1.0 for columns where round <= R
+                    required_round = col_idx + 2  # prob_r32 needs round >= 2
+                    if highest_round >= required_round:
+                        probs[col] = 1.0
+                    else:
+                        probs[col] = 0.0
+                eliminated_team_probs[team] = probs
+                
+                # Remove from championship_probs so they don't affect validation/renormalization
+                championship_probs.pop(team, None)
+                
+                round_names = {1: 'R64', 2: 'R32', 3: 'S16', 4: 'E8', 5: 'F4', 6: 'Finals', 7: 'Champion'}
+                print(f"    {team}: reached {round_names.get(highest_round, f'R{highest_round}')}")
+    
     # Validate and preprocess if base teams provided and validation not disabled
     name_mapping = {}
     if base_teams and args.validation != 'none':
+        # Remove eliminated teams from base_teams for validation purposes
+        active_base_teams = {k: v for k, v in base_teams.items() if k not in eliminated_team_probs}
+        
         print(f"\nValidating team names (mode: {args.validation})...")
+        if eliminated_team_probs:
+            print(f"  ({len(eliminated_team_probs)} eliminated teams excluded from validation)")
         
         # First, check that championship_probs sum to 1.0 (within tolerance)
         probs_sum = sum(championship_probs.values())
@@ -852,7 +926,7 @@ Examples:
         # e.g. "Texas/NC State" -> "Texas" and "NC State" as separate entries
         expanded_base_teams = {}
         combo_team_map = {}  # component_name -> combo_name
-        for team_name, info in base_teams.items():
+        for team_name, info in active_base_teams.items():
             if '/' in team_name:
                 components = [c.strip() for c in team_name.split('/')]
                 for component in components:
@@ -897,22 +971,27 @@ Examples:
         # Now "Texas" and "NC State" are properly matched, merge into "Texas/NC State"
         if combo_team_map:
             championship_probs, num_merges = merge_first_four_teams(
-                championship_probs, base_teams, game_odds
+                championship_probs, active_base_teams, game_odds
             )
         
-        # Filter to only teams in base_teams
+        # Filter to only active teams in base_teams (eliminated already removed)
         filtered_probs = {name: prob for name, prob in championship_probs.items() 
-                         if name in base_teams}
+                         if name in active_base_teams}
         
         if len(filtered_probs) < len(championship_probs):
             removed_count = len(championship_probs) - len(filtered_probs)
             print(f"\n  Filtered out {removed_count} teams not in base-teams")
         
-        # Add missing teams (in base_teams but not in odds) with seed base probabilities
-        # Only do this in warning/none mode (strict mode already errored above)
-        missing_teams = set(base_teams.keys()) - set(filtered_probs.keys())
-        if missing_teams and args.validation != 'strict':
-            # Load seed probabilities if not already loaded
+        # Add missing active teams (in active_base_teams but not in odds)
+        missing_teams = set(active_base_teams.keys()) - set(filtered_probs.keys())
+        if missing_teams and args.validation == 'assumedLost':
+            # Assumed lost mode: all missing teams get 0 probability (tiny epsilon for computation)
+            print(f"\n  Adding {len(missing_teams)} missing teams as eliminated (assumed lost):")
+            for team_name in sorted(missing_teams):
+                filtered_probs[team_name] = 1e-10  # Effectively 0
+                print(f"    {team_name}: 0 (eliminated)")
+        elif missing_teams and args.validation not in ('strict',):
+            # Warning mode: use seed base probabilities
             if not SEED_PROBABILITIES:
                 if args.seed_probs:
                     load_seed_probabilities(args.seed_probs)
@@ -956,31 +1035,16 @@ Examples:
         else:
             load_seed_probabilities()
     
-    # Load team status from results bracket
-    team_current_rounds = {}
-    team_eliminated = {}
-    if args.results:
-        print(f"\nLoading tournament state from {args.results}")
-        team_current_rounds, team_eliminated = load_team_status_from_results(args.results)
-        if team_current_rounds:
-            round_counts = {}
-            for team, round_num in team_current_rounds.items():
-                if not team_eliminated.get(team, False):
-                    round_counts[round_num] = round_counts.get(round_num, 0) + 1
-            print(f"  Teams still in tournament by round:")
-            for r in sorted(round_counts.keys()):
-                round_names = {1: 'R64', 2: 'R32', 3: 'S16', 4: 'E8', 5: 'F4', 6: 'Championship'}
-                print(f"    {round_names.get(r, f'Round {r}')}: {round_counts[r]} teams")
-    
     # Create probability CSV (pass base_teams directly since we already loaded it)
     create_probability_csv(
         championship_probs,
         args.output,
-        args.base_teams,  # Will reload but that's fine
+        args.base_teams,
         args.method,
         game_odds=game_odds,
         team_current_rounds=team_current_rounds,
-        team_eliminated=team_eliminated
+        team_eliminated=team_eliminated,
+        eliminated_team_probs=eliminated_team_probs
     )
     
     print(f"\nDone! CSV saved to {args.output}")

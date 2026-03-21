@@ -748,29 +748,100 @@
     }
     
     async function loadAllBrackets() {
-        // Generate all possible paths for each participant
-        const participantPaths = {};
-        for (const name of participants) {
-            participantPaths[name] = generateBracketPaths(name);
-        }
-        
-        // Phase 1: Try all JSON paths in parallel
         const unresolved = new Set(participants);
-        await tryLoadBatchByExtension(participantPaths, unresolved, 'json');
         
-        // Phase 2: For any not found, try XLSX
+        // Phase 1: Try most common format first — lowercase-march-madness-bracket (JSON)
+        await tryLoadBatchSinglePattern(
+            unresolved, 
+            (name) => `${BRACKETS_PATH}/${name.toLowerCase()}-march-madness-bracket-${YEAR}.json`,
+            'json'
+        );
+        
+        // Phase 2: Try alternate pattern — lowercase-bracket-march-madness (JSON)
         if (unresolved.size > 0) {
-            await tryLoadBatchByExtension(participantPaths, unresolved, 'xlsx');
+            await tryLoadBatchSinglePattern(
+                unresolved,
+                (name) => `${BRACKETS_PATH}/${name.toLowerCase()}-bracket-march-madness-${YEAR}.json`,
+                'json'
+            );
         }
         
-        // Phase 3: For any still not found, try CSV
+        // Phase 3: Try remaining case/pattern variants for JSON
         if (unresolved.size > 0) {
-            await tryLoadBatchByExtension(participantPaths, unresolved, 'csv');
+            const remainingPaths = {};
+            for (const name of unresolved) {
+                remainingPaths[name] = generateBracketPaths(name);
+            }
+            await tryLoadBatchByExtension(remainingPaths, unresolved, 'json');
+        }
+        
+        // Phase 4: Try XLSX for any still not found
+        if (unresolved.size > 0) {
+            const remainingPaths = {};
+            for (const name of unresolved) {
+                remainingPaths[name] = generateBracketPaths(name);
+            }
+            await tryLoadBatchByExtension(remainingPaths, unresolved, 'xlsx');
+        }
+        
+        // Phase 5: Try CSV for any still not found
+        if (unresolved.size > 0) {
+            const remainingPaths = {};
+            for (const name of unresolved) {
+                remainingPaths[name] = generateBracketPaths(name);
+            }
+            await tryLoadBatchByExtension(remainingPaths, unresolved, 'csv');
         }
         
         if (unresolved.size > 0) {
             for (const name of unresolved) {
                 console.warn(`No bracket found for ${name}`);
+            }
+        }
+    }
+    
+    /**
+     * Try loading brackets for all unresolved participants using a single URL pattern.
+     */
+    async function tryLoadBatchSinglePattern(unresolved, urlFn, ext) {
+        const promises = [...unresolved].map(async (name) => {
+            const url = urlFn(name);
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Not found');
+                return { name, url, ext, response };
+            } catch (e) {
+                throw e;
+            }
+        });
+        
+        const results = await Promise.allSettled(promises);
+        
+        for (const result of results) {
+            if (result.status !== 'fulfilled') continue;
+            const { name, url, ext, response } = result.value;
+            if (!unresolved.has(name)) continue;
+            
+            try {
+                let bracket;
+                if (ext === 'json') {
+                    bracket = await response.json();
+                    addParentGameReferences(bracket);
+                } else if (ext === 'csv') {
+                    const csvText = await response.text();
+                    bracket = parseBracketCSV(csvText);
+                } else if (ext === 'xlsx') {
+                    const arrayBuffer = await response.arrayBuffer();
+                    bracket = await parseBracketExcel(arrayBuffer);
+                }
+                
+                if (bracket) {
+                    participantBrackets[name] = bracket;
+                    unresolved.delete(name);
+                    console.log(`Loaded bracket for ${name} from ${url}`);
+                }
+            } catch (e) {
+                console.warn(`Error parsing bracket for ${name} from ${url}:`, e);
             }
         }
     }
@@ -1767,8 +1838,13 @@
         }
     }
     
-    function formatPreferenceTuple(pref, team1Name, team2Name) {
-        if (!pref) return 'N/A';
+    /**
+     * Format preference as structured parts for conditional styling.
+     * Returns an array of {text, isZero} objects.
+     * isZero=true means this value hit 0% and should show in the opposite color.
+     */
+    function formatPreferenceParts(pref, team1Name, team2Name) {
+        if (!pref) return [{ text: 'N/A', isZero: false }];
         
         const t1 = pref.team1;
         const t2 = pref.team2;
@@ -1788,7 +1864,48 @@
         const diff = Math.abs(t1 - t2);
         const diffPct = formatProbabilityPercent(diff);
         
-        return `${abbrev1}: ${t1Pct}, ${abbrev2}: ${t2Pct}, ${ratio}, Δ${diffPct}`;
+        return [
+            { text: `${abbrev1}: ${t1Pct}`, isZero: t1 === 0 },
+            { text: ', ', isZero: false },
+            { text: `${abbrev2}: ${t2Pct}`, isZero: t2 === 0 },
+            { text: `, ${ratio}, Δ${diffPct}`, isZero: false }
+        ];
+    }
+    
+    /**
+     * Get sorted stake entries for a game column.
+     * Primary sort: stake points (descending)
+     * Secondary sort: ratio of win probability impact (descending)
+     * @param {string} gameKey - The game key
+     * @param {string} team - 'team1', 'team2', or 'none'
+     */
+    function getSortedStakeEntries(gameKey, team, gameInfo) {
+        const entries = Object.entries(stakeData[gameKey] || {});
+        
+        // Filter to the relevant column
+        const filtered = entries.filter(([name, stake]) => {
+            if (team === 'team1') return stake && stake.team1 > 0;
+            if (team === 'team2') return stake && stake.team2 > 0;
+            return !stake || (!stake.team1 && !stake.team2);
+        });
+        
+        // Sort
+        return filtered.sort((a, b) => {
+            const [nameA, stakeA] = a;
+            const [nameB, stakeB] = b;
+            
+            // Primary: stake points (descending)
+            const pointsA = team === 'team1' ? (stakeA?.team1 || 0) : team === 'team2' ? (stakeA?.team2 || 0) : 0;
+            const pointsB = team === 'team1' ? (stakeB?.team1 || 0) : team === 'team2' ? (stakeB?.team2 || 0) : 0;
+            if (pointsA !== pointsB) return pointsB - pointsA;
+            
+            // Secondary: ratio of win probability impact (descending)
+            const prefA = getPreference(gameKey, nameA);
+            const prefB = getPreference(gameKey, nameB);
+            const ratioA = prefA ? Math.max(prefA.team1, prefA.team2) / Math.max(Math.min(prefA.team1, prefA.team2), 1e-10) : 0;
+            const ratioB = prefB ? Math.max(prefB.team1, prefB.team2) / Math.max(Math.min(prefB.team1, prefB.team2), 1e-10) : 0;
+            return ratioB - ratioA;
+        });
     }
 </script>
 
@@ -1924,7 +2041,7 @@
                         </tbody>
                     </table>
                     
-                    <p class="table-footnote">*Probabilities and average place are calculated from a stratified sample of up to 10 million outcomes, or all outcomes if fewer than 10 million remain.</p>
+                    <p class="table-footnote">*Probabilities and average place are calculated from a stratified sample of up to 10 million outcomes, or all outcomes if fewer than 10 million remain. Therefore, all probabilities before the end of the first round are an inaccurate best guess. Probabilities and average place are updated at the beginning of each day where games took place the day prior.</p>
                     
                     {#if standings.length === 0}
                         <p class="no-data">No brackets loaded yet. Add participant bracket files to see standings.</p>
@@ -2092,15 +2209,13 @@
                                             <span class="vegas-odds">{formatOdds(odds.team1Odds)}</span>
                                         </h4>
                                         <ul class="stake-list">
-                                            {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
-                                                {#if stake && stake.team1 > 0}
+                                            {#each getSortedStakeEntries(gameKey, 'team1', gameInfo) as [name, stake]}
                                                     {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team1}</span>
-                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
                                                     </li>
-                                                {/if}
                                             {/each}
                                         </ul>
                                     </div>
@@ -2111,15 +2226,13 @@
                                             <span class="vegas-odds">{formatOdds(odds.team2Odds)}</span>
                                         </h4>
                                         <ul class="stake-list">
-                                            {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
-                                                {#if stake && stake.team2 > 0}
+                                            {#each getSortedStakeEntries(gameKey, 'team2', gameInfo) as [name, stake]}
                                                     {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team2}</span>
-                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
                                                     </li>
-                                                {/if}
                                             {/each}
                                         </ul>
                                     </div>
@@ -2127,14 +2240,12 @@
                                     <div class="stake-column no-stake">
                                         <h4>No Stake</h4>
                                         <ul class="stake-list">
-                                            {#each Object.entries(stakeData[gameKey] || {}) as [name, stake]}
-                                                {#if !stake || (!stake.team1 && !stake.team2)}
+                                            {#each getSortedStakeEntries(gameKey, 'none', gameInfo) as [name, stake]}
                                                     {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
-                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({formatPreferenceTuple(pref, gameInfo.team1.name, gameInfo.team2.name)})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
                                                     </li>
-                                                {/if}
                                             {/each}
                                         </ul>
                                     </div>
@@ -2806,6 +2917,18 @@
     
     .stake-pref.lose-pref {
         color: #b45309;  /* Muted red/orange for lose preferences */
+    }
+    
+    /* When a win-pref entry has a 0% value, show it in the lose color (red/orange) */
+    .zero-prob-lose {
+        color: #dc2626;
+        font-weight: 600;
+    }
+    
+    /* When a lose-pref entry has a 0% value, show it in the normal/win color (black/dark) */
+    .zero-prob-win {
+        color: #1f2937;
+        font-weight: 600;
     }
     
     .lose-text {
