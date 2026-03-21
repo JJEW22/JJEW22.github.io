@@ -104,7 +104,7 @@
                 starBonuses = await response.json();
             }
         } catch (e) {
-            console.log('No star bonuses file found');
+            console.log('No star bonuses file found', e);
             starBonuses = [];
         }
     }
@@ -2041,7 +2041,7 @@
                         </tbody>
                     </table>
                     
-                    <p class="table-footnote">*Last updated 3/20 9am, next update 3/21 11am. Probabilities and average place are calculated from a stratified sample of up to 10 million outcomes, or all outcomes if fewer than 10 million remain. Therefore, all probabilities before the end of the first round are an inaccurate best guess. Probabilities and average place are updated at the beginning of each day where games took place the day prior.</p>
+                    <p class="table-footnote">*Last updated 3/21 11am, next update 3/22 11am. Probabilities and average place are calculated from a stratified sample of up to 10 million outcomes, or all outcomes if fewer than 10 million remain. Therefore, all probabilities before half way through 2nd round are a best guess. Probabilities and average place are updated at the beginning of each day where games took place the day prior.</p>
                     
                     {#if standings.length === 0}
                         <p class="no-data">No brackets loaded yet. Add participant bracket files to see standings.</p>

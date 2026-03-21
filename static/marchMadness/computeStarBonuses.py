@@ -75,7 +75,10 @@ def load_participants() -> Dict[str, Optional[str]]:
         sys.exit(1)
     
     data = load_json(PARTICIPANTS_FILE)
-    
+
+    for name in EXCLUDED_NAMES:
+        del data[name]
+
     if isinstance(data, list):
         return {name: name for name in data}
     elif isinstance(data, dict):
@@ -115,17 +118,18 @@ def load_bracket_for_participant(name: str) -> Optional[dict]:
         variants.append(capitalized)
     
     for variant in variants:
-        for ext in ['.json', '.xlsx']:
-            filepath = BRACKETS_DIR / f"{variant}-bracket-march-madness-{YEAR}{ext}"
-            if filepath.exists():
-                if ext == '.json':
-                    try:
-                        return load_json(filepath)
-                    except Exception as e:
-                        print(f"  Error loading {filepath}: {e}")
-                elif ext == '.xlsx':
-                    print(f"  Warning: Excel loading not implemented in this script for {filepath}")
-                    # Could add openpyxl-based loading here
+        for title in ['bracket-march-madness', 'march-madness-bracket']:
+            for ext in ['.json', '.xlsx']:
+                filepath = BRACKETS_DIR / f"{variant}-{title}-{YEAR}{ext}"
+                if filepath.exists():
+                    if ext == '.json':
+                        try:
+                            return load_json(filepath)
+                        except Exception as e:
+                            print(f"  Error loading {filepath}: {e}")
+                    elif ext == '.xlsx':
+                        print(f"  Warning: Excel loading not implemented in this script for {filepath}")
+                        # Could add openpyxl-based loading here
     
     return None
 
@@ -1310,6 +1314,8 @@ Examples:
                        help='List all awards with solver status and exit')
     parser.add_argument('--base-path', default=None,
                        help=f'Base path for data files (default: ./{YEAR})')
+    parser.add_argument('--exclude', default=None,
+                       help=f'comma separated list of names to exclude')
     
     args = parser.parse_args()
     
@@ -1326,6 +1332,20 @@ Examples:
         TEAMS_FILE = BASE_PATH / f"ThisYearTeams{YEAR}.csv"
         WIN_PROBABILITIES_DIR = BASE_PATH / "winProbabilities"
         WIN_PROBABILITIES_FILE = BASE_PATH / "winProbabilities.json"
+
+    global EXCLUDED_NAMES
+    if args.exclude:
+        global EXCLUDED_NAMES
+        EXCLUDED_NAMES = args.exclude
+        if EXCLUDED_NAMES == 'none':
+            EXCLUDED_NAMES == []
+        else:
+            EXCLUDED_NAMES = EXCLUDED_NAMES.split(',')
+    else:
+        EXCLUDED_NAMES == []
+    
+    print('excluded', EXCLUDED_NAMES)
+        
     
     # Load star bonuses
     print(f"Loading star bonuses from {STAR_BONUSES_FILE}")
