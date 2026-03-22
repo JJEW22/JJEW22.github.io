@@ -621,10 +621,13 @@
         "seed": 9,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
       "gameId": "r2-0",
-      "region": "",
-      "scheduledTime": "2026-03-21T21:15:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -639,8 +642,7 @@
       },
       "winner": null,
       "gameId": "r2-1",
-      "region": "",
-      "scheduledTime": "2026-03-22T21:15:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -653,10 +655,13 @@
         "seed": 3,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "Michigan State",
+        "seed": 3,
+        "region": "East"
+      },
       "gameId": "r2-2",
-      "region": "",
-      "scheduledTime": "2026-03-21T18:45:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -671,8 +676,7 @@
       },
       "winner": null,
       "gameId": "r2-3",
-      "region": "",
-      "scheduledTime": "2026-03-23T00:45:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -687,8 +691,7 @@
       },
       "winner": null,
       "gameId": "r2-4",
-      "region": "",
-      "scheduledTime": "2026-03-22T23:10:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -703,8 +706,7 @@
       },
       "winner": null,
       "gameId": "r2-5",
-      "region": "",
-      "scheduledTime": "2026-03-22T00:45:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -719,8 +721,7 @@
       },
       "winner": null,
       "gameId": "r2-6",
-      "region": "",
-      "scheduledTime": "2026-03-21T23:50:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -733,10 +734,13 @@
         "seed": 2,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Houston",
+        "seed": 2,
+        "region": "South"
+      },
       "gameId": "r2-7",
-      "region": "",
-      "scheduledTime": "2026-03-21T22:10:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -751,8 +755,7 @@
       },
       "winner": null,
       "gameId": "r2-8",
-      "region": "",
-      "scheduledTime": "2026-03-22T23:50:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -767,8 +770,7 @@
       },
       "winner": null,
       "gameId": "r2-9",
-      "region": "",
-      "scheduledTime": "2026-03-22T01:45:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -781,7 +783,11 @@
         "seed": 3,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Texas/NC State",
+        "seed": 11,
+        "region": "West"
+      },
       "gameId": "r2-10",
       "region": ""
     },
@@ -798,8 +804,7 @@
       },
       "winner": null,
       "gameId": "r2-11",
-      "region": "",
-      "scheduledTime": "2026-03-22T16:10:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -812,10 +817,13 @@
         "seed": 9,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "gameId": "r2-12",
-      "region": "",
-      "scheduledTime": "2026-03-21T16:10:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -830,8 +838,7 @@
       },
       "winner": null,
       "gameId": "r2-13",
-      "region": "",
-      "scheduledTime": "2026-03-23T01:45:41Z"
+      "region": ""
     },
     {
       "team1": {
@@ -846,8 +853,7 @@
       },
       "winner": null,
       "gameId": "r2-14",
-      "region": "",
-      "scheduledTime": "2026-03-22T22:10:00Z"
+      "region": ""
     },
     {
       "team1": {
@@ -862,20 +868,27 @@
       },
       "winner": null,
       "gameId": "r2-15",
-      "region": "",
-      "scheduledTime": "2026-03-22T18:45:00Z"
+      "region": ""
     }
   ],
   "round3": [
     {
-      "team1": null,
+      "team1": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r3-0",
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Michigan State",
+        "seed": 3,
+        "region": "East"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r3-1",
@@ -890,7 +903,11 @@
     },
     {
       "team1": null,
-      "team2": null,
+      "team2": {
+        "name": "Houston",
+        "seed": 2,
+        "region": "South"
+      },
       "winner": null,
       "gameId": "r3-3",
       "region": ""
@@ -903,14 +920,22 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Texas/NC State",
+        "seed": 11,
+        "region": "West"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r3-5",
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "team2": null,
       "winner": null,
       "gameId": "r3-6",
