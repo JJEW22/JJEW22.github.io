@@ -704,7 +704,11 @@
         "seed": 4,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Nebraska",
+        "seed": 4,
+        "region": "South"
+      },
       "gameId": "r2-5",
       "region": ""
     },
@@ -719,7 +723,11 @@
         "seed": 3,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Illinois",
+        "seed": 3,
+        "region": "South"
+      },
       "gameId": "r2-6",
       "region": ""
     },
@@ -768,7 +776,11 @@
         "seed": 4,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Arkansas",
+        "seed": 4,
+        "region": "West"
+      },
       "gameId": "r2-9",
       "region": ""
     },
@@ -896,13 +908,21 @@
     },
     {
       "team1": null,
-      "team2": null,
+      "team2": {
+        "name": "Nebraska",
+        "seed": 4,
+        "region": "South"
+      },
       "winner": null,
       "gameId": "r3-2",
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Illinois",
+        "seed": 3,
+        "region": "South"
+      },
       "team2": {
         "name": "Houston",
         "seed": 2,
@@ -914,7 +934,11 @@
     },
     {
       "team1": null,
-      "team2": null,
+      "team2": {
+        "name": "Arkansas",
+        "seed": 4,
+        "region": "West"
+      },
       "winner": null,
       "gameId": "r3-4",
       "region": ""

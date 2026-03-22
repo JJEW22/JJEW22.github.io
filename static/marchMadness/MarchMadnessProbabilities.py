@@ -17,6 +17,7 @@ import numpy as np
 import csv
 import time
 from typing import Dict, List, Optional, Set, Tuple, Union
+import pandas as pd
 
 # Scoring constants - MUST be loaded from config file
 SCORE_FOR_ROUND = None
@@ -3531,7 +3532,8 @@ def calculate_win_probabilities(
     max_simulations: Optional[int] = None,
     bonus_stars: Optional[Dict[str, int]] = None,
     max_scenarios: int = DEFAULT_MAX_SCENARIOS,
-    enable_timing: bool = False
+    enable_timing: bool = False,
+    output_path: str = None
 ) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, List], Dict[str, List], Dict, Dict, Optional[Dict]]:
     """
     Calculate win probabilities for all participants.
@@ -3898,6 +3900,17 @@ def calculate_win_probabilities(
     if enable_timing:
         timing_data['step4_determine_winners'] = t_step4
     
+    # Step 4.5: Output results
+    print("Step 4.5: Output win/losing sets...")
+    output = pd.DataFrame({
+        'outcome_string': outcome_strings,
+        'outcome_probability': outcome_probabilities,
+        'winner': winners, 
+        'loser': losers
+    })
+    output.to_csv(f'{os.path.splitext(output_path)[0]}_outcomes.csv', index=False)
+
+
     # Step 5: Accumulate results
     print("Step 5: Accumulating results...")
     t_start = time.time()
@@ -3912,6 +3925,7 @@ def calculate_win_probabilities(
         outcome_strings, outcome_probabilities, winners, losers, 
         all_sorted_scores, participants
     )
+
     t_step5 = time.time() - t_start
     print(f"  Total probability sum: {total_probability_sum:.6f}")
     if enable_timing:
@@ -4215,7 +4229,8 @@ def main():
         max_simulations=args.max_simulations,
         max_scenarios=args.max_scenarios,
         bonus_stars=participant_bonuses,
-        enable_timing=args.timing
+        enable_timing=args.timing,
+        output_path=args.output
     )
     
     # Save to JSON (include all probabilities, scenarios, and preferences)
