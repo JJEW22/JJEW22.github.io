@@ -640,7 +640,11 @@
         "seed": 4,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "St. John's",
+        "seed": 5,
+        "region": "East"
+      },
       "gameId": "r2-1",
       "region": ""
     },
@@ -814,7 +818,11 @@
         "seed": 2,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Purdue",
+        "seed": 2,
+        "region": "West"
+      },
       "gameId": "r2-11",
       "region": ""
     },
@@ -878,7 +886,11 @@
         "seed": 2,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Iowa State",
+        "seed": 2,
+        "region": "Midwest"
+      },
       "gameId": "r2-15",
       "region": ""
     }
@@ -890,7 +902,11 @@
         "seed": 1,
         "region": "East"
       },
-      "team2": null,
+      "team2": {
+        "name": "St. John's",
+        "seed": 5,
+        "region": "East"
+      },
       "winner": null,
       "gameId": "r3-0",
       "region": ""
@@ -949,7 +965,11 @@
         "seed": 11,
         "region": "West"
       },
-      "team2": null,
+      "team2": {
+        "name": "Purdue",
+        "seed": 2,
+        "region": "West"
+      },
       "winner": null,
       "gameId": "r3-5",
       "region": ""
@@ -967,7 +987,11 @@
     },
     {
       "team1": null,
-      "team2": null,
+      "team2": {
+        "name": "Iowa State",
+        "seed": 2,
+        "region": "Midwest"
+      },
       "winner": null,
       "gameId": "r3-7",
       "region": ""

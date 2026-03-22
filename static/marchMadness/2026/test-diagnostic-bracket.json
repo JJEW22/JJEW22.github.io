@@ -1,10 +1,10 @@
 {
   "participant": "John",
-  "scenario_rank": 1,
-  "short_outcome": "10110100101011101001101",
-  "full_outcome": "101111111011010110010111101111111100100010101100101011101001101",
-  "log_probability": -9.471247407780954,
-  "shifted_probability": 0.7006144303277548,
+  "scenario_rank": 5,
+  "short_outcome": "01101101010101011101",
+  "full_outcome": "101111111011010110010111101111111100100010101010101010101011101",
+  "log_probability": -8.248865306716905,
+  "shifted_probability": 0.6233997353116661,
   "champion": "Duke",
   "bracket": {
     "round1": [
@@ -877,8 +877,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Texas Tech",
-          "seed": 5,
+          "name": "Alabama",
+          "seed": 4,
           "region": "Midwest"
         },
         "gameId": "r2-13",
@@ -896,8 +896,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Virginia",
-          "seed": 3,
+          "name": "Tennessee",
+          "seed": 6,
           "region": "Midwest"
         },
         "gameId": "r2-14",
@@ -1031,8 +1031,8 @@
           "region": "West"
         },
         "winner": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Purdue",
+          "seed": 2,
           "region": "West"
         },
         "gameId": "r3-5",
@@ -1045,8 +1045,8 @@
           "region": "Midwest"
         },
         "team2": {
-          "name": "Texas Tech",
-          "seed": 5,
+          "name": "Alabama",
+          "seed": 4,
           "region": "Midwest"
         },
         "winner": {
@@ -1059,8 +1059,8 @@
       },
       {
         "team1": {
-          "name": "Virginia",
-          "seed": 3,
+          "name": "Tennessee",
+          "seed": 6,
           "region": "Midwest"
         },
         "team2": {
@@ -1123,13 +1123,13 @@
           "region": "West"
         },
         "team2": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Purdue",
+          "seed": 2,
           "region": "West"
         },
         "winner": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Arizona",
+          "seed": 1,
           "region": "West"
         },
         "gameId": "r4-2",
@@ -1177,8 +1177,8 @@
       },
       {
         "team1": {
-          "name": "Texas/NC State",
-          "seed": 11,
+          "name": "Arizona",
+          "seed": 1,
           "region": "West"
         },
         "team2": {

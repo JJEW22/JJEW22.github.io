@@ -1,0 +1,17 @@
+Step,Function,Total Time (s),Avg Time/Sim (ms),% of Total
+1,generate_all_outcome_strings,1.2299,0.001173,0.5%
+  1a,  -> champion_stratified_outcomes,0.0000,0.000000,0.0%
+  1b,  -> next_game_stratified_outcomes,0.0000,0.000000,0.0%
+  1c,  -> random_outcomes_batch,0.0000,0.000000,0.0%
+  1d,  -> combine_outcome_lists,0.0000,0.000000,0.0%
+  1e,  -> build_bitstring_mapping,0.0001,0.000000,0.0%
+  1f,  -> expand_to_full_bitstrings,0.4691,0.000447,0.2%
+2,calculate_all_outcome_probabilities,90.9607,0.086747,38.6%
+3,calculate_all_scores_batched,115.2290,0.109891,49.0%
+4,determine_winners_and_losers,13.9419,0.013296,5.9%
+5,accumulate_results,4.5884,0.004376,1.9%
+6,merge_and_generate_final_brackets,9.3978,0.008962,4.0%
+  6a,  -> prefilter_unmergeable,0.0413,0.000039,0.0%
+  6b,  -> merge_loop,3.2219,0.003073,1.4%
+  6c,  -> decode_outcomes,6.0854,0.005803,2.6%
+Total,,235.3477,0.224445,100.0%
