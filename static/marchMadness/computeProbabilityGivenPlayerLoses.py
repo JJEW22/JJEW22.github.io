@@ -48,13 +48,14 @@ def main():
     print(double_grouped_df)
 
 
+    print('finding total prob')
     total = 0
-    for index, data in values_df.iterrows():
-        total += data['outcome_probability']
-    print(total)
+    total = sum(values_df['outcome_probability'])
+    print('total found', total)
 
     and_max = 0
     who = None
+    print('finding and')
     for winner, _ in grouped_df.items():
         for loser, probability in double_grouped_df[winner].items():
              if probability > and_max:
@@ -66,6 +67,8 @@ def main():
     for winner, probability in grouped_df.items():
         adjusted[winner] = double_grouped_df[winner] / probability
 
+
+    print('finding given')
     cur_max = 0
     who = None
     for winner in adjusted.keys():

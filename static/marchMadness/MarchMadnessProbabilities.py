@@ -3900,16 +3900,16 @@ def calculate_win_probabilities(
     if enable_timing:
         timing_data['step4_determine_winners'] = t_step4
     
-    # Step 4.5: Output results
-    print("Step 4.5: Output win/losing sets...")
-    output = pd.DataFrame({
-        'outcome_string': outcome_strings,
-        'outcome_probability': outcome_probabilities,
-        'winner': winners, 
-        'loser': losers
-    })
-    output.to_csv(f'{os.path.splitext(output_path)[0]}_outcomes.csv', index=False)
-
+    # # Step 4.5: Output results
+    # print("Step 4.5: Output win/losing sets...")
+    # output = pd.DataFrame({
+    #     'outcome_string': outcome_strings,
+    #     'outcome_probability': outcome_probabilities,
+    #     'winner': winners, 
+    #     'loser': losers
+    # })
+    # output.to_csv(f'{os.path.splitext(output_path)[0]}_outcomes.csv', index=False)
+    # del output
 
     # Step 5: Accumulate results
     print("Step 5: Accumulating results...")

@@ -327,10 +327,10 @@
         "name": "Top/Sub",
         "round": 2,
         "halfway": true,
-        "reason": "Awarded to the person whose winning (Top) most implies someone elses losing (sub)",
+        "reason": "Awarded to the person whose winning (Top) most implies someone elses losing (sub) - found 88.4%",
         "Winners": [
-            [],
-            []
+            ["Jack"],
+            ["Alice"]
         ],
         "subImages": [
             "/marchMadness/2026/badges/top.png",
@@ -430,8 +430,8 @@
         "reason": "awarded to the first person eliminated from winning or losing",
         "pictureDesc": "picture of joe biden, and the maga hat",
         "Winners": [
-            [],
-            []
+            ["Kendall"],
+            ["John", "Brian", "Jack", "Josh", "Haneen", "Ethan", "Vedant", "Sam", "Na'ama"]
         ],
         "subImages": [
             "/marchMadness/2026/badges/joebiden.png",

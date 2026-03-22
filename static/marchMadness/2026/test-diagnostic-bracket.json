@@ -1,11 +1,11 @@
 {
   "participant": "John",
-  "scenario_rank": 5,
-  "short_outcome": "10100100000111110110101100",
-  "full_outcome": "101111111011010110010111101111111100100010101000111110110101100",
-  "log_probability": -15.697287173753198,
-  "shifted_probability": 0.20144548444783597,
-  "champion": "Michigan",
+  "scenario_rank": 1,
+  "short_outcome": "10110100101011101001101",
+  "full_outcome": "101111111011010110010111101111111100100010101100101011101001101",
+  "log_probability": -9.471247407780954,
+  "shifted_probability": 0.7006144303277548,
+  "champion": "Duke",
   "bracket": {
     "round1": [
       {
@@ -877,8 +877,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Alabama",
-          "seed": 4,
+          "name": "Texas Tech",
+          "seed": 5,
           "region": "Midwest"
         },
         "gameId": "r2-13",
@@ -955,8 +955,8 @@
           "region": "East"
         },
         "winner": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "gameId": "r3-1",
@@ -993,8 +993,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "Houston",
+          "seed": 2,
           "region": "South"
         },
         "gameId": "r3-3",
@@ -1031,8 +1031,8 @@
           "region": "West"
         },
         "winner": {
-          "name": "Purdue",
-          "seed": 2,
+          "name": "Texas/NC State",
+          "seed": 11,
           "region": "West"
         },
         "gameId": "r3-5",
@@ -1045,8 +1045,8 @@
           "region": "Midwest"
         },
         "team2": {
-          "name": "Alabama",
-          "seed": 4,
+          "name": "Texas Tech",
+          "seed": 5,
           "region": "Midwest"
         },
         "winner": {
@@ -1069,8 +1069,8 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Virginia",
-          "seed": 3,
+          "name": "Iowa State",
+          "seed": 2,
           "region": "Midwest"
         },
         "gameId": "r3-7",
@@ -1085,13 +1085,13 @@
           "region": "East"
         },
         "team2": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "winner": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "Duke",
+          "seed": 1,
           "region": "East"
         },
         "gameId": "r4-0",
@@ -1104,13 +1104,13 @@
           "region": "South"
         },
         "team2": {
-          "name": "Illinois",
-          "seed": 3,
+          "name": "Houston",
+          "seed": 2,
           "region": "South"
         },
         "winner": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Houston",
+          "seed": 2,
           "region": "South"
         },
         "gameId": "r4-1",
@@ -1123,13 +1123,13 @@
           "region": "West"
         },
         "team2": {
-          "name": "Purdue",
-          "seed": 2,
+          "name": "Texas/NC State",
+          "seed": 11,
           "region": "West"
         },
         "winner": {
-          "name": "Purdue",
-          "seed": 2,
+          "name": "Texas/NC State",
+          "seed": 11,
           "region": "West"
         },
         "gameId": "r4-2",
@@ -1142,8 +1142,8 @@
           "region": "Midwest"
         },
         "team2": {
-          "name": "Virginia",
-          "seed": 3,
+          "name": "Iowa State",
+          "seed": 2,
           "region": "Midwest"
         },
         "winner": {
@@ -1158,18 +1158,18 @@
     "round5": [
       {
         "team1": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "Duke",
+          "seed": 1,
           "region": "East"
         },
         "team2": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Houston",
+          "seed": 2,
           "region": "South"
         },
         "winner": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "Duke",
+          "seed": 1,
           "region": "East"
         },
         "gameId": "r5-0",
@@ -1177,8 +1177,8 @@
       },
       {
         "team1": {
-          "name": "Purdue",
-          "seed": 2,
+          "name": "Texas/NC State",
+          "seed": 11,
           "region": "West"
         },
         "team2": {
@@ -1198,8 +1198,8 @@
     "round6": [
       {
         "team1": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "Duke",
+          "seed": 1,
           "region": "East"
         },
         "team2": {
@@ -1208,18 +1208,18 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Michigan",
+          "name": "Duke",
           "seed": 1,
-          "region": "Midwest"
+          "region": "East"
         },
         "gameId": "r6-0",
         "region": ""
       }
     ],
     "winner": {
-      "name": "Michigan",
+      "name": "Duke",
       "seed": 1,
-      "region": "Midwest"
+      "region": "East"
     }
   }
 }
