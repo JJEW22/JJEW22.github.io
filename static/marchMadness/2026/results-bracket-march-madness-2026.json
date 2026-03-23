@@ -693,7 +693,11 @@
         "seed": 9,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Iowa",
+        "seed": 9,
+        "region": "South"
+      },
       "gameId": "r2-4",
       "region": ""
     },
@@ -765,7 +769,11 @@
         "seed": 9,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Arizona",
+        "seed": 1,
+        "region": "West"
+      },
       "gameId": "r2-8",
       "region": ""
     },
@@ -871,7 +879,11 @@
         "seed": 3,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Tennessee",
+        "seed": 6,
+        "region": "Midwest"
+      },
       "gameId": "r2-14",
       "region": ""
     },
@@ -923,7 +935,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Iowa",
+        "seed": 9,
+        "region": "South"
+      },
       "team2": {
         "name": "Nebraska",
         "seed": 4,
@@ -949,7 +965,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Arizona",
+        "seed": 1,
+        "region": "West"
+      },
       "team2": {
         "name": "Arkansas",
         "seed": 4,
@@ -986,7 +1006,11 @@
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Tennessee",
+        "seed": 6,
+        "region": "Midwest"
+      },
       "team2": {
         "name": "Iowa State",
         "seed": 2,

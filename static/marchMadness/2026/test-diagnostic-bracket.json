@@ -1,10 +1,10 @@
 {
   "participant": "John",
-  "scenario_rank": 5,
-  "short_outcome": "01101101010101011101",
-  "full_outcome": "101111111011010110010111101111111100100010101010101010101011101",
-  "log_probability": -8.248865306716905,
-  "shifted_probability": 0.6233997353116661,
+  "scenario_rank": 1,
+  "short_outcome": "00100010101011101",
+  "full_outcome": "101111111011010110010111101111111100000010101010100010101011101",
+  "log_probability": -7.130131395968332,
+  "shifted_probability": 0.7663116797184787,
   "champion": "Duke",
   "bracket": {
     "round1": [
@@ -706,8 +706,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Iowa",
+          "seed": 9,
           "region": "South"
         },
         "gameId": "r2-4",
@@ -964,8 +964,8 @@
       },
       {
         "team1": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Iowa",
+          "seed": 9,
           "region": "South"
         },
         "team2": {
@@ -974,8 +974,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Nebraska",
+          "seed": 4,
           "region": "South"
         },
         "gameId": "r3-2",
@@ -1099,8 +1099,8 @@
       },
       {
         "team1": {
-          "name": "Florida",
-          "seed": 1,
+          "name": "Nebraska",
+          "seed": 4,
           "region": "South"
         },
         "team2": {
