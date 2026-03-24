@@ -709,6 +709,7 @@ def fortified_solver(results_bracket, participant_brackets, participants, teams,
         print("    Need at least 2 win probability snapshots")
         return None
     
+    print('sorted rounds', sorted_rounds)
     first_probs = win_prob_history[sorted_rounds[0]].get('win_probabilities', {})
     latest_probs = win_prob_history[sorted_rounds[-1]].get('win_probabilities', {})
     

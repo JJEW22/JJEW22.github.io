@@ -328,8 +328,12 @@
         "halfway": true,
         "reason": "Awarded to the person whose winning (Top) most implies someone elses losing (sub) - found 88.4%",
         "Winners": [
-            ["Jack"],
-            ["Alice"]
+            [
+                "Jack"
+            ],
+            [
+                "Alice"
+            ]
         ],
         "subImages": [
             "/marchMadness/2026/badges/top.png",
@@ -339,16 +343,46 @@
     {
         "name": "Fallen From Grace",
         "round": 2,
-        "reason": "worst ratio of 1st round picks/ 2nd round picks",
+        "reason": "worst ratio of 2nd round picks/ 1st round picks",
         "image": "/marchMadness/2026/badges/devil.png",
-        "Winners": []
+        "Winners": [
+            "Ben"
+        ],
+        "scores": {
+            "Jack": 0.37037037037037035,
+            "Nick": 0.47619047619047616,
+            "Courtney": 0.2916666666666667,
+            "Anish": 0.36,
+            "Sandy": 0.4230769230769231,
+            "Alice": 0.3125,
+            "Kato": 0.4,
+            "John": 0.42857142857142855,
+            "Na'ama": 0.48,
+            "Dustin": 0.38095238095238093,
+            "Josh": 0.4444444444444444,
+            "Vedant": 0.4444444444444444,
+            "Brian": 0.4444444444444444,
+            "Ethan": 0.46153846153846156,
+            "Ben": 0.25,
+            "Aidan": 0.36363636363636365,
+            "Kendall": 0.34615384615384615,
+            "Sam": 0.44,
+            "Tyler": 0.52,
+            "Haneen": 0.39285714285714285,
+            "Manu": 0.375,
+            "Jared": 0.3181818181818182,
+            "Palmer": 0.44
+        }
     },
     {
         "name": "Fortified",
         "round": 2,
-        "reason": "Person whose probability of winning changed the least from the beginning to end of 2nd round",
+        "reason": "Person whose probability of winning changed the least from the beginning to end of 2nd round (changed by 1%)",
         "image": "/marchMadness/2026/badges/fort.png",
-        "Winners": []
+        "notes": "ultimately did manual",
+        "Winners": [
+            "Tyler"
+        ]
     },
     {
         "name": "Cheater",
@@ -429,8 +463,20 @@
         "reason": "awarded to the first person eliminated from winning or losing",
         "pictureDesc": "picture of joe biden, and the maga hat",
         "Winners": [
-            ["Kendall"],
-            ["John", "Brian", "Jack", "Josh", "Haneen", "Ethan", "Vedant", "Sam", "Na'ama"]
+            [
+                "Kendall"
+            ],
+            [
+                "John",
+                "Brian",
+                "Jack",
+                "Josh",
+                "Haneen",
+                "Ethan",
+                "Vedant",
+                "Sam",
+                "Na'ama"
+            ]
         ],
         "subImages": [
             "/marchMadness/2026/badges/joebiden.png",
@@ -443,7 +489,9 @@
         "reason": "First and last to 750 points",
         "pictureDesc": "the flash and flash from zootopia pictures",
         "Winners": [
-            ["John"],
+            [
+                "John"
+            ],
             []
         ],
         "subImages": [
@@ -469,7 +517,9 @@
             "John",
             "Brian",
             "Ben",
-            "Aidan"
+            "Aidan",
+            "John",
+            "Sam"
         ],
         "scores": {
             "Round 1: High Point (seed 12)": [
@@ -477,8 +527,12 @@
                 "Brian",
                 "Ben",
                 "Aidan"
+            ],
+            "Round 2: Texas/NC State (seed 11)": [
+                "John",
+                "Sam"
             ]
-        } 
+        }
     },
     {
         "name": "Dustin",
@@ -518,12 +572,15 @@
         "round": "unknown",
         "reason": "correctly/ incorrectly had a game where they were the only one to pick a team (before final 4)",
         "pictureDesc": "hammer and broken heart logo",
-        "Winners": [[],[
-            "Ben",
-            "Kendall",
-            "Alice",
-            "Nick"
-        ]],
+        "Winners": [
+            [],
+            [
+                "Ben",
+                "Kendall",
+                "Alice",
+                "Nick"
+            ]
+        ],
         "scores": {
             "💔 Ben incorrectly picked Northern Iowa (R1G2: St. John's vs Northern Iowa)": "heartbroken",
             "💔 Kendall incorrectly picked Furman (R1G7: UConn vs Furman)": "heartbroken",

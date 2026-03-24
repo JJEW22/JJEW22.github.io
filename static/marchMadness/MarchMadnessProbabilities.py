@@ -3482,6 +3482,10 @@ def accumulate_results(
     win_probability_sum = {name: 0.0 for name in participants}
     lose_probability_sum = {name: 0.0 for name in participants}
     place_probability_sum = {name: 0.0 for name in participants}
+    place_probabilities = {name: {} for name in participants}
+    for name in participants:
+        for place in range(len(participants)):
+            place_probabilities[name][place + 1] = 0
     raw_winning_outcomes = {name: {} for name in participants}
     raw_losing_outcomes = {name: {} for name in participants}
     
@@ -3510,6 +3514,7 @@ def accumulate_results(
         sorted_scores = all_sorted_scores[i]
         for place, (name, score) in enumerate(sorted_scores):
             place_probability_sum[name] += (place + 1) * prob
+            place_probabilities[name][place + 1] += prob
         
         print_progress(i, num_outcomes, "  Accumulating")
     
@@ -3519,7 +3524,8 @@ def accumulate_results(
         lose_probability_sum,
         place_probability_sum,
         raw_winning_outcomes,
-        raw_losing_outcomes
+        raw_losing_outcomes, 
+        place_probabilities
     )
 
 
@@ -3918,9 +3924,10 @@ def calculate_win_probabilities(
         total_probability_sum,
         win_probability_sum,
         lose_probability_sum,
-        place_probability_sum,
+        place_probability_sum, # the weighted average of place
         raw_winning_outcomes,
-        raw_losing_outcomes
+        raw_losing_outcomes,
+        places_probabilities # the probability of each person getting each place
     ) = accumulate_results(
         outcome_strings, outcome_probabilities, winners, losers, 
         all_sorted_scores, participants
@@ -4016,6 +4023,7 @@ def calculate_win_probabilities(
     win_probabilities = {}
     lose_probabilities = {}
     average_places = {}
+    probability_for_places = {}
     
     print("\nResults:")
     print("-" * 70)
@@ -4028,10 +4036,14 @@ def calculate_win_probabilities(
         win_prob = win_probability_sum[name] * normalization_factor
         lose_prob = lose_probability_sum[name] * normalization_factor
         avg_place = place_probability_sum[name] * normalization_factor  # Weighted average
+        normalized_places = {}
+        for place in range(len(participants)):
+            normalized_places[place + 1] = places_probabilities[name][place + 1] * normalization_factor
         
         win_probabilities[name] = win_prob
         lose_probabilities[name] = lose_prob
         average_places[name] = avg_place
+        probability_for_places[name] = normalized_places
         
         num_win_raw = len(raw_winning_outcomes.get(name, {}))
         num_lose_raw = len(raw_losing_outcomes.get(name, {}))
@@ -4109,7 +4121,7 @@ def calculate_win_probabilities(
         timing_data['step6b_merge_loop'] = winning_timing['merge_loop'] + losing_timing['merge_loop']
         timing_data['step6c_decode'] = winning_timing['decode'] + losing_timing['decode']
     
-    return win_probabilities, lose_probabilities, average_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs, timing_data, total_probability_sum, max_log_prob
+    return win_probabilities, lose_probabilities, average_places, probability_for_places, processed_winning, processed_losing, next_game_prefs, next_game_lose_prefs, timing_data, total_probability_sum, max_log_prob
 
 
 def main():
@@ -4219,7 +4231,7 @@ def main():
         print(f"Star bonuses applied: {participant_bonuses}")
     
     # Calculate probabilities
-    (win_probabilities, lose_probabilities, average_places, 
+    (win_probabilities, lose_probabilities, average_places, places_probabilities,
      winning_scenarios, losing_scenarios, next_game_prefs, next_game_lose_prefs, timing_data, total_probability_sum, max_log_prob) = calculate_win_probabilities(
         results_path=args.results,
         brackets_dir=args.brackets_dir,
@@ -4241,6 +4253,7 @@ def main():
     output_data = {
         'win_probabilities': win_probabilities,
         'lose_probabilities': lose_probabilities,
+        'places_probabilities': places_probabilities,
         'average_places': average_places,
         'winning_scenarios': winning_scenarios,
         'losing_scenarios': losing_scenarios,

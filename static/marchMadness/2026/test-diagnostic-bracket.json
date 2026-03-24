@@ -1,10 +1,10 @@
 {
   "participant": "John",
-  "scenario_rank": 1,
-  "short_outcome": "00100010101011101",
-  "full_outcome": "101111111011010110010111101111111100000010101010100010101011101",
-  "log_probability": -7.130131395968332,
-  "shifted_probability": 0.7663116797184787,
+  "scenario_rank": 4,
+  "short_outcome": "110010101111111",
+  "full_outcome": "101111111011010110010111101111111100000010101010110010101111111",
+  "log_probability": -7.074970101703613,
+  "shifted_probability": 0.6855285533256958,
   "champion": "Duke",
   "bracket": {
     "round1": [
@@ -955,8 +955,8 @@
           "region": "East"
         },
         "winner": {
-          "name": "UConn",
-          "seed": 2,
+          "name": "Michigan State",
+          "seed": 3,
           "region": "East"
         },
         "gameId": "r3-1",
@@ -1085,8 +1085,8 @@
           "region": "East"
         },
         "team2": {
-          "name": "UConn",
-          "seed": 2,
+          "name": "Michigan State",
+          "seed": 3,
           "region": "East"
         },
         "winner": {
@@ -1109,8 +1109,8 @@
           "region": "South"
         },
         "winner": {
-          "name": "Houston",
-          "seed": 2,
+          "name": "Nebraska",
+          "seed": 4,
           "region": "South"
         },
         "gameId": "r4-1",
@@ -1163,8 +1163,8 @@
           "region": "East"
         },
         "team2": {
-          "name": "Houston",
-          "seed": 2,
+          "name": "Nebraska",
+          "seed": 4,
           "region": "South"
         },
         "winner": {
@@ -1187,9 +1187,9 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Michigan",
+          "name": "Arizona",
           "seed": 1,
-          "region": "Midwest"
+          "region": "West"
         },
         "gameId": "r5-1",
         "region": ""
@@ -1203,9 +1203,9 @@
           "region": "East"
         },
         "team2": {
-          "name": "Michigan",
+          "name": "Arizona",
           "seed": 1,
-          "region": "Midwest"
+          "region": "West"
         },
         "winner": {
           "name": "Duke",

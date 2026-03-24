@@ -678,7 +678,11 @@
         "seed": 2,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "UConn",
+        "seed": 2,
+        "region": "East"
+      },
       "gameId": "r2-3",
       "region": ""
     },
@@ -864,7 +868,11 @@
         "seed": 4,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Alabama",
+        "seed": 4,
+        "region": "Midwest"
+      },
       "gameId": "r2-13",
       "region": ""
     },
@@ -929,7 +937,11 @@
         "seed": 3,
         "region": "East"
       },
-      "team2": null,
+      "team2": {
+        "name": "UConn",
+        "seed": 2,
+        "region": "East"
+      },
       "winner": null,
       "gameId": "r3-1",
       "region": ""
@@ -1000,7 +1012,11 @@
         "seed": 1,
         "region": "Midwest"
       },
-      "team2": null,
+      "team2": {
+        "name": "Alabama",
+        "seed": 4,
+        "region": "Midwest"
+      },
       "winner": null,
       "gameId": "r3-6",
       "region": ""
