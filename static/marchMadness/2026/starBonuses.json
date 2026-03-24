@@ -417,9 +417,16 @@
     {
         "name": "Unicorn",
         "round": 5,
-        "reason": "Submitted something to happen that never has",
+        "reason": "Submitted something to happen that never has: 4 from the same state in final 4/2 11 seeds in the final, 15 seed in elite 8/2 1 seeds eliminated first round, ",
         "manual": true,
         "image": "/marchMadness/2026/badges/unicorn.png",
+        "Winners": ["Ben", "Alice"]
+    },
+    {
+        "name": "Miskeen",
+        "round": 5,
+        "reason": "Had the lowest average point differential in games you incorrectly picked",
+        "image": "/marchMadness/2026/badges/miskeen.png",
         "Winners": []
     },
     {
@@ -445,7 +452,7 @@
     {
         "name": "Another Life",
         "round": 6,
-        "reason": "By another metric you won, picking the most games",
+        "reason": "By another metric you won: picking the most games or winning the meta bracket",
         "pictureDesc": "(logo is mario 1 up)",
         "image": "/marchMadness/2026/badges/1up.jpg",
         "Winners": []

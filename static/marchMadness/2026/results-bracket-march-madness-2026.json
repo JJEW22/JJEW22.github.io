@@ -17,7 +17,9 @@
         "region": "East"
       },
       "gameId": "r1-0",
-      "region": "East"
+      "region": "East",
+      "score1": 71,
+      "score2": 65
     },
     {
       "team1": {
@@ -36,7 +38,9 @@
         "region": "East"
       },
       "gameId": "r1-1",
-      "region": "East"
+      "region": "East",
+      "score1": 64,
+      "score2": 66
     },
     {
       "team1": {
@@ -55,7 +59,9 @@
         "region": "East"
       },
       "gameId": "r1-2",
-      "region": "East"
+      "region": "East",
+      "score1": 79,
+      "score2": 53
     },
     {
       "team1": {
@@ -74,7 +80,9 @@
         "region": "East"
       },
       "gameId": "r1-3",
-      "region": "East"
+      "region": "East",
+      "score1": 68,
+      "score2": 60
     },
     {
       "team1": {
@@ -93,7 +101,9 @@
         "region": "East"
       },
       "gameId": "r1-4",
-      "region": "East"
+      "region": "East",
+      "score1": 83,
+      "score2": 79
     },
     {
       "team1": {
@@ -112,7 +122,9 @@
         "region": "East"
       },
       "gameId": "r1-5",
-      "region": "East"
+      "region": "East",
+      "score1": 92,
+      "score2": 67
     },
     {
       "team1": {
@@ -131,7 +143,9 @@
         "region": "East"
       },
       "gameId": "r1-6",
-      "region": "East"
+      "region": "East",
+      "score1": 75,
+      "score2": 71
     },
     {
       "team1": {
@@ -150,7 +164,9 @@
         "region": "East"
       },
       "gameId": "r1-7",
-      "region": "East"
+      "region": "East",
+      "score1": 82,
+      "score2": 71
     },
     {
       "team1": {
@@ -169,7 +185,9 @@
         "region": "South"
       },
       "gameId": "r1-8",
-      "region": "South"
+      "region": "South",
+      "score1": 114,
+      "score2": 55
     },
     {
       "team1": {
@@ -188,7 +206,9 @@
         "region": "South"
       },
       "gameId": "r1-9",
-      "region": "South"
+      "region": "South",
+      "score1": 61,
+      "score2": 67
     },
     {
       "team1": {
@@ -207,7 +227,9 @@
         "region": "South"
       },
       "gameId": "r1-10",
-      "region": "South"
+      "region": "South",
+      "score1": 78,
+      "score2": 68
     },
     {
       "team1": {
@@ -226,7 +248,9 @@
         "region": "South"
       },
       "gameId": "r1-11",
-      "region": "South"
+      "region": "South",
+      "score1": 76,
+      "score2": 47
     },
     {
       "team1": {
@@ -245,7 +269,9 @@
         "region": "South"
       },
       "gameId": "r1-12",
-      "region": "South"
+      "region": "South",
+      "score1": 78,
+      "score2": 82
     },
     {
       "team1": {
@@ -264,7 +290,9 @@
         "region": "South"
       },
       "gameId": "r1-13",
-      "region": "South"
+      "region": "South",
+      "score1": 105,
+      "score2": 70
     },
     {
       "team1": {
@@ -283,7 +311,9 @@
         "region": "South"
       },
       "gameId": "r1-14",
-      "region": "South"
+      "region": "South",
+      "score1": 50,
+      "score2": 63
     },
     {
       "team1": {
@@ -302,7 +332,9 @@
         "region": "South"
       },
       "gameId": "r1-15",
-      "region": "South"
+      "region": "South",
+      "score1": 78,
+      "score2": 47
     },
     {
       "team1": {
@@ -321,7 +353,9 @@
         "region": "West"
       },
       "gameId": "r1-16",
-      "region": "West"
+      "region": "West",
+      "score1": 92,
+      "score2": 58
     },
     {
       "team1": {
@@ -340,7 +374,9 @@
         "region": "West"
       },
       "gameId": "r1-17",
-      "region": "West"
+      "region": "West",
+      "score1": 76,
+      "score2": 86
     },
     {
       "team1": {
@@ -359,7 +395,9 @@
         "region": "West"
       },
       "gameId": "r1-18",
-      "region": "West"
+      "region": "West",
+      "score1": 82,
+      "score2": 83
     },
     {
       "team1": {
@@ -378,7 +416,9 @@
         "region": "West"
       },
       "gameId": "r1-19",
-      "region": "West"
+      "region": "West",
+      "score1": 97,
+      "score2": 78
     },
     {
       "team1": {
@@ -397,7 +437,9 @@
         "region": "West"
       },
       "gameId": "r1-20",
-      "region": "West"
+      "region": "West",
+      "score1": 71,
+      "score2": 79
     },
     {
       "team1": {
@@ -416,7 +458,9 @@
         "region": "West"
       },
       "gameId": "r1-21",
-      "region": "West"
+      "region": "West",
+      "score1": 73,
+      "score2": 64
     },
     {
       "team1": {
@@ -435,7 +479,9 @@
         "region": "West"
       },
       "gameId": "r1-22",
-      "region": "West"
+      "region": "West",
+      "score1": 80,
+      "score2": 66
     },
     {
       "team1": {
@@ -454,7 +500,9 @@
         "region": "West"
       },
       "gameId": "r1-23",
-      "region": "West"
+      "region": "West",
+      "score1": 104,
+      "score2": 71
     },
     {
       "team1": {
@@ -473,7 +521,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-24",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 101,
+      "score2": 80
     },
     {
       "team1": {
@@ -492,7 +542,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-25",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 77,
+      "score2": 102
     },
     {
       "team1": {
@@ -511,7 +563,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-26",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 91,
+      "score2": 71
     },
     {
       "team1": {
@@ -530,7 +584,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-27",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 90,
+      "score2": 70
     },
     {
       "team1": {
@@ -549,7 +605,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-28",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 78,
+      "score2": 56
     },
     {
       "team1": {
@@ -568,7 +626,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-29",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 82,
+      "score2": 73
     },
     {
       "team1": {
@@ -587,7 +647,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-30",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 89,
+      "score2": 84
     },
     {
       "team1": {
@@ -606,7 +668,9 @@
         "region": "Midwest"
       },
       "gameId": "r1-31",
-      "region": "Midwest"
+      "region": "Midwest",
+      "score1": 108,
+      "score2": 74
     }
   ],
   "round2": [
@@ -627,7 +691,9 @@
         "region": "East"
       },
       "gameId": "r2-0",
-      "region": ""
+      "region": "",
+      "score1": 81,
+      "score2": 58
     },
     {
       "team1": {
@@ -646,7 +712,9 @@
         "region": "East"
       },
       "gameId": "r2-1",
-      "region": ""
+      "region": "",
+      "score1": 67,
+      "score2": 65
     },
     {
       "team1": {
@@ -665,7 +733,9 @@
         "region": "East"
       },
       "gameId": "r2-2",
-      "region": ""
+      "region": "",
+      "score1": 69,
+      "score2": 77
     },
     {
       "team1": {
@@ -684,7 +754,9 @@
         "region": "East"
       },
       "gameId": "r2-3",
-      "region": ""
+      "region": "",
+      "score1": 57,
+      "score2": 73
     },
     {
       "team1": {
@@ -703,7 +775,9 @@
         "region": "South"
       },
       "gameId": "r2-4",
-      "region": ""
+      "region": "",
+      "score1": 72,
+      "score2": 73
     },
     {
       "team1": {
@@ -722,7 +796,9 @@
         "region": "South"
       },
       "gameId": "r2-5",
-      "region": ""
+      "region": "",
+      "score1": 72,
+      "score2": 74
     },
     {
       "team1": {
@@ -741,7 +817,9 @@
         "region": "South"
       },
       "gameId": "r2-6",
-      "region": ""
+      "region": "",
+      "score1": 55,
+      "score2": 76
     },
     {
       "team1": {
@@ -760,7 +838,9 @@
         "region": "South"
       },
       "gameId": "r2-7",
-      "region": ""
+      "region": "",
+      "score1": 57,
+      "score2": 88
     },
     {
       "team1": {
@@ -779,7 +859,9 @@
         "region": "West"
       },
       "gameId": "r2-8",
-      "region": ""
+      "region": "",
+      "score1": 78,
+      "score2": 66
     },
     {
       "team1": {
@@ -798,7 +880,9 @@
         "region": "West"
       },
       "gameId": "r2-9",
-      "region": ""
+      "region": "",
+      "score1": 88,
+      "score2": 94
     },
     {
       "team1": {
@@ -817,7 +901,9 @@
         "region": "West"
       },
       "gameId": "r2-10",
-      "region": ""
+      "region": "",
+      "score1": 74,
+      "score2": 68
     },
     {
       "team1": {
@@ -836,7 +922,9 @@
         "region": "West"
       },
       "gameId": "r2-11",
-      "region": ""
+      "region": "",
+      "score1": 69,
+      "score2": 79
     },
     {
       "team1": {
@@ -855,7 +943,9 @@
         "region": "Midwest"
       },
       "gameId": "r2-12",
-      "region": ""
+      "region": "",
+      "score1": 95,
+      "score2": 72
     },
     {
       "team1": {
@@ -874,7 +964,9 @@
         "region": "Midwest"
       },
       "gameId": "r2-13",
-      "region": ""
+      "region": "",
+      "score1": 65,
+      "score2": 90
     },
     {
       "team1": {
@@ -893,7 +985,9 @@
         "region": "Midwest"
       },
       "gameId": "r2-14",
-      "region": ""
+      "region": "",
+      "score1": 79,
+      "score2": 72
     },
     {
       "team1": {
@@ -912,7 +1006,9 @@
         "region": "Midwest"
       },
       "gameId": "r2-15",
-      "region": ""
+      "region": "",
+      "score1": 63,
+      "score2": 82
     }
   ],
   "round3": [

@@ -1248,7 +1248,7 @@
      * - total: sum of all differentials
      * - counts: array of counts for each category (based on SCORE_DIFF_BUCKETS)
      */
-    function calculateScoreDifferential(resultsBracket, picksBracket) {
+    function calculateScoreDifferential(resultsBracket, picksBracket, findCorrect=true) {
         if (!resultsBracket || !picksBracket) return { total: 0, counts: [] };
         
         let totalDifferential = 0;
@@ -1265,12 +1265,13 @@
                 
                 // Skip if no result winner yet or no pick made
                 if (!resultGame?.winner || !pickGame?.winner) continue;
-                
+
                 // Check if the pick was correct
                 const resultWinner = resultGame.winner.name || resultGame.winner;
                 const pickWinner = pickGame.winner.name || pickGame.winner;
-                
-                if (resultWinner === pickWinner) {
+                const resultsLoser = (resultGame.winner.name === resultGame.team1.name) ? resultGame.team2.name : resultGame.team1.name;
+                const matches = findCorrect ? (resultWinner === pickWinner) : (resultsLoser === pickWinner)
+                if (matches) {
                     // Correct pick - add the score differential if scores exist
                     if (resultGame.score1 !== undefined && resultGame.score2 !== undefined) {
                         const differential = Math.abs(Number(resultGame.score1) - Number(resultGame.score2));
@@ -1357,6 +1358,9 @@
             
             // Calculate score differential for correct picks (tiebreaker)
             const scoreDifferential = calculateScoreDifferential(resultsBracket, bracket);
+
+            // Calculate score differential for correct incorrect picks (tiebreaker)
+            const lossScoreDifferential = calculateScoreDifferential(resultsBracket, bracket, false);
             
             // Get star bonus points
             const starPoints = getStarPoints(name);
@@ -1379,7 +1383,8 @@
                 averagePlace: averagePlaces[name] ?? null,
                 roundBreakdown: scoreResult.roundBreakdown,
                 picksPerRound,
-                scoreDifferential
+                scoreDifferential,
+                lossScoreDifferential
             });
         }
         
@@ -1975,7 +1980,8 @@
                                 <th>Win %*</th>
                                 <th>Lose %*</th>
                                 <th>Avg Place*</th>
-                                <th title="Sum of score differentials for correct picks (tiebreaker)">{getDiffColumnHeader()}</th>
+                                <th title="Sum of score differentials for correct picks (tiebreaker)">Win {getDiffColumnHeader()}</th>
+                                <th>Loss {getDiffColumnHeader()}</th>
                                 <th>Submitter</th>
                                 <th>Champion</th>
                             </tr>
@@ -2034,6 +2040,16 @@
                                             -
                                         {/if}
                                     </td>
+                                    <td class="total-points">
+                                        {#if entry.lossScoreDifferential && entry.lossScoreDifferential.total > 0}
+                                            {entry.lossScoreDifferential.total}
+                                            {#if entry.lossScoreDifferential.counts && entry.lossScoreDifferential.counts.length > 0}
+                                                <span class="diff-counts">({entry.lossScoreDifferential.counts.join(', ')})</span>
+                                            {/if}
+                                        {:else}
+                                            -
+                                        {/if}
+                                    </td>
                                     <td class="submitter">{entry.submitter}</td>
                                     <td class="champion">{entry.champion}</td>
                                 </tr>
@@ -2041,7 +2057,7 @@
                         </tbody>
                     </table>
                     
-                    <p class="table-footnote">*Last updated 3/22 11am, next update 3/23 11am. Probabilities and average place are calculated from a stratified sample of up to 10 million outcomes, or all outcomes if fewer than 10 million remain. Therefore, all probabilities before half way through 2nd round are a best guess. Probabilities and average place are updated at the beginning of each day where games took place the day prior.</p>
+                    <p class="table-footnote">*Last updated 3/23 11am, next update 3/27 11am. Probabilities and average place are calculated from a stratified sample of up to 10 million outcomes, or all outcomes if fewer than 10 million remain. Therefore, all probabilities before half way through 2nd round are a best guess. Probabilities and average place are updated at the beginning of each day where games took place the day prior.</p>
                     
                     {#if standings.length === 0}
                         <p class="no-data">No brackets loaded yet. Add participant bracket files to see standings.</p>
