@@ -1,80 +1,162 @@
 {
-  "fetched_at": "2026-03-23T10:32:34.608397",
+  "fetched_at": "2026-03-26T21:51:16.947945",
   "regions": "us",
   "championship_probs": {
-    "Michigan Wolverines": 0.20922328907236593,
-    "Arizona Wildcats": 0.2006585930284679,
-    "Duke Blue Devils": 0.16616280584923976,
-    "Houston Cougars": 0.10557729048574774,
-    "Purdue Boilermakers": 0.05915968863425519,
-    "Illinois Fighting Illini": 0.05446447525058414,
-    "Iowa State Cyclones": 0.0497284339244464,
-    "UConn Huskies": 0.03237039566780001,
-    "Michigan St Spartans": 0.027671467264409687,
-    "St. John's Red Storm": 0.02504570759698395,
-    "Arkansas Razorbacks": 0.020303325093413024,
-    "Tennessee Volunteers": 0.014005150778721638,
-    "Nebraska Cornhuskers": 0.01603393430274206,
-    "Alabama Crimson Tide": 0.007906133504117053,
-    "Iowa Hawkeyes": 0.008092598916950003,
-    "Texas Longhorns": 0.003596710629755557
+    "Michigan Wolverines": 0.204542303750262,
+    "Arizona Wildcats": 0.19171123672533782,
+    "Duke Blue Devils": 0.17260380449357657,
+    "Houston Cougars": 0.11294292424470989,
+    "Purdue Boilermakers": 0.06660736558021353,
+    "Illinois Fighting Illini": 0.056471462122354946,
+    "Iowa State Cyclones": 0.04723067741142414,
+    "UConn Huskies": 0.036078989689282324,
+    "Michigan St Spartans": 0.028863191751425862,
+    "St. John's Red Storm": 0.02650701283294212,
+    "Arkansas Razorbacks": 0.02029443170022131,
+    "Iowa Hawkeyes": 0.01593673164189158,
+    "Tennessee Volunteers": 0.013053704812202652,
+    "Alabama Crimson Tide": 0.007156163244155173
   },
   "game_odds": [
-    {
-      "home_team": "Purdue Boilermakers",
-      "away_team": "Texas Longhorns",
-      "commence_time": "2026-03-26T23:10:36Z",
-      "home_prob": 0.7471286423069543,
-      "away_prob": 0.2528713576930457
-    },
-    {
-      "home_team": "Nebraska Cornhuskers",
-      "away_team": "Iowa Hawkeyes",
-      "commence_time": "2026-03-26T23:30:00Z",
-      "home_prob": 0.5447839556119002,
-      "away_prob": 0.4552160443880998
-    },
-    {
-      "home_team": "Arizona Wildcats",
-      "away_team": "Arkansas Razorbacks",
-      "commence_time": "2026-03-27T01:45:00Z",
-      "home_prob": 0.7573360895160203,
-      "away_prob": 0.24266391048397964
-    },
     {
       "home_team": "Houston Cougars",
       "away_team": "Illinois Fighting Illini",
       "commence_time": "2026-03-27T02:05:00Z",
-      "home_prob": 0.593369754159424,
-      "away_prob": 0.4066302458405761
+      "home_prob": 0.5703677373988703,
+      "away_prob": 0.42963226260112974
+    },
+    {
+      "home_team": "Arizona Wildcats",
+      "away_team": "Arkansas Razorbacks",
+      "commence_time": "2026-03-27T02:06:00Z",
+      "home_prob": 0.7731634967719421,
+      "away_prob": 0.22683650322805793
     },
     {
       "home_team": "Duke Blue Devils",
       "away_team": "St. John's Red Storm",
       "commence_time": "2026-03-27T23:10:00Z",
-      "home_prob": 0.7182437191829069,
-      "away_prob": 0.28175628081709325
+      "home_prob": 0.7062490605082298,
+      "away_prob": 0.2937509394917702
     },
     {
       "home_team": "Michigan Wolverines",
       "away_team": "Alabama Crimson Tide",
       "commence_time": "2026-03-27T23:35:00Z",
-      "home_prob": 0.8126025033568656,
-      "away_prob": 0.18739749664313446
+      "home_prob": 0.7922085582518139,
+      "away_prob": 0.20779144174818612
     },
     {
       "home_team": "UConn Huskies",
       "away_team": "Michigan St Spartans",
       "commence_time": "2026-03-28T01:45:00Z",
-      "home_prob": 0.4906692152368087,
-      "away_prob": 0.5093307847631914
+      "home_prob": 0.5405925737143236,
+      "away_prob": 0.45940742628567655
     },
     {
       "home_team": "Iowa State Cyclones",
       "away_team": "Tennessee Volunteers",
       "commence_time": "2026-03-28T02:10:00Z",
-      "home_prob": 0.6267168631454688,
-      "away_prob": 0.3732831368545313
+      "home_prob": 0.6181602124584137,
+      "away_prob": 0.38183978754158643
+    },
+    {
+      "home_team": "Iowa State Cyclones",
+      "away_team": "Alabama Crimson Tide",
+      "commence_time": "2026-03-29T18:20:00Z",
+      "home_prob": 0.6430243445692884,
+      "away_prob": 0.35697565543071164
+    },
+    {
+      "home_team": "Michigan Wolverines",
+      "away_team": "Iowa State Cyclones",
+      "commence_time": "2026-03-29T18:20:00Z",
+      "home_prob": 0.6247068021892103,
+      "away_prob": 0.3752931978107896
+    },
+    {
+      "home_team": "Michigan Wolverines",
+      "away_team": "Tennessee Volunteers",
+      "commence_time": "2026-03-29T18:20:00Z",
+      "home_prob": 0.7375961393454983,
+      "away_prob": 0.26240386065450155
+    },
+    {
+      "home_team": "Duke Blue Devils",
+      "away_team": "UConn Huskies",
+      "commence_time": "2026-03-29T18:20:03Z",
+      "home_prob": 0.6343512204763316,
+      "away_prob": 0.36564877952366837
+    },
+    {
+      "home_team": "Alabama Crimson Tide",
+      "away_team": "Tennessee Volunteers",
+      "commence_time": "2026-03-29T18:20:06Z",
+      "home_prob": 0.49018324607329844,
+      "away_prob": 0.5098167539267016
+    },
+    {
+      "home_team": "UConn Huskies",
+      "away_team": "St. John's Red Storm",
+      "commence_time": "2026-03-29T18:20:18Z",
+      "home_prob": 0.5217391304347826,
+      "away_prob": 0.4782608695652174
+    },
+    {
+      "home_team": "Michigan St Spartans",
+      "away_team": "St. John's Red Storm",
+      "commence_time": "2026-03-29T18:20:45Z",
+      "home_prob": 0.5098167539267016,
+      "away_prob": 0.49018324607329844
+    },
+    {
+      "home_team": "Duke Blue Devils",
+      "away_team": "Michigan St Spartans",
+      "commence_time": "2026-03-29T18:20:50Z",
+      "home_prob": 0.6704377766847024,
+      "away_prob": 0.3295622233152976
+    },
+    {
+      "home_team": "Colorado Buffaloes",
+      "away_team": "Oklahoma Sooners",
+      "commence_time": "2026-04-02T00:00:00Z",
+      "home_prob": 0.3167420814479638,
+      "away_prob": 0.6832579185520362
+    },
+    {
+      "home_team": "Minnesota Golden Gophers",
+      "away_team": "Baylor Bears",
+      "commence_time": "2026-04-02T02:30:00Z",
+      "home_prob": 0.4086853434828726,
+      "away_prob": 0.5913146565171273
+    },
+    {
+      "home_team": "New Mexico Lobos",
+      "away_team": "Tulsa Golden Hurricane",
+      "commence_time": "2026-04-02T23:00:00Z",
+      "home_prob": 0.6020069482645952,
+      "away_prob": 0.3979930517354048
+    },
+    {
+      "home_team": "West Virginia Mountaineers",
+      "away_team": "Stanford Cardinal",
+      "commence_time": "2026-04-03T00:00:00Z",
+      "home_prob": 0.5,
+      "away_prob": 0.5
+    },
+    {
+      "home_team": "Auburn Tigers",
+      "away_team": "Illinois St Redbirds",
+      "commence_time": "2026-04-03T01:30:00Z",
+      "home_prob": 0.7063870352716872,
+      "away_prob": 0.29361296472831266
+    },
+    {
+      "home_team": "Creighton Bluejays",
+      "away_team": "Rutgers Scarlet Knights",
+      "commence_time": "2026-04-03T02:30:00Z",
+      "home_prob": 0.6047890270835755,
+      "away_prob": 0.39521097291642454
     }
   ]
 }
