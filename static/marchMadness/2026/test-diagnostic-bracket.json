@@ -1,10 +1,10 @@
 {
   "participant": "John",
-  "scenario_rank": 1,
-  "short_outcome": "1101101111111",
-  "full_outcome": "101111111011010110010111101111111100000010101010111010101111111",
-  "log_probability": -7.019725919476258,
-  "shifted_probability": 0.8670108807623573,
+  "scenario_rank": 4,
+  "short_outcome": "10101011111",
+  "full_outcome": "101111111011010110010111101111111100000010101010101110101011111",
+  "log_probability": -5.058296140318503,
+  "shifted_probability": 0.6937260286330236,
   "champion": "Duke",
   "bracket": {
     "round1": [
@@ -1051,8 +1051,8 @@
           "region": "East"
         },
         "winner": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "gameId": "r3-1",
@@ -1091,12 +1091,14 @@
           "region": "South"
         },
         "winner": {
-          "name": "Houston",
-          "seed": 2,
+          "name": "Illinois",
+          "seed": 3,
           "region": "South"
         },
         "gameId": "r3-3",
-        "region": ""
+        "region": "",
+        "score1": 65,
+        "score2": 55
       },
       {
         "team1": {
@@ -1115,7 +1117,9 @@
           "region": "West"
         },
         "gameId": "r3-4",
-        "region": ""
+        "region": "",
+        "score1": 109,
+        "score2": 88
       },
       {
         "team1": {
@@ -1185,8 +1189,8 @@
           "region": "East"
         },
         "team2": {
-          "name": "Michigan State",
-          "seed": 3,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "winner": {
@@ -1204,13 +1208,13 @@
           "region": "South"
         },
         "team2": {
-          "name": "Houston",
-          "seed": 2,
+          "name": "Illinois",
+          "seed": 3,
           "region": "South"
         },
         "winner": {
-          "name": "Iowa",
-          "seed": 9,
+          "name": "Illinois",
+          "seed": 3,
           "region": "South"
         },
         "gameId": "r4-1",
@@ -1263,8 +1267,8 @@
           "region": "East"
         },
         "team2": {
-          "name": "Iowa",
-          "seed": 9,
+          "name": "Illinois",
+          "seed": 3,
           "region": "South"
         },
         "winner": {

@@ -1074,9 +1074,15 @@
         "seed": 2,
         "region": "South"
       },
-      "winner": null,
+      "winner": {
+        "name": "Illinois",
+        "seed": 3,
+        "region": "South"
+      },
       "gameId": "r3-3",
-      "region": ""
+      "region": "",
+      "score1": 65,
+      "score2": 55
     },
     {
       "team1": {
@@ -1089,9 +1095,15 @@
         "seed": 4,
         "region": "West"
       },
-      "winner": null,
+      "winner": {
+        "name": "Arizona",
+        "seed": 1,
+        "region": "West"
+      },
       "gameId": "r3-4",
-      "region": ""
+      "region": "",
+      "score1": 109,
+      "score2": 88
     },
     {
       "team1": {
@@ -1159,13 +1171,21 @@
         "seed": 9,
         "region": "South"
       },
-      "team2": null,
+      "team2": {
+        "name": "Illinois",
+        "seed": 3,
+        "region": "South"
+      },
       "winner": null,
       "gameId": "r4-1",
       "region": ""
     },
     {
-      "team1": null,
+      "team1": {
+        "name": "Arizona",
+        "seed": 1,
+        "region": "West"
+      },
       "team2": {
         "name": "Purdue",
         "seed": 2,
