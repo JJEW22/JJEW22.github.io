@@ -4,7 +4,7 @@
         "round": 0,
         "reason": "has the most potential points to start",
         "Winners": [
-            "Alice"
+            "Ben"
         ],
         "image": "/marchMadness/2026/badges/GoldenBoy.png"
     },
@@ -389,8 +389,35 @@
         "round": 3,
         "reason": "Has my teams going the furthest: positive for (Kansas, Arkansas) and negative for (missouri)",
         "pictureDesc": "qr code to my venmo",
-        "Winners": [],
-        "image": "/marchMadness/2026/badges/Venmo_QR_code.png"
+        "Winners": [
+            "Alice"
+        ],
+        "image": "/marchMadness/2026/badges/Venmo_QR_code.png",
+        "scores": {
+            "Jack": 6,
+            "Nick": 1,
+            "Courtney": 3,
+            "Anish": 4,
+            "Sandy": 1,
+            "Alice": 21,
+            "Kato": 1,
+            "John": 4,
+            "Na'ama": 2,
+            "Dustin": -1,
+            "Josh": 4,
+            "Vedant": 2,
+            "Brian": 3,
+            "Ethan": 9,
+            "Ben": 6,
+            "Aidan": 16,
+            "Kendall": 6,
+            "Sam": 1,
+            "Tyler": 3,
+            "Haneen": 6,
+            "Manu": 0,
+            "Jared": 2,
+            "Palmer": 4
+        }
     },
     {
         "name": "More than fair",
@@ -420,7 +447,10 @@
         "reason": "Submitted something to happen that never has: 4 from the same state in final 4/2 11 seeds in the final, 15 seed in elite 8/2 1 seeds eliminated first round, ",
         "manual": true,
         "image": "/marchMadness/2026/badges/unicorn.png",
-        "Winners": ["Ben", "Alice"]
+        "Winners": [
+            "Ben",
+            "Alice"
+        ]
     },
     {
         "name": "Miskeen",
@@ -511,7 +541,35 @@
         "round": 3,
         "reason": "Correctly predicted the most not close games (wins by more than 10)",
         "image": "/marchMadness/2026/badges/wellDuh.jpg",
-        "Winners": []
+        "Winners": [
+            "Josh",
+            "Ethan"
+        ],
+        "scores": {
+            "Jack": 25,
+            "Nick": 23,
+            "Courtney": 24,
+            "Anish": 22,
+            "Sandy": 25,
+            "Alice": 10,
+            "Kato": 23,
+            "John": 24,
+            "Na'ama": 26,
+            "Dustin": 17,
+            "Josh": 27,
+            "Vedant": 26,
+            "Brian": 26,
+            "Ethan": 27,
+            "Ben": 15,
+            "Aidan": 21,
+            "Kendall": 23,
+            "Sam": 22,
+            "Tyler": 22,
+            "Haneen": 26,
+            "Manu": 21,
+            "Jared": 21,
+            "Palmer": 25
+        }
     },
     {
         "name": "Believer",
@@ -547,7 +605,34 @@
         "reason": "awarded for least underdog points received compared to potential",
         "pictureDesc": "dustin",
         "image": "/marchMadness/2026/badges/dustin.png",
-        "Winners": []
+        "Winners": [
+            "Jared"
+        ],
+        "scores": {
+            "Jack": 0.18518518518518517,
+            "Nick": 0.08120649651972157,
+            "Courtney": 0.04081632653061224,
+            "Anish": 0.1050228310502283,
+            "Sandy": 0.10144927536231885,
+            "Alice": 0.10902255639097744,
+            "Kato": 0.16019417475728157,
+            "John": 0.47368421052631576,
+            "Na'ama": 0.234375,
+            "Dustin": 0.11960784313725491,
+            "Josh": 0.4457831325301205,
+            "Vedant": 0.45348837209302323,
+            "Brian": 0.2978723404255319,
+            "Ethan": 0.2978723404255319,
+            "Ben": 0.06334841628959276,
+            "Aidan": 0.07241379310344828,
+            "Kendall": 0.06493506493506493,
+            "Sam": 0.27125506072874495,
+            "Tyler": 0.2057142857142857,
+            "Haneen": 0.4,
+            "Manu": 0.16776315789473684,
+            "Jared": 0.034055727554179564,
+            "Palmer": 0.06719367588932806
+        }
     },
     {
         "name": "Husky",
@@ -575,28 +660,39 @@
         ]
     },
     {
-        "name": "heartbreaker/heartbroken",
+        "name": "heartbreaker",
         "round": "unknown",
-        "reason": "correctly/ incorrectly had a game where they were the only one to pick a team (before final 4)",
+        "reason": "correctly had a game where they were the only one to pick a team (before final 4)",
         "pictureDesc": "hammer and broken heart logo",
+        "notes": "tyler needs update for Alabama pick and vedant needs update for Tennesse",
         "Winners": [
-            [],
-            [
-                "Ben",
-                "Kendall",
-                "Alice",
-                "Nick"
-            ]
+            "Vedant"
+        ],
+        "scores": {
+            "Vedant correctly picked Tennessee. (R3G3: Tennessee vs Iowa St.)": "heartbroken"
+        },
+        "image": "/marchMadness/2026/badges/hammer.png"
+    },
+    {
+        "name": "heartbroken",
+        "round": "unknown",
+        "reason": "incorrectly had a game where they were the only one to pick a team (before final 4)",
+        "pictureDesc": "hammer and broken heart logo",
+        "notes": "tyler needs update for Alabama pick and vedant needs update for Tennesse",
+        "Winners": [
+            "Ben",
+            "Kendall",
+            "Alice",
+            "Nick",
+            "Tyler"
         ],
         "scores": {
             "💔 Ben incorrectly picked Northern Iowa (R1G2: St. John's vs Northern Iowa)": "heartbroken",
             "💔 Kendall incorrectly picked Furman (R1G7: UConn vs Furman)": "heartbroken",
             "💔 Alice incorrectly picked Prairie View A&M/Lehigh (R1G8: Florida vs Prairie View A&M/Lehigh)": "heartbroken",
-            "💔 Nick incorrectly picked Wright State (R1G29: Virginia vs Wright State)": "heartbroken"
+            "💔 Nick incorrectly picked Wright State (R1G29: Virginia vs Wright State)": "heartbroken",
+            "💔 Tyler incorrectly picked Alabama (R3G2: Alabama vs Michigan)": "heartbroken"
         },
-        "subImages": [
-            "/marchMadness/2026/badges/hammer.png",
-            "/marchMadness/2026/badges/brokenheart.jpg"
-        ]
+        "image": "/marchMadness/2026/badges/brokenheart.jpg"
     }
 ]

@@ -1,10 +1,10 @@
 {
   "participant": "John",
-  "scenario_rank": 4,
-  "short_outcome": "10101011111",
-  "full_outcome": "101111111011010110010111101111111100000010101010101110101011111",
-  "log_probability": -5.058296140318503,
-  "shifted_probability": 0.6937260286330236,
+  "scenario_rank": 2,
+  "short_outcome": "1011101",
+  "full_outcome": "101111111011010110010111101111111100000010101010101110111011101",
+  "log_probability": -3.0635450345106956,
+  "shifted_probability": 0.8596635191872003,
   "champion": "Duke",
   "bracket": {
     "round1": [
@@ -1037,7 +1037,9 @@
           "region": "East"
         },
         "gameId": "r3-0",
-        "region": ""
+        "region": "",
+        "score1": 80,
+        "score2": 75
       },
       {
         "team1": {
@@ -1056,7 +1058,9 @@
           "region": "East"
         },
         "gameId": "r3-1",
-        "region": ""
+        "region": "",
+        "score1": 63,
+        "score2": 67
       },
       {
         "team1": {
@@ -1159,7 +1163,9 @@
           "region": "Midwest"
         },
         "gameId": "r3-6",
-        "region": ""
+        "region": "",
+        "score1": 90,
+        "score2": 77
       },
       {
         "team1": {
@@ -1173,12 +1179,14 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Iowa State",
-          "seed": 2,
+          "name": "Tennessee",
+          "seed": 6,
           "region": "Midwest"
         },
         "gameId": "r3-7",
-        "region": ""
+        "region": "",
+        "score1": 76,
+        "score2": 62
       }
     ],
     "round4": [
@@ -1246,8 +1254,8 @@
           "region": "Midwest"
         },
         "team2": {
-          "name": "Iowa State",
-          "seed": 2,
+          "name": "Tennessee",
+          "seed": 6,
           "region": "Midwest"
         },
         "winner": {
@@ -1291,9 +1299,9 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Arizona",
+          "name": "Michigan",
           "seed": 1,
-          "region": "West"
+          "region": "Midwest"
         },
         "gameId": "r5-1",
         "region": ""
@@ -1307,9 +1315,9 @@
           "region": "East"
         },
         "team2": {
-          "name": "Arizona",
+          "name": "Michigan",
           "seed": 1,
-          "region": "West"
+          "region": "Midwest"
         },
         "winner": {
           "name": "Duke",

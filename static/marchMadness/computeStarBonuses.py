@@ -561,6 +561,7 @@ def compute_max_underdog_points(picks_bracket, config):
             if winner_seed > expected_seed:
                 total += (winner_seed - expected_seed) * seed_factor[round_num]
     
+
     return total
 
 
@@ -1059,10 +1060,11 @@ def dustin_solver(results_bracket, participant_brackets, participants, teams, co
     scores = {}
     for name, bracket in participant_brackets.items():
         _, underdog_earned, _ = compute_total_score(results_bracket, bracket, teams, config)
-        max_underdog = compute_max_underdog_points(bracket, config)
-        
-        if max_underdog > 0:
-            ratio = underdog_earned / max_underdog
+        _, max_underdog_1, _ = compute_total_score(bracket, bracket, teams, config)
+        max_underdog_2 = compute_max_underdog_points(bracket, config)
+        print('underdog', name, max_underdog_1, max_underdog_2)
+        if max_underdog_2 > 0:
+            ratio = underdog_earned / max_underdog_2
         else:
             ratio = 0
         scores[name] = ratio

@@ -1023,9 +1023,15 @@
         "seed": 5,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
       "gameId": "r3-0",
-      "region": ""
+      "region": "",
+      "score1": 80,
+      "score2": 75
     },
     {
       "team1": {
@@ -1038,9 +1044,15 @@
         "seed": 2,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "UConn",
+        "seed": 2,
+        "region": "East"
+      },
       "gameId": "r3-1",
-      "region": ""
+      "region": "",
+      "score1": 63,
+      "score2": 67
     },
     {
       "team1": {
@@ -1137,9 +1149,15 @@
         "seed": 4,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "gameId": "r3-6",
-      "region": ""
+      "region": "",
+      "score1": 90,
+      "score2": 77
     },
     {
       "team1": {
@@ -1152,15 +1170,29 @@
         "seed": 2,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Tennessee",
+        "seed": 6,
+        "region": "Midwest"
+      },
       "gameId": "r3-7",
-      "region": ""
+      "region": "",
+      "score1": 76,
+      "score2": 62
     }
   ],
   "round4": [
     {
-      "team1": null,
-      "team2": null,
+      "team1": {
+        "name": "Duke",
+        "seed": 1,
+        "region": "East"
+      },
+      "team2": {
+        "name": "UConn",
+        "seed": 2,
+        "region": "East"
+      },
       "winner": null,
       "gameId": "r4-0",
       "region": ""
@@ -1196,8 +1228,16 @@
       "region": ""
     },
     {
-      "team1": null,
-      "team2": null,
+      "team1": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
+      "team2": {
+        "name": "Tennessee",
+        "seed": 6,
+        "region": "Midwest"
+      },
       "winner": null,
       "gameId": "r4-3",
       "region": ""
