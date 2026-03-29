@@ -472,8 +472,8 @@
         "halfway": true,
         "reason": "Has the bracket most (dis)similar to everyone else",
         "Winners": [
-            "Alice",
-            "Josh"
+            ["Alice"],
+            ["Josh"]
         ],
         "subImages": [
             "/marchMadness/2026/badges/wolf.png",
