@@ -809,6 +809,7 @@ def lone_wolf_sheep_solver(results_bracket, participant_brackets, participants, 
         return None
     
     avg_similarity = {}
+    print('comparing names', names)
     for name in names:
         total_sim = 0
         for other in names:

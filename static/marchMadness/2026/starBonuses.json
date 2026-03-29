@@ -469,15 +469,41 @@
     {
         "name": "Lone wolf/sheep",
         "round": 4,
+        "halfway": true,
         "reason": "Has the bracket most (dis)similar to everyone else",
         "Winners": [
-            [],
-            []
+            "Alice",
+            "Josh"
         ],
         "subImages": [
             "/marchMadness/2026/badges/wolf.png",
             "/marchMadness/2026/badges/sheep.jpeg"
-        ]
+        ],
+        "scores": {
+            "Jack": 68.68181818181819,
+            "Nick": 49.09090909090909,
+            "Courtney": 60.95454545454545,
+            "Anish": 61.81818181818182,
+            "Sandy": 57.27272727272727,
+            "Alice": 32.5,
+            "Kato": 56.95454545454545,
+            "John": 64.31818181818181,
+            "Na'ama": 66.86363636363636,
+            "Dustin": 42.59090909090909,
+            "Josh": 69.72727272727273,
+            "Vedant": 64.68181818181819,
+            "Brian": 64.18181818181819,
+            "Ethan": 66.22727272727273,
+            "Ben": 37.18181818181818,
+            "Aidan": 51.0,
+            "Kendall": 64.31818181818181,
+            "Sam": 57.63636363636363,
+            "Tyler": 60.63636363636363,
+            "Haneen": 68.95454545454545,
+            "Manu": 55.18181818181818,
+            "Jared": 51.22727272727273,
+            "Palmer": 57.45454545454545
+        }
     },
     {
         "name": "Another Life",
@@ -584,7 +610,10 @@
             "Ben",
             "Aidan",
             "John",
-            "Sam"
+            "Sam",
+            "Nick",
+            "Kato",
+            "Dustin"
         ],
         "scores": {
             "Round 1: High Point (seed 12)": [
@@ -596,6 +625,11 @@
             "Round 2: Texas/NC State (seed 11)": [
                 "John",
                 "Sam"
+            ],
+            "Round 4: Illinois (seed 3)": [
+                "Nick",
+                "Kato",
+                "Dustin"
             ]
         }
     },

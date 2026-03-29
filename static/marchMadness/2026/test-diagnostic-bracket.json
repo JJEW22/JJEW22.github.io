@@ -1,11 +1,11 @@
 {
-  "participant": "John",
-  "scenario_rank": 1,
-  "short_outcome": "11111",
-  "full_outcome": "101111111011010110010111101111111100000010101010101110111011111",
-  "log_probability": -2.3567552961402556,
-  "shifted_probability": 1.0,
-  "champion": "Duke",
+  "participant": "Josh",
+  "scenario_rank": 4,
+  "short_outcome": "01010",
+  "full_outcome": "101111111011010110010111101111111100000010101010101110110011010",
+  "log_probability": -3.3549252832590724,
+  "shifted_probability": 0.368553281667848,
+  "champion": "Arizona",
   "bracket": {
     "round1": [
       {
@@ -1202,8 +1202,8 @@
           "region": "East"
         },
         "winner": {
-          "name": "Duke",
-          "seed": 1,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "gameId": "r4-0",
@@ -1274,8 +1274,8 @@
     "round5": [
       {
         "team1": {
-          "name": "Duke",
-          "seed": 1,
+          "name": "UConn",
+          "seed": 2,
           "region": "East"
         },
         "team2": {
@@ -1284,9 +1284,9 @@
           "region": "South"
         },
         "winner": {
-          "name": "Duke",
-          "seed": 1,
-          "region": "East"
+          "name": "Illinois",
+          "seed": 3,
+          "region": "South"
         },
         "gameId": "r5-0",
         "region": ""
@@ -1314,9 +1314,9 @@
     "round6": [
       {
         "team1": {
-          "name": "Duke",
-          "seed": 1,
-          "region": "East"
+          "name": "Illinois",
+          "seed": 3,
+          "region": "South"
         },
         "team2": {
           "name": "Arizona",
@@ -1324,18 +1324,18 @@
           "region": "West"
         },
         "winner": {
-          "name": "Duke",
+          "name": "Arizona",
           "seed": 1,
-          "region": "East"
+          "region": "West"
         },
         "gameId": "r6-0",
         "region": ""
       }
     ],
     "winner": {
-      "name": "Duke",
+      "name": "Arizona",
       "seed": 1,
-      "region": "East"
+      "region": "West"
     }
   }
 }

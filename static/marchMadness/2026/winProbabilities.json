@@ -1,10 +1,10 @@
 {
   "win_probabilities": {
-    "John": 0.32115301972053334,
-    "Josh": 0.2776365570236765,
+    "Josh": 0.3830128536730319,
+    "John": 0.29132986921019577,
     "Haneen": 0.20908498348995416,
-    "Ethan": 0.12893307571413554,
-    "Kato": 0.06319236405170028,
+    "Kato": 0.06648431054815888,
+    "Ethan": 0.050087983078659123,
     "Jack": 0.0,
     "Nick": 0.0,
     "Courtney": 0.0,
@@ -25,22 +25,22 @@
     "Palmer": 0.0
   },
   "lose_probabilities": {
-    "John": 0.0,
     "Josh": 0.0,
+    "John": 0.0,
     "Haneen": 0.0,
-    "Ethan": 0.0,
     "Kato": 0.0,
+    "Ethan": 0.0,
     "Jack": 0.0,
     "Nick": 0.0,
     "Courtney": 0.0,
     "Anish": 0.0,
     "Sandy": 0.0,
-    "Alice": 0.7185479663019106,
+    "Alice": 0.0,
     "Na'ama": 0.0,
     "Dustin": 0.0,
     "Vedant": 0.0,
     "Brian": 0.0,
-    "Ben": 0.281452033698089,
+    "Ben": 1.0,
     "Aidan": 0.0,
     "Kendall": 0.0,
     "Sam": 0.0,
@@ -50,13 +50,13 @@
     "Palmer": 0.0
   },
   "places_probabilities": {
-    "John": {
-      "1": 0.32115301972053334,
-      "2": 0.2627432452398194,
-      "3": 0.023296502301073614,
-      "4": 0.12682038302565046,
-      "5": 0.18112168871626366,
-      "6": 0.08486516099665936,
+    "Josh": {
+      "1": 0.3830128536730319,
+      "2": 0.20396798558116971,
+      "3": 0.2266624442263077,
+      "4": 0.09065383012548467,
+      "5": 0.03989586175062667,
+      "6": 0.05580702464337918,
       "7": 0.0,
       "8": 0.0,
       "9": 0.0,
@@ -75,14 +75,14 @@
       "22": 0.0,
       "23": 0.0
     },
-    "Josh": {
-      "1": 0.2776365570236765,
-      "2": 0.22858585018372968,
-      "3": 0.25780966834128183,
-      "4": 0.04961120793182121,
-      "5": 0.03477717791800024,
-      "6": 0.12828303630041668,
-      "7": 0.023296502301073614,
+    "John": {
+      "1": 0.29132986921019577,
+      "2": 0.29256639575015697,
+      "3": 0.023296502301073614,
+      "4": 0.12352843652919189,
+      "5": 0.17929495138009582,
+      "6": 0.0899838448292858,
+      "7": 0.0,
       "8": 0.0,
       "9": 0.0,
       "10": 0.0,
@@ -102,12 +102,12 @@
     },
     "Haneen": {
       "1": 0.20908498348995416,
-      "2": 0.05435850401631971,
-      "3": 0.0,
-      "4": 0.10998017048123712,
-      "5": 0.0,
-      "6": 0.04249156667342276,
-      "7": 0.30736797464155075,
+      "2": 0.0,
+      "3": 0.05435850401631971,
+      "4": 0.022618286852211057,
+      "5": 0.08736188362902607,
+      "6": 0.019195064372349146,
+      "7": 0.33066447694262435,
       "8": 0.11629849356183816,
       "9": 0.07555314613901781,
       "10": 0.08486516099665936,
@@ -125,20 +125,20 @@
       "22": 0.0,
       "23": 0.0
     },
-    "Ethan": {
-      "1": 0.12893307571413554,
-      "2": 0.04198204157612671,
-      "3": 0.31121870938056445,
-      "4": 0.06289041316116022,
-      "5": 0.014064350889778657,
-      "6": 0.0,
-      "7": 0.11090650043418834,
-      "8": 0.00855419913781779,
-      "9": 0.18071087793885163,
-      "10": 0.1215447673950273,
-      "11": 0.019195064372349146,
-      "12": 0.0,
-      "13": 0.0,
+    "Kato": {
+      "1": 0.06648431054815888,
+      "2": 0.0,
+      "3": 0.007204863658126469,
+      "4": 0.032510522342305566,
+      "5": 0.050087983078659123,
+      "6": 0.007204998479723754,
+      "7": 0.07627350963504484,
+      "8": 0.06430413280828148,
+      "9": 0.03865640356294199,
+      "10": 0.1429402016374645,
+      "11": 0.055139608845589355,
+      "12": 0.328779048211203,
+      "13": 0.13041441719250083,
       "14": 0.0,
       "15": 0.0,
       "16": 0.0,
@@ -150,20 +150,20 @@
       "22": 0.0,
       "23": 0.0
     },
-    "Kato": {
-      "1": 0.06319236405170028,
-      "2": 0.0032919464964586004,
-      "3": 0.0,
-      "4": 0.039715386000432035,
-      "5": 0.050087983078659123,
-      "6": 0.007204998479723754,
-      "7": 0.06220942192065157,
-      "8": 0.06981402138485696,
-      "9": 0.04721060270075978,
-      "10": 0.1429402016374645,
-      "11": 0.03594454447324021,
-      "12": 0.34797411258355215,
-      "13": 0.13041441719250083,
+    "Ethan": {
+      "1": 0.050087983078659123,
+      "2": 0.11362227055347665,
+      "3": 0.2616075014487433,
+      "4": 0.1197064847511079,
+      "5": 0.014064350889778657,
+      "6": 0.0,
+      "7": 0.09684241271979507,
+      "8": 0.014064087714393264,
+      "9": 0.1892650770766694,
+      "10": 0.1215447673950273,
+      "11": 0.0,
+      "12": 0.019195064372349146,
+      "13": 0.0,
       "14": 0.0,
       "15": 0.0,
       "16": 0.0,
@@ -243,9 +243,9 @@
       "15": 0.084479344512352,
       "16": 0.0,
       "17": 0.05272049127733525,
-      "18": 0.2848591716527864,
-      "19": 0.2022606452949955,
-      "20": 0.0,
+      "18": 0.10882537052989773,
+      "19": 0.27287621384268373,
+      "20": 0.1054182325752004,
       "21": 0.0,
       "22": 0.0,
       "23": 0.0
@@ -255,8 +255,8 @@
       "2": 0.0,
       "3": 0.0,
       "4": 0.0,
-      "5": 0.08736188362902607,
-      "6": 0.0,
+      "5": 0.0,
+      "6": 0.08736188362902607,
       "7": 0.019195064372349146,
       "8": 0.18071087793885163,
       "9": 0.03418288376600123,
@@ -322,8 +322,8 @@
       "19": 0.0,
       "20": 0.030654612218371128,
       "21": 0.14543627987743302,
-      "22": 0.1053611416022849,
-      "23": 0.7185479663019106
+      "22": 0.8239091079041957,
+      "23": 0.0
     },
     "Na'ama": {
       "1": 0.0,
@@ -368,9 +368,9 @@
       "15": 0.0,
       "16": 0.0,
       "17": 0.0,
-      "18": 0.0,
-      "19": 0.2064301580061219,
-      "20": 0.793569841993878,
+      "18": 0.17603380112288866,
+      "19": 0.555282558015938,
+      "20": 0.26868364086117313,
       "21": 0.0,
       "22": 0.0,
       "23": 0.0
@@ -402,8 +402,8 @@
     },
     "Brian": {
       "1": 0.0,
-      "2": 0.10655694800137523,
-      "3": 0.13041441719250083,
+      "2": 0.08736188362902607,
+      "3": 0.14960948156485,
       "4": 0.18132175723214708,
       "5": 0.04961120793182121,
       "6": 0.00855419913781779,
@@ -447,8 +447,8 @@
       "19": 0.0,
       "20": 0.0,
       "21": 0.0,
-      "22": 0.7185479663019106,
-      "23": 0.281452033698089
+      "22": 0.0,
+      "23": 1.0
     },
     "Aidan": {
       "1": 0.0,
@@ -505,8 +505,8 @@
       "2": 0.02841518613370005,
       "3": 0.0,
       "4": 0.03477717791800024,
-      "5": 0.0032919464964586004,
-      "6": 0.0,
+      "5": 0.0,
+      "6": 0.0032919464964586004,
       "7": 0.0,
       "8": 0.013128546218352417,
       "9": 0.07667482286073875,
@@ -594,8 +594,8 @@
       "16": 0.03594454447324021,
       "17": 0.08736188362902607,
       "18": 0.0,
-      "19": 0.4194679685575044,
-      "20": 0.17577554578775076,
+      "19": 0.0,
+      "20": 0.5952435143452551,
       "21": 0.030654612218371128,
       "22": 0.0,
       "23": 0.0
@@ -627,28 +627,28 @@
     }
   },
   "average_places": {
-    "John": 2.838609958767269,
-    "Josh": 2.813341717642282,
-    "Haneen": 5.623265769691393,
-    "Ethan": 5.366207073739257,
-    "Kato": 9.637050036233662,
+    "Josh": 2.3678729346296414,
+    "John": 2.876843739606692,
+    "Haneen": 5.7882826596378125,
+    "Kato": 9.584739874854519,
+    "Ethan": 5.550886452847367,
     "Jack": 5.234157437134107,
     "Nick": 17.28871668516199,
-    "Courtney": 15.599767157038599,
-    "Anish": 10.872809842649824,
+    "Courtney": 15.881219190736688,
+    "Anish": 10.960171726278848,
     "Sandy": 16.28871668516199,
-    "Alice": 22.51180246198773,
+    "Alice": 21.793254495685822,
     "Na'ama": 7.942331423588219,
-    "Dustin": 19.793569841993875,
+    "Dustin": 19.092649839738282,
     "Vedant": 6.006385686482224,
-    "Brian": 6.584791010188938,
-    "Ben": 22.281452033698084,
+    "Brian": 6.603986074561287,
+    "Ben": 22.999999999999993,
     "Aidan": 21.176090892095797,
     "Kendall": 9.39084074925713,
-    "Sam": 12.796304114157065,
+    "Sam": 12.799596060653522,
     "Tyler": 8.945362478258403,
     "Manu": 14.814477013771015,
-    "Jared": 17.11631892820403,
+    "Jared": 17.53578689676154,
     "Palmer": 15.07763100309706
   },
   "winning_scenarios": {
@@ -751,6 +751,100 @@
             "winnerEitherTeams": null
           }
         ]
+      },
+      {
+        "outcome": "00100",
+        "probability": 0.0032919464964586004,
+        "baseProbability": 0.003240481463706001,
+        "logProbability": -5.732033360308512,
+        "baseOutcomes": [],
+        "games": [
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "UConn",
+            "winner": "UConn",
+            "loser": "Duke",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 2,
+            "winnerSeed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Michigan",
+            "team2": "Tennessee",
+            "winner": "Tennessee",
+            "loser": "Michigan",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "UConn",
+            "team2": "Illinois",
+            "winner": "UConn",
+            "loser": "Illinois",
+            "either": false,
+            "team1Seed": 2,
+            "team2Seed": 3,
+            "winnerSeed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Arizona",
+            "team2": "Tennessee",
+            "winner": "Tennessee",
+            "loser": "Arizona",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "UConn",
+            "team2": "Tennessee",
+            "winner": "Tennessee",
+            "loser": "UConn",
+            "either": false,
+            "team1Seed": 2,
+            "team2Seed": 6,
+            "winnerSeed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          }
+        ]
       }
     ],
     "John": [
@@ -848,8 +942,105 @@
         ]
       },
       {
-        "outcome": "XX001",
-        "probability": 0.06630209932853412,
+        "outcome": "X1001",
+        "probability": 0.05435850401631971,
+        "baseProbability": null,
+        "logProbability": null,
+        "baseOutcomes": [],
+        "games": [
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "UConn",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 2,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Michigan",
+            "team2": "Tennessee",
+            "winner": "Michigan",
+            "loser": "Tennessee",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke/UConn",
+            "team2": "Illinois",
+            "winner": "Illinois",
+            "loser": "Duke/UConn",
+            "either": false,
+            "team1Seed": "1/2",
+            "team2Seed": 3,
+            "winnerSeed": 3,
+            "team1IsEither": [
+              "Duke",
+              "UConn"
+            ],
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Arizona",
+            "team2": "Michigan",
+            "winner": "Michigan",
+            "loser": "Arizona",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 1,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Illinois",
+            "team2": "Michigan",
+            "winner": "Illinois",
+            "loser": "Michigan",
+            "either": false,
+            "team1Seed": 3,
+            "team2Seed": 1,
+            "winnerSeed": 3,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          }
+        ]
+      }
+    ],
+    "Na'ama": [],
+    "Dustin": [],
+    "Josh": [
+      {
+        "outcome": "XX01X",
+        "probability": 0.22303492023185756,
         "baseProbability": null,
         "logProbability": null,
         "baseOutcomes": [],
@@ -906,38 +1097,12 @@
             "gameIndex": 1,
             "team1": "Arizona",
             "team2": "Michigan/Tennessee",
-            "winner": "Michigan/Tennessee",
-            "loser": "Arizona",
+            "winner": "Arizona",
+            "loser": "Michigan/Tennessee",
             "either": false,
             "team1Seed": 1,
             "team2Seed": "1/6",
-            "winnerSeed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Michigan",
-              "Tennessee"
-            ],
-            "winnerIsEither": [
-              "Michigan",
-              "Tennessee"
-            ],
-            "winnerEitherTeams": [
-              "Michigan",
-              "Tennessee"
-            ]
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Illinois",
-            "team2": "Michigan/Tennessee",
-            "winner": "Illinois",
-            "loser": "Michigan/Tennessee",
-            "either": false,
-            "team1Seed": 3,
-            "team2Seed": "1/6",
-            "winnerSeed": 3,
+            "winnerSeed": 1,
             "team1IsEither": null,
             "team2IsEither": [
               "Michigan",
@@ -945,12 +1110,118 @@
             ],
             "winnerIsEither": null,
             "winnerEitherTeams": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Illinois",
+            "team2": "Arizona",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 3,
+            "team2Seed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null
           }
         ]
       },
       {
-        "outcome": "X0000",
-        "probability": 0.009325356060305323,
+        "outcome": "1X110",
+        "probability": 0.13015478293083682,
+        "baseProbability": null,
+        "logProbability": null,
+        "baseOutcomes": [],
+        "games": [
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "UConn",
+            "winner": "Duke",
+            "loser": "UConn",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 2,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 4,
+            "roundKey": "round4",
+            "gameIndex": 3,
+            "team1": "Michigan",
+            "team2": "Tennessee",
+            "winner": "either",
+            "either": true,
+            "team1Seed": 1,
+            "team2Seed": 6,
+            "team1IsEither": null,
+            "team2IsEither": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Illinois",
+            "winner": "Duke",
+            "loser": "Illinois",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 3,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 5,
+            "roundKey": "round5",
+            "gameIndex": 1,
+            "team1": "Arizona",
+            "team2": "Michigan/Tennessee",
+            "winner": "Arizona",
+            "loser": "Michigan/Tennessee",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": "1/6",
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": [
+              "Michigan",
+              "Tennessee"
+            ],
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          },
+          {
+            "round": 6,
+            "roundKey": "round6",
+            "gameIndex": 0,
+            "team1": "Duke",
+            "team2": "Arizona",
+            "winner": "Arizona",
+            "loser": "Duke",
+            "either": false,
+            "team1Seed": 1,
+            "team2Seed": 1,
+            "winnerSeed": 1,
+            "team1IsEither": null,
+            "team2IsEither": null,
+            "winnerIsEither": null,
+            "winnerEitherTeams": null
+          }
+        ]
+      },
+      {
+        "outcome": "X000X",
+        "probability": 0.02126895137251973,
         "baseProbability": null,
         "logProbability": null,
         "baseOutcomes": [],
@@ -1028,16 +1299,12 @@
             "gameIndex": 0,
             "team1": "Illinois",
             "team2": "Tennessee",
-            "winner": "Tennessee",
-            "loser": "Illinois",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 3,
             "team2Seed": 6,
-            "winnerSeed": 6,
             "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "team2IsEither": null
           }
         ]
       },
@@ -1136,201 +1403,12 @@
         ]
       }
     ],
-    "Na'ama": [],
-    "Dustin": [],
-    "Josh": [
-      {
-        "outcome": "1XX10",
-        "probability": 0.2239782952738113,
-        "baseProbability": null,
-        "logProbability": null,
-        "baseOutcomes": [],
-        "games": [
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "UConn",
-            "winner": "Duke",
-            "loser": "UConn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 2,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Michigan",
-            "team2": "Tennessee",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 3,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Arizona",
-            "team2": "Michigan/Tennessee",
-            "winner": "Arizona",
-            "loser": "Michigan/Tennessee",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Michigan",
-              "Tennessee"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Illinois",
-            "team2": "Arizona",
-            "winner": "Arizona",
-            "loser": "Duke/Illinois",
-            "either": false,
-            "team1Seed": "1/3",
-            "team2Seed": 1,
-            "winnerSeed": 1,
-            "team1IsEither": [
-              "Duke",
-              "Illinois"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          }
-        ]
-      },
-      {
-        "outcome": "1X011",
-        "probability": 0.05365826174986526,
-        "baseProbability": null,
-        "logProbability": null,
-        "baseOutcomes": [],
-        "games": [
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "UConn",
-            "winner": "Duke",
-            "loser": "UConn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 2,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Michigan",
-            "team2": "Tennessee",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Illinois",
-            "winner": "Illinois",
-            "loser": "Duke",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 3,
-            "winnerSeed": 3,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Arizona",
-            "team2": "Michigan/Tennessee",
-            "winner": "Arizona",
-            "loser": "Michigan/Tennessee",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Michigan",
-              "Tennessee"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Illinois",
-            "team2": "Arizona",
-            "winner": "Illinois",
-            "loser": "Arizona",
-            "either": false,
-            "team1Seed": 3,
-            "team2Seed": 1,
-            "winnerSeed": 3,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          }
-        ]
-      }
-    ],
     "Vedant": [],
     "Brian": [],
     "Ethan": [
       {
-        "outcome": "0XX10",
-        "probability": 0.09815264451175512,
+        "outcome": "0X110",
+        "probability": 0.050087983078659123,
         "baseProbability": null,
         "logProbability": null,
         "baseOutcomes": [],
@@ -1364,195 +1442,6 @@
             "team2Seed": 6,
             "team1IsEither": null,
             "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "UConn",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 2,
-            "team2Seed": 3,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Arizona",
-            "team2": "Michigan/Tennessee",
-            "winner": "Arizona",
-            "loser": "Michigan/Tennessee",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Michigan",
-              "Tennessee"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "UConn/Illinois",
-            "team2": "Arizona",
-            "winner": "Arizona",
-            "loser": "UConn/Illinois",
-            "either": false,
-            "team1Seed": "2/3",
-            "team2Seed": 1,
-            "winnerSeed": 1,
-            "team1IsEither": [
-              "UConn",
-              "Illinois"
-            ],
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          }
-        ]
-      },
-      {
-        "outcome": "0X011",
-        "probability": 0.027488484705921808,
-        "baseProbability": null,
-        "logProbability": null,
-        "baseOutcomes": [],
-        "games": [
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "UConn",
-            "winner": "UConn",
-            "loser": "Duke",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 2,
-            "winnerSeed": 2,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Michigan",
-            "team2": "Tennessee",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "UConn",
-            "team2": "Illinois",
-            "winner": "Illinois",
-            "loser": "UConn",
-            "either": false,
-            "team1Seed": 2,
-            "team2Seed": 3,
-            "winnerSeed": 3,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Arizona",
-            "team2": "Michigan/Tennessee",
-            "winner": "Arizona",
-            "loser": "Michigan/Tennessee",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Michigan",
-              "Tennessee"
-            ],
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Illinois",
-            "team2": "Arizona",
-            "winner": "Illinois",
-            "loser": "Arizona",
-            "either": false,
-            "team1Seed": 3,
-            "team2Seed": 1,
-            "winnerSeed": 3,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          }
-        ]
-      },
-      {
-        "outcome": "00100",
-        "probability": 0.0032919464964586004,
-        "baseProbability": 0.003240481463706001,
-        "logProbability": -5.732033360308512,
-        "baseOutcomes": [],
-        "games": [
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "UConn",
-            "winner": "UConn",
-            "loser": "Duke",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 2,
-            "winnerSeed": 2,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Michigan",
-            "team2": "Tennessee",
-            "winner": "Tennessee",
-            "loser": "Michigan",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "winnerSeed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
           },
           {
             "round": 5,
@@ -1576,15 +1465,18 @@
             "roundKey": "round5",
             "gameIndex": 1,
             "team1": "Arizona",
-            "team2": "Tennessee",
-            "winner": "Tennessee",
-            "loser": "Arizona",
+            "team2": "Michigan/Tennessee",
+            "winner": "Arizona",
+            "loser": "Michigan/Tennessee",
             "either": false,
             "team1Seed": 1,
-            "team2Seed": 6,
-            "winnerSeed": 6,
+            "team2Seed": "1/6",
+            "winnerSeed": 1,
             "team1IsEither": null,
-            "team2IsEither": null,
+            "team2IsEither": [
+              "Michigan",
+              "Tennessee"
+            ],
             "winnerIsEither": null,
             "winnerEitherTeams": null
           },
@@ -1593,13 +1485,13 @@
             "roundKey": "round6",
             "gameIndex": 0,
             "team1": "UConn",
-            "team2": "Tennessee",
-            "winner": "Tennessee",
+            "team2": "Arizona",
+            "winner": "Arizona",
             "loser": "UConn",
             "either": false,
             "team1Seed": 2,
-            "team2Seed": 6,
-            "winnerSeed": 6,
+            "team2Seed": 1,
+            "winnerSeed": 1,
             "team1IsEither": null,
             "team2IsEither": null,
             "winnerIsEither": null,
@@ -1718,96 +1610,7 @@
     "Courtney": [],
     "Anish": [],
     "Sandy": [],
-    "Alice": [
-      {
-        "outcome": "1XXXX",
-        "probability": 0.7185479663019108,
-        "baseProbability": null,
-        "logProbability": null,
-        "baseOutcomes": [],
-        "games": [
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "UConn",
-            "winner": "Duke",
-            "loser": "UConn",
-            "either": false,
-            "team1Seed": 1,
-            "team2Seed": 2,
-            "winnerSeed": 1,
-            "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
-          },
-          {
-            "round": 4,
-            "roundKey": "round4",
-            "gameIndex": 3,
-            "team1": "Michigan",
-            "team2": "Tennessee",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 6,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 0,
-            "team1": "Duke",
-            "team2": "Illinois",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": 3,
-            "team1IsEither": null,
-            "team2IsEither": null
-          },
-          {
-            "round": 5,
-            "roundKey": "round5",
-            "gameIndex": 1,
-            "team1": "Arizona",
-            "team2": "Michigan/Tennessee",
-            "winner": "either",
-            "either": true,
-            "team1Seed": 1,
-            "team2Seed": "1/6",
-            "team1IsEither": null,
-            "team2IsEither": [
-              "Michigan",
-              "Tennessee"
-            ]
-          },
-          {
-            "round": 6,
-            "roundKey": "round6",
-            "gameIndex": 0,
-            "team1": "Duke/Illinois",
-            "team2": "Arizona/Michigan/Tennessee",
-            "winner": "either",
-            "either": true,
-            "team1Seed": "1/3",
-            "team2Seed": "1/1/6",
-            "team1IsEither": [
-              "Duke",
-              "Illinois"
-            ],
-            "team2IsEither": [
-              "Arizona",
-              "Michigan",
-              "Tennessee"
-            ]
-          }
-        ]
-      }
-    ],
+    "Alice": [],
     "Kato": [],
     "John": [],
     "Na'ama": [],
@@ -1818,8 +1621,8 @@
     "Ethan": [],
     "Ben": [
       {
-        "outcome": "0XXXX",
-        "probability": 0.2814520336980891,
+        "outcome": "XXXXX",
+        "probability": 0.9999999999999998,
         "baseProbability": null,
         "logProbability": null,
         "baseOutcomes": [],
@@ -1830,16 +1633,12 @@
             "gameIndex": 0,
             "team1": "Duke",
             "team2": "UConn",
-            "winner": "UConn",
-            "loser": "Duke",
-            "either": false,
+            "winner": "either",
+            "either": true,
             "team1Seed": 1,
             "team2Seed": 2,
-            "winnerSeed": 2,
             "team1IsEither": null,
-            "team2IsEither": null,
-            "winnerIsEither": null,
-            "winnerEitherTeams": null
+            "team2IsEither": null
           },
           {
             "round": 4,
@@ -1858,13 +1657,16 @@
             "round": 5,
             "roundKey": "round5",
             "gameIndex": 0,
-            "team1": "UConn",
+            "team1": "Duke/UConn",
             "team2": "Illinois",
             "winner": "either",
             "either": true,
-            "team1Seed": 2,
+            "team1Seed": "1/2",
             "team2Seed": 3,
-            "team1IsEither": null,
+            "team1IsEither": [
+              "Duke",
+              "UConn"
+            ],
             "team2IsEither": null
           },
           {
@@ -1887,13 +1689,14 @@
             "round": 6,
             "roundKey": "round6",
             "gameIndex": 0,
-            "team1": "UConn/Illinois",
+            "team1": "Duke/UConn/Illinois",
             "team2": "Arizona/Michigan/Tennessee",
             "winner": "either",
             "either": true,
-            "team1Seed": "2/3",
+            "team1Seed": "1/2/3",
             "team2Seed": "1/1/6",
             "team1IsEither": [
+              "Duke",
               "UConn",
               "Illinois"
             ],
@@ -1948,11 +1751,11 @@
         },
         "Kato": {
           "team1": 0.0,
-          "team2": 0.22452267699542058
+          "team2": 0.23621897370788222
         },
         "John": {
-          "team1": 0.41129362322229907,
-          "team2": 0.09102376296448098
+          "team1": 0.37981585428695763,
+          "team2": 0.06542485872684076
         },
         "Na'ama": {
           "team1": 0.0,
@@ -1963,8 +1766,8 @@
           "team2": 0.0
         },
         "Josh": {
-          "team1": 0.38638555815913694,
-          "team2": 0.0
+          "team1": 0.4178633270944784,
+          "team2": 0.29403948058132706
         },
         "Vedant": {
           "team1": 0.0,
@@ -1976,7 +1779,7 @@
         },
         "Ethan": {
           "team1": 0.0,
-          "team2": 0.458099641420395
+          "team2": 0.1779627683642465
         },
         "Ben": {
           "team1": 0.0,
@@ -2048,11 +1851,11 @@
         },
         "Kato": {
           "team1": 0.06169368082981898,
-          "team2": 0.06895368216081091
+          "team2": 0.08490070525208315
         },
         "John": {
           "team1": 0.2998500049774839,
-          "team2": 0.40304720711505965
+          "team2": 0.2585763081030409
         },
         "Na'ama": {
           "team1": 0.0,
@@ -2063,8 +1866,8 @@
           "team2": 0.0
         },
         "Josh": {
-          "team1": 0.25815663790654514,
-          "team2": 0.35252230281367436
+          "team1": 0.32840871997961085,
+          "team2": 0.5929249816578184
         },
         "Vedant": {
           "team1": 0.0,
@@ -2075,8 +1878,8 @@
           "team2": 0.0
         },
         "Ethan": {
-          "team1": 0.1168257229859368,
-          "team2": 0.17547680791045503
+          "team1": 0.04657364091287108,
+          "team2": 0.06359800498705755
         },
         "Ben": {
           "team1": 0.0,
@@ -2145,7 +1948,7 @@
           "team2": 0.0
         },
         "Alice": {
-          "team1": 1.0,
+          "team1": 0.0,
           "team2": 0.0
         },
         "Kato": {
@@ -2181,7 +1984,7 @@
           "team2": 0.0
         },
         "Ben": {
-          "team1": 0.0,
+          "team1": 1.0,
           "team2": 1.0
         },
         "Aidan": {
@@ -2245,8 +2048,8 @@
           "team2": 0.0
         },
         "Alice": {
-          "team1": 0.7179966607718393,
-          "team2": 0.720667324474258
+          "team1": 0.0,
+          "team2": 0.0
         },
         "Kato": {
           "team1": 0.0,
@@ -2281,8 +2084,8 @@
           "team2": 0.0
         },
         "Ben": {
-          "team1": 0.28200333922816057,
-          "team2": 0.27933267552574204
+          "team1": 1.0,
+          "team2": 1.0
         },
         "Aidan": {
           "team1": 0.0,
