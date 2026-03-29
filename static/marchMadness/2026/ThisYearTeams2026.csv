@@ -1,12 +1,10 @@
 TEAM,SEED,Region,prob_r32,prob_r16,prob_r8,prob_r4,prob_r2,prob_win
-Arizona,1,West,1,1,1,0.69183676,0.3769512,0.26945992
-Duke,1,East,1,1,1,0.65803072,0.37934439,0.23545042
-Michigan,1,Midwest,1,1,1,0.73020712,0.39391208,0.22878672
-Illinois,3,South,1,1,1,0.72814336,0.3323355,0.10858833
-Purdue,2,West,1,1,1,0.30816324,0.12637424,0.06271912
-UConn,2,East,1,1,1,0.34196928,0.13672972,0.05429416
-Tennessee,6,Midwest,1,1,1,0.26979288,0.09001381,0.02409079
-Iowa,9,South,1,1,1,0.27185664,0.16433905,0.01661054
+Arizona,1,West,1,1,1,1,0.5963922,0.34605364
+Michigan,1,Midwest,1,1,1,0.7378903,0.39951063,0.22461245
+Duke,1,East,1,1,1,0.6612497,0.3702316,0.2152536
+Illinois,3,South,1,1,1,1,0.4036078,0.13393557
+UConn,2,East,1,1,1,0.3387503,0.1424777,0.05740096
+Tennessee,6,Midwest,1,1,1,0.2621097,0.08778007,0.02274378
 Akron,12,Midwest,0,0,0,0,0,0
 Alabama,4,Midwest,1,1,0,0,0,0
 Arkansas,4,West,1,1,0,0,0,0
@@ -22,6 +20,7 @@ High Point,12,West,1,0,0,0,0,0
 Hofstra,13,Midwest,0,0,0,0,0,0
 Houston,2,South,1,1,0,0,0,0
 Idaho,15,South,0,0,0,0,0,0
+Iowa,9,South,1,1,1,0,0,0
 Iowa State,2,Midwest,1,1,0,0,0,0
 Kansas,4,East,1,0,0,0,0,0
 Kennesaw State,14,West,0,0,0,0,0,0
@@ -40,6 +39,7 @@ Northern Iowa,12,East,0,0,0,0,0,0
 Ohio State,8,East,0,0,0,0,0,0
 Penn,14,South,0,0,0,0,0,0
 Prairie View A&M/Lehigh,16,South,0,0,0,0,0,0
+Purdue,2,West,1,1,1,0,0,0
 Queens,15,West,0,0,0,0,0,0
 Saint Louis,9,Midwest,1,0,0,0,0,0
 Saint Mary's,7,South,0,0,0,0,0,0
