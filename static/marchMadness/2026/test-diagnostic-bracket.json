@@ -1,11 +1,11 @@
 {
-  "participant": "Josh",
-  "scenario_rank": 4,
-  "short_outcome": "01010",
-  "full_outcome": "101111111011010110010111101111111100000010101010101110110011010",
-  "log_probability": -3.3549252832590724,
-  "shifted_probability": 0.368553281667848,
-  "champion": "Arizona",
+  "participant": "Haneen",
+  "scenario_rank": 2,
+  "short_outcome": "000",
+  "full_outcome": "101111111011010110010111101111111100000010101010101110110011000",
+  "log_probability": -3.4831824921389685,
+  "shifted_probability": 0.8440942568106763,
+  "champion": "Michigan",
   "bracket": {
     "round1": [
       {
@@ -1207,7 +1207,9 @@
           "region": "East"
         },
         "gameId": "r4-0",
-        "region": ""
+        "region": "",
+        "score1": 72,
+        "score2": 73
       },
       {
         "team1": {
@@ -1268,7 +1270,9 @@
           "region": "Midwest"
         },
         "gameId": "r4-3",
-        "region": ""
+        "region": "",
+        "score1": 95,
+        "score2": 62
       }
     ],
     "round5": [
@@ -1303,9 +1307,9 @@
           "region": "Midwest"
         },
         "winner": {
-          "name": "Arizona",
+          "name": "Michigan",
           "seed": 1,
-          "region": "West"
+          "region": "Midwest"
         },
         "gameId": "r5-1",
         "region": ""
@@ -1319,23 +1323,23 @@
           "region": "South"
         },
         "team2": {
-          "name": "Arizona",
+          "name": "Michigan",
           "seed": 1,
-          "region": "West"
+          "region": "Midwest"
         },
         "winner": {
-          "name": "Arizona",
+          "name": "Michigan",
           "seed": 1,
-          "region": "West"
+          "region": "Midwest"
         },
         "gameId": "r6-0",
         "region": ""
       }
     ],
     "winner": {
-      "name": "Arizona",
+      "name": "Michigan",
       "seed": 1,
-      "region": "West"
+      "region": "Midwest"
     }
   }
 }

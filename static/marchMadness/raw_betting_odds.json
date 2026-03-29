@@ -1,42 +1,26 @@
 {
-  "fetched_at": "2026-03-28T23:11:42.887266",
+  "fetched_at": "2026-03-29T19:33:56.042189",
   "regions": "us",
   "championship_probs": {
-    "Arizona Wildcats": 0.3460536356399151,
-    "Michigan Wolverines": 0.2246124529464045,
-    "Duke Blue Devils": 0.2152536007403043,
-    "Illinois Fighting Illini": 0.13393557379396712,
-    "UConn Huskies": 0.05740096019741448,
-    "Tennessee Volunteers": 0.02274377668199442
+    "Michigan Wolverines": 0.3405483124140201,
+    "Arizona Wildcats": 0.34689393314223166,
+    "Illinois Fighting Illini": 0.17958174673922608,
+    "UConn Huskies": 0.13297600770452214
   },
   "game_odds": [
     {
-      "home_team": "Arizona Wildcats",
-      "away_team": "Purdue Boilermakers",
-      "commence_time": "2026-03-29T00:59:56Z",
-      "home_prob": 0.6888888888888889,
-      "away_prob": 0.31111111111111106
-    },
-    {
-      "home_team": "Michigan Wolverines",
-      "away_team": "Tennessee Volunteers",
-      "commence_time": "2026-03-29T18:15:00Z",
-      "home_prob": 0.7378903028311451,
-      "away_prob": 0.26210969716885485
-    },
-    {
       "home_team": "Duke Blue Devils",
       "away_team": "UConn Huskies",
-      "commence_time": "2026-03-29T21:05:00Z",
-      "home_prob": 0.6612496978571504,
-      "away_prob": 0.3387503021428497
+      "commence_time": "2026-03-29T21:06:55Z",
+      "home_prob": 0.12189661720506564,
+      "away_prob": 0.8781033827949343
     },
     {
       "home_team": "New Mexico Lobos",
       "away_team": "Tulsa Golden Hurricane",
       "commence_time": "2026-04-02T23:00:00Z",
-      "home_prob": 0.6124698187028672,
-      "away_prob": 0.3875301812971328
+      "home_prob": 0.6143834511990048,
+      "away_prob": 0.3856165488009951
     },
     {
       "home_team": "Auburn Tigers",
@@ -44,6 +28,20 @@
       "commence_time": "2026-04-03T01:30:00Z",
       "home_prob": 0.7042260842444511,
       "away_prob": 0.295773915755549
+    },
+    {
+      "home_team": "UConn Huskies",
+      "away_team": "Illinois Fighting Illini",
+      "commence_time": "2026-04-04T22:09:39Z",
+      "home_prob": 0.4455405731442511,
+      "away_prob": 0.5544594268557488
+    },
+    {
+      "home_team": "Arizona Wildcats",
+      "away_team": "Michigan Wolverines",
+      "commence_time": "2026-04-05T00:49:41Z",
+      "home_prob": 0.41232826550803836,
+      "away_prob": 0.5876717344919616
     }
   ]
 }

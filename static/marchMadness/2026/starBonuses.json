@@ -472,8 +472,12 @@
         "halfway": true,
         "reason": "Has the bracket most (dis)similar to everyone else",
         "Winners": [
-            ["Alice"],
-            ["Josh"]
+            [
+                "Alice"
+            ],
+            [
+                "Josh"
+            ]
         ],
         "subImages": [
             "/marchMadness/2026/badges/wolf.png",
@@ -673,17 +677,52 @@
         "round": 4,
         "reason": "best performance of east - south",
         "image": "/marchMadness/2026/badges/hoosky.png",
-        "Winners": []
+        "Winners": [
+            "Sam"
+        ],
+        "scores": {
+            "Jack": 101,
+            "Nick": -134,
+            "Courtney": 151,
+            "Anish": 182,
+            "Sandy": -21,
+            "Alice": 153,
+            "Kato": 35,
+            "John": -26,
+            "Na'ama": 235,
+            "Dustin": -188,
+            "Josh": 117,
+            "Vedant": 102,
+            "Brian": 86,
+            "Ethan": 55,
+            "Ben": -73,
+            "Aidan": 65,
+            "Kendall": 44,
+            "Sam": 256,
+            "Tyler": 65,
+            "Haneen": 99,
+            "Manu": 111,
+            "Jared": 89,
+            "Palmer": 80
+        }
     },
     {
         "name": "Down/Left/Up/Right",
         "round": 4,
         "reason": "best performance in each division (each piece of a playstation D pad)",
         "Winners": [
-            [],
-            [],
-            [],
-            []
+            [
+                "Kato"
+            ],
+            [
+                "John"
+            ],
+            [
+                "Vedant"
+            ],
+            [
+                "Na'ama"
+            ]
         ],
         "image": "/marchMadness/2026/badges/DPad.png",
         "subImages": [
@@ -691,7 +730,109 @@
             "/marchMadness/2026/badges/DPadLeft.png",
             "/marchMadness/2026/badges/DPadUp.png",
             "/marchMadness/2026/badges/DPadRight.png"
-        ]
+        ],
+        "scores": {
+            "Down (South)": {
+                "Jack": 231,
+                "Nick": 401,
+                "Courtney": 161,
+                "Anish": 183,
+                "Sandy": 321,
+                "Alice": 193,
+                "Kato": 421,
+                "John": 306,
+                "Na'ama": 263,
+                "Dustin": 405,
+                "Josh": 248,
+                "Vedant": 235,
+                "Brian": 231,
+                "Ethan": 311,
+                "Ben": 208,
+                "Aidan": 130,
+                "Kendall": 218,
+                "Sam": 200,
+                "Tyler": 257,
+                "Haneen": 248,
+                "Manu": 267,
+                "Jared": 141,
+                "Palmer": 200
+            },
+            "Left (West)": {
+                "Jack": 387,
+                "Nick": 265,
+                "Courtney": 250,
+                "Anish": 250,
+                "Sandy": 172,
+                "Alice": 95,
+                "Kato": 330,
+                "John": 466,
+                "Na'ama": 300,
+                "Dustin": 202,
+                "Josh": 437,
+                "Vedant": 322,
+                "Brian": 306,
+                "Ethan": 365,
+                "Ben": 144,
+                "Aidan": 204,
+                "Kendall": 305,
+                "Sam": 327,
+                "Tyler": 387,
+                "Haneen": 387,
+                "Manu": 252,
+                "Jared": 265,
+                "Palmer": 255
+            },
+            "Up (Midwest)": {
+                "Jack": 320,
+                "Nick": 132,
+                "Courtney": 260,
+                "Anish": 320,
+                "Sandy": 297,
+                "Alice": 60,
+                "Kato": 177,
+                "John": 357,
+                "Na'ama": 295,
+                "Dustin": 117,
+                "Josh": 357,
+                "Vedant": 474,
+                "Brian": 392,
+                "Ethan": 377,
+                "Ben": 130,
+                "Aidan": 342,
+                "Kendall": 340,
+                "Sam": 260,
+                "Tyler": 255,
+                "Haneen": 355,
+                "Manu": 320,
+                "Jared": 320,
+                "Palmer": 317
+            },
+            "Right (East)": {
+                "Jack": 332,
+                "Nick": 267,
+                "Courtney": 312,
+                "Anish": 365,
+                "Sandy": 300,
+                "Alice": 346,
+                "Kato": 456,
+                "John": 280,
+                "Na'ama": 498,
+                "Dustin": 217,
+                "Josh": 365,
+                "Vedant": 337,
+                "Brian": 317,
+                "Ethan": 366,
+                "Ben": 135,
+                "Aidan": 195,
+                "Kendall": 262,
+                "Sam": 456,
+                "Tyler": 322,
+                "Haneen": 347,
+                "Manu": 378,
+                "Jared": 230,
+                "Palmer": 280
+            }
+        }
     },
     {
         "name": "heartbreaker",

@@ -1193,9 +1193,15 @@
         "seed": 2,
         "region": "East"
       },
-      "winner": null,
+      "winner": {
+        "name": "UConn",
+        "seed": 2,
+        "region": "East"
+      },
       "gameId": "r4-0",
-      "region": ""
+      "region": "",
+      "score1": 72,
+      "score2": 73
     },
     {
       "team1": {
@@ -1250,14 +1256,24 @@
         "seed": 6,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "gameId": "r4-3",
-      "region": ""
+      "region": "",
+      "score1": 95,
+      "score2": 62
     }
   ],
   "round5": [
     {
-      "team1": null,
+      "team1": {
+        "name": "UConn",
+        "seed": 2,
+        "region": "East"
+      },
       "team2": {
         "name": "Illinois",
         "seed": 3,
@@ -1273,7 +1289,11 @@
         "seed": 1,
         "region": "West"
       },
-      "team2": null,
+      "team2": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "winner": null,
       "gameId": "r5-1",
       "region": ""
