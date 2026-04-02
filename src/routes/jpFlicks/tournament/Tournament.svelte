@@ -68,16 +68,13 @@
             const match = tournament.bracket.rounds[editingMatch.roundIndex].matches[editingMatch.matchIndex];
             match.score1 = score1;
             match.score2 = score2;
-            // Determine winner (higher score wins, or null if tie - ties might need extra handling)
             if (score1 > score2) {
                 match.winner = match.team1.name;
             } else if (score2 > score1) {
                 match.winner = match.team2.name;
             } else {
-                match.winner = null; // Tie - might need tiebreaker
+                match.winner = null;
             }
-            
-            // Propagate winner to next round if applicable
             propagateWinner(editingMatch.roundIndex, editingMatch.matchIndex);
         } else if (editingMatch.type === 'thirdPlace') {
             tournament.bracket.thirdPlaceMatch.score1 = score1;
@@ -86,6 +83,37 @@
                 tournament.bracket.thirdPlaceMatch.winner = tournament.bracket.thirdPlaceMatch.team1.name;
             } else if (score2 > score1) {
                 tournament.bracket.thirdPlaceMatch.winner = tournament.bracket.thirdPlaceMatch.team2.name;
+            }
+        } else if (editingMatch.type === 'wb' || editingMatch.type === 'lb') {
+            // Double elimination bracket match
+            const bracketSide = editingMatch.type === 'wb' ? tournament.bracket.winnersBracket : tournament.bracket.losersBracket;
+            const match = bracketSide.rounds[editingMatch.roundIndex].matches[editingMatch.matchIndex];
+            match.score1 = score1;
+            match.score2 = score2;
+            if (score1 > score2) {
+                match.winner = match.team1.name;
+            } else if (score2 > score1) {
+                match.winner = match.team2.name;
+            } else {
+                match.winner = null;
+            }
+            if (match.winner) {
+                propagateDoubleElimination(editingMatch.type, editingMatch.roundIndex, editingMatch.matchIndex);
+            }
+        } else if (editingMatch.type === 'grandFinal') {
+            const match = tournament.bracket.grandFinal.matches[editingMatch.matchIndex];
+            match.score1 = score1;
+            match.score2 = score2;
+            if (score1 > score2) {
+                match.winner = match.team1.name;
+            } else if (score2 > score1) {
+                match.winner = match.team2.name;
+            } else {
+                match.winner = null;
+            }
+            // If GF-1 and losers side won, populate reset match
+            if (editingMatch.matchIndex === 0 && match.winner) {
+                propagateGrandFinal(match);
             }
         }
         
@@ -155,6 +183,197 @@
                 }
             }
         });
+    }
+    
+    // === DOUBLE ELIMINATION FUNCTIONS ===
+    
+    // Check if this is a double elimination tournament
+    $: isDoubleElimination = tournament?.bracket?.bracketType === 'doubleElimination' || 
+                              tournament?.format?.bracketType === 'doubleElimination';
+    
+    // Find a match by ID across all bracket sections
+    function findMatchById(matchId) {
+        if (!tournament?.bracket) return null;
+        
+        // Search winners bracket
+        if (tournament.bracket.winnersBracket) {
+            for (const round of tournament.bracket.winnersBracket.rounds) {
+                for (const match of round.matches) {
+                    if (match.id === matchId) return match;
+                }
+            }
+        }
+        // Search losers bracket
+        if (tournament.bracket.losersBracket) {
+            for (const round of tournament.bracket.losersBracket.rounds) {
+                for (const match of round.matches) {
+                    if (match.id === matchId) return match;
+                }
+            }
+        }
+        // Search grand final
+        if (tournament.bracket.grandFinal) {
+            for (const match of tournament.bracket.grandFinal.matches) {
+                if (match.id === matchId) return match;
+            }
+        }
+        return null;
+    }
+    
+    // Find a losers bracket round by ID
+    function findLBRound(roundId) {
+        if (!tournament.bracket?.losersBracket) return null;
+        return tournament.bracket.losersBracket.rounds.find(r => r.id === roundId);
+    }
+    
+    // Propagate winner (and loser) in double elimination
+    function propagateDoubleElimination(side, roundIndex, matchIndex) {
+        const bracketSide = side === 'wb' ? tournament.bracket.winnersBracket : tournament.bracket.losersBracket;
+        const match = bracketSide.rounds[roundIndex].matches[matchIndex];
+        
+        if (!match.winner) return;
+        
+        const winnerName = match.winner;
+        const loserName = match.winner === match.team1?.name ? match.team2?.name : match.team1?.name;
+        
+        // Propagate winner forward in the same bracket
+        const nextRoundIndex = roundIndex + 1;
+        if (nextRoundIndex < bracketSide.rounds.length) {
+            const nextRound = bracketSide.rounds[nextRoundIndex];
+            const nextMatchIndex = Math.floor(matchIndex / 2);
+            const slot = matchIndex % 2;
+            
+            if (nextMatchIndex < nextRound.matches.length) {
+                const nextMatch = nextRound.matches[nextMatchIndex];
+                if (slot === 0) {
+                    nextMatch.team1 = { name: winnerName, source: match.id, seed: null };
+                } else {
+                    nextMatch.team2 = { name: winnerName, source: match.id, seed: null };
+                }
+            }
+        } else if (side === 'wb') {
+            // Winner of last WB round goes to grand final team1
+            if (tournament.bracket.grandFinal?.matches?.length > 0) {
+                tournament.bracket.grandFinal.matches[0].team1 = { 
+                    name: winnerName, source: match.id, seed: null 
+                };
+            }
+        } else if (side === 'lb') {
+            // Winner of last LB round goes to grand final team2
+            if (tournament.bracket.grandFinal?.matches?.length > 0) {
+                tournament.bracket.grandFinal.matches[0].team2 = { 
+                    name: winnerName, source: match.id, seed: null 
+                };
+            }
+        }
+        
+        // Propagate loser to losers bracket (only from winners bracket)
+        if (side === 'wb' && match.loserGoesTo && loserName) {
+            const dest = match.loserGoesTo;
+            
+            if (dest.round === 'LB-SF') {
+                // Goes to LB semifinal
+                const lbSfRound = findLBRound('LB-SF');
+                if (lbSfRound && dest.matchIndex < lbSfRound.matches.length) {
+                    const destMatch = lbSfRound.matches[dest.matchIndex];
+                    if (dest.slot === 'team1') {
+                        destMatch.team1 = { name: loserName, source: match.id + ' (L)', seed: null };
+                    } else {
+                        destMatch.team2 = { name: loserName, source: match.id + ' (L)', seed: null };
+                    }
+                }
+            } else {
+                // Goes to a specific LB round
+                const destRound = findLBRound(dest.round);
+                if (destRound && dest.matchIndex < destRound.matches.length) {
+                    const destMatch = destRound.matches[dest.matchIndex];
+                    if (dest.slot === 'team1') {
+                        destMatch.team1 = { name: loserName, source: match.id + ' (L)', seed: null };
+                    } else {
+                        destMatch.team2 = { name: loserName, source: match.id + ' (L)', seed: null };
+                    }
+                }
+            }
+        }
+    }
+    
+    // Handle grand final propagation (GF-1 result -> potentially populate reset)
+    function propagateGrandFinal(match) {
+        if (!tournament.bracket.grandFinal || tournament.bracket.grandFinal.matches.length < 2) return;
+        
+        const gf1 = tournament.bracket.grandFinal.matches[0];
+        const resetMatch = tournament.bracket.grandFinal.matches[1];
+        
+        if (!gf1.winner) return;
+        
+        // Check if losers side won (team2 is always the losers bracket representative)
+        const losersSideWon = gf1.winner === gf1.team2?.name;
+        
+        if (losersSideWon) {
+            // Populate reset match with same teams
+            resetMatch.team1 = { ...gf1.team1 };
+            resetMatch.team2 = { ...gf1.team2 };
+        }
+    }
+    
+    // Check if grand final reset is needed
+    function isResetNeeded() {
+        if (!tournament.bracket?.grandFinal?.matches?.[0]) return false;
+        const gf1 = tournament.bracket.grandFinal.matches[0];
+        return gf1.winner && gf1.winner === gf1.team2?.name;
+    }
+    
+    // Get the overall champion
+    function getDoubleElimChampion() {
+        if (!tournament.bracket?.grandFinal?.matches) return null;
+        const gf1 = tournament.bracket.grandFinal.matches[0];
+        
+        if (!gf1.winner) return null;
+        
+        // If winners side won GF-1, they're champion
+        if (gf1.winner === gf1.team1?.name) return gf1.winner;
+        
+        // If losers side won GF-1, check reset
+        if (tournament.bracket.grandFinal.matches.length > 1) {
+            const reset = tournament.bracket.grandFinal.matches[1];
+            if (reset.winner) return reset.winner;
+        }
+        
+        return null; // Reset still pending
+    }
+    
+    // Populate double elimination bracket from group standings
+    function populateDoubleElimBracket() {
+        if (!tournament.bracket?.winnersBracket || !tournament.bracket?.losersBracket) return;
+        if (!tournament.groups || tournament.groups.length === 0) return;
+        
+        const standings = calculateStandings(tournament.groups[0]);
+        
+        // Winners bracket: seeds 1-4
+        const wb = tournament.bracket.winnersBracket;
+        if (wb.rounds.length > 0 && wb.rounds[0].matches.length >= 2) {
+            wb.rounds[0].matches[0].team1 = { name: standings[0]?.name || 'TBD', source: '1st Place', seed: 1 };
+            wb.rounds[0].matches[0].team2 = { name: standings[3]?.name || 'TBD', source: '4th Place', seed: 4 };
+            wb.rounds[0].matches[1].team1 = { name: standings[1]?.name || 'TBD', source: '2nd Place', seed: 2 };
+            wb.rounds[0].matches[1].team2 = { name: standings[2]?.name || 'TBD', source: '3rd Place', seed: 3 };
+        }
+        
+        // Losers bracket: seeds 5-10
+        const lb = tournament.bracket.losersBracket;
+        if (lb.rounds.length > 0 && lb.rounds[0].matches.length >= 4) {
+            lb.rounds[0].matches[0].team1 = { name: standings[4]?.name || 'TBD', source: '5th Place', seed: 5 };
+            lb.rounds[0].matches[0].team2 = { name: standings[7]?.name || 'TBD', source: '8th Place', seed: 8 };
+            lb.rounds[0].matches[1].team1 = { name: standings[5]?.name || 'TBD', source: '6th Place', seed: 6 };
+            lb.rounds[0].matches[1].team2 = { name: standings[6]?.name || 'TBD', source: '7th Place', seed: 7 };
+            // Matches 2 and 3 have team2 pre-filled (9th, 10th) but team1 comes from WB losers
+            lb.rounds[0].matches[2].team2 = { name: standings[8]?.name || 'TBD', source: '9th Place', seed: 9 };
+            lb.rounds[0].matches[3].team2 = { name: standings[9]?.name || 'TBD', source: '10th Place', seed: 10 };
+        }
+        
+        tournament = tournament;
+        if (tournament.bracket) {
+            tournament.bracket = { ...tournament.bracket };
+        }
     }
     
     // Check if all group stage matches are complete
@@ -279,8 +498,12 @@
     // Check and populate bracket when group stage completes
     function checkAndPopulateBracket() {
         if (isGroupStageComplete() && tournament.format.groupStage && tournament.format.knockoutStage) {
-            populateBracketFromGroups();
-            tournament = tournament; // Ensure reactivity update
+            if (isDoubleElimination) {
+                populateDoubleElimBracket();
+            } else {
+                populateBracketFromGroups();
+            }
+            tournament = tournament;
         }
     }
     
@@ -291,17 +514,35 @@
             match.score1 = null;
             match.score2 = null;
             match.completed = false;
-            // Note: Clearing a group match might invalidate bracket, but we don't auto-clear bracket
         } else if (type === 'bracket') {
             const match = tournament.bracket.rounds[indices.roundIndex].matches[indices.matchIndex];
             match.score1 = null;
             match.score2 = null;
             match.winner = null;
-            // TODO: Could also clear downstream matches
         } else if (type === 'thirdPlace') {
             tournament.bracket.thirdPlaceMatch.score1 = null;
             tournament.bracket.thirdPlaceMatch.score2 = null;
             tournament.bracket.thirdPlaceMatch.winner = null;
+        } else if (type === 'wb' || type === 'lb') {
+            const bracketSide = type === 'wb' ? tournament.bracket.winnersBracket : tournament.bracket.losersBracket;
+            const match = bracketSide.rounds[indices.roundIndex].matches[indices.matchIndex];
+            match.score1 = null;
+            match.score2 = null;
+            match.winner = null;
+        } else if (type === 'grandFinal') {
+            const match = tournament.bracket.grandFinal.matches[indices.matchIndex];
+            match.score1 = null;
+            match.score2 = null;
+            match.winner = null;
+            // Also clear reset if clearing GF-1
+            if (indices.matchIndex === 0 && tournament.bracket.grandFinal.matches.length > 1) {
+                const reset = tournament.bracket.grandFinal.matches[1];
+                reset.score1 = null;
+                reset.score2 = null;
+                reset.winner = null;
+                reset.team1 = { name: 'TBD', source: 'GF-1 Team 1' };
+                reset.team2 = { name: 'TBD', source: 'GF-1 Team 2' };
+            }
         }
         
         tournament = tournament;
@@ -495,14 +736,47 @@
             return { match: tournament.bracket.thirdPlaceMatch, type: 'thirdPlace' };
         }
         
-        for (let roundIndex = 0; roundIndex < tournament.bracket.rounds.length; roundIndex++) {
-            const round = tournament.bracket.rounds[roundIndex];
-            for (let matchIndex = 0; matchIndex < round.matches.length; matchIndex++) {
-                if (round.matches[matchIndex].id === matchId) {
-                    return { match: round.matches[matchIndex], roundIndex, matchIndex, type: 'bracket' };
+        // Search single elimination rounds
+        if (tournament.bracket.rounds) {
+            for (let roundIndex = 0; roundIndex < tournament.bracket.rounds.length; roundIndex++) {
+                const round = tournament.bracket.rounds[roundIndex];
+                for (let matchIndex = 0; matchIndex < round.matches.length; matchIndex++) {
+                    if (round.matches[matchIndex].id === matchId) {
+                        return { match: round.matches[matchIndex], roundIndex, matchIndex, type: 'bracket' };
+                    }
                 }
             }
         }
+        
+        // Search double elimination brackets
+        if (tournament.bracket.winnersBracket) {
+            for (let roundIndex = 0; roundIndex < tournament.bracket.winnersBracket.rounds.length; roundIndex++) {
+                const round = tournament.bracket.winnersBracket.rounds[roundIndex];
+                for (let matchIndex = 0; matchIndex < round.matches.length; matchIndex++) {
+                    if (round.matches[matchIndex].id === matchId) {
+                        return { match: round.matches[matchIndex], roundIndex, matchIndex, type: 'wb' };
+                    }
+                }
+            }
+        }
+        if (tournament.bracket.losersBracket) {
+            for (let roundIndex = 0; roundIndex < tournament.bracket.losersBracket.rounds.length; roundIndex++) {
+                const round = tournament.bracket.losersBracket.rounds[roundIndex];
+                for (let matchIndex = 0; matchIndex < round.matches.length; matchIndex++) {
+                    if (round.matches[matchIndex].id === matchId) {
+                        return { match: round.matches[matchIndex], roundIndex, matchIndex, type: 'lb' };
+                    }
+                }
+            }
+        }
+        if (tournament.bracket.grandFinal) {
+            for (let matchIndex = 0; matchIndex < tournament.bracket.grandFinal.matches.length; matchIndex++) {
+                if (tournament.bracket.grandFinal.matches[matchIndex].id === matchId) {
+                    return { match: tournament.bracket.grandFinal.matches[matchIndex], matchIndex, type: 'grandFinal' };
+                }
+            }
+        }
+        
         return null;
     }
     
@@ -608,6 +882,20 @@
     
     function selectTab(tab) {
         activeTab = tab;
+    }
+    
+    // Get standings highlight zone for a given position (0-indexed)
+    function getStandingsHighlight(position) {
+        const highlights = tournament?.format?.standingsHighlights;
+        if (!highlights || !highlights.length) return null;
+        
+        // Find the tightest zone this position falls into
+        // Sorted by 'top' ascending so we match the most specific zone
+        const sorted = [...highlights].sort((a, b) => a.top - b.top);
+        for (const h of sorted) {
+            if (position < h.top) return h;
+        }
+        return null;
     }
 </script>
 
@@ -727,7 +1015,13 @@
                                                 <tbody>
                                                     {#each standings as team, i}
                                                         {@const teamInfo = getTeamInfo(team.name)}
-                                                        <tr class:qualifies={i < tournament.format.groupAdvancement}>
+                                                        {@const highlight = getStandingsHighlight(i)}
+                                                        {@const isLastInZone = highlight && (!getStandingsHighlight(i + 1) || getStandingsHighlight(i + 1)?.label !== highlight.label)}
+                                                        <tr 
+                                                            class:qualifies={i < tournament.format.groupAdvancement}
+                                                            style={highlight ? `border-left: 4px solid ${highlight.color};` : ''}
+                                                            class:zone-last={isLastInZone}
+                                                        >
                                                             <td class="pos">{i + 1}</td>
                                                             <td class="name">{team.name}</td>
                                                             <td class="player">{teamInfo?.player1 || '—'}</td>
@@ -902,6 +1196,224 @@
                 {#if tournament.format.knockoutStage && tournament.bracket}
                     <div class="bracket-view">
                         <h2>{tournament.bracket.name}</h2>
+                        
+                        {#if editable && isDoubleElimination && isGroupStageComplete()}
+                            <button class="populate-btn" on:click={populateDoubleElimBracket}>
+                                🔄 Update Bracket from Standings
+                            </button>
+                        {/if}
+                        
+                        {#if isDoubleElimination}
+                            <!-- Double Elimination Bracket -->
+                            <div class="de-bracket">
+                                <!-- Winners Bracket -->
+                                {#if tournament.bracket.winnersBracket}
+                                    <div class="de-section winners-section">
+                                        <h3 class="de-section-title winners-title">🏆 Winners Bracket</h3>
+                                        <div class="bracket-container">
+                                            {#each tournament.bracket.winnersBracket.rounds as round, roundIndex}
+                                                <div class="bracket-round">
+                                                    <h4 class="round-title">{round.name}</h4>
+                                                    <div class="round-matches">
+                                                        {#each round.matches as match, matchIndex}
+                                                            {@const scheduleInfo = getBracketMatchSchedule(match.id)}
+                                                            <div class={getMatchClass(match)}>
+                                                                {#if scheduleInfo}
+                                                                    <button class="bracket-schedule-link" on:click={() => scrollToSchedule(scheduleInfo.slotIndex)} title="View in schedule">
+                                                                        🕐 {scheduleInfo.time} • Board {scheduleInfo.board}
+                                                                    </button>
+                                                                {/if}
+                                                                {#if editingMatch?.type === 'wb' && editingMatch?.roundIndex === roundIndex && editingMatch?.matchIndex === matchIndex}
+                                                                    <div class="bracket-match-edit">
+                                                                        <div class="edit-team">
+                                                                            <span class="team-name">{getTeamDisplayName(match.team1)}</span>
+                                                                            <input type="number" min="0" bind:value={editingMatch.score1} class="score-input" />
+                                                                        </div>
+                                                                        <div class="edit-team">
+                                                                            <span class="team-name">{getTeamDisplayName(match.team2)}</span>
+                                                                            <input type="number" min="0" bind:value={editingMatch.score2} class="score-input" />
+                                                                        </div>
+                                                                        <div class="edit-actions">
+                                                                            <button class="edit-btn save" on:click={saveMatchScore}>✓ Save</button>
+                                                                            <button class="edit-btn cancel" on:click={cancelEditing}>✕ Cancel</button>
+                                                                        </div>
+                                                                    </div>
+                                                                {:else}
+                                                                    <div class={getTeamClass(match, 1)}
+                                                                        on:click={() => editable && isNextMatch(match) && startEditing('wb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(match) && startEditing('wb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        role={editable && isNextMatch(match) ? "button" : "text"}
+                                                                        tabindex={editable && isNextMatch(match) ? 0 : -1}
+                                                                        class:clickable={editable && isNextMatch(match)}
+                                                                    >
+                                                                        <span class="team-name">{getTeamDisplayName(match.team1)}</span>
+                                                                        {#if match.score1 !== null}<span class="team-score">{match.score1}</span>{/if}
+                                                                    </div>
+                                                                    <div class={getTeamClass(match, 2)}
+                                                                        on:click={() => editable && isNextMatch(match) && startEditing('wb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(match) && startEditing('wb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        role={editable && isNextMatch(match) ? "button" : "text"}
+                                                                        tabindex={editable && isNextMatch(match) ? 0 : -1}
+                                                                        class:clickable={editable && isNextMatch(match)}
+                                                                    >
+                                                                        <span class="team-name">{getTeamDisplayName(match.team2)}</span>
+                                                                        {#if match.score2 !== null}<span class="team-score">{match.score2}</span>{/if}
+                                                                    </div>
+                                                                    {#if editable && match.winner}
+                                                                        <button class="clear-btn bracket-clear" on:click={() => clearMatchResult('wb', { roundIndex, matchIndex })} title="Clear result">🗑</button>
+                                                                    {/if}
+                                                                {/if}
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
+                                
+                                <!-- Losers Bracket -->
+                                {#if tournament.bracket.losersBracket}
+                                    <div class="de-section losers-section">
+                                        <h3 class="de-section-title losers-title">💀 Losers Bracket</h3>
+                                        <div class="bracket-container">
+                                            {#each tournament.bracket.losersBracket.rounds as round, roundIndex}
+                                                <div class="bracket-round">
+                                                    <h4 class="round-title">{round.name}</h4>
+                                                    <div class="round-matches">
+                                                        {#each round.matches as match, matchIndex}
+                                                            {@const scheduleInfo = getBracketMatchSchedule(match.id)}
+                                                            <div class={getMatchClass(match)}>
+                                                                {#if scheduleInfo}
+                                                                    <button class="bracket-schedule-link" on:click={() => scrollToSchedule(scheduleInfo.slotIndex)} title="View in schedule">
+                                                                        🕐 {scheduleInfo.time} • Board {scheduleInfo.board}
+                                                                    </button>
+                                                                {/if}
+                                                                {#if editingMatch?.type === 'lb' && editingMatch?.roundIndex === roundIndex && editingMatch?.matchIndex === matchIndex}
+                                                                    <div class="bracket-match-edit">
+                                                                        <div class="edit-team">
+                                                                            <span class="team-name">{getTeamDisplayName(match.team1)}</span>
+                                                                            <input type="number" min="0" bind:value={editingMatch.score1} class="score-input" />
+                                                                        </div>
+                                                                        <div class="edit-team">
+                                                                            <span class="team-name">{getTeamDisplayName(match.team2)}</span>
+                                                                            <input type="number" min="0" bind:value={editingMatch.score2} class="score-input" />
+                                                                        </div>
+                                                                        <div class="edit-actions">
+                                                                            <button class="edit-btn save" on:click={saveMatchScore}>✓ Save</button>
+                                                                            <button class="edit-btn cancel" on:click={cancelEditing}>✕ Cancel</button>
+                                                                        </div>
+                                                                    </div>
+                                                                {:else}
+                                                                    <div class={getTeamClass(match, 1)}
+                                                                        on:click={() => editable && isNextMatch(match) && startEditing('lb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(match) && startEditing('lb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        role={editable && isNextMatch(match) ? "button" : "text"}
+                                                                        tabindex={editable && isNextMatch(match) ? 0 : -1}
+                                                                        class:clickable={editable && isNextMatch(match)}
+                                                                    >
+                                                                        <span class="team-name">{getTeamDisplayName(match.team1)}</span>
+                                                                        {#if match.score1 !== null}<span class="team-score">{match.score1}</span>{/if}
+                                                                    </div>
+                                                                    <div class={getTeamClass(match, 2)}
+                                                                        on:click={() => editable && isNextMatch(match) && startEditing('lb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(match) && startEditing('lb', { roundIndex, matchIndex }, match.score1, match.score2)}
+                                                                        role={editable && isNextMatch(match) ? "button" : "text"}
+                                                                        tabindex={editable && isNextMatch(match) ? 0 : -1}
+                                                                        class:clickable={editable && isNextMatch(match)}
+                                                                    >
+                                                                        <span class="team-name">{getTeamDisplayName(match.team2)}</span>
+                                                                        {#if match.score2 !== null}<span class="team-score">{match.score2}</span>{/if}
+                                                                    </div>
+                                                                    {#if editable && match.winner}
+                                                                        <button class="clear-btn bracket-clear" on:click={() => clearMatchResult('lb', { roundIndex, matchIndex })} title="Clear result">🗑</button>
+                                                                    {/if}
+                                                                {/if}
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
+                                
+                                <!-- Grand Final -->
+                                {#if tournament.bracket.grandFinal}
+                                    <div class="de-section grand-final-section">
+                                        <h3 class="de-section-title gf-title">👑 Grand Final</h3>
+                                        <div class="grand-final-matches">
+                                            {#each tournament.bracket.grandFinal.matches as match, matchIndex}
+                                                {#if !match.conditional || isResetNeeded()}
+                                                    <div class="gf-match-wrapper">
+                                                        <h4 class="gf-match-label">
+                                                            {#if matchIndex === 0}
+                                                                Game 1
+                                                            {:else}
+                                                                Reset (Losers side won Game 1)
+                                                            {/if}
+                                                        </h4>
+                                                        <div class={getMatchClass(match)}>
+                                                            {#if editingMatch?.type === 'grandFinal' && editingMatch?.matchIndex === matchIndex}
+                                                                <div class="bracket-match-edit">
+                                                                    <div class="edit-team">
+                                                                        <span class="team-name">{getTeamDisplayName(match.team1)}</span>
+                                                                        <input type="number" min="0" bind:value={editingMatch.score1} class="score-input" />
+                                                                    </div>
+                                                                    <div class="edit-team">
+                                                                        <span class="team-name">{getTeamDisplayName(match.team2)}</span>
+                                                                        <input type="number" min="0" bind:value={editingMatch.score2} class="score-input" />
+                                                                    </div>
+                                                                    <div class="edit-actions">
+                                                                        <button class="edit-btn save" on:click={saveMatchScore}>✓ Save</button>
+                                                                        <button class="edit-btn cancel" on:click={cancelEditing}>✕ Cancel</button>
+                                                                    </div>
+                                                                </div>
+                                                            {:else}
+                                                                <div class={getTeamClass(match, 1)}
+                                                                    on:click={() => editable && isNextMatch(match) && startEditing('grandFinal', { matchIndex }, match.score1, match.score2)}
+                                                                    on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(match) && startEditing('grandFinal', { matchIndex }, match.score1, match.score2)}
+                                                                    role={editable && isNextMatch(match) ? "button" : "text"}
+                                                                    tabindex={editable && isNextMatch(match) ? 0 : -1}
+                                                                    class:clickable={editable && isNextMatch(match)}
+                                                                >
+                                                                    <span class="team-name">{getTeamDisplayName(match.team1)}</span>
+                                                                    <span class="team-tag winners-tag">W</span>
+                                                                    {#if match.score1 !== null}<span class="team-score">{match.score1}</span>{/if}
+                                                                </div>
+                                                                <div class={getTeamClass(match, 2)}
+                                                                    on:click={() => editable && isNextMatch(match) && startEditing('grandFinal', { matchIndex }, match.score1, match.score2)}
+                                                                    on:keydown={(e) => e.key === 'Enter' && editable && isNextMatch(match) && startEditing('grandFinal', { matchIndex }, match.score1, match.score2)}
+                                                                    role={editable && isNextMatch(match) ? "button" : "text"}
+                                                                    tabindex={editable && isNextMatch(match) ? 0 : -1}
+                                                                    class:clickable={editable && isNextMatch(match)}
+                                                                >
+                                                                    <span class="team-name">{getTeamDisplayName(match.team2)}</span>
+                                                                    <span class="team-tag losers-tag">L</span>
+                                                                    {#if match.score2 !== null}<span class="team-score">{match.score2}</span>{/if}
+                                                                </div>
+                                                                {#if editable && match.winner}
+                                                                    <button class="clear-btn bracket-clear" on:click={() => clearMatchResult('grandFinal', { matchIndex })} title="Clear result">🗑</button>
+                                                                {/if}
+                                                            {/if}
+                                                        </div>
+                                                    </div>
+                                                {/if}
+                                            {/each}
+                                            
+                                            <!-- Champion Display -->
+                                            {#if getDoubleElimChampion()}
+                                                <div class="champion-display">
+                                                    <h3 class="champion-title">🏆 CHAMPION 🏆</h3>
+                                                    <div class="champion-name">{getDoubleElimChampion()}</div>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                {/if}
+                            </div>
+                        {:else}
+                        <!-- Single Elimination Bracket (original) -->
                         
                         <div class="bracket-container">
                             {#each tournament.bracket.rounds as round, roundIndex}
@@ -1091,6 +1603,7 @@
                                 {/if}
                             {/if}
                         </div>
+                        {/if}
                     </div>
                 {/if}
                 </div>
@@ -1384,6 +1897,10 @@
     
     .standings-table tr.qualifies td.pos {
         color: #059669;
+    }
+    
+    .standings-table tr.zone-last td {
+        border-bottom: 2.5px solid #9ca3af;
     }
     
     /* Group Stage Status */
@@ -2156,6 +2673,102 @@
         font-weight: 600;
         color: #78716c;
         text-align: center;
+    }
+    
+    /* Double Elimination */
+    .de-bracket {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+    
+    .de-section {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 2px solid #e5e7eb;
+    }
+    
+    .winners-section {
+        border-color: #86efac;
+        background: #f0fdf4;
+    }
+    
+    .losers-section {
+        border-color: #fca5a5;
+        background: #fef2f2;
+    }
+    
+    .grand-final-section {
+        border-color: #fbbf24;
+        background: #fffbeb;
+    }
+    
+    .de-section-title {
+        margin: 0 0 1rem 0;
+        font-size: 1.25rem;
+    }
+    
+    .winners-title { color: #166534; }
+    .losers-title { color: #991b1b; }
+    .gf-title { color: #92400e; }
+    
+    .grand-final-matches {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+    }
+    
+    .gf-match-wrapper {
+        text-align: center;
+    }
+    
+    .gf-match-label {
+        margin: 0 0 0.5rem 0;
+        font-size: 1rem;
+        color: #6b7280;
+    }
+    
+    .team-tag {
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+        margin-left: 0.4rem;
+        vertical-align: middle;
+    }
+    
+    .winners-tag {
+        background: #dcfce7;
+        color: #166534;
+    }
+    
+    .losers-tag {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .champion-display {
+        text-align: center;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        padding: 1.5rem 2rem;
+        border-radius: 12px;
+        margin-top: 1rem;
+    }
+    
+    .champion-display .champion-title {
+        margin: 0 0 0.5rem 0;
+        font-size: 1rem;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+    
+    .champion-display .champion-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: white;
     }
     
     /* Responsive */

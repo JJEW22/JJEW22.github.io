@@ -1,0 +1,762 @@
+{
+  "tournamentName": "Final Tournament",
+  "date": "April 2, 2026",
+  "location": "Jack's House",
+  "format": {
+    "groupStage": true,
+    "knockoutStage": true,
+    "bracketType": "doubleElimination",
+    "groupAdvancement": 10,
+    "matchesPerTeam": 2,
+    "description": "All 13 teams play 2 group matches. Top 10 advance: seeds 1-4 enter Winners bracket, seeds 5-10 enter Losers bracket. Double elimination - must lose twice to be out. Losers bracket winner must beat Winners bracket winner twice to take the title.",
+    "standingsHighlights": [
+      {
+        "top": 4,
+        "color": "#f59e0b",
+        "label": "Winners Bracket"
+      },
+      {
+        "top": 10,
+        "color": "#6b7280",
+        "label": "Losers Bracket"
+      }
+    ]
+  },
+  "teams": [
+    {
+      "name": "Nawty",
+      "player1": "Nick",
+      "player2": "Shawty"
+    },
+    {
+      "name": "Pill Dickle",
+      "player1": "Vedant",
+      "player2": "Sam"
+    },
+    {
+      "name": "Milk and Honey",
+      "player1": "Jack",
+      "player2": "Patrik"
+    },
+    {
+      "name": "Shake Shack",
+      "player1": "Upekha",
+      "player2": "Abhishek"
+    },
+    {
+      "name": "The Sun also Rises",
+      "player1": "Anand",
+      "player2": "Anand roomate"
+    },
+    {
+      "name": "Edger Team",
+      "player1": "Annie",
+      "player2": "Moll Ball"
+    },
+    {
+      "name": "Frolicc",
+      "player1": "Jenny",
+      "player2": "Ellie"
+    },
+    {
+      "name": "Washed and Chopped",
+      "player1": "Ethan",
+      "player2": "Tyler"
+    },
+    {
+      "name": "XX",
+      "player1": "Jared",
+      "player2": "Will"
+    },
+    {
+      "name": "Jayhawks",
+      "player1": "Josh",
+      "player2": "John"
+    },
+    {
+      "name": "XXX",
+      "player1": "Anish",
+      "player2": "Dina"
+    },
+    {
+      "name": "X",
+      "player1": "Haneen",
+      "player2": "Na'ama"
+    },
+    {
+      "name": "XXXX",
+      "player1": "Alice",
+      "player2": "Lisa"
+    }
+  ],
+  "groups": [
+    {
+      "name": "League",
+      "teams": [
+        "Nawty",
+        "Pill Dickle",
+        "Milk and Honey",
+        "Shake Shack",
+        "The Sun also Rises",
+        "Edger Team",
+        "Frolicc",
+        "Washed and Chopped",
+        "XX",
+        "Jayhawks",
+        "XXX",
+        "X",
+        "XXXX"
+      ],
+      "matches": [
+        {
+          "team1": "Washed and Chopped",
+          "team2": "Frolicc",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 1
+        },
+        {
+          "team1": "Frolicc",
+          "team2": "Milk and Honey",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 2
+        },
+        {
+          "team1": "Milk and Honey",
+          "team2": "Jayhawks",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 3
+        },
+        {
+          "team1": "Jayhawks",
+          "team2": "XXXX",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 4
+        },
+        {
+          "team1": "XXXX",
+          "team2": "Edger Team",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 5
+        },
+        {
+          "team1": "Edger Team",
+          "team2": "X",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 6
+        },
+        {
+          "team1": "X",
+          "team2": "XX",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 7
+        },
+        {
+          "team1": "XX",
+          "team2": "Shake Shack",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 8
+        },
+        {
+          "team1": "Shake Shack",
+          "team2": "The Sun also Rises",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 9
+        },
+        {
+          "team1": "The Sun also Rises",
+          "team2": "Nawty",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 10
+        },
+        {
+          "team1": "Nawty",
+          "team2": "Pill Dickle",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 11
+        },
+        {
+          "team1": "Pill Dickle",
+          "team2": "XXX",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 12
+        },
+        {
+          "team1": "XXX",
+          "team2": "Washed and Chopped",
+          "score1": null,
+          "score2": null,
+          "completed": false,
+          "matchNum": 13
+        }
+      ]
+    }
+  ],
+  "bracket": {
+    "name": "Double Elimination Knockout",
+    "bracketType": "doubleElimination",
+    "winnersBracket": {
+      "rounds": [
+        {
+          "name": "WB Round 1",
+          "matches": [
+            {
+              "id": "WB-R1-1",
+              "team1": {
+                "name": "TBD",
+                "source": "1st Place",
+                "seed": 1
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "4th Place",
+                "seed": 4
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null,
+              "loserGoesTo": {
+                "round": "LB-R1",
+                "matchIndex": 3,
+                "slot": "team1"
+              }
+            },
+            {
+              "id": "WB-R1-2",
+              "team1": {
+                "name": "TBD",
+                "source": "2nd Place",
+                "seed": 2
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "3rd Place",
+                "seed": 3
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null,
+              "loserGoesTo": {
+                "round": "LB-R1",
+                "matchIndex": 2,
+                "slot": "team1"
+              }
+            }
+          ]
+        },
+        {
+          "name": "WB Final",
+          "matches": [
+            {
+              "id": "WB-F",
+              "team1": {
+                "name": "TBD",
+                "source": "WB-R1-1"
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "WB-R1-2"
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null,
+              "loserGoesTo": {
+                "round": "LB-SF",
+                "matchIndex": 0,
+                "slot": "team1"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "losersBracket": {
+      "rounds": [
+        {
+          "name": "LB Round 1",
+          "id": "LB-R1",
+          "matches": [
+            {
+              "id": "LB-R1-1",
+              "team1": {
+                "name": "TBD",
+                "source": "5th Place",
+                "seed": 5
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "8th Place",
+                "seed": 8
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null,
+              "winnerGoesTo": {
+                "round": "LB-R2",
+                "matchIndex": 1,
+                "slot": "team1"
+              }
+            },
+            {
+              "id": "LB-R1-2",
+              "team1": {
+                "name": "TBD",
+                "source": "6th Place",
+                "seed": 6
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "7th Place",
+                "seed": 7
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null,
+              "winnerGoesTo": {
+                "round": "LB-R2",
+                "matchIndex": 0,
+                "slot": "team1"
+              }
+            },
+            {
+              "id": "LB-R1-3",
+              "team1": {
+                "name": "TBD",
+                "source": "Loser WB-R1-2 (2v3)",
+                "seed": null
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "9th Place",
+                "seed": 9
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null,
+              "winnerGoesTo": {
+                "round": "LB-R2",
+                "matchIndex": 1,
+                "slot": "team2"
+              }
+            },
+            {
+              "id": "LB-R1-4",
+              "team1": {
+                "name": "TBD",
+                "source": "Loser WB-R1-1 (1v4)",
+                "seed": null
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "10th Place",
+                "seed": 10
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null,
+              "winnerGoesTo": {
+                "round": "LB-R2",
+                "matchIndex": 0,
+                "slot": "team2"
+              }
+            }
+          ]
+        },
+        {
+          "name": "LB Round 2",
+          "id": "LB-R2",
+          "matches": [
+            {
+              "id": "LB-R2-1",
+              "team1": {
+                "name": "TBD",
+                "source": "LB-R1-2"
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "LB-R1-4"
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null
+            },
+            {
+              "id": "LB-R2-2",
+              "team1": {
+                "name": "TBD",
+                "source": "LB-R1-1"
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "LB-R1-3"
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "LB Round 3",
+          "id": "LB-R3",
+          "matches": [
+            {
+              "id": "LB-R3-1",
+              "team1": {
+                "name": "TBD",
+                "source": "LB-R2-1"
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "LB-R2-2"
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "LB Semifinal",
+          "id": "LB-SF",
+          "matches": [
+            {
+              "id": "LB-SF-1",
+              "team1": {
+                "name": "TBD",
+                "source": "Loser WB Final"
+              },
+              "team2": {
+                "name": "TBD",
+                "source": "LB-R3-1"
+              },
+              "score1": null,
+              "score2": null,
+              "winner": null
+            }
+          ]
+        }
+      ]
+    },
+    "grandFinal": {
+      "name": "Grand Final",
+      "matches": [
+        {
+          "id": "GF-1",
+          "team1": {
+            "name": "TBD",
+            "source": "WB Final Winner (Winners Side)"
+          },
+          "team2": {
+            "name": "TBD",
+            "source": "LB Semifinal Winner (Losers Side)"
+          },
+          "score1": null,
+          "score2": null,
+          "winner": null,
+          "description": "If Winners side wins, they are champion. If Losers side wins, a reset match is played."
+        },
+        {
+          "id": "GF-Reset",
+          "team1": {
+            "name": "TBD",
+            "source": "GF-1 Team 1"
+          },
+          "team2": {
+            "name": "TBD",
+            "source": "GF-1 Team 2"
+          },
+          "score1": null,
+          "score2": null,
+          "winner": null,
+          "description": "Reset match - only played if Losers side won GF-1.",
+          "conditional": true
+        }
+      ]
+    }
+  },
+  "schedule": [
+    {
+      "time": "7:00 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Nawty",
+          "team2": "Pill Dickle",
+          "group": "League",
+          "matchNum": 11
+        },
+        {
+          "board": "Anish",
+          "team1": "Jayhawks",
+          "team2": "XXXX",
+          "group": "League",
+          "matchNum": 4
+        }
+      ]
+    },
+    {
+      "time": "7:15 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "XXX",
+          "team2": "Washed and Chopped",
+          "group": "League",
+          "matchNum": 13
+        },
+        {
+          "board": "Anish",
+          "team1": "Edger Team",
+          "team2": "X",
+          "group": "League",
+          "matchNum": 6
+        }
+      ]
+    },
+    {
+      "time": "7:30 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Milk and Honey",
+          "team2": "Jayhawks",
+          "group": "League",
+          "matchNum": 3
+        },
+        {
+          "board": "Anish",
+          "team1": "The Sun also Rises",
+          "team2": "Nawty",
+          "group": "League",
+          "matchNum": 10
+        }
+      ]
+    },
+    {
+      "time": "7:45 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Washed and Chopped",
+          "team2": "Frolicc",
+          "group": "League",
+          "matchNum": 1
+        },
+        {
+          "board": "Anish",
+          "team1": "XX",
+          "team2": "Shake Shack",
+          "group": "League",
+          "matchNum": 8
+        }
+      ]
+    },
+    {
+      "time": "8:00 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "XXXX",
+          "team2": "Edger Team",
+          "group": "League",
+          "matchNum": 5
+        },
+        {
+          "board": "Anish",
+          "team1": "Pill Dickle",
+          "team2": "XXX",
+          "group": "League",
+          "matchNum": 12
+        }
+      ]
+    },
+    {
+      "time": "8:15 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "X",
+          "team2": "XX",
+          "group": "League",
+          "matchNum": 7
+        },
+        {
+          "board": "Anish",
+          "team1": "Frolicc",
+          "team2": "Milk and Honey",
+          "group": "League",
+          "matchNum": 2
+        }
+      ]
+    },
+    {
+      "time": "8:30 PM",
+      "stage": "Group Stage (Float)",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Shake Shack",
+          "team2": "The Sun also Rises",
+          "group": "League",
+          "matchNum": 9
+        }
+      ]
+    },
+    {
+      "time": "8:45 PM",
+      "stage": "WB Round 1 + LB Round 1 (A)",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "1st Place",
+          "team2": "4th Place",
+          "matchId": "WB-R1-1"
+        },
+        {
+          "board": "Anish",
+          "team1": "5th Place",
+          "team2": "8th Place",
+          "matchId": "LB-R1-1"
+        }
+      ]
+    },
+    {
+      "time": "9:05 PM",
+      "stage": "WB Round 1 + LB Round 1 (B)",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "2nd Place",
+          "team2": "3rd Place",
+          "matchId": "WB-R1-2"
+        },
+        {
+          "board": "Anish",
+          "team1": "6th Place",
+          "team2": "7th Place",
+          "matchId": "LB-R1-2"
+        }
+      ]
+    },
+    {
+      "time": "9:25 PM",
+      "stage": "LB Round 1 (C+D)",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Loser WB(2v3)",
+          "team2": "9th Place",
+          "matchId": "LB-R1-3"
+        },
+        {
+          "board": "Anish",
+          "team1": "Loser WB(1v4)",
+          "team2": "10th Place",
+          "matchId": "LB-R1-4"
+        }
+      ]
+    },
+    {
+      "time": "9:45 PM",
+      "stage": "LB Round 2",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Winner LB-R1-1",
+          "team2": "Winner LB-R1-3",
+          "matchId": "LB-R2-1"
+        },
+        {
+          "board": "Anish",
+          "team1": "Winner LB-R1-2",
+          "team2": "Winner LB-R1-4",
+          "matchId": "LB-R2-2"
+        }
+      ]
+    },
+    {
+      "time": "10:05 PM",
+      "stage": "WB Final + LB Round 3",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Winner WB-R1-1",
+          "team2": "Winner WB-R1-2",
+          "matchId": "WB-F"
+        },
+        {
+          "board": "Anish",
+          "team1": "Winner LB-R2-1",
+          "team2": "Winner LB-R2-2",
+          "matchId": "LB-R3-1"
+        }
+      ]
+    },
+    {
+      "time": "10:25 PM",
+      "stage": "LB Semifinal",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "Loser WB Final",
+          "team2": "Winner LB-R3",
+          "matchId": "LB-SF-1"
+        }
+      ]
+    },
+    {
+      "time": "10:45 PM",
+      "stage": "Grand Final",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "WB Champion",
+          "team2": "LB Champion",
+          "matchId": "GF-1"
+        }
+      ]
+    },
+    {
+      "time": "11:05 PM",
+      "stage": "Grand Final Reset (if needed)",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "GF-1 Team 1",
+          "team2": "GF-1 Team 2",
+          "matchId": "GF-Reset"
+        }
+      ]
+    }
+  ]
+}

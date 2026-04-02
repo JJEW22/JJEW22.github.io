@@ -55,7 +55,7 @@
     const LAST_TEAM_FOR_ADJUSTMENT = 'Kalice';
 
     // Tournament points file
-    const TOURNAMENT_POINTS_FILE = '/marchMadness/2026/tournamentPoints.json'
+    const TOURNAMENT_POINTS_FILE = '/jpFlicks/tournamentPoints.json'
 
     // file information
     const HOME_GAMES_PAGE_NAME = "HomeGames"
@@ -2201,6 +2201,11 @@
                         <td><b>5th-6th</b></td>
                         <td>1 pts</td>
                         <td>2 pts</td>
+                    </tr>
+                    <tr>
+                        <td><b>7th-10th</b></td>
+                        <td>-</td>
+                        <td>1 pts</td>
                     </tr>
                 </tbody>
             </table>
