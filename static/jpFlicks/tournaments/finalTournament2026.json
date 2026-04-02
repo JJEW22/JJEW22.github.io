@@ -566,26 +566,6 @@
         },
         {
           "board": "Anish",
-          "team1": "Milk and Honey",
-          "team2": "Jayhawks",
-          "group": "League",
-          "matchNum": 4
-        }
-      ]
-    },
-    {
-      "time": "7:45 PM",
-      "stage": "Group Stage",
-      "matches": [
-        {
-          "board": "Home",
-          "team1": "If there's a Will there's a J",
-          "team2": "Shake Shack",
-          "group": "League",
-          "matchNum": 9
-        },
-        {
-          "board": "Anish",
           "team1": "Eeke",
           "team2": "Frolicc",
           "group": "League",
@@ -594,7 +574,7 @@
       ]
     },
     {
-      "time": "8:00 PM",
+      "time": "7:45 PM",
       "stage": "Group Stage",
       "matches": [
         {
@@ -606,15 +586,15 @@
         },
         {
           "board": "Anish",
-          "team1": "Flickers of Hope",
-          "team2": "Edger Team",
+          "team1": "Tall Order of the Phoenix",
+          "team2": "If there's a Will there's a J",
           "group": "League",
-          "matchNum": 6
+          "matchNum": 8
         }
       ]
     },
     {
-      "time": "8:15 PM",
+      "time": "8:00 PM",
       "stage": "Group Stage",
       "matches": [
         {
@@ -626,15 +606,15 @@
         },
         {
           "board": "Anish",
-          "team1": "Tall Order of the Phoenix",
-          "team2": "If there's a Will there's a J",
+          "team1": "Shake Shack",
+          "team2": "The Sun also Rises",
           "group": "League",
-          "matchNum": 8
+          "matchNum": 10
         }
       ]
     },
     {
-      "time": "8:30 PM",
+      "time": "8:15 PM",
       "stage": "Group Stage",
       "matches": [
         {
@@ -646,10 +626,30 @@
         },
         {
           "board": "Anish",
-          "team1": "Shake Shack",
-          "team2": "The Sun also Rises",
+          "team1": "Flickers of Hope",
+          "team2": "Edger Team",
           "group": "League",
-          "matchNum": 10
+          "matchNum": 6
+        }
+      ]
+    },
+    {
+      "time": "8:30 PM",
+      "stage": "Group Stage",
+      "matches": [
+        {
+          "board": "Home",
+          "team1": "If there's a Will there's a J",
+          "team2": "Shake Shack",
+          "group": "League",
+          "matchNum": 9
+        },
+        {
+          "board": "Anish",
+          "team1": "Milk and Honey",
+          "team2": "Jayhawks",
+          "group": "League",
+          "matchNum": 4
         }
       ]
     },
