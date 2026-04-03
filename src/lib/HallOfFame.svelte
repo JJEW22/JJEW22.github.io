@@ -55,6 +55,21 @@
       },
     },
     {
+      eventName: '2026 Final Tournament',
+      champion: "Dill Pickle",
+      members: "Sam + Vedant",
+      record: {
+        record: "5-0-1",
+        PD: "+270"
+      },
+      runnerUp: "Milk and Honey",
+      runnerUpMembers: "Jack + Patrik",
+      runnerUpRecord: {
+        record: "7-0-2",
+        PD: "+425"
+      },
+    },
+    {
       eventName: 'Season 2',
       champion: "Your Team?",
       members: "You? + Partner?",

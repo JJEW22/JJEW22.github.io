@@ -117,113 +117,113 @@
         {
           "team1": "Washed and Chopped",
           "team2": "Eeke",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 75,
+          "score2": 0,
+          "completed": true,
           "matchNum": 1
         },
         {
           "team1": "Eeke",
           "team2": "Frolicc",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 65,
+          "score2": 10,
+          "completed": true,
           "matchNum": 2
         },
         {
           "team1": "Frolicc",
           "team2": "Milk and Honey",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 0,
+          "score2": 75,
+          "completed": true,
           "matchNum": 3
         },
         {
           "team1": "Milk and Honey",
           "team2": "Jayhawks",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 70,
+          "score2": 0,
+          "completed": true,
           "matchNum": 4
         },
         {
           "team1": "Jayhawks",
           "team2": "Flickers of Hope",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 75,
+          "score2": 0,
+          "completed": true,
           "matchNum": 5
         },
         {
           "team1": "Flickers of Hope",
           "team2": "Edger Team",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 5,
+          "score2": 75,
+          "completed": true,
           "matchNum": 6
         },
         {
           "team1": "Edger Team",
           "team2": "Tall Order of the Phoenix",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 10,
+          "score2": 55,
+          "completed": true,
           "matchNum": 7
         },
         {
           "team1": "Tall Order of the Phoenix",
           "team2": "If there's a Will there's a J",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 75,
+          "score2": 0,
+          "completed": true,
           "matchNum": 8
         },
         {
           "team1": "If there's a Will there's a J",
           "team2": "Shake Shack",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 40,
+          "score2": 20,
+          "completed": true,
           "matchNum": 9
         },
         {
           "team1": "Shake Shack",
           "team2": "The Sun also Rises",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 40,
+          "score2": 65,
+          "completed": true,
           "matchNum": 10
         },
         {
           "team1": "The Sun also Rises",
           "team2": "Nawty",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 20,
+          "score2": 25,
+          "completed": true,
           "matchNum": 11
         },
         {
           "team1": "Nawty",
           "team2": "Pill Dickle",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 0,
+          "score2": 75,
+          "completed": true,
           "matchNum": 12
         },
         {
           "team1": "Pill Dickle",
           "team2": "dinkherjee",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 75,
+          "score2": 0,
+          "completed": true,
           "matchNum": 13
         },
         {
           "team1": "dinkherjee",
           "team2": "Washed and Chopped",
-          "score1": null,
-          "score2": null,
-          "completed": false,
+          "score1": 0,
+          "score2": 75,
+          "completed": true,
           "matchNum": 14
         }
       ]
@@ -240,18 +240,18 @@
             {
               "id": "WB-R1-1",
               "team1": {
-                "name": "TBD",
+                "name": "Pill Dickle",
                 "source": "1st Place",
                 "seed": 1
               },
               "team2": {
-                "name": "TBD",
+                "name": "Tall Order of the Phoenix",
                 "source": "4th Place",
                 "seed": 4
               },
-              "score1": null,
-              "score2": null,
-              "winner": null,
+              "score1": 100,
+              "score2": 10,
+              "winner": "Pill Dickle",
               "loserGoesTo": {
                 "round": "LB-R1",
                 "matchIndex": 3,
@@ -261,18 +261,22 @@
             {
               "id": "WB-R1-2",
               "team1": {
-                "name": "TBD",
+                "name": "Washed and Chopped",
                 "source": "2nd Place",
                 "seed": 2
               },
               "team2": {
-                "name": "TBD",
+                "name": "Milk and Honey",
                 "source": "3rd Place",
                 "seed": 3
               },
-              "score1": null,
-              "score2": null,
-              "winner": null,
+              "score1": 105,
+              "score2": 10,
+              "winner": {
+                "name": "Washed and Chopped",
+                "source": "2nd Place",
+                "seed": 2
+              },
               "loserGoesTo": {
                 "round": "LB-R1",
                 "matchIndex": 2,
@@ -287,16 +291,18 @@
             {
               "id": "WB-F",
               "team1": {
-                "name": "TBD",
-                "source": "WB-R1-1"
+                "name": "Pill Dickle",
+                "source": "WB-R1-1",
+                "seed": null
               },
               "team2": {
-                "name": "TBD",
-                "source": "WB-R1-2"
+                "name": "Washed and Chopped",
+                "source": "WB-R1-2",
+                "seed": null
               },
-              "score1": null,
-              "score2": null,
-              "winner": null,
+              "score1": 70,
+              "score2": 30,
+              "winner": "Pill Dickle",
               "loserGoesTo": {
                 "round": "LB-SF",
                 "matchIndex": 0,
@@ -316,18 +322,18 @@
             {
               "id": "LB-R1-1",
               "team1": {
-                "name": "TBD",
+                "name": "Edger Team",
                 "source": "5th Place",
                 "seed": 5
               },
               "team2": {
-                "name": "TBD",
+                "name": "Eeke",
                 "source": "8th Place",
                 "seed": 8
               },
-              "score1": null,
-              "score2": null,
-              "winner": null,
+              "score1": 0,
+              "score2": 100,
+              "winner": "Eeke",
               "winnerGoesTo": {
                 "round": "LB-R2",
                 "matchIndex": 1,
@@ -337,18 +343,18 @@
             {
               "id": "LB-R1-2",
               "team1": {
-                "name": "TBD",
+                "name": "The Sun also Rises",
                 "source": "6th Place",
                 "seed": 6
               },
               "team2": {
-                "name": "TBD",
+                "name": "Jayhawks",
                 "source": "7th Place",
                 "seed": 7
               },
-              "score1": null,
-              "score2": null,
-              "winner": null,
+              "score1": 0,
+              "score2": 100,
+              "winner": "Jayhawks",
               "winnerGoesTo": {
                 "round": "LB-R2",
                 "matchIndex": 0,
@@ -358,18 +364,18 @@
             {
               "id": "LB-R1-3",
               "team1": {
-                "name": "TBD",
-                "source": "Loser WB-R1-2 (2v3)",
+                "name": "Milk and Honey",
+                "source": "WB-R1-2 (L)",
                 "seed": null
               },
               "team2": {
-                "name": "TBD",
+                "name": "If there's a Will there's a J",
                 "source": "9th Place",
                 "seed": 9
               },
-              "score1": null,
-              "score2": null,
-              "winner": null,
+              "score1": 100,
+              "score2": 0,
+              "winner": "Milk and Honey",
               "winnerGoesTo": {
                 "round": "LB-R2",
                 "matchIndex": 1,
@@ -379,18 +385,18 @@
             {
               "id": "LB-R1-4",
               "team1": {
-                "name": "TBD",
-                "source": "Loser WB-R1-1 (1v4)",
+                "name": "Tall Order of the Phoenix",
+                "source": "WB-R1-1 (L)",
                 "seed": null
               },
               "team2": {
-                "name": "TBD",
+                "name": "Nawty",
                 "source": "10th Place",
                 "seed": 10
               },
-              "score1": null,
-              "score2": null,
-              "winner": null,
+              "score1": 25,
+              "score2": 5,
+              "winner": "Tall Order of the Phoenix",
               "winnerGoesTo": {
                 "round": "LB-R2",
                 "matchIndex": 0,
@@ -406,30 +412,34 @@
             {
               "id": "LB-R2-1",
               "team1": {
-                "name": "TBD",
-                "source": "LB-R1-2"
+                "name": "Eeke",
+                "source": "LB-R1-1",
+                "seed": null
               },
               "team2": {
-                "name": "TBD",
-                "source": "LB-R1-4"
+                "name": "Jayhawks",
+                "source": "LB-R1-2",
+                "seed": null
               },
-              "score1": null,
-              "score2": null,
-              "winner": null
+              "score1": 45,
+              "score2": 75,
+              "winner": "Jayhawks"
             },
             {
               "id": "LB-R2-2",
               "team1": {
-                "name": "TBD",
-                "source": "LB-R1-1"
+                "name": "Milk and Honey",
+                "source": "LB-R1-3",
+                "seed": null
               },
               "team2": {
-                "name": "TBD",
-                "source": "LB-R1-3"
+                "name": "Tall Order of the Phoenix",
+                "source": "LB-R1-4",
+                "seed": null
               },
-              "score1": null,
-              "score2": null,
-              "winner": null
+              "score1": 70,
+              "score2": 40,
+              "winner": "Milk and Honey"
             }
           ]
         },
@@ -440,16 +450,18 @@
             {
               "id": "LB-R3-1",
               "team1": {
-                "name": "TBD",
-                "source": "LB-R2-1"
+                "name": "Jayhawks",
+                "source": "LB-R2-1",
+                "seed": null
               },
               "team2": {
-                "name": "TBD",
-                "source": "LB-R2-2"
+                "name": "Milk and Honey",
+                "source": "LB-R2-2",
+                "seed": null
               },
-              "score1": null,
-              "score2": null,
-              "winner": null
+              "score1": 0,
+              "score2": 100,
+              "winner": "Milk and Honey"
             }
           ]
         },
@@ -460,16 +472,22 @@
             {
               "id": "LB-SF-1",
               "team1": {
-                "name": "TBD",
-                "source": "Loser WB Final"
+                "name": "Milk and Honey",
+                "source": "LB-R3-1",
+                "seed": null
               },
               "team2": {
-                "name": "TBD",
-                "source": "LB-R3-1"
+                "name": "Washed and Chopped",
+                "source": "WB Final",
+                "seed": null
               },
-              "score1": null,
-              "score2": null,
-              "winner": null
+              "score1": 40,
+              "score2": 10,
+              "winner":  {
+                "name": "Milk and Honey",
+                "source": "LB-R3-1",
+                "seed": null
+              }
             }
           ]
         }
@@ -481,31 +499,43 @@
         {
           "id": "GF-1",
           "team1": {
-            "name": "TBD",
-            "source": "WB Final Winner (Winners Side)"
+            "name": "Pill Dickle",
+            "source": "WB-F",
+            "seed": null
           },
           "team2": {
-            "name": "TBD",
-            "source": "LB Semifinal Winner (Losers Side)"
+                "name": "Milk and Honey",
+                "source": "LB Semifinal",
+                "seed": null
           },
-          "score1": null,
-          "score2": null,
-          "winner": null,
+          "score1": 10,
+          "score2": 75,
+          "winner": {
+                "name": "Milk and Honey",
+                "source": "LB Semifinal",
+                "seed": null
+          },
           "description": "If Winners side wins, they are champion. If Losers side wins, a reset match is played."
         },
         {
           "id": "GF-Reset",
           "team1": {
-            "name": "TBD",
-            "source": "GF-1 Team 1"
+            "name": "Pill Dickle",
+            "source": "grandFinal",
+            "seed": null
           },
           "team2": {
-            "name": "TBD",
-            "source": "GF-1 Team 2"
+                "name": "Milk and Honey",
+                "source": "grandFinal",
+                "seed": null
           },
-          "score1": null,
-          "score2": null,
-          "winner": null,
+          "score1": 60,
+          "score2": 15,
+          "winner": {
+            "name": "Pill Dickle",
+            "source": "grandFinal",
+            "seed": null
+          },
           "description": "Reset match - only played if Losers side won GF-1.",
           "conditional": true
         }
