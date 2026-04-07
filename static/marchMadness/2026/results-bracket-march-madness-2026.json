@@ -1323,10 +1323,20 @@
         "seed": 1,
         "region": "Midwest"
       },
-      "winner": null,
+      "winner": {
+        "name": "Michigan",
+        "seed": 1,
+        "region": "Midwest"
+      },
       "gameId": "r6-0",
-      "region": ""
+      "region": "",
+      "score1": 63,
+      "score2": 69
     }
   ],
-  "winner": null
+  "winner": {
+    "name": "Michigan",
+    "seed": 1,
+    "region": "Midwest"
+  }
 }

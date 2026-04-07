@@ -457,7 +457,9 @@
         "round": 5,
         "reason": "Had the lowest average point differential in games you incorrectly picked",
         "image": "/marchMadness/2026/badges/miskeen.png",
-        "Winners": ["Josh"]
+        "Winners": [
+            "Josh"
+        ]
     },
     {
         "name": "the Independent",
@@ -542,14 +544,20 @@
         "reason": "By another metric you won: picking the most games or winning the meta bracket",
         "pictureDesc": "(logo is mario 1 up)",
         "image": "/marchMadness/2026/badges/1up.jpg",
-        "Winners": []
+        "Winners": [
+            "Jack",
+            "John",
+            "Haneen"
+        ]
     },
     {
         "name": "Pants Coin",
         "round": 6,
-        "reason": "luckily have the least point differential for correctly picked games",
+        "reason": "'luckily' have the least point differential for correctly picked games",
         "image": "/marchMadness/2026/badges/pantsCoin.jpg",
-        "Winners": []
+        "Winners": [
+            "Alice"
+        ]
     },
     {
         "name": "Joever/hard hat",
@@ -650,7 +658,9 @@
             "Na'ama",
             "Ethan",
             "Sam",
-            "Manu"
+            "Manu",
+            "Haneen",
+            "Jared"
         ],
         "scores": {
             "Round 1: High Point (seed 12)": [
@@ -667,14 +677,6 @@
                 "Nick",
                 "Kato",
                 "Dustin"
-            ],
-            "Round 5: UConn (seed 2)": [
-                "Alice",
-                "Kato",
-                "Na'ama",
-                "Ethan",
-                "Sam",
-                "Manu"
             ]
         }
     },

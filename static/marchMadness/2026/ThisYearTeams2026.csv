@@ -1,6 +1,6 @@
 TEAM,SEED,Region,prob_r32,prob_r16,prob_r8,prob_r4,prob_r2,prob_win
-Michigan,1,Midwest,1,1,1,1,1,0.71917808
-UConn,2,East,1,1,1,1,1,0.28082192
+Michigan,1,Midwest,1,1,1,1,1,1
+UConn,2,East,1,1,1,1,1,0
 Akron,12,Midwest,0,0,0,0,0,0
 Alabama,4,Midwest,1,1,0,0,0,0
 Arizona,1,West,1,1,1,1,0,0

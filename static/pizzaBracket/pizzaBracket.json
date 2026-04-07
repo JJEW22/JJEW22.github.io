@@ -1,0 +1,511 @@
+{
+  "bracketName": "JP Pizza Bracket",
+  "description": "24 pizzas, 4 divisions, 1 champion",
+  "divisions": [
+    {
+      "name": "South JP",
+      "color": "#dc2626",
+      "rounds": [
+        {
+          "name": "Round 1",
+          "matches": [
+            {
+              "id": "A-R1-triple",
+              "type": "triple",
+              "teams": [
+                {
+                  "name": "Round 2",
+                  "seed": 2,
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "italilian P&S",
+                  "seed": 3,
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "Ruggieros",
+                  "seed": 4,
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            },
+            {
+              "id": "A-R1-std",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "burritos",
+                  "seed": 5,
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "forest hills",
+                  "seed": 6,
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "Round 2",
+          "matches": [
+            {
+              "id": "A-R2",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "Pete's",
+                  "seed": 1,
+                  "source": "bye",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "A-R1-std",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "Division Final",
+          "matches": [
+            {
+              "id": "A-Final",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "A-R1-triple",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "A-R2",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "East JP",
+      "color": "#2563eb",
+      "rounds": [
+        {
+          "name": "Round 1",
+          "matches": [
+            {
+              "id": "B-R1-triple",
+              "type": "triple",
+              "teams": [
+                {
+                  "name": "Rizzo",
+                  "seed": 2,
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "Dublin House of pizza",
+                  "seed": 3,
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "Egelston",
+                  "seed": 4,
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            },
+            {
+              "id": "B-R1-std",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "Cappy's",
+                  "seed": 5,
+                  "votes": 5,
+                  "rating": 4.25
+                },
+                {
+                  "name": "Nicole's",
+                  "seed": 6,
+                  "votes": 2,
+                  "rating": 3.25
+                }
+              ],
+              "winner": "Cappy's"
+            }
+          ]
+        },
+        {
+          "name": "Round 2",
+          "matches": [
+            {
+              "id": "B-R2",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "Mario's",
+                  "seed": 1,
+                  "source": "bye",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "Cappy's",
+                  "seed": null,
+                  "source": "B-R1-std",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "Division Final",
+          "matches": [
+            {
+              "id": "B-Final",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "B-R1-triple",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "B-R2",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "West JP",
+      "color": "#16a34a",
+      "rounds": [
+        {
+          "name": "Round 1",
+          "matches": [
+            {
+              "id": "C-R1-triple",
+              "type": "triple",
+              "teams": [
+                {
+                  "name": "real deal",
+                  "seed": 2,
+                  "votes": 6,
+                  "rating": 4.06
+                },
+                {
+                  "name": "Same old place",
+                  "seed": 3,
+                  "votes": 3,
+                  "rating": 3.7
+                },
+                {
+                  "name": "Zestos",
+                  "seed": 4,
+                  "votes": null,
+                  "rating": 3.33
+                }
+              ],
+              "winner": "real deal"
+            },
+            {
+              "id": "C-R1-std",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "JPHOP",
+                  "seed": 5,
+                  "votes": 5,
+                  "rating": 3.12
+                },
+                {
+                  "name": "Joseph's",
+                  "seed": 6,
+                  "votes": 2,
+                  "rating": 2.62
+                }
+              ],
+              "winner": "JPHOP"
+            }
+          ]
+        },
+        {
+          "name": "Round 2",
+          "matches": [
+            {
+              "id": "C-R2",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "Pizza stop",
+                  "seed": 1,
+                  "source": "bye",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "JPHOP",
+                  "seed": null,
+                  "source": "C-R1-std",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "Division Final",
+          "matches": [
+            {
+              "id": "C-Final",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "real deal",
+                  "seed": null,
+                  "source": "C-R1-triple",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "C-R2",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mission Hill",
+      "color": "#d97706",
+      "rounds": [
+        {
+          "name": "Round 1",
+          "matches": [
+            {
+              "id": "D-R1-triple",
+              "type": "triple",
+              "teams": [
+                {
+                  "name": "Penguin",
+                  "seed": 2,
+                  "votes": null,
+                  "rating": 3.88
+                },
+                {
+                  "name": "Il Mondo's",
+                  "seed": 3,
+                  "votes": 6,
+                  "rating": 4.62
+                },
+                {
+                  "name": "mama",
+                  "seed": 4,
+                  "votes": 1,
+                  "rating": 3.98
+                }
+              ],
+              "winner": "Il Mondo's"
+            },
+            {
+              "id": "D-R1-std",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "AK's",
+                  "seed": 5,
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "tremont house of pizza",
+                  "seed": 6,
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "Round 2",
+          "matches": [
+            {
+              "id": "D-R2",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "Chacos",
+                  "seed": 1,
+                  "source": "bye",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "D-R1-std",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        },
+        {
+          "name": "Division Final",
+          "matches": [
+            {
+              "id": "D-Final",
+              "type": "standard",
+              "teams": [
+                {
+                  "name": "Il Mondo's",
+                  "seed": null,
+                  "source": "D-R1-triple",
+                  "votes": null,
+                  "rating": null
+                },
+                {
+                  "name": "TBD",
+                  "seed": null,
+                  "source": "D-R2",
+                  "votes": null,
+                  "rating": null
+                }
+              ],
+              "winner": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "finals": {
+    "rounds": [
+      {
+        "name": "Semifinals",
+        "matches": [
+          {
+            "id": "SF-1",
+            "type": "standard",
+            "teams": [
+              {
+                "name": "TBD",
+                "seed": null,
+                "source": "A-Final",
+                "votes": null,
+                "rating": null
+              },
+              {
+                "name": "TBD",
+                "seed": null,
+                "source": "B-Final",
+                "votes": null,
+                "rating": null
+              }
+            ],
+            "winner": null
+          },
+          {
+            "id": "SF-2",
+            "type": "standard",
+            "teams": [
+              {
+                "name": "TBD",
+                "seed": null,
+                "source": "C-Final",
+                "votes": null,
+                "rating": null
+              },
+              {
+                "name": "TBD",
+                "seed": null,
+                "source": "D-Final",
+                "votes": null,
+                "rating": null
+              }
+            ],
+            "winner": null
+          }
+        ]
+      },
+      {
+        "name": "Championship",
+        "matches": [
+          {
+            "id": "Final",
+            "type": "standard",
+            "teams": [
+              {
+                "name": "TBD",
+                "seed": null,
+                "source": "SF-1",
+                "votes": null,
+                "rating": null
+              },
+              {
+                "name": "TBD",
+                "seed": null,
+                "source": "SF-2",
+                "votes": null,
+                "rating": null
+              }
+            ],
+            "winner": null
+          }
+        ]
+      }
+    ]
+  }
+}

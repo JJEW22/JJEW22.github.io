@@ -25,6 +25,13 @@
             image: 'none',
             display: true  // Show this project
         },
+        {
+            title: "JP Pizza Bracket",
+            description: "24 pizzerias, 4 divisions, 1 champion. Rating the best pizza in JP and Mission Hill.",
+            link: "/pizzaBracket",
+            image: 'none',
+            display: true
+        },
     ];
 
 // Filter to only show projects where display is true
