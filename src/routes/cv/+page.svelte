@@ -28,7 +28,7 @@
 
     // Technical Skills data
     const skills = {
-        certifications: ["Series 65"],
+        certifications: ["Series 65", "SIE", "Massachusetts Life Insurance Producer"],
         languages: {
             proficient: ["Python", "C++", "Java", "TypeScript"],
             familiar: ["MATLAB", "JavaScript", "Swift", "Racket", "ACL2 Sedan"]
@@ -39,11 +39,21 @@
     // Experience data
     const experience = [
         {
+            company: "Rise North Capital",
+            title: "Financial Representative",
+            location: "Boston, MA",
+            startDate: "Spring 2025",
+            endDate: "Present",
+            accomplishments: [
+                "Provide personalized financial services to clients"
+            ]
+        },
+        {
             company: "Northeastern University CRI",
             title: "Commercialization Specialist",
             location: "Boston, MA",
             startDate: "Spring 2023",
-            endDate: "Present",
+            endDate: "Spring 2025",
             accomplishments: [
                 "Filter incoming invention disclosures for commercial viability and patentability",
                 "Perform outreach for license deals by packing similar IP together and developing marketing materials for distribution"
@@ -174,7 +184,7 @@
             <div class="contact-info">
                 <span>{contact.location}</span>
                 <span>•</span>
-                <a href="mailto:{contact.email}">{contact.email}</a>
+                <a href="/cdn-cgi/l/email-protection#750e161a1b011416015b1018141c1908">{contact.email}</a>
                 <span>•</span>
                 <span>{contact.phone}</span>
                 <span>•</span>

@@ -1,7 +1,7 @@
 <script>
     // Update these with your actual information
     let name = "John Wilkins";
-    let role = "PhD Student at Northeastern University";
+    let roles = ["Financial Representative at Rise North Capital", "PhD Student at Northeastern University"];
     let tagline = "CS Theory and Finance";
     
     // Social links - update with your actual links
@@ -25,7 +25,9 @@
         <section class="hero">
             <div class="hero-content">
                 <h1>{name}</h1>
-                <h2>{role}</h2>
+                {#each roles as role}
+                    <h2>{role}</h2>
+                {/each}
                 <p class="tagline">{tagline}</p>
                 
                 <div class="bio-section">
@@ -35,7 +37,7 @@
                             I am a third-year Computer Science PhD Student at Northeastern University, where I am advised by <a href="https://www.ccs.neu.edu/home/koods/"> Ravi Sundaram </a>. My research interests are in algorithmic fairness theory and its applications to personal finance outcomes.
                             </p>
                             <p>
-                            In addition to conducting research I will be working as a Financial Representative at Rise North Capital to get experience with the personal side of personal finance starting Summer 2026.
+                            In addition to conducting research I put it into practice as a Financial Representative at <a href="https://www.risenorthcapital.com/">Rise North Capital</a>.
                             </p>
                     </div>
                 </div>
