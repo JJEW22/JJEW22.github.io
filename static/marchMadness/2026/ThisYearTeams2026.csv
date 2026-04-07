@@ -1,10 +1,9 @@
 TEAM,SEED,Region,prob_r32,prob_r16,prob_r8,prob_r4,prob_r2,prob_win
-Arizona,1,West,1,1,1,1,0.42649309,0.34689393
-Michigan,1,Midwest,1,1,1,1,0.5687812,0.34054831
-Illinois,3,South,1,1,1,1,0.57350691,0.17958175
-UConn,2,East,1,1,1,1,0.4312188,0.13297601
+Michigan,1,Midwest,1,1,1,1,1,0.71917808
+UConn,2,East,1,1,1,1,1,0.28082192
 Akron,12,Midwest,0,0,0,0,0,0
 Alabama,4,Midwest,1,1,0,0,0,0
+Arizona,1,West,1,1,1,1,0,0
 Arkansas,4,West,1,1,0,0,0,0
 BYU,6,West,0,0,0,0,0,0
 Cal Baptist,13,East,0,0,0,0,0,0
@@ -19,6 +18,7 @@ High Point,12,West,1,0,0,0,0,0
 Hofstra,13,Midwest,0,0,0,0,0,0
 Houston,2,South,1,1,0,0,0,0
 Idaho,15,South,0,0,0,0,0,0
+Illinois,3,South,1,1,1,1,0,0
 Iowa,9,South,1,1,1,0,0,0
 Iowa State,2,Midwest,1,1,0,0,0,0
 Kansas,4,East,1,0,0,0,0,0

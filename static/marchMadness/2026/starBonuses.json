@@ -457,14 +457,41 @@
         "round": 5,
         "reason": "Had the lowest average point differential in games you incorrectly picked",
         "image": "/marchMadness/2026/badges/miskeen.png",
-        "Winners": []
+        "Winners": ["Josh"]
     },
     {
         "name": "the Independent",
         "round": 5,
         "reason": "Lowest absolute different between left and right half of the bracket",
         "image": "/marchMadness/2026/badges/independent.jpg",
-        "Winners": []
+        "Winners": [
+            "Anish"
+        ],
+        "scores": {
+            "Jack": 144,
+            "Nick": 271,
+            "Courtney": 37,
+            "Anish": 22,
+            "Sandy": 152,
+            "Alice": 384,
+            "Kato": 370,
+            "John": 237,
+            "Na'ama": 166,
+            "Dustin": 303,
+            "Josh": 181,
+            "Vedant": 224,
+            "Brian": 150,
+            "Ethan": 65,
+            "Ben": 69,
+            "Aidan": 221,
+            "Kendall": 165,
+            "Sam": 69,
+            "Tyler": 63,
+            "Haneen": 147,
+            "Manu": 73,
+            "Jared": 214,
+            "Palmer": 92
+        }
     },
     {
         "name": "Lone wolf/sheep",
@@ -617,7 +644,13 @@
             "Sam",
             "Nick",
             "Kato",
-            "Dustin"
+            "Dustin",
+            "Alice",
+            "Kato",
+            "Na'ama",
+            "Ethan",
+            "Sam",
+            "Manu"
         ],
         "scores": {
             "Round 1: High Point (seed 12)": [
@@ -634,6 +667,14 @@
                 "Nick",
                 "Kato",
                 "Dustin"
+            ],
+            "Round 5: UConn (seed 2)": [
+                "Alice",
+                "Kato",
+                "Na'ama",
+                "Ethan",
+                "Sam",
+                "Manu"
             ]
         }
     },
