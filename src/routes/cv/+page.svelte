@@ -184,7 +184,7 @@
             <div class="contact-info">
                 <span>{contact.location}</span>
                 <span>•</span>
-                <a href="/cdn-cgi/l/email-protection#750e161a1b011416015b1018141c1908">{contact.email}</a>
+                <a href="mailto:{contact.email}">{contact.email}</a>
                 <span>•</span>
                 <span>{contact.phone}</span>
                 <span>•</span>
