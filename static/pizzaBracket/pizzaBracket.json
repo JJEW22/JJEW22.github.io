@@ -41,17 +41,17 @@
                 {
                   "name": "burritos",
                   "seed": 5,
-                  "votes": null,
-                  "rating": null
+                  "votes": 8,
+                  "rating": 3.09
                 },
                 {
                   "name": "forest hills",
                   "seed": 6,
-                  "votes": null,
-                  "rating": null
+                  "votes": 3,
+                  "rating": 2.94
                 }
               ],
-              "winner": null
+              "winner": "burritos"
             }
           ]
         },
@@ -70,7 +70,7 @@
                   "rating": null
                 },
                 {
-                  "name": "TBD",
+                  "name": "burritos",
                   "seed": null,
                   "source": "A-R1-std",
                   "votes": null,
@@ -337,7 +337,7 @@
                 {
                   "name": "Penguin",
                   "seed": 2,
-                  "votes": null,
+                  "votes": 4,
                   "rating": 3.88
                 },
                 {
@@ -349,30 +349,30 @@
                 {
                   "name": "mama",
                   "seed": 4,
-                  "votes": 1,
+                  "votes": 4,
                   "rating": 3.98
                 }
               ],
-              "winner": "Il Mondo's"
+              "winner": "mama"
             },
             {
               "id": "D-R1-std",
               "type": "standard",
               "teams": [
                 {
-                  "name": "AK's",
+                  "name": "Crispy Dough",
                   "seed": 5,
-                  "votes": null,
-                  "rating": null
+                  "votes": 10,
+                  "rating": 4.63
                 },
                 {
                   "name": "tremont house of pizza",
                   "seed": 6,
-                  "votes": null,
-                  "rating": null
+                  "votes": 2,
+                  "rating": 2.96
                 }
               ],
-              "winner": null
+              "winner": "Crispy Dough"
             }
           ]
         },
@@ -391,7 +391,7 @@
                   "rating": null
                 },
                 {
-                  "name": "TBD",
+                  "name": "Crispy Dough",
                   "seed": null,
                   "source": "D-R1-std",
                   "votes": null,

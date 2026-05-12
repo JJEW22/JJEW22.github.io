@@ -168,6 +168,12 @@ def process_bracket(bracket, match_ratings):
             print(f"  No ratings for match {match['id']} — skipping")
             return
         
+        # Check if there are actual ratings (not just empty lists)
+        total_ratings = sum(len(r) for r in ratings_for_match.values())
+        if total_ratings == 0:
+            print(f"  No actual ratings data for match {match['id']} — skipping")
+            return
+        
         if match['type'] == 'triple':
             teams_ratings = {}
             for t in match['teams']:
