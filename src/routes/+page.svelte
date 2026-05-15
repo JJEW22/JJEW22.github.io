@@ -42,6 +42,17 @@
                     </div>
                 </div>
                 
+                <div class="page-links">
+                    <a href="/research" class="page-link">
+                        <span class="pl-icon">📄</span>
+                        <span class="pl-label">Research</span>
+                    </a>
+                    <a href="/advising" class="page-link">
+                        <span class="pl-icon">💼</span>
+                        <span class="pl-label">Financial Advising</span>
+                    </a>
+                </div>
+                
                 <div class="social-links">
                     {#if socials.email}
                         <a href="mailto:{socials.email}" aria-label="Email">
@@ -177,6 +188,36 @@
     .bio-text p:last-child {
         margin-bottom: 0;
     }
+
+    .page-links {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        justify-content: center;
+    }
+    
+    .page-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.65rem 1.25rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #333;
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+    }
+    
+    .page-link:hover {
+        border-color: #0066cc;
+        background: #f0f7ff;
+        transform: translateY(-1px);
+    }
+    
+    .pl-icon { font-size: 1.1rem; }
+    .pl-label { color: inherit; }
 
     .social-links {
         display: flex;
