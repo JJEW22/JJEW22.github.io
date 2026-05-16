@@ -9,7 +9,7 @@
 
 <div class="container">
     <nav class="breadcrumb">
-        <a href="/me">← Back to Home</a>
+        <a href="/">← Back to Home</a>
     </nav>
     
     <main>

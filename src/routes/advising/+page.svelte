@@ -1,15 +1,33 @@
 <script>
     import '../../app.css';
+    import { onMount, onDestroy } from 'svelte';
     
     let showCalendly = false;
     
     // Replace with your actual Calendly URL
     const CALENDLY_URL = 'https://calendly.com/jwilkins-risenorthcapital/30min?hide_landing_page_details=1&hide_gdpr_banner=1';
+    
+    function handleCalendlyEvent(e) {
+        if (e.data.event === 'calendly.event_scheduled') {
+            window.location.href = '/advising/confirmed';
+        }
+    }
+    
+    onMount(() => {
+        window.addEventListener('message', handleCalendlyEvent);
+    });
+    
+    onDestroy(() => {
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('message', handleCalendlyEvent);
+        }
+    });
 </script>
 
 <svelte:head>
     <title>John Wilkins - Financial Advisor</title>
     <meta name="description" content="Personalized financial planning, investment management, and insurance solutions.">
+    <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
 </svelte:head>
 
 <div class="page">
@@ -148,27 +166,10 @@
             </p>
             
             <div class="calendly-container">
-                <!-- Replace the URL below with your actual Calendly link -->
-                <!-- Option 1: iframe embed -->
-                <!-- <div class="calendly-placeholder">
-                    <div class="placeholder-content">
-                        <span class="placeholder-icon">📅</span>
-                        <h3>Book a Time</h3>
-                        <p>Scheduling will be available here once set up.</p>
-                        <a href={CALENDLY_URL} class="btn btn-primary" target="_blank" rel="noopener">
-                            Open Scheduling Page
-                        </a>
-                    </div>
-                </div> -->
-                
-                <!-- When you have your Calendly URL, replace the placeholder above with: -->
-                <iframe 
-                    src={CALENDLY_URL}
-                    width="100%" 
-                    height="700" 
-                    frameborder="0"
-                    title="Schedule a consultation"
-                ></iframe>
+                <div class="calendly-inline-widget" 
+                     data-url={CALENDLY_URL}
+                     style="min-width:320px;height:700px;">
+                </div>
             </div>
         </section>
         
