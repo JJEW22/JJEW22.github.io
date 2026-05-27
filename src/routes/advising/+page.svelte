@@ -65,6 +65,7 @@
                     your goals, your timeline, and your comfort with risk — then building a plan that 
                     reflects all three.
                 </p>
+                Current Credentials
                 <div class="credentials">
                     <div class="credential">
                         <span class="cred-icon">📜</span>
@@ -88,7 +89,32 @@
                         </div>
                     </div>
                 </div>
+                Pursing Credentials
+                <div class="credentials">
+                    <div class="credential">
+                        <span class="cred-icon">📜</span>
+                        <div>
+                            <strong>Enrolled Agent</strong>
+                            <span>Final Exam October 2026</span>
+                        </div>
+                    </div>
+                    <div class="credential">
+                        <span class="cred-icon">📜</span>
+                        <div>
+                            <strong>CFA</strong>
+                            <span>Final exam Feb 2028</span>
+                        </div>
+                    </div>
+                    <div class="credential">
+                        <span class="cred-icon">📜</span>
+                        <div>
+                            <strong>CFP</strong>
+                            <span>Final Exam November 2028</span>
+                        </div>
+                    </div>
+                </div>
             </div>
+
         </section>
         
         <!-- Services -->
@@ -162,7 +188,7 @@
         <section id="schedule" class="section schedule-section">
             <h2>Schedule a Consultation</h2>
             <p class="schedule-intro">
-                Ready to get started? Book a free introductory call and we'll talk through your goals.
+                Ready to get started? Book a free introductory call and we'll talk through your goals. Don't see a time that works for you? You can find my email at the bottom of this page, reach out and I would be happy to find a time that works for you
             </p>
             
             <div class="calendly-container">
