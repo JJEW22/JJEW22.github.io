@@ -29,6 +29,7 @@
     // Technical Skills data
     const skills = {
         certifications: ["Series 65", "SIE", "Massachusetts Life Insurance Producer"],
+        designationsInProgress: ["Enrolled Agent (EA)", "Chartered Financial Analyst (CFA)", "Certified Financial Planner (CFP)"],
         languages: {
             proficient: ["Python", "C++", "Java", "TypeScript"],
             familiar: ["MATLAB", "JavaScript", "Swift", "Racket", "ACL2 Sedan"]
@@ -45,7 +46,9 @@
             startDate: "Spring 2025",
             endDate: "Present",
             accomplishments: [
-                "Provide personalized financial services to clients"
+                "Provide holistic financial planning services to clients including investment management, retirement planning, and insurance solutions",
+                "Develop personalized financial strategies aligned with client goals, risk tolerance, and life stage",
+                "Conduct portfolio reviews and recommend adjustments to optimize long-term outcomes"
             ]
         },
         {
@@ -117,6 +120,17 @@
 
     // Projects data
     const projects = [
+        {
+            name: "Client Management Platform",
+            technologies: ["TypeScript", "SvelteKit", "Python"],
+            startDate: "Spring 2026",
+            endDate: "Present",
+            accomplishments: [
+                "Built a custom CRM tool to manage client relationships, track meeting notes, and organize action items across advisory practice",
+                "Designed data pipelines to consolidate client financial profiles, enabling faster preparation for review meetings",
+                "Implemented automated tracking of follow-up tasks and pending client deliverables to ensure timely service"
+            ]
+        },
         {
             name: "Patent Citation Network Analyzer",
             technologies: ["Python", "pandas", "Tableau", "NumPy"],
@@ -248,7 +262,12 @@
             <div class="skills-grid">
                 {#if skills.certifications && skills.certifications.length > 0}
                     <div class="skill-category">
-                        <strong>Certifications:</strong> {skills.certifications.join(', ')}
+                        <strong>Certifications & Designations:</strong>
+                        <div class="skill-list">
+                            <span class="skill-label">Completed:</span> {skills.certifications.join(', ')}
+                            <br>
+                            <span class="skill-label">In Progress:</span> {skills.designationsInProgress.join(', ')}
+                        </div>
                     </div>
                 {/if}
                 <div class="skill-category">
