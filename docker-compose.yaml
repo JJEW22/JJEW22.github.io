@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   svelte-app:
     build:
@@ -8,13 +6,13 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      # For Windows, use this format
       - type: bind
         source: .
         target: /app
-      # Prevent node_modules from being overwritten
       - /app/node_modules
+    env_file:
+      - .env                     # <-- ADD: pulls in DATABASE_URL + FOOTBALL_DATA_TOKEN
     environment:
       - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true  # Helps with file watching on Windows
+      - CHOKIDAR_USEPOLLING=true
     command: npm run dev -- --host 0.0.0.0

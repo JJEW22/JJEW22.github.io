@@ -16,6 +16,9 @@ secrets.json
 /.svelte-kit
 /build
 
+# neon
+.neon
+
 # OS
 .DS_Store
 Thumbs.db

@@ -38,6 +38,8 @@
 		"vite": "^7.0.4"
 	},
 	"dependencies": {
+		"@node-rs/argon2": "^2.0.2",
+		"postgres": "^3.4.9",
 		"xlsx": "^0.18.5"
 	}
 }
