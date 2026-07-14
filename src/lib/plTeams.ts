@@ -1,3 +1,4 @@
+// src/lib/plTeams.ts
 // Shared source of truth for the 20 Premier League clubs (2026-27).
 // `code` is the football-data.org three-letter TLA, used to map API teams to ids.
 export interface Team {

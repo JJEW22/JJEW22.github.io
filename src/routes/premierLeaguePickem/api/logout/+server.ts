@@ -1,3 +1,4 @@
+// src/routes/premierLeaguePickem/api/logout/+server.ts
 import { json } from '@sveltejs/kit';
 import { deleteSession } from '$lib/server/auth';
 import type { RequestHandler } from './$types';

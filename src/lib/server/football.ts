@@ -1,3 +1,4 @@
+// src/lib/server/football.ts
 import { env } from '$env/dynamic/private';
 import { tlaToId } from '$lib/plTeams';
 
@@ -12,7 +13,7 @@ export interface Fixture {
     awayId: string;
     homeName: string;
     awayName: string;
-    winner: string | null; // HOME_TEAM | AWAY_TEAM | DRAW | null
+    winner: string | null;
 }
 
 export interface StandingRow {
@@ -24,6 +25,14 @@ export interface StandingRow {
     lost: number;
     gd: number;
     points: number;
+}
+
+export interface FinishedMatch {
+    id: string;
+    matchweek: number;
+    winner: string; // 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW'
+    homeId: string;
+    awayId: string;
 }
 
 // The free tier allows ~10 requests/minute, so cache each path briefly.
@@ -43,8 +52,6 @@ async function fd(path: string): Promise<any> {
     return data;
 }
 
-// NOTE: field names below follow football-data.org v4. If a club's `tla` doesn't
-// match the code in $lib/plTeams.ts, the name still renders (id just falls back).
 export async function getFixtures(matchweek: number): Promise<Fixture[]> {
     const data = await fd(`/competitions/PL/matches?matchday=${matchweek}`);
     return (data.matches ?? []).map((m: any) => ({
@@ -72,5 +79,17 @@ export async function getStandings(): Promise<StandingRow[]> {
         lost: r.lost,
         gd: r.goalDifference,
         points: r.points
+    }));
+}
+
+// Finished matches across the season, for populating the `results` table.
+export async function getFinishedMatches(): Promise<FinishedMatch[]> {
+    const data = await fd('/competitions/PL/matches?status=FINISHED');
+    return (data.matches ?? []).map((m: any) => ({
+        id: String(m.id),
+        matchweek: m.matchday,
+        winner: m.score?.winner ?? 'DRAW',
+        homeId: tlaToId(m.homeTeam.tla),
+        awayId: tlaToId(m.awayTeam.tla)
     }));
 }

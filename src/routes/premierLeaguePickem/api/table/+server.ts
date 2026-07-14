@@ -1,3 +1,4 @@
+// src/routes/premierLeaguePickem/api/table/+server.ts
 import { json } from '@sveltejs/kit';
 import { sql } from '$lib/server/db';
 import type { RequestHandler } from './$types';

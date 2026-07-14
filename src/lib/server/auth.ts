@@ -1,3 +1,4 @@
+// src/lib/server/auth.ts
 import crypto from 'node:crypto';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { sql } from '$lib/server/db';

@@ -1,3 +1,4 @@
+// src/lib/server/db.ts
 import postgres from 'postgres';
 import { env } from '$env/dynamic/private';
 
