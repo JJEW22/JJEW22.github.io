@@ -30,12 +30,19 @@ export interface StandingRow {
 export interface FinishedMatch {
     id: string;
     matchweek: number;
-    winner: string; // 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW'
+    winner: string;
     homeId: string;
     awayId: string;
 }
 
-// The free tier allows ~10 requests/minute, so cache each path briefly.
+export interface UpcomingMatch {
+    id: string;
+    matchweek: number;
+    kickoff: string;
+    homeId: string;
+    awayId: string;
+}
+
 const cache = new Map<string, { at: number; data: any }>();
 const TTL_MS = 60 * 1000;
 
@@ -43,9 +50,7 @@ async function fd(path: string): Promise<any> {
     const hit = cache.get(path);
     if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
     if (!env.FOOTBALL_DATA_TOKEN) throw new Error('FOOTBALL_DATA_TOKEN is not set');
-    const res = await fetch(`${BASE}${path}`, {
-        headers: { 'X-Auth-Token': env.FOOTBALL_DATA_TOKEN }
-    });
+    const res = await fetch(`${BASE}${path}`, { headers: { 'X-Auth-Token': env.FOOTBALL_DATA_TOKEN } });
     if (!res.ok) throw new Error(`football-data ${res.status} on ${path}`);
     const data = await res.json();
     cache.set(path, { at: Date.now(), data });
@@ -82,13 +87,26 @@ export async function getStandings(): Promise<StandingRow[]> {
     }));
 }
 
-// Finished matches across the season, for populating the `results` table.
 export async function getFinishedMatches(): Promise<FinishedMatch[]> {
     const data = await fd('/competitions/PL/matches?status=FINISHED');
     return (data.matches ?? []).map((m: any) => ({
         id: String(m.id),
         matchweek: m.matchday,
         winner: m.score?.winner ?? 'DRAW',
+        homeId: tlaToId(m.homeTeam.tla),
+        awayId: tlaToId(m.awayTeam.tla)
+    }));
+}
+
+// Matches in a forward date window, used to map odds events to fixture ids.
+export async function getUpcomingMatches(daysAhead = 10): Promise<UpcomingMatch[]> {
+    const from = new Date().toISOString().slice(0, 10);
+    const to = new Date(Date.now() + daysAhead * 86400000).toISOString().slice(0, 10);
+    const data = await fd(`/competitions/PL/matches?dateFrom=${from}&dateTo=${to}`);
+    return (data.matches ?? []).map((m: any) => ({
+        id: String(m.id),
+        matchweek: m.matchday,
+        kickoff: m.utcDate,
         homeId: tlaToId(m.homeTeam.tla),
         awayId: tlaToId(m.awayTeam.tla)
     }));

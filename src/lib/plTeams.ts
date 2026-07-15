@@ -25,7 +25,7 @@ export const TEAMS: Team[] = [
     { id: 'mci', name: 'Manchester City', code: 'MCI' },
     { id: 'mun', name: 'Manchester United', code: 'MUN' },
     { id: 'new', name: 'Newcastle United', code: 'NEW' },
-    { id: 'nfo', name: 'Nottingham Forest', code: 'NFO' },
+    { id: 'nfo', name: 'Nottingham Forest', code: 'NOT' },
     { id: 'sun', name: 'Sunderland', code: 'SUN' },
     { id: 'tot', name: 'Tottenham', code: 'TOT' }
 ];

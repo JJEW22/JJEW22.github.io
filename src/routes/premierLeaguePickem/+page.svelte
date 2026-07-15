@@ -158,6 +158,17 @@
             weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
         });
     }
+    // Show the points multiplier only once real odds exist (default sentinel is 1).
+    function fmtOdds(m) {
+        return m && m !== 1 ? Number(m).toFixed(2) : null;
+    }
+    function fmtNum(n) {
+        return n === null || n === undefined ? null : Number(n).toFixed(2);
+    }
+    // Probability fraction (0..1) -> whole-number percent.
+    function pct(p) {
+        return p === null || p === undefined ? null : Math.round(Number(p) * 100);
+    }
     async function goToWeek(n) {
         if (n < 1 || n > TOTAL_MATCHWEEKS) return;
         currentWeek = n;
@@ -282,19 +293,36 @@
                                 {@const away = teamById[fixture.awayId] || { name: fixture.awayName }}
                                 {@const locked = kickoffPassed(fixture)}
                                 {@const choice = matchPicks[fixture.id]}
+                                {@const homeMult = fmtOdds(fixture.multHome)}
+                                {@const awayMult = fmtOdds(fixture.multAway)}
+                                {@const homePct = pct(fixture.probHome)}
+                                {@const awayPct = pct(fixture.probAway)}
+                                {@const drawPct = pct(fixture.probDraw)}
                                 <div class="fixture" class:locked>
                                     <div class="fixture-time">
                                         {formatKickoff(fixture.kickoff)}
                                         {#if locked}<span class="lock-tag">Locked</span>{/if}
                                     </div>
-                                    <div class="pick-row two">
+                                    <div class="pick-row two" class:has-draw={homeMult}>
                                         <button class="pick home" class:selected={choice === 'HOME'} disabled={locked} on:click={() => pick(fixture.id, 'HOME')}>
-                                            <span class="team">{home.name}</span>
-                                            <span class="hint">Home win</span>
+                                            <span class="pick-text">
+                                                <span class="team">{home.name}</span>
+                                                <span class="hint">Home win</span>
+                                            </span>
+                                            {#if homeMult}<span class="odds">{homePct}%<span class="mult"> (×{homeMult})</span></span>{/if}
                                         </button>
+                                        {#if homeMult}
+                                            <div class="draw-box" aria-hidden="true">
+                                                <span class="draw-pct">{drawPct}%</span>
+                                                <span class="draw-label">Draw</span>
+                                            </div>
+                                        {/if}
                                         <button class="pick away" class:selected={choice === 'AWAY'} disabled={locked} on:click={() => pick(fixture.id, 'AWAY')}>
-                                            <span class="team">{away.name}</span>
-                                            <span class="hint">Away win</span>
+                                            <span class="pick-text">
+                                                <span class="team">{away.name}</span>
+                                                <span class="hint">Away win</span>
+                                            </span>
+                                            {#if awayMult}<span class="odds">{awayPct}%<span class="mult"> (×{awayMult})</span></span>{/if}
                                         </button>
                                     </div>
                                 </div>
@@ -435,15 +463,24 @@
     .fixture.locked { opacity: 0.6; }
     .fixture-time { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.6rem; display: flex; gap: 0.5rem; align-items: center; }
     .lock-tag { background: #6b7280; color: white; border-radius: 10px; padding: 0.1rem 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
-    .pick-row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    .pick { border: 2px solid #e5e7eb; background: white; border-radius: 8px; padding: 0.6rem 0.9rem; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; gap: 0.15rem; font: inherit; }
-    .pick.home { align-items: flex-start; text-align: left; }
-    .pick.away { align-items: flex-end; text-align: right; }
+    .pick-row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; align-items: stretch; }
+    .pick-row.two.has-draw { grid-template-columns: 1fr auto 1fr; }
+    .draw-box { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 3.4rem; padding: 0.3rem 0.55rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f8fafc; }
+    .draw-pct { font-weight: 700; font-size: 0.9rem; color: #4b5563; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .draw-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; }
+    .pick { border: 2px solid #e5e7eb; background: white; border-radius: 8px; padding: 0.6rem 0.9rem; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; font: inherit; }
+    .pick.home { flex-direction: row; text-align: left; }
+    .pick.away { flex-direction: row-reverse; text-align: right; }
+    .pick-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+    .pick.home .pick-text { align-items: flex-start; }
+    .pick.away .pick-text { align-items: flex-end; }
     .pick .team { font-weight: 600; color: #1a1a1a; line-height: 1.15; }
     .pick .hint { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; }
+    .pick .odds { font-weight: 700; font-size: 0.9rem; color: #2c5aa0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .pick .odds .mult { font-size: 0.72rem; font-weight: 500; opacity: 0.7; margin-left: 0.2rem; }
     .pick:hover:not(:disabled) { border-color: #2c5aa0; }
     .pick.selected { background: #2c5aa0; border-color: #2c5aa0; }
-    .pick.selected .team, .pick.selected .hint { color: white; }
+    .pick.selected .team, .pick.selected .hint, .pick.selected .odds { color: white; }
     .pick:disabled { cursor: not-allowed; }
 
     .save-row { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
