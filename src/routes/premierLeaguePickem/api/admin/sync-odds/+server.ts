@@ -1,6 +1,6 @@
 // src/routes/premierLeaguePickem/api/admin/sync-odds/+server.ts
-import { json, error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import { json } from '@sveltejs/kit';
+import { requireAdmin } from '$lib/server/roles';
 import { sql } from '$lib/server/db';
 import { fetchOddsMultipliers } from '$lib/server/odds';
 import { getUpcomingMatches } from '$lib/server/football';
@@ -8,10 +8,8 @@ import type { RequestHandler } from './$types';
 
 // Captures probabilities + multipliers onto upcoming fixtures. Run on a schedule
 // with ?key=<SYNC_SECRET>. Odds freeze at kickoff (started matches are skipped).
-export const POST: RequestHandler = async ({ url }) => {
-    if (!env.SYNC_SECRET || url.searchParams.get('key') !== env.SYNC_SECRET) {
-        throw error(401, 'bad or missing key');
-    }
+export const POST: RequestHandler = async ({ url, locals }) => {
+    requireAdmin(locals.user, url, 'pickem:admin');
 
     const [odds, fixtures] = await Promise.all([fetchOddsMultipliers(), getUpcomingMatches(45)]);
 

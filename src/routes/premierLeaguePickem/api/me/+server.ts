@@ -12,6 +12,7 @@ export const GET: RequestHandler = async ({ locals }) => {
     const tp = (await sql`select team_order from table_predictions where user_id = ${locals.user.id}`)[0];
     return json({
         user: locals.user.username,
+        roles: locals.user.roles,
         fanTeam: me?.fan_team ?? null,
         matchPicks,
         tableOrder: tp?.team_order ?? null

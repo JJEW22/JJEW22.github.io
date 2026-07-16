@@ -1,6 +1,6 @@
 // src/routes/premierLeaguePickem/api/admin/sync-results/+server.ts
-import { json, error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import { json } from '@sveltejs/kit';
+import { requireAdmin } from '$lib/server/roles';
 import { sql } from '$lib/server/db';
 import { getFinishedMatches } from '$lib/server/football';
 import type { RequestHandler } from './$types';
@@ -9,10 +9,8 @@ import type { RequestHandler } from './$types';
 // (a cron job or GitHub Action) with ?key=<SYNC_SECRET>.
 // Note: mult_home / mult_away are left at their default (1) here; the future
 // odds job is what fills those in.
-export const POST: RequestHandler = async ({ url }) => {
-    if (!env.SYNC_SECRET || url.searchParams.get('key') !== env.SYNC_SECRET) {
-        throw error(401, 'bad or missing key');
-    }
+export const POST: RequestHandler = async ({ url, locals }) => {
+    requireAdmin(locals.user, url, 'pickem:admin');
     const matches = await getFinishedMatches();
     for (const m of matches) {
         await sql`insert into results (fixture_id, matchweek, winner, home_id, away_id)
