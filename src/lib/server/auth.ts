@@ -6,6 +6,7 @@ import { sql } from '$lib/server/db';
 export interface SessionUser {
     id: number;
     username: string;
+    roles: string[];
 }
 
 const SESSION_DAYS = 30;
@@ -34,7 +35,7 @@ export async function createSession(userId: number): Promise<{ token: string; ex
 export async function validateSession(token: string | undefined): Promise<SessionUser | null> {
     if (!token) return null;
     const rows = await sql`
-        select s.user_id, s.expires_at, u.username
+        select s.user_id, s.expires_at, u.username, u.roles
         from sessions s join users u on u.id = s.user_id
         where s.token_hash = ${hashToken(token)}`;
     const row = rows[0];
@@ -43,7 +44,11 @@ export async function validateSession(token: string | undefined): Promise<Sessio
         await sql`delete from sessions where token_hash = ${hashToken(token)}`;
         return null;
     }
-    return { id: Number(row.user_id), username: row.username as string };
+    return {
+        id: Number(row.user_id),
+        username: row.username as string,
+        roles: (row.roles as string[]) ?? []
+    };
 }
 
 export async function deleteSession(token: string | undefined): Promise<void> {

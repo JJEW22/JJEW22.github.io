@@ -88,6 +88,9 @@
     let activeTab = 'matches';
 
     let user = '';
+    let roles = [];
+    let syncStatus = '';
+    let syncing = false;
     let loginName = '';
     let loginCode = '';
     let loginError = '';
@@ -118,9 +121,30 @@
         const me = await loadMe();
         if (me.user) {
             user = me.user;
+            roles = me.roles || [];
             matchPicks = me.matchPicks || {};
             if (me.tableOrder) tableOrder = me.tableOrder;
         }
+    }
+
+    // pickem:admin (or site:admin) sees the Admin tab.
+    $: isPickemAdmin = roles.includes('site:admin') || roles.includes('pickem:admin');
+
+    async function runSync(which) {
+        syncStatus = '';
+        syncing = true;
+        try {
+            const r = await fetch(`${API}/admin/${which}`, { method: 'POST' });
+            const data = await r.json();
+            if (!r.ok) {
+                syncStatus = data?.message || data?.error || `Sync failed (${r.status}).`;
+            } else {
+                syncStatus = JSON.stringify(data);
+            }
+        } catch (_) {
+            syncStatus = 'Network error.';
+        }
+        syncing = false;
     }
 
     // ---- Auth ----
@@ -276,6 +300,9 @@
                 <button class="tab" class:active={activeTab === 'table'} on:click={() => (activeTab = 'table')}>Predict Table</button>
                 <button class="tab" class:active={activeTab === 'results'} on:click={() => (activeTab = 'results')}>Results</button>
                 <button class="tab" class:active={activeTab === 'pltable'} on:click={() => (activeTab = 'pltable')}>PL Table</button>
+                {#if isPickemAdmin}
+                    <button class="tab" class:active={activeTab === 'admin'} on:click={() => (activeTab = 'admin')}>Admin</button>
+                {/if}
             </div>
 
             {#if activeTab === 'matches'}
@@ -390,7 +417,7 @@
                     <p class="note">Match scoring is provisional (1 for a correct winner); table scoring is still to be wired.</p>
                 </section>
 
-            {:else}
+            {:else if activeTab === 'pltable'}
                 <section class="panel">
                     <h2 class="week-title solo">Premier League table</h2>
                     <p class="progress">Live standings for {SEASON}.</p>
@@ -418,6 +445,18 @@
                     </div>
                     <p class="note">Pulled from football-data.org via the standings route. Zeroed until matches are played.</p>
                 </section>
+
+            {:else if activeTab === 'admin'}
+                <section class="panel">
+                    <h2 class="week-title solo">Admin</h2>
+                    <p class="progress">Pickem admin tools. These also run automatically on a schedule.</p>
+                    <div class="admin-actions">
+                        <button class="save-btn" on:click={() => runSync('sync-odds')} disabled={syncing}>Sync odds</button>
+                        <button class="save-btn" on:click={() => runSync('sync-results')} disabled={syncing}>Sync results</button>
+                    </div>
+                    {#if syncing}<p class="note">Running…</p>{/if}
+                    {#if syncStatus}<pre class="sync-out">{syncStatus}</pre>{/if}
+                </section>
             {/if}
         </main>
     </div>
@@ -425,6 +464,8 @@
 
 <style>
     .page-background { min-height: 100vh; background-color: #4a9b9b; padding: 1rem 0; }
+    .admin-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
+    .sync-out { background: #0f172a; color: #cbd5e1; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
     .breadcrumb { margin-bottom: 2rem; }
     .breadcrumb a { color: #666; text-decoration: none; font-size: 0.9rem; }

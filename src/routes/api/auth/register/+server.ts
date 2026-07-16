@@ -9,7 +9,7 @@ import type { RequestHandler } from './$types';
 // chooses username + password. Invite consumed atomically -> one link, one account.
 export const POST: RequestHandler = async ({ request, cookies }) => {
     const { invite, username, password } = await request.json();
-    const uname = (username ?? '').trim().toLowerCase();
+    const uname = (username ?? '').trim(); // keep original casing for display
     if (!invite) return json({ ok: false, error: 'An invite is required.' }, { status: 400 });
     if (uname.length < 2 || (password ?? '').length < 4) {
         return json({ ok: false, error: 'Username needs 2+ chars, password needs 4+.' }, { status: 400 });
@@ -23,6 +23,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     if ((await sql`select 1 from users where email = ${email}`)[0]) {
         return json({ ok: false, error: 'An account already exists for this email.' }, { status: 409 });
+    }
+    if ((await sql`select 1 from users where lower(username) = ${uname.toLowerCase()}`)[0]) {
+        return json({ ok: false, error: 'That username is taken — pick another.' }, { status: 409 });
     }
 
     const passwordHash = await hashPassword(password);

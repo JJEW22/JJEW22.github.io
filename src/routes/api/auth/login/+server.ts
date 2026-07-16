@@ -13,7 +13,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         return json({ ok: false, error: 'Enter your email or username and password.' }, { status: 400 });
     }
     const existing = (await sql`
-        select id, password_hash from users where username = ${id} or email = ${id}`)[0];
+        select id, password_hash from users
+        where lower(username) = ${id} or lower(email) = ${id}`)[0];
     if (!existing) {
         return json({ ok: false, error: 'No account found. Accounts are invite-only.' }, { status: 401 });
     }
