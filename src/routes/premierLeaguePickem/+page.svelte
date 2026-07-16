@@ -42,15 +42,15 @@
         } catch (_) {}
         return { user: null };
     }
-    async function login(username, code) {
+    async function login(identifier, password) {
         try {
-            const r = await fetch(`${API}/login`, {
+            const r = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, code })
+                body: JSON.stringify({ identifier, password })
             });
             const data = await r.json();
-            return r.ok ? { ok: true, user: data.user } : { ok: false, error: data.error };
+            return r.ok ? { ok: true } : { ok: false, error: data.error };
         } catch (_) {
             return { ok: false, error: 'Network error.' };
         }
@@ -138,7 +138,7 @@
         loggingIn = false;
     }
     async function logout() {
-        await postJSON('/logout', {});
+        await fetch('/api/auth/logout', { method: 'POST' });
         user = '';
         matchPicks = {};
         tableOrder = TEAMS.map((t) => t.id);
@@ -263,10 +263,11 @@
                     <span class="whoami">Logged in as <b>{user}</b></span>
                     <button class="link-btn" on:click={logout}>Log out</button>
                 {:else}
-                    <input class="auth-input" type="text" placeholder="Username" bind:value={loginName} />
-                    <input class="auth-input" type="password" placeholder="Access code" bind:value={loginCode} on:keydown={(e) => e.key === 'Enter' && doLogin()} />
-                    <button class="save-btn small" on:click={doLogin} disabled={loggingIn}>{loggingIn ? 'Logging in…' : 'Log in'}</button>
+                    <input class="auth-input" type="text" placeholder="Email or username" bind:value={loginName} />
+                    <input class="auth-input" type="password" placeholder="Password" bind:value={loginCode} on:keydown={(e) => e.key === 'Enter' && doLogin()} />
+                    <button class="save-btn small" on:click={doLogin} disabled={loggingIn}>{loggingIn ? 'Signing in…' : 'Sign in'}</button>
                     {#if loginError}<span class="status-msg err">{loginError}</span>{/if}
+                    <span class="auth-note">Sign in with email or username. New here? You'll need an <a href="/account">invite link</a>.</span>
                 {/if}
             </div>
 
@@ -439,6 +440,7 @@
     .auth-input { padding: 0.6rem 0.9rem; font-size: 0.95rem; border: 2px solid #e5e7eb; border-radius: 8px; }
     .auth-input:focus { outline: none; border-color: #2c5aa0; }
     .whoami { color: #1a1a1a; }
+    .auth-note { color: #6b7280; font-size: 0.85rem; font-style: italic; }
     .link-btn { background: none; border: none; color: #2c5aa0; cursor: pointer; text-decoration: underline; font: inherit; }
 
     .tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.5rem; flex-wrap: wrap; }
