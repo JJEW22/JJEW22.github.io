@@ -405,7 +405,7 @@
                                         <td class="num">{i + 1}</td>
                                         <td class="strong">{row.player}</td>
                                         <td class="num">{row.matchPoints || 0}</td>
-                                        <td class="num">{row.tablePoints || 0}</td>
+                                        <td class="num">{row.tablePoints || 0}{#if row.tableProvisional}<span class="prov-star" title="Includes provisional weeks with games in hand — may change once postponed fixtures are played">*</span>{/if}</td>
                                         <td class="num hl">{row.total}</td>
                                     </tr>
                                 {:else}
@@ -413,6 +413,9 @@
                                 {/each}
                             </tbody>
                         </table>
+                        {#if ranked.some((r) => r.tableProvisional)}
+                            <p class="note">* Table points include provisional weeks (teams with games in hand); these may change once postponed fixtures are played.</p>
+                        {/if}
                     </div>
                     <p class="note">Match scoring is provisional (1 for a correct winner); table scoring is still to be wired.</p>
                 </section>
@@ -464,6 +467,7 @@
 
 <style>
     .page-background { min-height: 100vh; background-color: #4a9b9b; padding: 1rem 0; }
+    .prov-star { color: #f59e0b; font-weight: 700; margin-left: 1px; cursor: help; }
     .admin-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
     .sync-out { background: #0f172a; color: #cbd5e1; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }

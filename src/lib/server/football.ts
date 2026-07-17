@@ -33,6 +33,8 @@ export interface FinishedMatch {
     winner: string;
     homeId: string;
     awayId: string;
+    homeGoals: number | null;
+    awayGoals: number | null;
 }
 
 export interface UpcomingMatch {
@@ -94,7 +96,9 @@ export async function getFinishedMatches(): Promise<FinishedMatch[]> {
         matchweek: m.matchday,
         winner: m.score?.winner ?? 'DRAW',
         homeId: tlaToId(m.homeTeam.tla),
-        awayId: tlaToId(m.awayTeam.tla)
+        awayId: tlaToId(m.awayTeam.tla),
+        homeGoals: m.score?.fullTime?.home ?? null,
+        awayGoals: m.score?.fullTime?.away ?? null
     }));
 }
 
