@@ -3,7 +3,73 @@ import { sql } from '$lib/server/db';
 import { TEAMS } from '$lib/plTeams';
 
 // Fixed base for every match. Tune here.
-export const BASE_POINTS = 100;
+export const BASE_POINTS = 25;
+
+// Match bonuses (added to base). Gold/silver/bronze always apply to their
+// designated match for everyone; the fan-team bonus applies to a player's
+// fan-team match. When more than one would land on the same match they do NOT
+// stack — the largest applies (see computeLeaderboard).
+export const GOLDEN_BONUS = 10;
+export const SILVER_BONUS = 5;
+export const BRONZE_BONUS = 3;
+export const FAN_BONUS = 5;
+
+// Interest-function constants.
+const REL_C = 5; // relative-position softening constant
+const ABS_B = 3; // absolute-position offset
+
+export interface BonusInput {
+    id: string;
+    homeId: string | null;
+    awayId: string | null;
+    probHome: number | null;
+    probAway: number | null;
+}
+
+// "Most interesting match" ranking → golden (1st), silver (2nd), bronze (3rd).
+// Weeks 1–5: closeness of the two win probabilities, (w1 + w2) / |w1 - w2|.
+// Weeks 6+: that × relative-position × absolute-position, where
+//   relative = (C + 1) / (C + |pos1 - pos2|)         (shrinks as teams separate)
+//   absolute = max(40 - pos1 - pos2, pos1 + pos2 - B) (matters to top or bottom)
+// `positions` maps teamId → current standings position (1 = top).
+export function pickBonusFixtures(
+    fixtures: BonusInput[],
+    matchweek: number,
+    positions: Map<string, number>
+): { goldenId: string | null; silverId: string | null; bronzeId: string | null } {
+    const scored = fixtures.map((f) => {
+        const w1 = f.probHome ?? 0;
+        const w2 = f.probAway ?? 0;
+        const denom = Math.abs(w1 - w2);
+        let probValue: number;
+        if (denom === 0) probValue = w1 + w2 === 0 ? 0 : (w1 + w2) / 1e-9;
+        else probValue = (w1 + w2) / denom;
+
+        let interest = probValue;
+        if (matchweek > 5) {
+            const t1 = positions.get(f.homeId ?? '') ?? 20;
+            const t2 = positions.get(f.awayId ?? '') ?? 20;
+            const rel = (REL_C + 1) / (REL_C + Math.abs(t1 - t2));
+            const abs = Math.max(40 - t1 - t2, t1 + t2 - ABS_B);
+            interest = probValue * rel * abs;
+        }
+        return { id: f.id, interest };
+    });
+    scored.sort((a, b) => b.interest - a.interest);
+    return {
+        goldenId: scored[0]?.id ?? null,
+        silverId: scored[1]?.id ?? null,
+        bronzeId: scored[2]?.id ?? null
+    };
+}
+
+// Map a bonus flag to its base-point value.
+export function bonusPoints(flag: string | null): number {
+    if (flag === 'GOLDEN') return GOLDEN_BONUS;
+    if (flag === 'SILVER') return SILVER_BONUS;
+    if (flag === 'BRONZE') return BRONZE_BONUS;
+    return 0;
+}
 
 type Outcome = 'WIN' | 'TIE' | 'LOSS';
 
@@ -150,6 +216,7 @@ interface ResultRow {
     away_goals: number | null;
     mult_home: number;
     mult_away: number;
+    bonus: string | null;
 }
 
 export interface LeaderRow {
@@ -163,12 +230,12 @@ export interface LeaderRow {
 }
 
 export async function computeLeaderboard(): Promise<LeaderRow[]> {
-    const users = await sql<{ id: number; username: string; fan_team: string | null }[]>`
-        select id, username, fan_team from users`;
+    const users = await sql<{ id: number; username: string; fan_team: string | null; predictions_saved_at: Date | null }[]>`
+        select id, username, fan_team, predictions_saved_at from users`;
     const picks = await sql<{ user_id: number; fixture_id: string; pick: string }[]>`
         select user_id, fixture_id, pick from match_picks`;
     const results = await sql<ResultRow[]>`
-        select fixture_id, matchweek, winner, home_id, away_id, home_goals, away_goals, mult_home, mult_away
+        select fixture_id, matchweek, winner, home_id, away_id, home_goals, away_goals, mult_home, mult_away, bonus
         from results`;
     const preds = await sql<{ user_id: number; team_order: unknown }[]>`
         select user_id, team_order from table_predictions`;
@@ -201,6 +268,10 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
 
     const board: LeaderRow[] = users.map((u) => {
         const myPicks = picksByUser.get(u.id) ?? new Map<string, string>();
+        // Fan benefits (auto-pick, 1/2-tie, +5 base) and table points only count
+        // once the player has committed their season predictions.
+        const saved = u.predictions_saved_at != null;
+        const fanActive = saved && u.fan_team ? u.fan_team : null;
         let matchPoints = 0;
 
         for (const r of results) {
@@ -208,10 +279,10 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
 
             let side: 'HOME' | 'AWAY' | null = null;
             let isFanTeamGame = false;
-            if (u.fan_team && r.home_id === u.fan_team) {
+            if (fanActive && r.home_id === fanActive) {
                 side = 'HOME';
                 isFanTeamGame = true;
-            } else if (u.fan_team && r.away_id === u.fan_team) {
+            } else if (fanActive && r.away_id === fanActive) {
                 side = 'AWAY';
                 isFanTeamGame = true;
             } else {
@@ -226,15 +297,22 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
                 outcome = 'WIN';
             else outcome = 'LOSS';
 
+            // Effective base: gold/silver/bronze apply to their match for everyone;
+            // the fan-team bonus applies to the fan's match. They STACK — e.g. a
+            // fan team in the golden match gets base + 10 + 5.
+            const matchBonus = bonusPoints(r.bonus);
+            const fanBonus = !!fanActive && (r.home_id === fanActive || r.away_id === fanActive) ? FAN_BONUS : 0;
+            const base = BASE_POINTS + matchBonus + fanBonus;
+
             const oddsMult = side === 'HOME' ? Number(r.mult_home) : Number(r.mult_away);
-            matchPoints += BASE_POINTS * oddsMult * resultMultiplier(outcome, isFanTeamGame);
+            matchPoints += base * oddsMult * resultMultiplier(outcome, isFanTeamGame);
         }
 
-        // Table-prediction points, summed over every completed week.
+        // Table-prediction points, summed over every completed week (only if saved).
         let lockedTable = 0;
         let provTable = 0;
         const order = predByUser.get(u.id);
-        if (order && order.length) {
+        if (saved && order && order.length) {
             const predPos = new Map<string, number>();
             order.forEach((tid, i) => predPos.set(tid, i + 1));
             for (const wt of weekTables) {

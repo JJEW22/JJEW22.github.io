@@ -6,6 +6,7 @@
 
     const SEASON = '2026-27';
     const TOTAL_MATCHWEEKS = 38;
+    const BASE_POINTS = 25; // keep in sync with scoring.ts
     const API = '/premierLeaguePickem/api';
 
     // Offline fallback so the page still renders before the backend is running.
@@ -103,8 +104,14 @@
     let matchSaving = false;
 
     let tableOrder = TEAMS.map((t) => t.id);
-    let tableStatus = '';
-    let tableSaving = false;
+    let fanTeam = '';
+    let fanQuery = '';
+    let showFanList = false;
+    let predictionsSaved = false;
+    let predictionsLocked = false;
+    let seasonDeadline = '';
+    let seasonSaving = false;
+    let seasonStatus = '';
     let dragIndex = null;
 
     let leaderboard = [];
@@ -124,6 +131,11 @@
             roles = me.roles || [];
             matchPicks = me.matchPicks || {};
             if (me.tableOrder) tableOrder = me.tableOrder;
+            fanTeam = me.fanTeam || '';
+            fanQuery = fanTeam && teamById[fanTeam] ? teamById[fanTeam].name : '';
+            predictionsSaved = !!me.predictionsSaved;
+            predictionsLocked = !!me.predictionsLocked;
+            seasonDeadline = me.deadline || '';
         }
     }
 
@@ -167,12 +179,52 @@
         matchPicks = {};
         tableOrder = TEAMS.map((t) => t.id);
         matchStatus = '';
-        tableStatus = '';
+        seasonStatus = '';
+        fanTeam = '';
+        fanQuery = '';
+        predictionsSaved = false;
+        predictionsLocked = false;
     }
 
     // ---- Matches ----
     function kickoffPassed(fixture) {
         return new Date(fixture.kickoff).getTime() <= Date.now();
+    }
+
+    // Which side (if any) is auto-picked because it's the player's fan team.
+    // Only active once season predictions are saved.
+    function fanSide(fixture, fan, saved) {
+        if (!saved || !fan) return null;
+        if (fixture.homeId === fan) return 'HOME';
+        if (fixture.awayId === fan) return 'AWAY';
+        return null;
+    }
+
+    // The golden match this week (kept for possible display use).
+    $: goldenFixture = (matchweek?.fixtures || []).find((f) => f.bonus === 'GOLDEN') || null;
+
+    // Per-person effective base for a fixture, mirroring scoring.ts exactly.
+    // Gold/silver/bronze apply to their match for everyone; the fan-team bonus
+    // applies to the fan's match. They STACK (e.g. fan team in golden = 25+10+5).
+    function bonusPoints(flag) {
+        return flag === 'GOLDEN' ? 10 : flag === 'SILVER' ? 5 : flag === 'BRONZE' ? 3 : 0;
+    }
+    function effectiveBase(fixture, fan, saved) {
+        const matchBonus = bonusPoints(fixture.bonus);
+        const fanHere = fanSide(fixture, fan, saved) !== null;
+        const fanBonus = fanHere ? 5 : 0;
+        const parts = [{ label: 'Base', pts: BASE_POINTS }];
+        if (matchBonus > 0) {
+            const label =
+                fixture.bonus === 'GOLDEN' ? 'Golden match' : fixture.bonus === 'SILVER' ? 'Silver match' : 'Bronze match';
+            parts.push({ label, pts: matchBonus });
+        }
+        if (fanBonus > 0) parts.push({ label: 'Fan team', pts: fanBonus });
+        return { total: BASE_POINTS + matchBonus + fanBonus, parts };
+    }
+    function baseTooltip(eb) {
+        const sum = eb.parts.map((p, i) => (i === 0 ? `${p.label} ${p.pts}` : `+ ${p.label} ${p.pts}`)).join('  ');
+        return `${sum}  =  ${eb.total} base points`;
     }
     function pick(fixtureId, choice) {
         matchPicks = { ...matchPicks, [fixtureId]: choice };
@@ -228,13 +280,31 @@
         tableOrder = a;
         dragIndex = null;
     }
-    async function saveTablePrediction() {
-        if (!user) { tableStatus = 'Log in before saving.'; return; }
-        tableSaving = true;
-        tableStatus = '';
-        const res = await postJSON('/table', { order: tableOrder });
-        tableSaving = false;
-        tableStatus = res.ok ? 'Table saved.' : (res.error || 'Could not save.');
+    // Searchable fan-team dropdown
+    $: fanMatches = fanQuery.trim()
+        ? TEAMS.filter((t) => t.name.toLowerCase().includes(fanQuery.trim().toLowerCase()))
+        : TEAMS;
+    function selectFan(t) {
+        fanTeam = t.id;
+        fanQuery = t.name;
+        showFanList = false;
+    }
+
+    async function saveSeasonPredictions() {
+        if (!user) { seasonStatus = 'Log in before saving.'; return; }
+        if (!fanTeam) { seasonStatus = 'Pick your fan team first.'; return; }
+        if (tableOrder.length !== 20) { seasonStatus = 'Order all 20 teams.'; return; }
+        seasonSaving = true;
+        seasonStatus = '';
+        const res = await postJSON('/season', { fanTeam, tableOrder });
+        seasonSaving = false;
+        if (res.ok) {
+            predictionsSaved = true;
+            predictionsLocked = !!res.locked;
+            seasonStatus = predictionsLocked ? 'Saved and locked for the season.' : 'Saved. You can still edit until the deadline.';
+        } else {
+            seasonStatus = res.error || 'Could not save.';
+        }
     }
 
     // ---- Derived ----
@@ -297,7 +367,7 @@
 
             <div class="tabs" role="tablist">
                 <button class="tab" class:active={activeTab === 'matches'} on:click={() => (activeTab = 'matches')}>Matches</button>
-                <button class="tab" class:active={activeTab === 'table'} on:click={() => (activeTab = 'table')}>Predict Table</button>
+                <button class="tab" class:active={activeTab === 'table'} on:click={() => (activeTab = 'table')}>Season predictions</button>
                 <button class="tab" class:active={activeTab === 'results'} on:click={() => (activeTab = 'results')}>Results</button>
                 <button class="tab" class:active={activeTab === 'pltable'} on:click={() => (activeTab = 'pltable')}>PL Table</button>
                 {#if isPickemAdmin}
@@ -326,16 +396,29 @@
                                 {@const homePct = pct(fixture.probHome)}
                                 {@const awayPct = pct(fixture.probAway)}
                                 {@const drawPct = pct(fixture.probDraw)}
-                                <div class="fixture" class:locked>
+                                {@const fanPick = fanSide(fixture, fanTeam, predictionsSaved)}
+                                {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved)}
+                                <div class="fixture" class:locked class:golden={fixture.bonus === 'GOLDEN'} class:silver={fixture.bonus === 'SILVER'} class:bronze={fixture.bonus === 'BRONZE'}>
+                                    <span class="base-badge" title={baseTooltip(eb)}>{eb.total} pts</span>
                                     <div class="fixture-time">
                                         {formatKickoff(fixture.kickoff)}
+                                        {#if fixture.bonus === 'GOLDEN'}<span class="bonus-tag gold">★ Golden match</span>{/if}
+                                        {#if fixture.bonus === 'SILVER'}<span class="bonus-tag slv">★ Silver match</span>{/if}
+                                        {#if fixture.bonus === 'BRONZE'}<span class="bonus-tag brz">★ Bronze match</span>{/if}
                                         {#if locked}<span class="lock-tag">Locked</span>{/if}
                                     </div>
                                     <div class="pick-row two" class:has-draw={homeMult}>
-                                        <button class="pick home" class:selected={choice === 'HOME'} disabled={locked} on:click={() => pick(fixture.id, 'HOME')}>
+                                        <button
+                                            class="pick home"
+                                            class:selected={choice === 'HOME' || fanPick === 'HOME'}
+                                            class:fan-locked={fanPick === 'HOME'}
+                                            disabled={locked || fanPick !== null}
+                                            title={fanPick === 'HOME' ? `Auto-picked to win — ${home.name} is your fan team, locked for the season.` : ''}
+                                            on:click={() => pick(fixture.id, 'HOME')}
+                                        >
                                             <span class="pick-text">
-                                                <span class="team">{home.name}</span>
-                                                <span class="hint">Home win</span>
+                                                <span class="team">{home.name}{#if fanPick === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}</span>
+                                                <span class="hint">{fanPick === 'HOME' ? 'Your team (locked)' : 'Home win'}</span>
                                             </span>
                                             {#if homeMult}<span class="odds">{homePct}%<span class="mult"> (×{homeMult})</span></span>{/if}
                                         </button>
@@ -345,10 +428,17 @@
                                                 <span class="draw-label">Draw</span>
                                             </div>
                                         {/if}
-                                        <button class="pick away" class:selected={choice === 'AWAY'} disabled={locked} on:click={() => pick(fixture.id, 'AWAY')}>
+                                        <button
+                                            class="pick away"
+                                            class:selected={choice === 'AWAY' || fanPick === 'AWAY'}
+                                            class:fan-locked={fanPick === 'AWAY'}
+                                            disabled={locked || fanPick !== null}
+                                            title={fanPick === 'AWAY' ? `Auto-picked to win — ${away.name} is your fan team, locked for the season.` : ''}
+                                            on:click={() => pick(fixture.id, 'AWAY')}
+                                        >
                                             <span class="pick-text">
-                                                <span class="team">{away.name}</span>
-                                                <span class="hint">Away win</span>
+                                                <span class="team">{away.name}{#if fanPick === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}</span>
+                                                <span class="hint">{fanPick === 'AWAY' ? 'Your team (locked)' : 'Away win'}</span>
                                             </span>
                                             {#if awayMult}<span class="odds">{awayPct}%<span class="mult"> (×{awayMult})</span></span>{/if}
                                         </button>
@@ -367,25 +457,60 @@
 
             {:else if activeTab === 'table'}
                 <section class="panel">
+                    {#if predictionsLocked}
+                        <p class="progress">Your season predictions are <b>locked</b> for the season.</p>
+                    {:else if predictionsSaved}
+                        <p class="progress">Saved — you can still edit until the deadline{#if seasonDeadline} ({new Date(seasonDeadline).toLocaleString()}){/if}.</p>
+                    {:else}
+                        <p class="progress">Set your fan team and predicted table, then save. Editable until {#if seasonDeadline}{new Date(seasonDeadline).toLocaleString()}{:else}kickoff{/if}; your first save after that locks them permanently.</p>
+                    {/if}
+
+                    <h2 class="week-title solo">I'm a fan of…</h2>
+                    <div class="fan-picker">
+                        <input
+                            class="fan-input"
+                            type="text"
+                            placeholder="Search teams…"
+                            bind:value={fanQuery}
+                            on:focus={() => (showFanList = true)}
+                            on:input={() => (showFanList = true)}
+                            disabled={predictionsLocked}
+                        />
+                        {#if showFanList && !predictionsLocked}
+                            <ul class="fan-list">
+                                {#each fanMatches as t}
+                                    <li><button type="button" class="fan-option" class:sel={t.id === fanTeam} on:click={() => selectFan(t)}>{t.name}</button></li>
+                                {:else}
+                                    <li class="fan-none">No teams match.</li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </div>
+                    <p class="disclosure">
+                        You'll automatically pick this team to win all of their games this season (but you
+                        get half of the points on a tie instead of 1/3 — I did the math, this makes the
+                        expected value the same, so <b>just pick your favorite</b>).
+                    </p>
+
                     <h2 class="week-title solo">Your predicted final table</h2>
                     <p class="progress">Drag to reorder, or use the arrows. 1st at the top, 20th at the bottom.</p>
                     <ol class="table-predict">
                         {#each tableOrder as teamId, i (teamId)}
                             {@const team = teamById[teamId] || { name: teamId }}
-                            <li class="predict-row" class:dragging={dragIndex === i} draggable="true" on:dragstart={() => onDragStart(i)} on:dragover={onDragOver} on:drop={() => onDrop(i)}>
+                            <li class="predict-row" class:dragging={dragIndex === i} draggable={!predictionsLocked} on:dragstart={() => onDragStart(i)} on:dragover={onDragOver} on:drop={() => onDrop(i)}>
                                 <span class="pos" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span>
                                 <span class="drag-handle" aria-hidden="true">&#10247;</span>
                                 <span class="predict-team">{team.name}</span>
                                 <span class="row-controls">
-                                    <button class="move" on:click={() => moveUp(i)} disabled={i === 0} aria-label="Move up">&#9650;</button>
-                                    <button class="move" on:click={() => moveDown(i)} disabled={i === tableOrder.length - 1} aria-label="Move down">&#9660;</button>
+                                    <button class="move" on:click={() => moveUp(i)} disabled={i === 0 || predictionsLocked} aria-label="Move up">&#9650;</button>
+                                    <button class="move" on:click={() => moveDown(i)} disabled={i === tableOrder.length - 1 || predictionsLocked} aria-label="Move down">&#9660;</button>
                                 </span>
                             </li>
                         {/each}
                     </ol>
                     <div class="save-row">
-                        <button class="save-btn" on:click={saveTablePrediction} disabled={tableSaving}>{tableSaving ? 'Saving…' : 'Save table prediction'}</button>
-                        {#if tableStatus}<span class="status-msg">{tableStatus}</span>{/if}
+                        <button class="save-btn" on:click={saveSeasonPredictions} disabled={seasonSaving || predictionsLocked}>{seasonSaving ? 'Saving…' : 'Save my season predictions'}</button>
+                        {#if seasonStatus}<span class="status-msg">{seasonStatus}</span>{/if}
                     </div>
                     <p class="legend"><span class="swatch cl"></span> Top 5 (Champions League) <span class="swatch rel"></span> Bottom 3 (relegation)</p>
                 </section>
@@ -467,6 +592,16 @@
 
 <style>
     .page-background { min-height: 100vh; background-color: #4a9b9b; padding: 1rem 0; }
+    .fan-picker { position: relative; max-width: 360px; margin-bottom: 0.75rem; }
+    .fan-input { width: 100%; box-sizing: border-box; padding: 0.6rem 0.9rem; font-size: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; }
+    .fan-input:focus { outline: none; border-color: #2c5aa0; }
+    .fan-input:disabled { background: #f3f4f6; color: #6b7280; }
+    .fan-list { list-style: none; margin: 0.25rem 0 0; padding: 0.25rem; position: absolute; z-index: 10; background: white; border: 1px solid #e5e7eb; border-radius: 8px; width: 100%; box-sizing: border-box; max-height: 240px; overflow-y: auto; box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
+    .fan-option { display: block; width: 100%; text-align: left; padding: 0.5rem 0.7rem; background: none; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+    .fan-option:hover { background: #f0f9ff; }
+    .fan-option.sel { background: #2c5aa0; color: white; }
+    .fan-none { padding: 0.5rem 0.7rem; color: #9ca3af; font-size: 0.9rem; }
+    .disclosure { color: #4b5563; font-size: 0.9rem; line-height: 1.6; margin: 0 0 1.5rem; max-width: 640px; }
     .prov-star { color: #f59e0b; font-weight: 700; margin-left: 1px; cursor: help; }
     .admin-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
     .sync-out { background: #0f172a; color: #cbd5e1; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
@@ -506,9 +641,25 @@
     .week-title.solo + .progress { text-align: left; }
 
     .fixtures { display: flex; flex-direction: column; gap: 0.75rem; }
-    .fixture { border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.75rem 1rem 1rem; background: #fafbfc; }
+    .fixture { position: relative; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.75rem 1rem 1rem; background: #fafbfc; }
     .fixture.locked { opacity: 0.6; }
-    .fixture-time { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.6rem; display: flex; gap: 0.5rem; align-items: center; }
+    /* Golden / silver match highlight around the whole card */
+    .fixture.golden { border: 2px solid #d4af37; box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25); background: linear-gradient(180deg, #fffdf3 0%, #fafbfc 60%); }
+    .fixture.silver { border: 2px solid #9aa3ad; box-shadow: 0 0 0 3px rgba(154, 163, 173, 0.25); background: linear-gradient(180deg, #f8fafc 0%, #fafbfc 60%); }
+    .fixture.bronze { border: 2px solid #c08457; box-shadow: 0 0 0 3px rgba(192, 132, 87, 0.22); background: linear-gradient(180deg, #fdf6f0 0%, #fafbfc 60%); }
+    /* Effective base-points badge, top-right */
+    .base-badge { position: absolute; top: 0.55rem; right: 0.6rem; background: #eef2f7; color: #2c5aa0; border: 1px solid #d7e0ec; border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.72rem; font-weight: 700; cursor: help; }
+    .fixture.golden .base-badge { background: #fbf3d6; color: #8a6d1a; border-color: #e6cf7a; }
+    .fixture.silver .base-badge { background: #eef1f4; color: #556; border-color: #c7ced6; }
+    .fixture.bronze .base-badge { background: #f6e7da; color: #7a4a24; border-color: #ddb595; }
+    .bonus-tag { border-radius: 10px; padding: 0.1rem 0.5rem; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .bonus-tag.gold { background: #d4af37; color: #3d2f00; }
+    .bonus-tag.slv { background: #9aa3ad; color: #1f242b; }
+    .bonus-tag.brz { background: #c08457; color: #2e1a0c; }
+    .pick.fan-locked { background: #2c5aa0; border-color: #2c5aa0; cursor: not-allowed; }
+    .pick.fan-locked .team, .pick.fan-locked .hint, .pick.fan-locked .odds { color: white; }
+    .fan-lock-icon { font-size: 0.75rem; }
+    .fixture-time { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.6rem; padding-right: 3.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .lock-tag { background: #6b7280; color: white; border-radius: 10px; padding: 0.1rem 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
     .pick-row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; align-items: stretch; }
     .pick-row.two.has-draw { grid-template-columns: 1fr auto 1fr; }
