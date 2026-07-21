@@ -11,7 +11,7 @@ import type { RequestHandler } from './$types';
 // (table points, 1/2-tie, +5 fan base) only apply once a save exists.
 export const POST: RequestHandler = async ({ request, locals }) => {
     if (!locals.user) return json({ ok: false, error: 'Log in first.' }, { status: 401 });
-    const { fanTeam, tableOrder } = await request.json();
+    const { fanTeam, tableOrder, displayName } = await request.json();
 
     if (!fanTeam || !teamById[fanTeam]) {
         return json({ ok: false, error: 'Pick your fan team.' }, { status: 400 });
@@ -21,7 +21,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     }
     for (const id of tableOrder) if (!teamById[id]) return json({ ok: false, error: 'Unknown team in order.' }, { status: 400 });
 
-    const existing = (await sql`select predictions_saved_at from users where id = ${locals.user.id}`)[0];
+    const name = typeof displayName === 'string' ? displayName.trim() : '';
+    if (name.length > 40) return json({ ok: false, error: 'Name must be 40 characters or fewer.' }, { status: 400 });
+
+    const existing = (await sql`select predictions_saved_at, pickem_joined_at from users where id = ${locals.user.id}`)[0];
+    if (existing?.pickem_joined_at == null) {
+        return json({ ok: false, error: 'Join the competition first.' }, { status: 403 });
+    }
     const hasSaved = existing?.predictions_saved_at != null;
     if (hasSaved && deadlinePassed()) {
         return json({ ok: false, error: 'Your season predictions are locked.' }, { status: 409 });
@@ -30,6 +36,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     await sql.begin(async (tx) => {
         await tx`update users
                  set fan_team = ${fanTeam},
+                     display_name = ${name || null},
                      predictions_saved_at = coalesce(predictions_saved_at, now())
                  where id = ${locals.user!.id}`;
         await tx`insert into table_predictions (user_id, team_order)

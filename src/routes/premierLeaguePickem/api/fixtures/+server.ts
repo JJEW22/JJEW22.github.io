@@ -31,22 +31,33 @@ export const GET: RequestHandler = async ({ url }) => {
         from results where home_goals is not null and away_goals is not null`;
     const positions = new Map(computeTable(finished).map((e) => [e.teamId, e.position]));
 
-    // Golden/silver/bronze for this week, using the SAME picker the scorer uses,
-    // so what players see while picking matches how it later scores.
-    const { goldenId, silverId, bronzeId } = pickBonusFixtures(
-        fixtures.map((f) => {
-            const o = oddsById.get(f.id);
-            return {
-                id: f.id,
-                homeId: f.homeId,
-                awayId: f.awayId,
-                probHome: o?.prob_home != null ? Number(o.prob_home) : null,
-                probAway: o?.prob_away != null ? Number(o.prob_away) : null
-            };
-        }),
-        mw,
-        positions
+    // Bonuses are only "established" from 2 weeks before the week is played, and
+    // only once odds exist (otherwise ranking would be arbitrary). Future weeks
+    // therefore show no gold/silver/bronze at all.
+    const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+    const earliestKickoff = fixtures.reduce(
+        (min, f) => Math.min(min, new Date(f.kickoff).getTime()),
+        Infinity
     );
+    const oddsExist = oddsRows.some((o) => o.prob_home != null || o.prob_away != null);
+    const established = fixtures.length > 0 && oddsExist && earliestKickoff - Date.now() <= TWO_WEEKS_MS;
+
+    const { goldenId, silverId, bronzeId } = established
+        ? pickBonusFixtures(
+              fixtures.map((f) => {
+                  const o = oddsById.get(f.id);
+                  return {
+                      id: f.id,
+                      homeId: f.homeId,
+                      awayId: f.awayId,
+                      probHome: o?.prob_home != null ? Number(o.prob_home) : null,
+                      probAway: o?.prob_away != null ? Number(o.prob_away) : null
+                  };
+              }),
+              mw,
+              positions
+          )
+        : { goldenId: null, silverId: null, bronzeId: null };
 
     return json({
         number: mw,

@@ -1,0 +1,27 @@
+# .github/workflows/pickem-cron.yml
+# Drives the pickem automation: results sync (135 min after kickoff) and the
+# Wednesday pick reminders. The endpoint self-gates, so running every 15 minutes
+# is harmless — it only acts when something is actually due.
+#
+# Setup:
+#   1. Add a repo Actions secret SYNC_SECRET matching the server's SYNC_SECRET.
+#   2. (Optional) change the URL if your domain differs.
+# Notes:
+#   - GitHub cron is best-effort (can drift a few minutes) and scheduled workflows
+#     are auto-disabled after 60 days of repo inactivity — re-enable if that happens.
+name: Pickem cron
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger cron endpoint
+        run: |
+          curl -fsS -X POST \
+            "https://johnjackwilkins.com/premierLeaguePickem/api/cron?key=${{ secrets.SYNC_SECRET }}" \
+            && echo "cron ok"

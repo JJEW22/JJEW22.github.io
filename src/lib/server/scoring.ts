@@ -230,8 +230,9 @@ export interface LeaderRow {
 }
 
 export async function computeLeaderboard(): Promise<LeaderRow[]> {
-    const users = await sql<{ id: number; username: string; fan_team: string | null; predictions_saved_at: Date | null }[]>`
-        select id, username, fan_team, predictions_saved_at from users`;
+    const users = await sql<{ id: number; username: string; display_name: string | null; fan_team: string | null; predictions_saved_at: Date | null }[]>`
+        select id, username, display_name, fan_team, predictions_saved_at
+        from users where pickem_joined_at is not null`;
     const picks = await sql<{ user_id: number; fixture_id: string; pick: string }[]>`
         select user_id, fixture_id, pick from match_picks`;
     const results = await sql<ResultRow[]>`
@@ -327,7 +328,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         }
 
         return {
-            player: u.username,
+            player: u.display_name || u.username,
             matchPoints: Math.round(matchPoints),
             tablePoints: lockedTable + provTable,
             lockedTablePoints: lockedTable,
