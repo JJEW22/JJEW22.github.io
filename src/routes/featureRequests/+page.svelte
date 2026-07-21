@@ -72,14 +72,16 @@
         <main>
             <h1>Feature Requests</h1>
             <p class="lede">
-                Got an idea to make the competition better? Drop one request per two-week cycle.
-                Each one comes straight to me, and I'll build my favorite. The slate clears every cycle{#if resetText} (next reset: <b>{resetText}</b>){/if}.
+                Got an idea to make the site or a competition better? Type a request here and it'll be sent
+                to me on a two-week cycle (so I don't get spammed). Each one comes straight to me, and I'll
+                build my favorite. If I didn't build your request from last time you're welcome to submit it
+                again — know that I've got it saved, but additional submissions bump it up the order.
             </p>
 
             {#if !loaded}
                 <p class="muted">Loading…</p>
             {:else if !signedIn}
-                <div class="gate"><p>Please <a href="/premierLeaguePickem">sign in on the Pickem page</a> to submit a request.</p></div>
+                <div class="gate"><p>Please <a href="/account?redirect=/featureRequests">sign in</a> to submit a request.</p></div>
             {:else if !joined}
                 <div class="gate"><p>Join the competition on the <a href="/premierLeaguePickem">Pickem page</a> first, then you can send requests.</p></div>
             {:else}
