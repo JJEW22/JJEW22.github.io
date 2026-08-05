@@ -62,9 +62,9 @@ npm run test      # playwright e2e
 - **Team data**: `$lib/plTeams` exports `TEAMS` (array) and `teamById` (lookup). Each team has
   `id`, `name`, and `color`.
 - **API routes**: pickem endpoints live under `/premierLeaguePickem/api`
-  (`fixtures`, `me`, `picks`, `season`, `join`, `leaderboard`, `standings`,
-  `admin/sync-odds`, `admin/sync-results`).
-  Auth is separate, at `/api/auth/login` and `/api/auth/logout`.
+  (`fixtures`, `me`, `picks`, `season`, `join`, `leaderboard`, `standings`, `table`,
+  `fan-team`, `features`, `cron`, `admin/sync-odds`, `admin/sync-results`).
+  Auth is separate, under `/api/auth` (`login`, `logout`, `register`, `me`, `invite-info`).
 - **Roles**: `site:admin` and `pickem:admin` both unlock the Admin tab.
 - **External data**: standings come from football-data.org via the standings route.
 - **Client-side fallbacks**: the page falls back to `SAMPLE_MATCHWEEKS` and zeroed standings when
@@ -82,6 +82,10 @@ the comments in the source mark them:
 
 Bonus match points (Golden +10 / Silver +5 / Bronze +3) and the fan-team bonus (+5) stack, and
 are implemented in both `effectiveBase()` on the client and `scoring.ts` on the server.
+
+## Running commands
+node_modules exists only inside the container. Never run npm directly on the host.
+Use: docker compose exec svelte-app npm run check
 
 ## Don't
 
