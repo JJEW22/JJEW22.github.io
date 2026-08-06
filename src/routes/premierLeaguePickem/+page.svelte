@@ -941,5 +941,17 @@
         .auth-input { width: 100%; }
         .pick .team { font-size: 0.85rem; }
         .week-title { font-size: 1.35rem; min-width: 8rem; }
+
+        /* Tabs: scroll horizontally as a single row instead of wrapping into
+           several rows of pill buttons. */
+        .tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tab, .tab-link { flex: 0 0 auto; white-space: nowrap; padding: 0.6rem 0.85rem; font-size: 0.9rem; }
+
+        /* Match cards: stack Home / Draw / Away instead of a cramped 3-up row
+           that forces horizontal scrolling on narrow screens. */
+        .pick-row.two, .pick-row.two.has-draw { grid-template-columns: 1fr; gap: 0.5rem; }
+        .pick.home, .pick.away { flex-direction: row; text-align: left; }
+        .pick.home .pick-text, .pick.away .pick-text { align-items: flex-start; }
+        .draw-box { flex-direction: row; justify-content: center; gap: 0.5rem; min-width: 0; padding: 0.4rem 0.75rem; }
     }
 </style>
