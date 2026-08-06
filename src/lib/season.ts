@@ -5,3 +5,6 @@ export const PREDICTIONS_DEADLINE = new Date('2026-08-20T23:59:00-04:00');
 export function deadlinePassed(now: Date = new Date()): boolean {
     return now.getTime() > PREDICTIONS_DEADLINE.getTime();
 }
+
+// Picks lock this long before kickoff. keep in sync with +page.svelte
+export const PICK_LOCK_LEAD_MS = 15 * 60 * 1000;

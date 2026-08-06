@@ -102,9 +102,11 @@ export async function getFinishedMatches(): Promise<FinishedMatch[]> {
     }));
 }
 
-// Matches in a forward date window, used to map odds events to fixture ids.
-export async function getUpcomingMatches(daysAhead = 10): Promise<UpcomingMatch[]> {
-    const from = new Date().toISOString().slice(0, 10);
+// Matches within a date window relative to now: `daysBack` days in the past to
+// `daysAhead` days in the future. Used by the cron jobs to find recently-finished
+// kickoffs (backward) and matches coming up soon (forward).
+export async function getMatchesInWindow(daysBack = 0, daysAhead = 10): Promise<UpcomingMatch[]> {
+    const from = new Date(Date.now() - daysBack * 86400000).toISOString().slice(0, 10);
     const to = new Date(Date.now() + daysAhead * 86400000).toISOString().slice(0, 10);
     const data = await fd(`/competitions/PL/matches?dateFrom=${from}&dateTo=${to}`);
     return (data.matches ?? []).map((m: any) => ({
@@ -114,4 +116,9 @@ export async function getUpcomingMatches(daysAhead = 10): Promise<UpcomingMatch[
         homeId: tlaToId(m.homeTeam.tla),
         awayId: tlaToId(m.awayTeam.tla)
     }));
+}
+
+// Matches in a forward date window, used to map odds events to fixture ids.
+export async function getUpcomingMatches(daysAhead = 10): Promise<UpcomingMatch[]> {
+    return getMatchesInWindow(0, daysAhead);
 }
