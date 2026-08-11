@@ -4,7 +4,8 @@
 # is harmless — it only acts when something is actually due.
 #
 # Setup:
-#   1. Add a repo Actions secret SYNC_SECRET matching the server's SYNC_SECRET.
+#   1. Add a repo Actions secret SYNC_SECRET whose value matches the SYNC_SECRET
+#      env var on the Render service, byte for byte (watch for a trailing newline).
 #   2. (Optional) change the URL if your domain differs.
 # Notes:
 #   - GitHub cron is best-effort (can drift a few minutes) and scheduled workflows
@@ -21,7 +22,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger cron endpoint
+        env:
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
         run: |
-          curl -fsS -X POST \
-            "https://johnjackwilkins.com/premierLeaguePickem/api/cron?key=${{ secrets.SYNC_SECRET }}" \
-            && echo "cron ok"
+          set -uo pipefail
+          # An unset secret interpolates to an empty string, which the server would
+          # just reject as a 403 — fail with something you can actually read instead.
+          if [ -z "${SYNC_SECRET}" ]; then
+            echo "::error::SYNC_SECRET is not set for this repo (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          # Sent as a header, not a query param: no URL encoding to get wrong, and the
+          # secret stays out of the CDN/host access logs.
+          status=$(curl -sS -X POST \
+            -H "x-sync-key: ${SYNC_SECRET}" \
+            -o response.json -w '%{http_code}' \
+            "https://johnjackwilkins.com/premierLeaguePickem/api/cron") || {
+            echo "::error::could not reach the cron endpoint"
+            exit 1
+          }
+          echo "HTTP $status"
+          cat response.json; echo
+          [ "$status" = "200" ] || exit 1
