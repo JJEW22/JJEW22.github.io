@@ -32,6 +32,13 @@
             image: 'none',
             display: true
         },
+        {
+            title: "Premier League Pickem",
+            description: "Pick a winner in every match, predict where all 20 clubs finish, and get scored on both across the season.",
+            link: "/premierLeaguePickem",
+            image: 'none',
+            display: true
+        },
     ];
 
 // Filter to only show projects where display is true

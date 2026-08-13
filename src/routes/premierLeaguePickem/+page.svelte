@@ -150,22 +150,19 @@
     $: predictionsGate = !user || !joined;
 
     // Competition pot, computed live from the number of joined participants.
-    // Per person: $2 lights + $4 snacks + $9 prize = up to $15. The lights pool
-    // caps at $35 and the winner's prize at $125, so each person's lights/prize
-    // share shrinks once those caps are hit (snacks stay $4/person).
-    const BUYIN_LIGHTS = 2;
-    const BUYIN_SNACKS = 4;
-    const BUYIN_PRIZE = 9;
-    const LIGHTS_CAP = 35;
-    const PRIZE_CAP = 125;
-    const money = (n) => '$' + (Math.round(n * 100) / 100).toFixed(2);
+    // $10 a head, all of it toward the winner's prize (gear for their club), and the
+    // pool caps at $150 — past 15 players the prize stops growing, so each person's
+    // share shrinks instead. No lights cost and nothing collected on the day.
+    const BUYIN_PRIZE = 10;
+    const PRIZE_CAP = 150;
+    // Whole amounts render clean ($10, $150); split shares keep their cents ($9.38).
+    const money = (n) => {
+        const v = Math.round(n * 100) / 100;
+        return '$' + (Number.isInteger(v) ? v : v.toFixed(2));
+    };
     $: participants = leaderboard.length;
-    $: lightsPool = Math.min(LIGHTS_CAP, BUYIN_LIGHTS * participants);
-    $: snacksPool = BUYIN_SNACKS * participants;
     $: prizePool = Math.min(PRIZE_CAP, BUYIN_PRIZE * participants);
-    $: perLights = participants ? lightsPool / participants : BUYIN_LIGHTS;
     $: perPrize = participants ? prizePool / participants : BUYIN_PRIZE;
-    $: perTotal = perLights + BUYIN_SNACKS + perPrize;
 
     async function joinCompetition() {
         if (!user) return;
@@ -675,37 +672,35 @@
                         <ul>
                             <li>Each week, <b>pick the winner of every match</b> (no draws). A correct pick scores <b>{BASE_POINTS} base points</b> multiplied by the match odds — closer games are worth more.</li>
                             <li><b>Predict where all 20 clubs finish.</b> You're scored every completed week on how close each club is to where you placed it.</li>
-                            <li>Pick a <b>fan team</b> (auto-picked to win all its games) and a <b>display name</b>. Both lock at <b>23:59 the day before the season</b>.</li>
+                            <li>Pick a <b>fan team</b> (you're locked into picking them to win every week; the bonuses offset that, so just take your favorite) and a <b>display name</b>. Both lock at <b>23:59 the day before the season</b>.</li>
                             <li>Three "matches of the week" carry bonus points — <span class="chip gold">Golden +10</span> <span class="chip slv">Silver +5</span> <span class="chip brz">Bronze +3</span> — and your fan team's match is <b>+5</b>. These <b>stack</b>.</li>
-                            <li>Buy-in is <b>up to $15</b>: lights, snacks at the ceremony, and the winner's prize (details below).</li>
+                            <li>Buy-in is <b>$10</b> a head, all of it toward <b>gear for the winner's club</b>. Nothing else to pay, on the day or otherwise.</li>
+                            <li>The season closes with a <b>watch party on Super Sunday</b>, where the last games settle the table and the prize is handed over.</li>
                         </ul>
                     </div>
 
                     <div class="rule-block">
                         <h3>The competition & buy-in</h3>
-                        <p>Everyone contributes up to <b>$15</b>, split three ways. The pot below updates live with the <b>{participants}</b> {participants === 1 ? 'player' : 'players'} who've joined so far.</p>
-                        <div class="pot-grid">
-                            <div class="pot-card">
-                                <span class="pot-label">💡 Lights</span>
-                                <span class="pot-per">{money(perLights)} / person</span>
-                                <span class="pot-pool">Pool: <b>{money(lightsPool)}</b></span>
-                                <span class="pot-note">$2 each, pool capped at {money(LIGHTS_CAP)}</span>
-                            </div>
-                            <div class="pot-card">
-                                <span class="pot-label">🍿 Snacks</span>
-                                <span class="pot-per">{money(BUYIN_SNACKS)} / person</span>
-                                <span class="pot-pool">Pool: <b>{money(snacksPool)}</b></span>
-                                <span class="pot-note">$4 each for the ceremony</span>
-                            </div>
+                        <p><b>{money(BUYIN_PRIZE)} a person</b>, and every cent of it goes to the prize. The pot below updates live with the <b>{participants}</b> {participants === 1 ? 'player' : 'players'} who've joined so far.</p>
+                        <div class="pot-grid single">
                             <div class="pot-card">
                                 <span class="pot-label">🏆 Winner's prize</span>
                                 <span class="pot-per">{money(perPrize)} / person</span>
                                 <span class="pot-pool">Prize: <b>{money(prizePool)}</b></span>
-                                <span class="pot-note">$9 each, prize capped at {money(PRIZE_CAP)}</span>
+                                <span class="pot-note">{money(BUYIN_PRIZE)} each, prize capped at {money(PRIZE_CAP)}</span>
                             </div>
                         </div>
-                        <p class="pot-total">Your buy-in at {participants} {participants === 1 ? 'player' : 'players'}: <b>{money(perTotal)}</b></p>
-                        <p class="note">As more people join, the lights pool ({money(LIGHTS_CAP)}) and prize ({money(PRIZE_CAP)}) hit their caps, so each person's share of those two shrinks — snacks stay $4 a head. The winner takes the whole prize pool.</p>
+                        <p class="pot-total">Your buy-in at {participants} {participants === 1 ? 'player' : 'players'}: <b>{money(perPrize)}</b></p>
+                        <p class="note">The prize is <b>gear for your club</b> — kit, scarf, whatever you want — bought for the winner out of the pot. The pool caps at {money(PRIZE_CAP)}, so once {PRIZE_CAP / BUYIN_PRIZE} people have joined, each extra player lowers everyone's share rather than growing the prize. There's <b>no lights cost and nothing to pay on the day</b>.</p>
+                    </div>
+
+                    <div class="rule-block">
+                        <h3>Super Sunday</h3>
+                        <ul>
+                            <li>The season ends with a <b>watch party on Super Sunday</b> — the final matchday, when all ten games kick off at the same time.</li>
+                            <li>It's the last round of picks, and the week that settles the final table, so anything still <span class="prov-star">*</span> provisional resolves there.</li>
+                            <li>The winner's gear gets handed over at the party. <b>Nothing to chip in on the day</b> — the {money(BUYIN_PRIZE)} buy-in is the only cost all season.</li>
+                        </ul>
                     </div>
 
                     <div class="rule-block">
@@ -728,9 +723,9 @@
 
                         <h4>Fan team</h4>
                         <ul>
-                            <li>Choose one club for the season. You <b>automatically pick them to win</b> every one of their matches.</li>
-                            <li>Their matches carry a <b>+5</b> base bonus, and one of their draws scores <b>1/2</b> instead of 1/3.</li>
-                            <li>The half-point-on-draw exactly offsets the auto-win, so the expected value is the same either way — <b>just pick your favorite.</b></li>
+                            <li>Choose one club for the season. You're <b>locked into picking them to win</b> every one of their matches — you never get to pick against them, however the fixture looks.</li>
+                            <li><b>To offset that</b>, their matches carry a <b>+5</b> base bonus and their draws score <b>1/2</b> instead of 1/3.</li>
+                            <li>That offset is the point: it cancels out the cost of the forced auto-pick, so <b>no club is a better choice than any other</b> — the expected value comes out even whoever you take. <b>Just pick your favorite.</b></li>
                         </ul>
 
                         <h4>Season predictions (order, fan team, name)</h4>
@@ -742,14 +737,18 @@
 
                         <h4>Table scoring</h4>
                         <ul>
-                            <li>Every completed week, each club costs you points based on <b>how far its real position is</b> from where you predicted it — closer is better — summed across all weeks.</li>
+                            <li>Every completed week, each of the 20 clubs <b>earns</b> you points based on <b>how far its real position is</b> from where you predicted it. Exact is worth the most, and the value drops off the further out you were.</li>
+                            <li>The payout comes from a <b>scoring array</b> built fresh for each week. In week <i>W</i> the array opens at <b>W</b> for an exact hit and steps down to <b>1</b>, scoring <b>0</b> once you're further off than the array is long. So precision is worth more and more as the season runs on, and being wrong early costs you very little.</li>
+                            <!-- Mirrors arrayForWeek() in src/lib/server/scoring.ts — update both together. -->
+                            <li>Worked examples. <b>Week 1</b> is <code>[1]</code>: only an exact placement scores at all, for a single point. <b>Week 10</b> is <code>[10, 6, 3, 1]</code> — exact 10, one place out 6, two out 3, three out 1, four or more nothing. <b>Week 38</b> is <code>[38, 29, 22, 16, 11, 7, 4, 2, 1]</code>, where even eight places out still pays.</li>
+                            <li>Your table score is the sum over <b>every club, every completed week</b>, so a club you've read correctly keeps paying out week after week.</li>
                             <li>Weeks where clubs still have games in hand are <b>provisional</b> (marked <span class="prov-star">*</span>) and can shift once postponed games are played.</li>
                         </ul>
 
                         <h4>Winning</h4>
                         <ul>
                             <li>Your total is <b>match points + table points</b>, updated live as results come in.</li>
-                            <li>Highest total at the end of the season takes the prize pool.</li>
+                            <li>Highest total at the end of the season takes the pot, spent on <b>gear for the club of their choice</b>.</li>
                         </ul>
                     </div>
                 </section>
@@ -855,6 +854,9 @@
     .chip.slv { background: #9aa3ad; color: #1f242b; border-color: #868f99; }
     .chip.brz { background: #c08457; color: #2e1a0c; border-color: #a86e42; }
     .pot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    /* One bucket left in the pot — keep the card from stretching the full width. */
+    .pot-grid.single { grid-template-columns: minmax(200px, 320px); }
+    .rules code { background: #eef2f7; border: 1px solid #d7e0ec; border-radius: 6px; padding: 0.05rem 0.35rem; font-size: 0.88em; color: #1f3a63; }
     .pot-card { display: flex; flex-direction: column; gap: 0.2rem; background: #fafbfc; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem 1.1rem; }
     .pot-label { font-weight: 700; color: #1a202c; }
     .pot-per { font-size: 1.5rem; font-weight: 800; color: #2c5aa0; }
