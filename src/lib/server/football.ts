@@ -19,6 +19,7 @@ export interface Fixture {
 export interface StandingRow {
     teamId: string;
     name: string;
+    crest: string | null; // club badge URL from football-data; null if unavailable
     played: number;
     won: number;
     drawn: number;
@@ -80,6 +81,7 @@ export async function getStandings(): Promise<StandingRow[]> {
     return (total?.table ?? []).map((r: any) => ({
         teamId: tlaToId(r.team.tla),
         name: r.team.shortName || r.team.name,
+        crest: r.team.crest ?? null,
         played: r.playedGames,
         won: r.won,
         drawn: r.draw,

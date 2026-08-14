@@ -173,6 +173,8 @@ interface ResultRow {
 
 export interface LeaderRow {
     player: string;
+    fanTeam: string | null; // null until the player has saved their season predictions
+    correctPicks: number; // outright winners called correctly; draws don't count
     matchPoints: number;
     tablePoints: number;
     lockedTablePoints: number;
@@ -226,6 +228,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         const saved = u.predictions_saved_at != null;
         const fanActive = saved && u.fan_team ? u.fan_team : null;
         let matchPoints = 0;
+        let correctPicks = 0;
 
         for (const r of results) {
             if (!r.winner) continue;
@@ -249,6 +252,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
             else if ((side === 'HOME' && r.winner === 'HOME_TEAM') || (side === 'AWAY' && r.winner === 'AWAY_TEAM'))
                 outcome = 'WIN';
             else outcome = 'LOSS';
+            if (outcome === 'WIN') correctPicks++;
 
             // Effective base: gold/silver/bronze apply to their match for everyone;
             // the fan-team bonus applies to the fan's match. They STACK — e.g. a
@@ -285,6 +289,8 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         // floats, so round them before they leave the server.
         return {
             player: u.display_name || u.username,
+            fanTeam: fanActive,
+            correctPicks,
             matchPoints: round1(matchPoints),
             tablePoints: round1(lockedTable + provTable),
             lockedTablePoints: round1(lockedTable),

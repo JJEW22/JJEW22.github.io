@@ -92,7 +92,7 @@
             const r = await fetch(`${API}/standings`);
             if (r.ok) return await r.json();
         } catch (_) {}
-        return TEAMS.map((t) => ({ teamId: t.id, name: t.name, played: 0, won: 0, drawn: 0, lost: 0, gd: 0, points: 0 }));
+        return TEAMS.map((t) => ({ teamId: t.id, name: t.name, crest: null, played: 0, won: 0, drawn: 0, lost: 0, gd: 0, points: 0 }));
     }
 
     // ============================================================
@@ -130,6 +130,7 @@
     let dragIndex = null;
 
     let leaderboard = [];
+    /** @type {any[]} */
     let standings = [];
 
     onMount(async () => {
@@ -383,6 +384,14 @@
     $: ranked = [...leaderboard]
         .map((r) => ({ ...r, total: round1((r.matchPoints || 0) + (r.tablePoints || 0)) }))
         .sort((a, b) => b.total - a.total);
+    // Club badges come from football-data via the standings route. They're absent
+    // when that fetch falls back, so the crest cell degrades to a colour + code chip.
+    let crestById = new Map();
+    $: {
+        const m = new Map();
+        for (const s of standings || []) if (s.crest) m.set(s.teamId, s.crest);
+        crestById = m;
+    }
 </script>
 
 <svelte:head>
@@ -423,7 +432,7 @@
             <div class="tabs" role="tablist">
                 <button class="tab" class:active={activeTab === 'matches'} on:click={() => (activeTab = 'matches')}>Match Predictions</button>
                 <button class="tab" class:active={activeTab === 'table'} on:click={() => (activeTab = 'table')}>Season predictions</button>
-                <button class="tab" class:active={activeTab === 'results'} on:click={() => (activeTab = 'results')}>Results</button>
+                <button class="tab" class:active={activeTab === 'results'} on:click={() => (activeTab = 'results')}>Standings</button>
                 <button class="tab" class:active={activeTab === 'pltable'} on:click={() => (activeTab = 'pltable')}>PL Table</button>
                 <button class="tab" class:active={activeTab === 'rules'} on:click={() => (activeTab = 'rules')}>Rules</button>
                 <a class="tab tab-link" href="/featureRequests">Feature Requests ↗</a>
@@ -621,19 +630,31 @@
                     <div class="table-wrapper">
                         <table class="grid-table">
                             <thead>
-                                <tr><th>#</th><th>Player</th><th class="num">Match</th><th class="num">Table</th><th class="num hl">Total</th></tr>
+                                <tr><th>#</th><th>Player</th><th class="crest-col">Team</th><th class="num">Correct</th><th class="num">Match</th><th class="num">Table</th><th class="num hl">Total</th></tr>
                             </thead>
                             <tbody>
                                 {#each ranked as row, i}
+                                    {@const fan = row.fanTeam ? teamById[row.fanTeam] : null}
+                                    {@const crest = row.fanTeam ? crestById.get(row.fanTeam) : null}
                                     <tr class:you={row.player === user}>
                                         <td class="num">{i + 1}</td>
                                         <td class="strong">{row.player}</td>
+                                        <td class="crest-col">
+                                            {#if fan && crest}
+                                                <img class="crest" src={crest} alt={fan.name} title={fan.name} loading="lazy" />
+                                            {:else if fan}
+                                                <span class="crest-chip" style="background:{fan.color}" title={fan.name}>{fan.code}</span>
+                                            {:else}
+                                                <span class="crest-none" title="No fan team locked in yet">—</span>
+                                            {/if}
+                                        </td>
+                                        <td class="num">{row.correctPicks || 0}</td>
                                         <td class="num">{row.matchPoints || 0}</td>
                                         <td class="num">{row.tablePoints || 0}{#if row.tableProvisional}<span class="prov-star" title="Includes provisional weeks with games in hand — may change once postponed fixtures are played">*</span>{/if}</td>
                                         <td class="num hl">{row.total}</td>
                                     </tr>
                                 {:else}
-                                    <tr><td colspan="5" class="empty-cell">No players yet.</td></tr>
+                                    <tr><td colspan="7" class="empty-cell">No players yet.</td></tr>
                                 {/each}
                             </tbody>
                         </table>
@@ -799,6 +820,11 @@
     .fan-none { padding: 0.5rem 0.7rem; color: #9ca3af; font-size: 0.9rem; }
     .disclosure { color: #4b5563; font-size: 0.9rem; line-height: 1.6; margin: 0 0 1.5rem; max-width: 640px; }
     .prov-star { color: #f59e0b; font-weight: 700; margin-left: 1px; cursor: help; }
+    /* Fan-team column on the standings table */
+    .crest-col { width: 3.25rem; text-align: center; }
+    .crest { width: 1.5rem; height: 1.5rem; object-fit: contain; vertical-align: middle; cursor: help; }
+    .crest-chip { display: inline-block; min-width: 2.1rem; padding: 0.1rem 0.3rem; border-radius: 6px; color: #fff; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em; cursor: help; }
+    .crest-none { color: #9ca3af; cursor: help; }
     .admin-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
     .sync-out { background: #0f172a; color: #cbd5e1; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
