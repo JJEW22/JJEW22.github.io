@@ -393,41 +393,79 @@
         crestById = m;
     }
 
-    // Standings table: if the full-width headers would force a horizontal scroll,
-    // abbreviate them and explain the abbreviations in a legend underneath.
+    // Two places swap to a compact form rather than growing a horizontal scrollbar:
+    // the standings headers (abbreviated + legend) and the tab row (a dropdown).
     let compactStandings = false;
-    // Action on the scroll wrapper. The full-form width is remembered before
-    // switching, because once abbreviated the table fits — measuring again would
-    // say "expand", which would overflow again, and it would flip back and forth.
-    /** @param {HTMLElement} node */
-    function fitStandings(node) {
-        let fullWidth = 0;
-        function check() {
-            /** @type {HTMLElement | null} */
-            const table = node.querySelector('table');
-            if (!table) return;
-            if (!compactStandings) {
-                fullWidth = table.scrollWidth;
-                if (fullWidth > node.clientWidth) compactStandings = true;
-            } else if (fullWidth && node.clientWidth >= fullWidth) {
-                compactStandings = false;
+    let compactTabs = false;
+
+    // Builds an action that flips `apply` when the element's content is too wide.
+    // The full-form width is remembered before switching, because once the compact
+    // form renders the element fits — measuring again would say "expand", which
+    // overflows again, and it would flip back and forth forever.
+    /** @param {(compact: boolean) => void} apply */
+    function widthFitter(apply) {
+        /**
+         * @param {HTMLElement} node
+         * @param {unknown} deps - changing this re-measures; the value itself is unused
+         */
+        return function (node, deps) {
+            void deps;
+            let fullWidth = 0;
+            let compact = false;
+            function check() {
+                if (!compact) {
+                    fullWidth = node.scrollWidth;
+                    // 1px of tolerance: sub-pixel rounding shouldn't trigger a swap.
+                    if (fullWidth > node.clientWidth + 1) {
+                        compact = true;
+                        apply(true);
+                    }
+                } else if (fullWidth && node.clientWidth >= fullWidth) {
+                    compact = false;
+                    apply(false);
+                }
             }
-        }
-        const ro = new ResizeObserver(check);
-        ro.observe(node);
-        check();
-        return {
-            // Row data changed, so the remembered width is stale: re-measure from full.
-            async update() {
-                fullWidth = 0;
-                compactStandings = false;
-                await tick();
-                check();
-            },
-            destroy() {
-                ro.disconnect();
-            }
+            const ro = new ResizeObserver(check);
+            ro.observe(node);
+            check();
+            return {
+                // Contents changed, so the remembered width is stale: re-measure from full.
+                async update() {
+                    fullWidth = 0;
+                    compact = false;
+                    apply(false);
+                    await tick();
+                    check();
+                },
+                destroy() {
+                    ro.disconnect();
+                }
+            };
         };
+    }
+    const fitStandings = widthFitter((v) => (compactStandings = v));
+    const fitTabs = widthFitter((v) => (compactTabs = v));
+
+    // One definition of the tabs, rendered either as a button row or a dropdown.
+    const TABS = [
+        { id: 'matches', label: 'Match Predictions' },
+        { id: 'table', label: 'Season predictions' },
+        { id: 'results', label: 'Standings' },
+        { id: 'pltable', label: 'PL Table' },
+        { id: 'rules', label: 'Rules' }
+    ];
+    const FEATURES_OPTION = '__features';
+    $: visibleTabs = isPickemAdmin ? [...TABS, { id: 'admin', label: 'Admin' }] : TABS;
+
+    /** @param {Event & { currentTarget: HTMLSelectElement }} e */
+    function onTabSelect(e) {
+        const choice = e.currentTarget.value;
+        if (choice === FEATURES_OPTION) {
+            e.currentTarget.value = activeTab; // leave the picker on the real tab
+            window.location.href = '/featureRequests';
+            return;
+        }
+        activeTab = choice;
     }
 </script>
 
@@ -466,15 +504,27 @@
                 {/if}
             </div>
 
-            <div class="tabs" role="tablist">
-                <button class="tab" class:active={activeTab === 'matches'} on:click={() => (activeTab = 'matches')}>Match Predictions</button>
-                <button class="tab" class:active={activeTab === 'table'} on:click={() => (activeTab = 'table')}>Season predictions</button>
-                <button class="tab" class:active={activeTab === 'results'} on:click={() => (activeTab = 'results')}>Standings</button>
-                <button class="tab" class:active={activeTab === 'pltable'} on:click={() => (activeTab = 'pltable')}>PL Table</button>
-                <button class="tab" class:active={activeTab === 'rules'} on:click={() => (activeTab = 'rules')}>Rules</button>
-                <a class="tab tab-link" href="/featureRequests">Feature Requests ↗</a>
-                {#if isPickemAdmin}
-                    <button class="tab" class:active={activeTab === 'admin'} on:click={() => (activeTab = 'admin')}>Admin</button>
+            <div
+                class="tabs"
+                class:as-select={compactTabs}
+                role={compactTabs ? undefined : 'tablist'}
+                use:fitTabs={visibleTabs.length}
+            >
+                {#if compactTabs}
+                    <select class="tab-select" aria-label="Choose a section" value={activeTab} on:change={onTabSelect}>
+                        {#each visibleTabs as t}
+                            <option value={t.id}>{t.label}</option>
+                        {/each}
+                        <option value={FEATURES_OPTION}>Feature Requests ↗</option>
+                    </select>
+                {:else}
+                    {#each TABS as t}
+                        <button class="tab" class:active={activeTab === t.id} on:click={() => (activeTab = t.id)}>{t.label}</button>
+                    {/each}
+                    <a class="tab tab-link" href="/featureRequests">Feature Requests ↗</a>
+                    {#if isPickemAdmin}
+                        <button class="tab" class:active={activeTab === 'admin'} on:click={() => (activeTab = 'admin')}>Admin</button>
+                    {/if}
                 {/if}
             </div>
 
@@ -942,6 +992,11 @@
     .bonus-tag.team { background: #fff; color: var(--tc); border: 1.5px solid var(--tc); }
     .joined-badge { color: #059669; font-size: 0.85rem; font-weight: 600; }
     .tab-link { text-decoration: none; display: inline-flex; align-items: center; }
+    /* Too many tabs to fit in one row: swap the row for a native picker, which
+       gets the OS wheel/sheet on a phone instead of a fiddly horizontal scroll. */
+    .tabs.as-select { display: block; overflow: visible; border-bottom: none; padding-bottom: 0.25rem; }
+    .tab-select { width: 100%; padding: 0.65rem 0.75rem; font-size: 1rem; font-weight: 600; color: #2c5aa0; background: #fff; border: 1px solid #d7e0ec; border-radius: 8px; }
+    .tab-select:focus { outline: 2px solid #2c5aa0; outline-offset: 1px; }
     /* Rules tab */
     .rules .rule-block { margin-bottom: 2rem; }
     .rules h3 { font-size: 1.35rem; color: #1a202c; margin: 0 0 0.75rem; }
