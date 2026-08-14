@@ -1,18 +1,10 @@
 // src/lib/server/scoring.ts
 import { sql } from '$lib/server/db';
 import { TEAMS } from '$lib/plTeams';
+import { BASE_POINTS, FAN_BONUS, bonusPoints, tableScoring, round1, ceil1 } from '$lib/pickemScoring';
 
-// Fixed base for every match. Tune here.
-export const BASE_POINTS = 25;
-
-// Match bonuses (added to base). Gold/silver/bronze always apply to their
-// designated match for everyone; the fan-team bonus applies to a player's
-// fan-team match. When more than one would land on the same match they do NOT
-// stack — the largest applies (see computeLeaderboard).
-export const GOLDEN_BONUS = 10;
-export const SILVER_BONUS = 5;
-export const BRONZE_BONUS = 3;
-export const FAN_BONUS = 5;
+// Point values and the two scoring formulas live in $lib/pickemScoring so the
+// rules tab renders the same numbers this file scores with.
 
 // Interest-function constants.
 const REL_C = 5; // relative-position softening constant
@@ -63,14 +55,6 @@ export function pickBonusFixtures(
     };
 }
 
-// Map a bonus flag to its base-point value.
-export function bonusPoints(flag: string | null): number {
-    if (flag === 'GOLDEN') return GOLDEN_BONUS;
-    if (flag === 'SILVER') return SILVER_BONUS;
-    if (flag === 'BRONZE') return BRONZE_BONUS;
-    return 0;
-}
-
 type Outcome = 'WIN' | 'TIE' | 'LOSS';
 
 // Rule 3: win = 1, loss = 0, tie = 1/3 (or 1/2 when it's your fan team's game).
@@ -78,45 +62,6 @@ export function resultMultiplier(outcome: Outcome, isFanTeamGame: boolean): numb
     if (outcome === 'WIN') return 1;
     if (outcome === 'LOSS') return 0;
     return isFanTeamGame ? 1 / 2 : 1 / 3; // tie
-}
-
-// ---------- Table-prediction scoring: array generator ----------
-
-// Deterministic gap-walk. Gap-vector for a matchweek: start [] (week 1); the
-// "perfect" length-k vector is [k, k-1, ..., 1]; between perfects, raise gaps
-// left-to-right one at a time, then append a 1.
-export function gapVectorForWeek(week: number): number[] {
-    const gaps: number[] = [];
-    let w = 1;
-    while (w < week) {
-        const L = gaps.length;
-        for (let i = 0; i < L && w < week; i++) {
-            gaps[i] += 1;
-            w++;
-        }
-        if (w < week) {
-            gaps.push(1);
-            w++;
-        }
-    }
-    return gaps;
-}
-
-// Scoring array for a week: leading value == week, descending to 1.
-export function arrayForWeek(week: number): number[] {
-    if (week < 1) return [];
-    const gaps = gapVectorForWeek(week);
-    const n = gaps.length + 1;
-    const arr = new Array<number>(n);
-    arr[n - 1] = 1;
-    for (let i = n - 2; i >= 0; i--) arr[i] = arr[i + 1] + gaps[i];
-    return arr;
-}
-
-// Points for one team in one week: array[distance], or 0 beyond the array.
-export function tableScoring(distance: number, week: number): number {
-    const arr = arrayForWeek(week);
-    return distance >= 0 && distance < arr.length ? arr[distance] : 0;
 }
 
 // ---------- Table derived from match data ----------
@@ -300,13 +245,15 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
 
             // Effective base: gold/silver/bronze apply to their match for everyone;
             // the fan-team bonus applies to the fan's match. They STACK — e.g. a
-            // fan team in the golden match gets base + 10 + 5.
+            // fan team in the golden match gets base + GOLDEN_BONUS + FAN_BONUS.
             const matchBonus = bonusPoints(r.bonus);
             const fanBonus = !!fanActive && (r.home_id === fanActive || r.away_id === fanActive) ? FAN_BONUS : 0;
             const base = BASE_POINTS + matchBonus + fanBonus;
 
+            // Rounded up to the next tenth per match, so a single fixture never
+            // contributes a score finer than 0.1 (and neither can the total).
             const oddsMult = side === 'HOME' ? Number(r.mult_home) : Number(r.mult_away);
-            matchPoints += base * oddsMult * resultMultiplier(outcome, isFanTeamGame);
+            matchPoints += ceil1(base * oddsMult * resultMultiplier(outcome, isFanTeamGame));
         }
 
         // Table-prediction points, summed over every completed week (only if saved).
@@ -327,18 +274,20 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
             }
         }
 
+        // Every individual award is already an exact tenth; the running sums are
+        // floats, so round them before they leave the server.
         return {
             player: u.display_name || u.username,
-            matchPoints: Math.round(matchPoints),
-            tablePoints: lockedTable + provTable,
-            lockedTablePoints: lockedTable,
-            provisionalTablePoints: provTable,
+            matchPoints: round1(matchPoints),
+            tablePoints: round1(lockedTable + provTable),
+            lockedTablePoints: round1(lockedTable),
+            provisionalTablePoints: round1(provTable),
             tableProvisional: provTable > 0,
             total: 0
         };
     });
 
-    board.forEach((b) => (b.total = b.matchPoints + b.tablePoints));
+    board.forEach((b) => (b.total = round1(b.matchPoints + b.tablePoints)));
     board.sort((a, b) => b.total - a.total);
     return board;
 }

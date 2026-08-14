@@ -6,5 +6,6 @@ export function deadlinePassed(now: Date = new Date()): boolean {
     return now.getTime() > PREDICTIONS_DEADLINE.getTime();
 }
 
-// Picks lock this long before kickoff. keep in sync with +page.svelte
+// Picks lock this long before kickoff. Imported by both the client and the server —
+// don't redeclare it locally.
 export const PICK_LOCK_LEAD_MS = 15 * 60 * 1000;

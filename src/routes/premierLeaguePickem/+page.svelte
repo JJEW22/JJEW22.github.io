@@ -2,11 +2,24 @@
 <script>
     import { onMount } from 'svelte';
     import { TEAMS, teamById } from '$lib/plTeams';
+    import {
+        BASE_POINTS,
+        GOLDEN_BONUS,
+        SILVER_BONUS,
+        BRONZE_BONUS,
+        FAN_BONUS,
+        TABLE_REACH,
+        bonusPoints,
+        tableScoring,
+        round1
+    } from '$lib/pickemScoring';
+    import { PICK_LOCK_LEAD_MS } from '$lib/season';
 
     const SEASON = '2026-27';
     const TOTAL_MATCHWEEKS = 38;
-    const BASE_POINTS = 25; // keep in sync with scoring.ts
     const API = '/premierLeaguePickem/api';
+    // 0..TABLE_REACH, for the worked example in the rules tab.
+    const distanceRow = Array.from({ length: TABLE_REACH + 1 }, (v, i) => i);
 
     // Offline fallback so the page still renders before the backend is running.
     const SAMPLE_MATCHWEEKS = {
@@ -224,7 +237,6 @@
     }
 
     // ---- Matches ----
-    const PICK_LOCK_LEAD_MS = 15 * 60 * 1000; // keep in sync with season.ts
     function kickoffPassed(fixture) {
         // "locked" now means within 15 minutes of kickoff, not just after it.
         return new Date(fixture.kickoff).getTime() - PICK_LOCK_LEAD_MS <= Date.now();
@@ -242,16 +254,14 @@
     // The golden match this week (kept for possible display use).
     $: goldenFixture = (matchweek?.fixtures || []).find((f) => f.bonus === 'GOLDEN') || null;
 
-    // Per-person effective base for a fixture, mirroring scoring.ts exactly.
+    // Per-person effective base for a fixture. Values and bonusPoints() come from
+    // $lib/pickemScoring, the same module the server scores with.
     // Gold/silver/bronze apply to their match for everyone; the fan-team bonus
-    // applies to the fan's match. They STACK (e.g. fan team in golden = 25+10+5).
-    function bonusPoints(flag) {
-        return flag === 'GOLDEN' ? 10 : flag === 'SILVER' ? 5 : flag === 'BRONZE' ? 3 : 0;
-    }
+    // applies to the fan's match. They STACK.
     function effectiveBase(fixture, fan, saved) {
         const matchBonus = bonusPoints(fixture.bonus);
         const fanHere = fanSide(fixture, fan, saved) !== null;
-        const fanBonus = fanHere ? 5 : 0;
+        const fanBonus = fanHere ? FAN_BONUS : 0;
         const parts = [{ label: 'Base', pts: BASE_POINTS }];
         if (matchBonus > 0) {
             const label =
@@ -371,7 +381,7 @@
         (f) => !kickoffPassed(f) && (matchPicks[f.id] || fanSide(f, fanTeam, predictionsSaved))
     ).length;
     $: ranked = [...leaderboard]
-        .map((r) => ({ ...r, total: (r.matchPoints || 0) + (r.tablePoints || 0) }))
+        .map((r) => ({ ...r, total: round1((r.matchPoints || 0) + (r.tablePoints || 0)) }))
         .sort((a, b) => b.total - a.total);
 </script>
 
@@ -673,7 +683,7 @@
                             <li>Each week, <b>pick the winner of every match</b> (no draws). A correct pick scores <b>{BASE_POINTS} base points</b> multiplied by the match odds — closer games are worth more.</li>
                             <li><b>Predict where all 20 clubs finish.</b> You're scored every completed week on how close each club is to where you placed it.</li>
                             <li>Pick a <b>fan team</b> (you're locked into picking them to win every week; the bonuses offset that, so just take your favorite) and a <b>display name</b>. Both lock at <b>23:59 the day before the season</b>.</li>
-                            <li>Three "matches of the week" carry bonus points — <span class="chip gold">Golden +10</span> <span class="chip slv">Silver +5</span> <span class="chip brz">Bronze +3</span> — and your fan team's match is <b>+5</b>. These <b>stack</b>.</li>
+                            <li>Three "matches of the week" carry bonus points — <span class="chip gold">Golden +{GOLDEN_BONUS}</span> <span class="chip slv">Silver +{SILVER_BONUS}</span> <span class="chip brz">Bronze +{BRONZE_BONUS}</span> — and your fan team's match is <b>+{FAN_BONUS}</b>. These <b>stack</b>.</li>
                             <li>Buy-in is <b>$10</b> a head, all of it toward <b>gear for the winner's club</b>. Nothing else to pay, on the day or otherwise.</li>
                             <li>The season closes with a <b>watch party on Super Sunday</b>, where the last games settle the table and the prize is handed over.</li>
                         </ul>
@@ -710,21 +720,22 @@
                         <ul>
                             <li>Pick <b>Home</b> or <b>Away</b> for every fixture — draws can't be picked. Each pick locks at that match's kickoff.</li>
                             <li>Score for a match = <b>base × odds multiplier × result</b>, where result is <b>1</b> for a correct winner, <b>0</b> for wrong, and <b>1/3</b> if the match ends in a draw.</li>
+                            <li>Each match is then <b>rounded up to the next tenth of a point</b>. Nothing anywhere in the game is scored finer than <b>0.1</b>.</li>
                             <li>The <b>odds multiplier</b> is derived from the betting market (vig removed): a pick on a longer shot is worth more than a heavy favorite. It's shown on each match as <span class="chip">%  (×mult)</span>.</li>
                             <li>Base points are <b>{BASE_POINTS}</b>, before any bonuses.</li>
                         </ul>
 
                         <h4>Bonus matches</h4>
                         <ul>
-                            <li>Each week three fixtures are flagged as the most interesting: <span class="chip gold">Golden +10</span>, <span class="chip slv">Silver +5</span>, <span class="chip brz">Bronze +3</span> base points, for everyone.</li>
+                            <li>Each week three fixtures are flagged as the most interesting: <span class="chip gold">Golden +{GOLDEN_BONUS}</span>, <span class="chip slv">Silver +{SILVER_BONUS}</span>, <span class="chip brz">Bronze +{BRONZE_BONUS}</span> base points, for everyone.</li>
                             <li>They're chosen from how close the two sides are and — later in the season — how much the game matters to the top or bottom of the table. They're <b>established about two weeks out</b>; further-off weeks show none yet.</li>
-                            <li>Bonuses <b>stack</b> with the fan-team bonus (e.g. your fan team in the Golden match is +10 and +5).</li>
+                            <li>Bonuses <b>stack</b> with the fan-team bonus (e.g. your fan team in the Golden match is +{GOLDEN_BONUS} and +{FAN_BONUS}, so {BASE_POINTS + GOLDEN_BONUS + FAN_BONUS} base).</li>
                         </ul>
 
                         <h4>Fan team</h4>
                         <ul>
                             <li>Choose one club for the season. You're <b>locked into picking them to win</b> every one of their matches — you never get to pick against them, however the fixture looks.</li>
-                            <li><b>To offset that</b>, their matches carry a <b>+5</b> base bonus and their draws score <b>1/2</b> instead of 1/3.</li>
+                            <li><b>To offset that</b>, their matches carry a <b>+{FAN_BONUS}</b> base bonus and their draws score <b>1/2</b> instead of 1/3.</li>
                             <li>That offset is the point: it cancels out the cost of the forced auto-pick, so <b>no club is a better choice than any other</b> — the expected value comes out even whoever you take. <b>Just pick your favorite.</b></li>
                         </ul>
 
@@ -737,10 +748,16 @@
 
                         <h4>Table scoring</h4>
                         <ul>
-                            <li>Every completed week, each of the 20 clubs <b>earns</b> you points based on <b>how far its real position is</b> from where you predicted it. Exact is worth the most, and the value drops off the further out you were.</li>
-                            <li>The payout comes from a <b>scoring array</b> built fresh for each week. In week <i>W</i> the array opens at <b>W</b> for an exact hit and steps down to <b>1</b>, scoring <b>0</b> once you're further off than the array is long. So precision is worth more and more as the season runs on, and being wrong early costs you very little.</li>
-                            <!-- Mirrors arrayForWeek() in src/lib/server/scoring.ts — update both together. -->
-                            <li>Worked examples. <b>Week 1</b> is <code>[1]</code>: only an exact placement scores at all, for a single point. <b>Week 10</b> is <code>[10, 6, 3, 1]</code> — exact 10, one place out 6, two out 3, three out 1, four or more nothing. <b>Week 38</b> is <code>[38, 29, 22, 16, 11, 7, 4, 2, 1]</code>, where even eight places out still pays.</li>
+                            <li>Every completed week, each of the 20 clubs <b>earns</b> you points based on <b>how far its real position is</b> from where you predicted it.</li>
+                            <li>The rule is one line: in matchweek <i>W</i>, an exact call is worth <b>W</b>, and every place you're out costs <b>a tenth of W</b>. At <b>{TABLE_REACH} places or more</b> out, that club scores nothing that week.</li>
+                            <li>So the table matters more and more as the season runs on — week 1 is worth almost nothing, week 38 is worth 38 times as much — and every score lands on a single decimal place.</li>
+                            <li>Week 38 in full, by how many places you're out:
+                                <div class="score-row">
+                                    {#each distanceRow as d}
+                                        <span class="score-cell"><b>{d}</b><span>{tableScoring(d, TOTAL_MATCHWEEKS)}</span></span>
+                                    {/each}
+                                </div>
+                            </li>
                             <li>Your table score is the sum over <b>every club, every completed week</b>, so a club you've read correctly keeps paying out week after week.</li>
                             <li>Weeks where clubs still have games in hand are <b>provisional</b> (marked <span class="prov-star">*</span>) and can shift once postponed games are played.</li>
                         </ul>
@@ -856,7 +873,11 @@
     .pot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1rem 0; }
     /* One bucket left in the pot — keep the card from stretching the full width. */
     .pot-grid.single { grid-template-columns: minmax(200px, 320px); }
-    .rules code { background: #eef2f7; border: 1px solid #d7e0ec; border-radius: 6px; padding: 0.05rem 0.35rem; font-size: 0.88em; color: #1f3a63; }
+    /* "places out -> points" strip in the table-scoring rules */
+    .score-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0 0.25rem; }
+    .score-cell { display: flex; flex-direction: column; align-items: center; min-width: 3rem; padding: 0.3rem 0.4rem; background: #f7f9fc; border: 1px solid #d7e0ec; border-radius: 8px; line-height: 1.25; }
+    .score-cell b { font-size: 0.72rem; color: #6b7280; font-weight: 700; }
+    .score-cell span { font-size: 0.95rem; color: #1f3a63; font-weight: 700; }
     .pot-card { display: flex; flex-direction: column; gap: 0.2rem; background: #fafbfc; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem 1.1rem; }
     .pot-label { font-weight: 700; color: #1a202c; }
     .pot-per { font-size: 1.5rem; font-weight: 800; color: #2c5aa0; }

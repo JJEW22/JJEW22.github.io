@@ -70,18 +70,27 @@ npm run test      # playwright e2e
 - **Client-side fallbacks**: the page falls back to `SAMPLE_MATCHWEEKS` and zeroed standings when
   fetches fail, so it renders before the backend is up. Preserve this behavior.
 
-### Constants that must stay in sync
+### Scoring constants — one source of truth
 
-These are duplicated between the frontend and backend. Changing one means changing the other —
-the comments in the source mark them:
+**`$lib/pickemScoring`** owns every scoring value and formula. It is client-safe (not under
+`$lib/server`), so `+page.svelte`, `scoring.ts`, and the rules tab all import from it. Never
+redeclare these locally — they used to be duplicated and drifted apart.
 
-| Constant | Value | Lives in |
-|---|---|---|
-| `BASE_POINTS` | 25 | `+page.svelte` and `scoring.ts` |
-| `PICK_LOCK_LEAD_MS` | 15 min | `+page.svelte` and `season.ts` |
+| Export | Value |
+|---|---|
+| `BASE_POINTS` | 50 |
+| `GOLDEN_BONUS` / `SILVER_BONUS` / `BRONZE_BONUS` | 20 / 15 / 10 |
+| `FAN_BONUS` | 10 |
+| `TABLE_REACH` | 10 |
+| `bonusPoints(flag)` | flag → bonus value |
+| `tableScoring(distance, week)` | `week × (10 − distance) / 10`, 0 at 10+ places out |
+| `round1(n)` | table sums are exact tenths; float addition isn't |
 
-Bonus match points (Golden +10 / Silver +5 / Bronze +3) and the fan-team bonus (+5) stack, and
-are implemented in both `effectiveBase()` on the client and `scoring.ts` on the server.
+Bonus match points and the fan-team bonus **stack** (fan team in the golden match = 50+20+10).
+`PICK_LOCK_LEAD_MS` and `PREDICTIONS_DEADLINE` live in `$lib/season`, imported by both sides.
+
+The rules tab renders these values and calls `tableScoring()` directly, so the copy cannot drift
+from the scoring. Change the numbers here and the rules update themselves.
 
 ## Running commands
 node_modules exists only inside the container. Never run npm directly on the host.
