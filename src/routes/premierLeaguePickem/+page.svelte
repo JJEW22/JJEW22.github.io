@@ -641,7 +641,7 @@
                             <p class="note">* Table points include provisional weeks (teams with games in hand); these may change once postponed fixtures are played.</p>
                         {/if}
                     </div>
-                    <p class="note">Match scoring is provisional (1 for a correct winner); table scoring is still to be wired.</p>
+                    <p class="note">Match points are {BASE_POINTS} base — plus any Golden/Silver/Bronze and fan-team bonus — times the odds multiplier and the result, rounded up to the next tenth. Table points are the matchweek number for an exact call, less a tenth of it per place out and nothing at {TABLE_REACH}+ places, summed over all 20 clubs every completed week. Full detail on the Rules tab.</p>
                 </section>
 
             {:else if activeTab === 'pltable'}

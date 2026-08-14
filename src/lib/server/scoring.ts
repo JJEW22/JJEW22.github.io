@@ -9,6 +9,10 @@ import { BASE_POINTS, FAN_BONUS, bonusPoints, tableScoring, round1, ceil1 } from
 // Interest-function constants.
 const REL_C = 5; // relative-position softening constant
 const ABS_B = 3; // absolute-position offset
+// Smallest odds gap the closeness term will divide by. Two sides priced almost
+// identically would otherwise produce an unbounded score and win Golden outright,
+// no matter what the table says. Also removes the divide-by-zero case.
+const ODDS_GAP_FLOOR = 0.005;
 
 export interface BonusInput {
     id: string;
@@ -19,10 +23,14 @@ export interface BonusInput {
 }
 
 // "Most interesting match" ranking → golden (1st), silver (2nd), bronze (3rd).
-// Weeks 1–5: closeness of the two win probabilities, (w1 + w2) / |w1 - w2|.
+// Weeks 1–5: closeness of the two win probabilities, (w1 + w2) / sqrt(|w1 - w2|),
+//   the gap floored at ODDS_GAP_FLOOR. The square root is deliberate: dividing by
+//   the raw gap made closeness swamp everything else (~92% of the spread between
+//   fixtures); the root brings it to roughly 40%, leaving room for the table terms.
 // Weeks 6+: that × relative-position × absolute-position, where
-//   relative = (C + 1) / (C + |pos1 - pos2|)         (shrinks as teams separate)
-//   absolute = max(40 - pos1 - pos2, pos1 + pos2 - B) (matters to top or bottom)
+//   relative = (C + 1) / (C + |pos1 - pos2|)           (shrinks as teams separate)
+//   absolute = max(40 - pos1 - pos2, pos1 + pos2 - B)² (matters to top or bottom;
+//              squared so a title race or relegation six-pointer carries real weight)
 // `positions` maps teamId → current standings position (1 = top).
 export function pickBonusFixtures(
     fixtures: BonusInput[],
@@ -32,17 +40,16 @@ export function pickBonusFixtures(
     const scored = fixtures.map((f) => {
         const w1 = f.probHome ?? 0;
         const w2 = f.probAway ?? 0;
-        const denom = Math.abs(w1 - w2);
-        let probValue: number;
-        if (denom === 0) probValue = w1 + w2 === 0 ? 0 : (w1 + w2) / 1e-9;
-        else probValue = (w1 + w2) / denom;
+        // No odds yet (both zero) falls out as 0 without a special case.
+        const gap = Math.max(Math.abs(w1 - w2), ODDS_GAP_FLOOR);
+        const probValue = (w1 + w2) / Math.sqrt(gap);
 
         let interest = probValue;
         if (matchweek > 5) {
             const t1 = positions.get(f.homeId ?? '') ?? 20;
             const t2 = positions.get(f.awayId ?? '') ?? 20;
             const rel = (REL_C + 1) / (REL_C + Math.abs(t1 - t2));
-            const abs = Math.max(40 - t1 - t2, t1 + t2 - ABS_B);
+            const abs = Math.max(40 - t1 - t2, t1 + t2 - ABS_B) ** 2;
             interest = probValue * rel * abs;
         }
         return { id: f.id, interest };
