@@ -1,6 +1,6 @@
 <!-- src/routes/premierLeaguePickem/+page.svelte -->
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { TEAMS, teamById } from '$lib/plTeams';
     import {
         BASE_POINTS,
@@ -392,6 +392,43 @@
         for (const s of standings || []) if (s.crest) m.set(s.teamId, s.crest);
         crestById = m;
     }
+
+    // Standings table: if the full-width headers would force a horizontal scroll,
+    // abbreviate them and explain the abbreviations in a legend underneath.
+    let compactStandings = false;
+    // Action on the scroll wrapper. The full-form width is remembered before
+    // switching, because once abbreviated the table fits — measuring again would
+    // say "expand", which would overflow again, and it would flip back and forth.
+    /** @param {HTMLElement} node */
+    function fitStandings(node) {
+        let fullWidth = 0;
+        function check() {
+            /** @type {HTMLElement | null} */
+            const table = node.querySelector('table');
+            if (!table) return;
+            if (!compactStandings) {
+                fullWidth = table.scrollWidth;
+                if (fullWidth > node.clientWidth) compactStandings = true;
+            } else if (fullWidth && node.clientWidth >= fullWidth) {
+                compactStandings = false;
+            }
+        }
+        const ro = new ResizeObserver(check);
+        ro.observe(node);
+        check();
+        return {
+            // Row data changed, so the remembered width is stale: re-measure from full.
+            async update() {
+                fullWidth = 0;
+                compactStandings = false;
+                await tick();
+                check();
+            },
+            destroy() {
+                ro.disconnect();
+            }
+        };
+    }
 </script>
 
 <svelte:head>
@@ -627,10 +664,18 @@
                 <section class="panel">
                     <h2 class="week-title solo">Leaderboard</h2>
                     <p class="progress">Everyone's running totals. Updates as results come in.</p>
-                    <div class="table-wrapper">
-                        <table class="grid-table">
+                    <div class="table-wrapper" use:fitStandings={ranked}>
+                        <table class="grid-table" class:compact={compactStandings}>
                             <thead>
-                                <tr><th>#</th><th>Player</th><th class="crest-col">Team</th><th class="num">Correct</th><th class="num">Match</th><th class="num">Table</th><th class="num hl">Total</th></tr>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Player</th>
+                                    <th class="crest-col" title="Fan team">{compactStandings ? 'T' : 'Team'}</th>
+                                    <th class="num" title="Correct picks">{compactStandings ? '✓' : 'Correct'}</th>
+                                    <th class="num" title="Match points">{compactStandings ? 'M' : 'Match'}</th>
+                                    <th class="num" title="Table points">{compactStandings ? 'Tbl' : 'Table'}</th>
+                                    <th class="num hl" title="Total points">{compactStandings ? 'Tot' : 'Total'}</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 {#each ranked as row, i}
@@ -658,6 +703,15 @@
                                 {/each}
                             </tbody>
                         </table>
+                        {#if compactStandings}
+                            <p class="note legend">
+                                <span><b>T</b> Fan team</span>
+                                <span><b>✓</b> Correct picks</span>
+                                <span><b>M</b> Match points</span>
+                                <span><b>Tbl</b> Table points</span>
+                                <span><b>Tot</b> Total</span>
+                            </p>
+                        {/if}
                         {#if ranked.some((r) => r.tableProvisional)}
                             <p class="note">* Table points include provisional weeks (teams with games in hand); these may change once postponed fixtures are played.</p>
                         {/if}
@@ -825,6 +879,9 @@
     .crest { width: 1.5rem; height: 1.5rem; object-fit: contain; vertical-align: middle; cursor: help; }
     .crest-chip { display: inline-block; min-width: 2.1rem; padding: 0.1rem 0.3rem; border-radius: 6px; color: #fff; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em; cursor: help; }
     .crest-none { color: #9ca3af; cursor: help; }
+    /* Legend shown only when the standings headers are abbreviated to avoid a scrollbar */
+    .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; margin-top: 0.5rem; }
+    .legend b { color: #2c5aa0; font-weight: 800; margin-right: 0.15rem; }
     .admin-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
     .sync-out { background: #0f172a; color: #cbd5e1; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
@@ -971,6 +1028,10 @@
 
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .grid-table { width: 100%; min-width: 480px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    /* Abbreviated standings: drop the 480px floor, which is what was both forcing the
+       scrollbar and padding the Player column out with the leftover width. */
+    .grid-table.compact { min-width: 0; }
+    .grid-table.compact th, .grid-table.compact td { padding-left: 0.4rem; padding-right: 0.4rem; }
     .grid-table th { background: #2c5aa0; color: white; padding: 0.75rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
     .grid-table th.num, .grid-table td.num { text-align: center; }
     .grid-table th.hl { background: #1e4080; }
