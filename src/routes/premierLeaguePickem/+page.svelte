@@ -92,7 +92,7 @@
             const r = await fetch(`${API}/standings`);
             if (r.ok) return await r.json();
         } catch (_) {}
-        return TEAMS.map((t) => ({ teamId: t.id, name: t.name, crest: null, played: 0, won: 0, drawn: 0, lost: 0, gd: 0, points: 0 }));
+        return TEAMS.map((t) => ({ teamId: t.id, name: t.name, crest: null, played: 0, won: 0, drawn: 0, lost: 0, gd: 0, points: 0, form: [], formPoints: 0 }));
     }
 
     // ============================================================
@@ -129,6 +129,16 @@
     let seasonStatus = '';
     let dragIndex = null;
 
+    // Everyone's predicted tables. Hidden until an admin reveals them; admins can
+    // always look, so they can check the view before publishing it.
+    let tablesRevealed = false;
+    let tableView = 'mine'; // 'mine' | 'summary' | a player id as a string
+    /** @type {any[]} */
+    let allTables = [];
+    let tablesLoading = false;
+    let revealSaving = false;
+
+    /** @type {any[]} */
     let leaderboard = [];
     /** @type {any[]} */
     let standings = [];
@@ -154,7 +164,27 @@
             predictionsSaved = !!me.predictionsSaved;
             predictionsLocked = !!me.predictionsLocked;
             seasonDeadline = me.deadline || '';
+            tablesRevealed = !!me.tablesRevealed;
+            loadAllTables();
         }
+    }
+
+    // Called on login, on joining, and after an admin flips the reveal switch.
+    // A 401/403 just leaves the viewer empty — your own table still edits fine.
+    async function loadAllTables() {
+        if (tablesLoading) return;
+        tablesLoading = true;
+        try {
+            const r = await fetch(`${API}/tables`);
+            if (r.ok) {
+                const data = await r.json();
+                allTables = data.players || [];
+                tablesRevealed = !!data.revealed;
+            }
+        } catch (_) {
+            /* transient; leave the viewer as-is */
+        }
+        tablesLoading = false;
     }
 
     // pickem:admin (or site:admin) sees the Admin tab.
@@ -183,11 +213,36 @@
         joining = true;
         try {
             const r = await fetch(`${API}/join`, { method: 'POST' });
-            if (r.ok) joined = true;
+            if (r.ok) {
+                joined = true;
+                loadAllTables(); // the tables endpoint only answers members
+            }
         } catch (_) {
             /* transient; leave un-joined */
         }
         joining = false;
+    }
+
+    async function toggleRevealTables() {
+        revealSaving = true;
+        syncStatus = '';
+        try {
+            const r = await fetch(`${API}/admin/reveal-tables`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: !tablesRevealed })
+            });
+            const data = await r.json();
+            if (r.ok) {
+                tablesRevealed = !!data.enabled;
+                await loadAllTables(); // re-read so the viewer matches the new state
+            } else {
+                syncStatus = data?.message || data?.error || `Could not update (${r.status}).`;
+            }
+        } catch (_) {
+            syncStatus = 'Network error.';
+        }
+        revealSaving = false;
     }
 
     async function runSync(which) {
@@ -359,6 +414,63 @@
         showFanList = false;
     }
 
+    // ---- Everyone's tables ----
+    // Gated the same way the tab is, then by the admin's reveal switch.
+    $: canViewTables = !predictionsGate && (tablesRevealed || isPickemAdmin);
+    // The reveal can be switched off while someone is looking at another player.
+    $: if (!canViewTables && tableView !== 'mine') tableView = 'mine';
+
+    $: myTableName = (displayName || user || '').trim();
+    $: viewedPlayer =
+        tableView === 'mine' || tableView === 'summary'
+            ? null
+            : allTables.find((p) => String(p.id) === tableView) || null;
+    $: tableTitle =
+        tableView === 'mine'
+            ? 'Your predicted final table'
+            : tableView === 'summary'
+                ? "Everyone's predicted tables"
+                : viewedPlayer
+                    ? `${viewedPlayer.name}'s predicted table`
+                    : 'Predicted table';
+
+    // Summary grid: one row per club, one column per player, ordered by the
+    // group's average call so the grid reads top-to-bottom like a real table.
+    $: summaryRows = TEAMS.map((t) => {
+        // One cell per player, in the same order as the header row.
+        const cells = allTables.map((p) => {
+            const i = p.order.indexOf(t.id);
+            return { id: p.id, pos: i < 0 ? null : i + 1 };
+        });
+        const given = cells.map((c) => c.pos).filter((n) => n != null);
+        return {
+            teamId: t.id,
+            name: t.name,
+            cells,
+            avg: given.length ? given.reduce((a, b) => a + b, 0) / given.length : null
+        };
+    })
+        .sort((a, b) => (a.avg ?? 99) - (b.avg ?? 99))
+        // Consensus rank is fixed, so the CL/relegation tint on Avg keeps meaning
+        // the group's verdict even when the grid is sorted by one player's column.
+        .map((r, i) => ({ ...r, consensus: i + 1 }));
+
+    // Summary-grid columns: club, consensus average, then one per player. All open
+    // low-to-high, because every value is a league position.
+    let sgSort = { key: 'avg', asc: true };
+    // Declared up front so it can be typed; the player columns depend on allTables,
+    // so the value itself is reactive.
+    /** @type {Record<string, { asc: boolean, get: (r: any) => any }>} */
+    let SG_COLS = {};
+    $: SG_COLS = {
+        club: { asc: true, get: (r) => r.name },
+        avg: { asc: true, get: (r) => r.avg },
+        ...Object.fromEntries(
+            allTables.map((p) => [`p${p.id}`, { asc: true, get: (r) => (r.cells.find((c) => c.id === p.id) || {}).pos }])
+        )
+    };
+    $: sgRows = sortRows(summaryRows, SG_COLS, sgSort);
+
     async function saveSeasonPredictions() {
         if (!user) { seasonStatus = 'Log in before saving.'; return; }
         if (!fanTeam) { seasonStatus = 'Pick your fan team first.'; return; }
@@ -381,9 +493,50 @@
     $: pickedCount = (matchweek?.fixtures || []).filter(
         (f) => !kickoffPassed(f) && (matchPicks[f.id] || fanSide(f, fanTeam, predictionsSaved))
     ).length;
+    // `rank` is fixed by total and survives re-sorting, so the # column always
+    // says where a player actually stands even when you sort by another column.
     $: ranked = [...leaderboard]
         .map((r) => ({ ...r, total: round1((r.matchPoints || 0) + (r.tablePoints || 0)) }))
-        .sort((a, b) => b.total - a.total);
+        .sort((a, b) => b.total - a.total)
+        .map((r, i) => ({ ...r, rank: i + 1 }));
+    // Uniform across rows — the highest matchweek with a finished match, which is
+    // usually still in progress rather than complete.
+    $: tableWeek = ranked[0]?.tableWeek || 0;
+
+    // Leaderboard columns. Header labels carry both forms so the compact swap and
+    // the sort button stay in one place.
+    /** @type {Record<string, { label: string, short?: string, cls: string, title: string, asc: boolean, get: (r: any) => any }>} */
+    const LB_COLS = {
+        player: { label: 'Player', short: 'Player', cls: '', title: 'Display name', asc: true, get: (r) => r.player },
+        fanTeam: { label: 'Team', short: 'T', cls: 'crest-col', title: 'Fan team', asc: true, get: (r) => (r.fanTeam && teamById[r.fanTeam] ? teamById[r.fanTeam].name : '') },
+        correctPicks: { label: 'Correct', short: '✓', cls: 'num', title: 'Correct picks', asc: false, get: (r) => r.correctPicks || 0 },
+        matchPoints: { label: 'Match', short: 'M', cls: 'num', title: 'Match points', asc: false, get: (r) => r.matchPoints || 0 },
+        tablePoints: { label: 'Table', short: 'Tbl', cls: 'num', title: 'Table points', asc: false, get: (r) => r.tablePoints || 0 },
+        currentTablePoints: { label: 'Live table', short: 'LT', cls: 'num', title: 'If this week ended with the standings exactly as they are now, the table score you would get for it', asc: false, get: (r) => r.currentTablePoints || 0 },
+        total: { label: 'Total', short: 'Tot', cls: 'num hl', title: 'Total points', asc: false, get: (r) => r.total }
+    };
+    const LB_ORDER = ['player', 'fanTeam', 'correctPicks', 'matchPoints', 'tablePoints', 'currentTablePoints', 'total'];
+    let lbSort = { key: 'total', asc: false };
+    // Array.sort is stable, so ties keep their by-total order underneath.
+    $: lbRows = sortRows(ranked, LB_COLS, lbSort);
+
+    // Premier League table columns. Default is the delivered order, which is already
+    // points-then-tiebreakers — sorting by points keeps that thanks to a stable sort.
+    /** @type {Record<string, { label: string, short?: string, cls: string, title: string, asc: boolean, get: (r: any) => any }>} */
+    const PL_COLS = {
+        name: { label: 'Club', cls: '', title: 'Club', asc: true, get: (r) => r.name || r.teamId },
+        played: { label: 'P', cls: 'num', title: 'Played', asc: false, get: (r) => r.played },
+        won: { label: 'W', cls: 'num', title: 'Won', asc: false, get: (r) => r.won },
+        drawn: { label: 'D', cls: 'num', title: 'Drawn', asc: false, get: (r) => r.drawn },
+        lost: { label: 'L', cls: 'num', title: 'Lost', asc: false, get: (r) => r.lost },
+        gd: { label: 'GD', cls: 'num', title: 'Goal difference', asc: false, get: (r) => r.gd },
+        points: { label: 'Pts', cls: 'num hl', title: 'Points', asc: false, get: (r) => r.points },
+        formPoints: { label: 'Last 5', cls: 'num', title: 'Points won in the last 5 matches, most recent first', asc: false, get: (r) => r.formPoints }
+    };
+    const PL_ORDER = ['name', 'played', 'won', 'drawn', 'lost', 'gd', 'points', 'formPoints'];
+    let plSort = { key: 'points', asc: false };
+    // `pos` is the real league position, so it stays put when you sort by GD or form.
+    $: plRows = sortRows((standings || []).map((r, i) => ({ ...r, pos: i + 1 })), PL_COLS, plSort);
     // Club badges come from football-data via the standings route. They're absent
     // when that fetch falls back, so the crest cell degrades to a colour + code chip.
     let crestById = new Map();
@@ -391,6 +544,34 @@
         const m = new Map();
         for (const s of standings || []) if (s.crest) m.set(s.teamId, s.crest);
         crestById = m;
+    }
+
+    // ---- Sortable tables ----
+    // Shared by all three grids. A column config is { get, asc }: `get` pulls the
+    // value, `asc` is the direction the FIRST click uses — points open high-to-low,
+    // names and league positions open low-to-high. Clicking the active column flips.
+    /** @param {{key: string, asc: boolean}} state @param {Record<string, any>} cols @param {string} key */
+    function sortBy(state, cols, key) {
+        if (!cols[key]) return state;
+        return state.key === key ? { key, asc: !state.asc } : { key, asc: cols[key].asc };
+    }
+
+    // Rows missing a value sink to the bottom in BOTH directions — an unplayed club
+    // or a player with no fan team shouldn't outrank anyone just because you flipped.
+    /** @param {any[]} rows @param {Record<string, any>} cols @param {{key: string, asc: boolean}} state */
+    function sortRows(rows, cols, state) {
+        const col = cols[state.key];
+        if (!col) return rows;
+        const dir = state.asc ? 1 : -1;
+        return [...rows].sort((a, b) => {
+            const x = col.get(a);
+            const y = col.get(b);
+            const xm = x == null || x === '';
+            const ym = y == null || y === '';
+            if (xm || ym) return xm && ym ? 0 : xm ? 1 : -1;
+            const d = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
+            return d * dir;
+        });
     }
 
     // Two places swap to a compact form rather than growing a horizontal scrollbar:
@@ -686,26 +867,97 @@
                         expected value the same, so <b>just pick your favorite</b>).
                     </p>
 
-                    <h2 class="week-title solo">Your predicted final table</h2>
-                    <p class="progress">Drag to reorder, or use the arrows. 1st at the top, 20th at the bottom.</p>
-                    <ol class="table-predict">
-                        {#each tableOrder as teamId, i (teamId)}
-                            {@const team = teamById[teamId] || { name: teamId }}
-                            <li class="predict-row" class:dragging={dragIndex === i} draggable={!predictionsLocked} on:dragstart={() => onDragStart(i)} on:dragover={onDragOver} on:drop={() => onDrop(i)}>
-                                <span class="pos" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span>
-                                <span class="drag-handle" aria-hidden="true">&#10247;</span>
-                                <span class="predict-team">{team.name}</span>
-                                <span class="row-controls">
-                                    <button class="move" on:click={() => moveUp(i)} disabled={i === 0 || predictionsLocked} aria-label="Move up">&#9650;</button>
-                                    <button class="move" on:click={() => moveDown(i)} disabled={i === tableOrder.length - 1 || predictionsLocked} aria-label="Move down">&#9660;</button>
-                                </span>
-                            </li>
-                        {/each}
-                    </ol>
-                    <div class="save-row">
-                        <button class="save-btn" on:click={saveSeasonPredictions} disabled={seasonSaving || predictionsLocked}>{seasonSaving ? 'Saving…' : 'Save my season predictions'}</button>
-                        {#if seasonStatus}<span class="status-msg">{seasonStatus}</span>{/if}
+                    <div class="table-head">
+                        <h2 class="week-title solo">{tableTitle}</h2>
+                        {#if canViewTables}
+                            <select class="fan-input view-select" aria-label="Whose predicted table to show" bind:value={tableView}>
+                                <option value="mine">My predicted table</option>
+                                <option value="summary">Summary — everyone</option>
+                                {#each allTables as p (p.id)}
+                                    <option value={String(p.id)}>{p.name === myTableName ? `${p.name} (you)` : p.name}</option>
+                                {/each}
+                            </select>
+                        {/if}
                     </div>
+                    {#if canViewTables && !tablesRevealed}
+                        <p class="note">Not published yet — only admins can see other players' tables. Turn it on from the Admin tab.</p>
+                    {/if}
+
+                    {#if tableView === 'mine'}
+                        <p class="progress">Drag to reorder, or use the arrows. 1st at the top, 20th at the bottom.</p>
+                        <ol class="table-predict">
+                            {#each tableOrder as teamId, i (teamId)}
+                                {@const team = teamById[teamId] || { name: teamId }}
+                                <li class="predict-row" class:dragging={dragIndex === i} draggable={!predictionsLocked} on:dragstart={() => onDragStart(i)} on:dragover={onDragOver} on:drop={() => onDrop(i)}>
+                                    <span class="pos" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span>
+                                    <span class="drag-handle" aria-hidden="true">&#10247;</span>
+                                    <span class="predict-team">{team.name}</span>
+                                    <span class="row-controls">
+                                        <button class="move" on:click={() => moveUp(i)} disabled={i === 0 || predictionsLocked} aria-label="Move up">&#9650;</button>
+                                        <button class="move" on:click={() => moveDown(i)} disabled={i === tableOrder.length - 1 || predictionsLocked} aria-label="Move down">&#9660;</button>
+                                    </span>
+                                </li>
+                            {/each}
+                        </ol>
+                        <div class="save-row">
+                            <button class="save-btn" on:click={saveSeasonPredictions} disabled={seasonSaving || predictionsLocked}>{seasonSaving ? 'Saving…' : 'Save my season predictions'}</button>
+                            {#if seasonStatus}<span class="status-msg">{seasonStatus}</span>{/if}
+                        </div>
+                    {:else if tablesLoading}
+                        <div class="empty">Loading predictions…</div>
+                    {:else if tableView === 'summary'}
+                        {#if allTables.length}
+                            <p class="progress">Every club, and where each player placed it. Rows are ordered by the group's average call.</p>
+                            <div class="table-wrapper">
+                                <table class="grid-table summary-grid">
+                                    <thead>
+                                        <tr>
+                                            <th>
+                                                <button class="sort-btn" class:active={sgSort.key === 'club'} on:click={() => (sgSort = sortBy(sgSort, SG_COLS, 'club'))}>Club<span class="sort-arrow">{sgSort.key === 'club' ? (sgSort.asc ? '▲' : '▼') : ''}</span></button>
+                                            </th>
+                                            <th class="num" title="Average predicted position">
+                                                <button class="sort-btn" class:active={sgSort.key === 'avg'} on:click={() => (sgSort = sortBy(sgSort, SG_COLS, 'avg'))}>Avg<span class="sort-arrow">{sgSort.key === 'avg' ? (sgSort.asc ? '▲' : '▼') : ''}</span></button>
+                                            </th>
+                                            {#each allTables as p (p.id)}
+                                                <th class="num" title="Sort by where {p.name} placed each club">
+                                                    <button class="sort-btn" class:active={sgSort.key === `p${p.id}`} on:click={() => (sgSort = sortBy(sgSort, SG_COLS, `p${p.id}`))}>{p.name}<span class="sort-arrow">{sgSort.key === `p${p.id}` ? (sgSort.asc ? '▲' : '▼') : ''}</span></button>
+                                                </th>
+                                            {/each}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {#each sgRows as row (row.teamId)}
+                                            <tr>
+                                                <td class="strong">{row.name}</td>
+                                                <td class="num"><span class="pos-dot" class:cl={row.consensus <= 5} class:rel={row.consensus > 17}>{row.avg == null ? '—' : row.avg.toFixed(1)}</span></td>
+                                                {#each row.cells as cell (cell.id)}
+                                                    <td class="num">{cell.pos ?? '—'}</td>
+                                                {/each}
+                                            </tr>
+                                        {/each}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {:else}
+                            <div class="empty">Nobody has saved a predicted table yet.</div>
+                        {/if}
+                    {:else if viewedPlayer}
+                        <p class="progress">
+                            {viewedPlayer.name}'s call for the final table.{#if viewedPlayer.fanTeam} Fan of <b>{(teamById[viewedPlayer.fanTeam] || { name: viewedPlayer.fanTeam }).name}</b> (★).{/if}{#if !viewedPlayer.saved} Not locked in yet.{/if}
+                        </p>
+                        <ol class="table-predict">
+                            {#each viewedPlayer.order as teamId, i (teamId)}
+                                {@const team = teamById[teamId] || { name: teamId }}
+                                <li class="predict-row static">
+                                    <span class="pos" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span>
+                                    <span class="predict-team">{team.name}</span>
+                                    {#if teamId === viewedPlayer.fanTeam}<span class="fan-star" title="Their fan team">★</span>{/if}
+                                </li>
+                            {/each}
+                        </ol>
+                    {:else}
+                        <div class="empty">That player's table isn't available.</div>
+                    {/if}
                     <p class="legend"><span class="swatch cl"></span> Top 5 (Champions League) <span class="swatch rel"></span> Bottom 3 (relegation)</p>
                 </section>
                 </div>
@@ -718,21 +970,23 @@
                         <table class="grid-table" class:compact={compactStandings}>
                             <thead>
                                 <tr>
-                                    <th>#</th>
-                                    <th>Player</th>
-                                    <th class="crest-col" title="Fan team">{compactStandings ? 'T' : 'Team'}</th>
-                                    <th class="num" title="Correct picks">{compactStandings ? '✓' : 'Correct'}</th>
-                                    <th class="num" title="Match points">{compactStandings ? 'M' : 'Match'}</th>
-                                    <th class="num" title="Table points">{compactStandings ? 'Tbl' : 'Table'}</th>
-                                    <th class="num hl" title="Total points">{compactStandings ? 'Tot' : 'Total'}</th>
+                                    <th title="Rank by total — stays put when you sort by another column">#</th>
+                                    {#each LB_ORDER as key (key)}
+                                        {@const col = LB_COLS[key]}
+                                        <th class={col.cls} title={col.title}>
+                                            <button class="sort-btn" class:active={lbSort.key === key} on:click={() => (lbSort = sortBy(lbSort, LB_COLS, key))}>
+                                                {compactStandings ? col.short : col.label}<span class="sort-arrow">{lbSort.key === key ? (lbSort.asc ? '▲' : '▼') : ''}</span>
+                                            </button>
+                                        </th>
+                                    {/each}
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each ranked as row, i}
+                                {#each lbRows as row (row.rank)}
                                     {@const fan = row.fanTeam ? teamById[row.fanTeam] : null}
                                     {@const crest = row.fanTeam ? crestById.get(row.fanTeam) : null}
                                     <tr class:you={row.player === user}>
-                                        <td class="num">{i + 1}</td>
+                                        <td class="num">{row.rank}</td>
                                         <td class="strong">{row.player}</td>
                                         <td class="crest-col">
                                             {#if fan && crest}
@@ -746,10 +1000,11 @@
                                         <td class="num">{row.correctPicks || 0}</td>
                                         <td class="num">{row.matchPoints || 0}</td>
                                         <td class="num">{row.tablePoints || 0}{#if row.tableProvisional}<span class="prov-star" title="Includes provisional weeks with games in hand — may change once postponed fixtures are played">*</span>{/if}</td>
+                                        <td class="num">{#if tableWeek < 1}<span class="not-scored" title="No matchweek has completed yet, so there is nothing to score the table against">—</span>{:else}{row.currentTablePoints || 0}{#if row.currentTableProvisional}<span class="prov-star" title="Clubs still have games in hand, so this week's value can still move">*</span>{/if}{/if}</td>
                                         <td class="num hl">{row.total}</td>
                                     </tr>
                                 {:else}
-                                    <tr><td colspan="7" class="empty-cell">No players yet.</td></tr>
+                                    <tr><td colspan="8" class="empty-cell">No players yet.</td></tr>
                                 {/each}
                             </tbody>
                         </table>
@@ -759,11 +1014,17 @@
                                 <span><b>✓</b> Correct picks</span>
                                 <span><b>M</b> Match points</span>
                                 <span><b>Tbl</b> Table points</span>
+                                <span><b>LT</b> Live table points</span>
                                 <span><b>Tot</b> Total</span>
                             </p>
                         {/if}
                         {#if ranked.some((r) => r.tableProvisional)}
                             <p class="note">* Table points include provisional weeks (teams with games in hand); these may change once postponed fixtures are played.</p>
+                        {/if}
+                        {#if tableWeek >= 1}
+                            <p class="note">"Live table" is what the standings are worth for matchweek {tableWeek}: <b>if the week ended exactly as it stands, that's the table score each player would take from it</b> — so it shows who's currently reading the table best. Nothing here is settled; it moves with every remaining game of the week. Table points only, and it's the in-progress week's running share of the Table column, so don't add it to Total.</p>
+                        {:else}
+                            <p class="note">"Live table" shows — until the first matchweek completes; there's no table to score predictions against yet.</p>
                         {/if}
                     </div>
                     <p class="note">Match points are {BASE_POINTS} base — plus any Golden/Silver/Bronze and fan-team bonus — times the odds multiplier and the result, rounded up to the next tenth. Table points are the matchweek number for an exact call, less a tenth of it per place out and nothing at {TABLE_REACH}+ places, summed over all 20 clubs every completed week. Full detail on the Rules tab.</p>
@@ -776,13 +1037,23 @@
                     <div class="table-wrapper">
                         <table class="grid-table">
                             <thead>
-                                <tr><th>#</th><th>Club</th><th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th class="num">GD</th><th class="num hl">Pts</th></tr>
+                                <tr>
+                                    <th title="League position — stays put when you sort by another column">#</th>
+                                    {#each PL_ORDER as key (key)}
+                                        {@const col = PL_COLS[key]}
+                                        <th class={col.cls} title={col.title}>
+                                            <button class="sort-btn" class:active={plSort.key === key} on:click={() => (plSort = sortBy(plSort, PL_COLS, key))}>
+                                                {col.label}<span class="sort-arrow">{plSort.key === key ? (plSort.asc ? '▲' : '▼') : ''}</span>
+                                            </button>
+                                        </th>
+                                    {/each}
+                                </tr>
                             </thead>
                             <tbody>
-                                {#each standings as row, i}
+                                {#each plRows as row (row.teamId)}
                                     {@const team = teamById[row.teamId]}
                                     <tr>
-                                        <td class="num"><span class="pos-dot" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span></td>
+                                        <td class="num"><span class="pos-dot" class:cl={row.pos <= 5} class:rel={row.pos > 17}>{row.pos}</span></td>
                                         <td class="strong">{row.name || (team ? team.name : row.teamId)}</td>
                                         <td class="num">{row.played}</td>
                                         <td class="num">{row.won}</td>
@@ -790,12 +1061,26 @@
                                         <td class="num">{row.lost}</td>
                                         <td class="num">{row.gd > 0 ? '+' : ''}{row.gd}</td>
                                         <td class="num hl">{row.points}</td>
+                                        <td class="num">
+                                            {#if row.form && row.form.length}
+                                                <span class="form-cell">
+                                                    <span class="form-pts">{row.formPoints}</span>
+                                                    <span class="form-run">
+                                                        {#each row.form as r, k (k)}
+                                                            <span class="pip" class:w={r === 'W'} class:d={r === 'D'} class:l={r === 'L'} class:latest={k === 0} title="{k === 0 ? 'Most recent — ' : ''}{r === 'W' ? 'Win' : r === 'D' ? 'Draw' : 'Loss'}">{r === 'W' ? '✓' : r === 'D' ? '–' : '✕'}</span>
+                                                        {/each}
+                                                    </span>
+                                                </span>
+                                            {:else}
+                                                <span class="not-scored" title="No matches played yet">—</span>
+                                            {/if}
+                                        </td>
                                     </tr>
                                 {/each}
                             </tbody>
                         </table>
                     </div>
-                    <p class="note">Pulled from football-data.org via the standings route. Zeroed until matches are played.</p>
+                    <p class="note">Pulled from football-data.org via the standings route. Zeroed until matches are played. <b>Last 5</b> is points won in the club's five most recent matches, newest first — the ringed result is the latest. Click any header to sort.</p>
                 </section>
 
             {:else if activeTab === 'rules'}
@@ -905,6 +1190,19 @@
                     </div>
                     {#if syncing}<p class="note">Running…</p>{/if}
                     {#if syncStatus}<pre class="sync-out">{syncStatus}</pre>{/if}
+
+                    <h2 class="week-title solo">Visibility</h2>
+                    <label class="admin-toggle">
+                        <input type="checkbox" checked={tablesRevealed} on:change={toggleRevealTables} disabled={revealSaving} />
+                        <span>Publish everyone's predicted tables</span>
+                    </label>
+                    <p class="note">
+                        {#if tablesRevealed}
+                            On — every player in the competition can browse each other's predicted final tables from the Season predictions tab. Uncheck to hide them again.
+                        {:else}
+                            Off — only admins can see other players' tables. Leave this until after the prediction deadline.
+                        {/if}
+                    </p>
                 </section>
             {/if}
         </main>
@@ -924,6 +1222,8 @@
     .fan-none { padding: 0.5rem 0.7rem; color: #9ca3af; font-size: 0.9rem; }
     .disclosure { color: #4b5563; font-size: 0.9rem; line-height: 1.6; margin: 0 0 1.5rem; max-width: 640px; }
     .prov-star { color: #f59e0b; font-weight: 700; margin-left: 1px; cursor: help; }
+    /* Nothing to compute yet, as opposed to a genuine score of zero */
+    .not-scored { color: #9ca3af; cursor: help; }
     /* Fan-team column on the standings table */
     .crest-col { width: 3.25rem; text-align: center; }
     .crest { width: 1.5rem; height: 1.5rem; object-fit: contain; vertical-align: middle; cursor: help; }
@@ -933,6 +1233,8 @@
     .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; margin-top: 0.5rem; }
     .legend b { color: #2c5aa0; font-weight: 800; margin-right: 0.15rem; }
     .admin-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
+    .admin-toggle { display: inline-flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; font-weight: 600; color: #1a1a1a; cursor: pointer; }
+    .admin-toggle input { width: 1.05rem; height: 1.05rem; accent-color: #2c5aa0; cursor: pointer; }
     .sync-out { background: #0f172a; color: #cbd5e1; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
     .breadcrumb { margin-bottom: 2rem; }
@@ -1064,9 +1366,19 @@
     .empty { text-align: center; padding: 2rem; color: #6b7280; background: #f9fafb; border-radius: 8px; }
     .empty-cell { text-align: center; color: #6b7280; padding: 1.5rem; }
 
+    /* Heading + "whose table" picker, side by side until the row runs out of room */
+    .table-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .view-select { max-width: 260px; padding: 0.5rem 0.75rem; font-size: 0.95rem; font-weight: 600; color: #2c5aa0; background: white; }
+    /* One column per player, so this is the one table that genuinely needs to scroll */
+    .summary-grid { min-width: 0; }
+    .summary-grid th, .summary-grid td { padding-left: 0.5rem; padding-right: 0.5rem; }
+
     .table-predict { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
     .predict-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.85rem; background: white; border: 1px solid #e5e7eb; border-radius: 8px; cursor: grab; }
     .predict-row.dragging { opacity: 0.4; }
+    /* Someone else's table: read-only, so no grab cursor and no drag handle */
+    .predict-row.static { cursor: default; }
+    .fan-star { color: #d4af37; font-size: 0.95rem; cursor: help; }
     .pos { width: 1.8rem; text-align: center; font-weight: 700; color: #6b7280; border-radius: 4px; }
     .pos.cl, .pos-dot.cl { background: rgba(44,90,160,0.12); color: #2c5aa0; }
     .pos.rel, .pos-dot.rel { background: #fee2e2; color: #dc2626; }
@@ -1097,6 +1409,28 @@
     .grid-table td.hl { background: rgba(44,90,160,0.08); font-weight: 700; }
     .grid-table tr.you { background: #fef3c7; }
     .pos-dot { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.3rem; border-radius: 4px; font-weight: 700; }
+
+    /* Sortable headers. The button inherits the th's colour and casing so the row
+       still reads as a header rather than a strip of controls. */
+    .sort-btn { display: inline-flex; align-items: center; gap: 0.1rem; background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; white-space: nowrap; }
+    .sort-btn:hover { text-decoration: underline; }
+    .sort-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .sort-btn.active { text-decoration: underline; }
+    /* Fixed width whether or not an arrow is showing, so toggling the sort can't
+       change column widths and set the compact-header fitter oscillating. */
+    .sort-arrow { display: inline-block; width: 0.8em; font-size: 0.7em; line-height: 1; }
+
+    /* Last-5 form guide: points won, then one pip per match, most recent first */
+    .form-cell { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+    .form-pts { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 1ch; }
+    .form-run { display: inline-flex; gap: 0.3rem; }
+    .pip { width: 1.05rem; height: 1.05rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; line-height: 1; color: #fff; cursor: help; }
+    .pip.w { background: #16a34a; }
+    .pip.d { background: #9ca3af; }
+    .pip.l { background: #dc2626; }
+    /* The most recent result, ringed. box-shadow rather than a border so the pip
+       keeps its size and the row doesn't shift. */
+    .pip.latest { box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px #1f2937; }
 
     @media (max-width: 768px) {
         .container { padding: 1rem; }

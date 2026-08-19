@@ -180,6 +180,14 @@ export interface LeaderRow {
     lockedTablePoints: number;
     provisionalTablePoints: number;
     tableProvisional: boolean;
+    // If the current week ended with the standings exactly as they are, the table
+    // score this player would take from it. That week is usually still in progress,
+    // so the value moves as its remaining games are played — it is that week's
+    // running share of tablePoints, not a separate award, so never add it to total.
+    currentTablePoints: number;
+    // Uniform across rows; carried here so the flat array response keeps its shape.
+    tableWeek: number;
+    currentTableProvisional: boolean;
     total: number;
 }
 
@@ -220,6 +228,12 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         const table = computeTable(upto);
         weekTables.push({ week: W, table, locked: lockedSet(table, W) });
     }
+
+    // The live table is the last week computed. If any club there still has games
+    // in hand, this week's value can still move, so it carries the same * as the
+    // cumulative column.
+    const latest = weekTables[weekTables.length - 1];
+    const currentTableProvisional = latest ? [...latest.locked.values()].some((l) => !l) : false;
 
     const board: LeaderRow[] = users.map((u) => {
         const myPicks = picksByUser.get(u.id) ?? new Map<string, string>();
@@ -270,6 +284,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         // Table-prediction points, summed over every completed week (only if saved).
         let lockedTable = 0;
         let provTable = 0;
+        let currentTable = 0;
         const order = predByUser.get(u.id);
         if (saved && order && order.length) {
             const predPos = new Map<string, number>();
@@ -281,6 +296,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
                     const pts = tableScoring(Math.abs(e.position - pp), wt.week);
                     if (wt.locked.get(e.teamId)) lockedTable += pts;
                     else provTable += pts;
+                    if (wt.week === currentWeek) currentTable += pts;
                 }
             }
         }
@@ -296,6 +312,9 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
             lockedTablePoints: round1(lockedTable),
             provisionalTablePoints: round1(provTable),
             tableProvisional: provTable > 0,
+            currentTablePoints: round1(currentTable),
+            tableWeek: currentWeek,
+            currentTableProvisional,
             total: 0
         };
     });

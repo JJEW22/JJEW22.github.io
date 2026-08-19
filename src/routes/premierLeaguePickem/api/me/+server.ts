@@ -1,6 +1,7 @@
 // src/routes/premierLeaguePickem/api/me/+server.ts
 import { json } from '@sveltejs/kit';
 import { sql } from '$lib/server/db';
+import { getFlag, REVEAL_TABLES_KEY } from '$lib/server/appMeta';
 import { PREDICTIONS_DEADLINE, deadlinePassed } from '$lib/season';
 import type { RequestHandler } from './$types';
 
@@ -13,6 +14,7 @@ export const GET: RequestHandler = async ({ locals }) => {
     const picks = await sql`select fixture_id, pick from match_picks where user_id = ${locals.user.id}`;
     const matchPicks = Object.fromEntries(picks.map((p) => [p.fixture_id, p.pick]));
     const tp = (await sql`select team_order from table_predictions where user_id = ${locals.user.id}`)[0];
+    const tablesRevealed = await getFlag(REVEAL_TABLES_KEY);
 
     const saved = me?.predictions_saved_at != null;
     return json({
@@ -25,6 +27,7 @@ export const GET: RequestHandler = async ({ locals }) => {
         tableOrder: tp?.team_order ?? null,
         predictionsSaved: saved,
         predictionsLocked: saved && deadlinePassed(),
-        deadline: PREDICTIONS_DEADLINE.toISOString()
+        deadline: PREDICTIONS_DEADLINE.toISOString(),
+        tablesRevealed
     });
 };

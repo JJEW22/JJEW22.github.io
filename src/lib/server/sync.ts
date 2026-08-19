@@ -5,18 +5,10 @@ import { sql } from '$lib/server/db';
 import { getFinishedMatches, getFixtures, getMatchesInWindow } from '$lib/server/football';
 import { pickBonusFixtures, computeTable } from '$lib/server/scoring';
 import { sendEmail } from '$lib/server/email';
+import { getMeta, setMeta } from '$lib/server/appMeta';
 import { PICK_LOCK_LEAD_MS } from '$lib/season';
 
 const RESYNC_AFTER_MS = 135 * 60 * 1000; // sync results 135 min after kickoff
-
-async function getMeta(key: string): Promise<string | null> {
-    const row = (await sql`select value from app_meta where key = ${key}`)[0];
-    return row?.value ?? null;
-}
-async function setMeta(key: string, value: string): Promise<void> {
-    await sql`insert into app_meta (key, value, updated_at) values (${key}, ${value}, now())
-              on conflict (key) do update set value = excluded.value, updated_at = now()`;
-}
 
 // Pull finished results, store goals/winner, and (re)designate the current
 // week's golden/silver/bronze bonus matches. Idempotent.
