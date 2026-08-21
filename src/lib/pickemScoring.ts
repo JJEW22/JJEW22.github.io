@@ -24,6 +24,41 @@ export function bonusPoints(flag: string | null): number {
     return 0;
 }
 
+// ---------- Auto-assigned picks ----------
+
+// A player who never picked still gets a side once the match locks, decided by a
+// 50/50 coin — but that match's weight drops by this much. Deducted from the
+// effective base, so a wrong coin still scores 0 rather than going negative.
+export const AUTO_PICK_PENALTY = 20;
+
+// The coin. Derived from (player, fixture) rather than stored, so the leaderboard
+// and the UI always agree and nothing has to run at lock time to keep them in sync.
+//
+// Deterministic, but not exploitable: an auto-pick is always worth AUTO_PICK_PENALTY
+// less than a real one, so knowing your own flip in advance can never beat simply
+// making the pick.
+export function coinPick(userId: number, fixtureId: string): 'HOME' | 'AWAY' {
+    // FNV-1a over "<userId>:<fixtureId>", then an xorshift-multiply finalizer.
+    // FNV alone doesn't avalanche into the low bit well enough to split 50/50 on
+    // the near-sequential keys this gets called with; the finalizer fixes that.
+    const key = `${userId}:${fixtureId}`;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < key.length; i++) {
+        h ^= key.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    h ^= h >>> 16;
+    h = Math.imul(h, 0x7feb352d) >>> 0;
+    h ^= h >>> 15;
+    return (h & 1) === 0 ? 'HOME' : 'AWAY';
+}
+
+// Effective base for one match: the fixed base, plus any bonuses that apply, less
+// the penalty when nobody made the call. Never below zero.
+export function effectiveBasePoints(matchBonus: number, fanBonus: number, auto: boolean): number {
+    return Math.max(0, BASE_POINTS + matchBonus + fanBonus - (auto ? AUTO_PICK_PENALTY : 0));
+}
+
 // ---------- Table-prediction points ----------
 
 // How many places out a club can be before it stops scoring. Also the divisor,

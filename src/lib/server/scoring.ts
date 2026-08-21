@@ -1,7 +1,15 @@
 // src/lib/server/scoring.ts
 import { sql } from '$lib/server/db';
 import { TEAMS } from '$lib/plTeams';
-import { BASE_POINTS, FAN_BONUS, bonusPoints, tableScoring, round1, ceil1 } from '$lib/pickemScoring';
+import {
+    FAN_BONUS,
+    bonusPoints,
+    coinPick,
+    effectiveBasePoints,
+    tableScoring,
+    round1,
+    ceil1
+} from '$lib/pickemScoring';
 
 // Point values and the two scoring formulas live in $lib/pickemScoring so the
 // rules tab renders the same numbers this file scores with.
@@ -249,6 +257,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
 
             let side: 'HOME' | 'AWAY' | null = null;
             let isFanTeamGame = false;
+            let autoPicked = false;
             if (fanActive && r.home_id === fanActive) {
                 side = 'HOME';
                 isFanTeamGame = true;
@@ -257,7 +266,15 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
                 isFanTeamGame = true;
             } else {
                 const manual = myPicks.get(r.fixture_id);
-                if (manual === 'HOME' || manual === 'AWAY') side = manual;
+                if (manual === 'HOME' || manual === 'AWAY') {
+                    side = manual;
+                } else {
+                    // No pick, and this match is finished — so it locked long ago.
+                    // The coin decides, at a reduced weight. Nothing to look up:
+                    // reaching this branch at all means the lock has passed.
+                    side = coinPick(u.id, r.fixture_id);
+                    autoPicked = true;
+                }
             }
             if (!side) continue;
 
@@ -273,7 +290,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
             // fan team in the golden match gets base + GOLDEN_BONUS + FAN_BONUS.
             const matchBonus = bonusPoints(r.bonus);
             const fanBonus = !!fanActive && (r.home_id === fanActive || r.away_id === fanActive) ? FAN_BONUS : 0;
-            const base = BASE_POINTS + matchBonus + fanBonus;
+            const base = effectiveBasePoints(matchBonus, fanBonus, autoPicked);
 
             // Rounded up to the next tenth per match, so a single fixture never
             // contributes a score finer than 0.1 (and neither can the total).

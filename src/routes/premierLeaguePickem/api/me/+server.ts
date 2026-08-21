@@ -19,6 +19,9 @@ export const GET: RequestHandler = async ({ locals }) => {
     const saved = me?.predictions_saved_at != null;
     return json({
         user: locals.user.username,
+        // The client needs this to work out its own coinPick() for locked matches
+        // it never picked — the same input the server scores with.
+        userId: locals.user.id,
         roles: locals.user.roles,
         joined: me?.pickem_joined_at != null,
         displayName: me?.display_name ?? null,

@@ -9,7 +9,10 @@
         BRONZE_BONUS,
         FAN_BONUS,
         TABLE_REACH,
+        AUTO_PICK_PENALTY,
         bonusPoints,
+        coinPick,
+        effectiveBasePoints,
         tableScoring,
         round1
     } from '$lib/pickemScoring';
@@ -80,6 +83,18 @@
             return { ok: false, error: 'Network error.' };
         }
     }
+    // Who picked what, for matches that have already kicked off. The server only
+    // returns started fixtures, so an empty object simply means nothing to reveal.
+    /** @param {number} n */
+    async function loadReveal(n) {
+        try {
+            const r = await fetch(`${API}/reveal?mw=${n}`);
+            if (r.ok) return (await r.json()).picks || {};
+        } catch (_) {
+            /* transient; the cards just render without the reveal */
+        }
+        return {};
+    }
     async function loadLeaderboard() {
         try {
             const r = await fetch(`${API}/leaderboard`);
@@ -101,6 +116,8 @@
     let activeTab = 'results';
 
     let user = '';
+    let userId = 0; // needed to derive this player's own coin pick
+    /** @type {any[]} */
     let roles = [];
     let joined = false;
     let joining = false;
@@ -117,6 +134,11 @@
     let matchPicks = {};
     let matchStatus = '';
     let matchSaving = false;
+    /**
+     * fixture id -> { home: [{id, name, fan}], away: [...] }, started matches only
+     * @type {Record<string, any>}
+     */
+    let revealedPicks = {};
 
     let tableOrder = TEAMS.map((t) => t.id);
     let fanTeam = '';
@@ -146,6 +168,7 @@
     onMount(async () => {
         await applyMe();
         matchweek = await loadMatchweek(currentWeek);
+        revealedPicks = await loadReveal(currentWeek);
         leaderboard = await loadLeaderboard();
         standings = await loadStandings();
     });
@@ -154,6 +177,7 @@
         const me = await loadMe();
         if (me.user) {
             user = me.user;
+            userId = me.userId || 0;
             roles = me.roles || [];
             joined = !!me.joined;
             displayName = me.displayName || '';
@@ -314,7 +338,7 @@
     // $lib/pickemScoring, the same module the server scores with.
     // Gold/silver/bronze apply to their match for everyone; the fan-team bonus
     // applies to the fan's match. They STACK.
-    function effectiveBase(fixture, fan, saved) {
+    function effectiveBase(fixture, fan, saved, auto) {
         const matchBonus = bonusPoints(fixture.bonus);
         const fanHere = fanSide(fixture, fan, saved) !== null;
         const fanBonus = fanHere ? FAN_BONUS : 0;
@@ -325,10 +349,13 @@
             parts.push({ label, pts: matchBonus });
         }
         if (fanBonus > 0) parts.push({ label: 'Fan team', pts: fanBonus });
-        return { total: BASE_POINTS + matchBonus + fanBonus, parts };
+        if (auto) parts.push({ label: 'No pick (coin flip)', pts: -AUTO_PICK_PENALTY });
+        return { total: effectiveBasePoints(matchBonus, fanBonus, !!auto), parts };
     }
     function baseTooltip(eb) {
-        const sum = eb.parts.map((p, i) => (i === 0 ? `${p.label} ${p.pts}` : `+ ${p.label} ${p.pts}`)).join('  ');
+        const sum = eb.parts
+            .map((p, i) => (i === 0 ? `${p.label} ${p.pts}` : `${p.pts < 0 ? '−' : '+'} ${p.label} ${Math.abs(p.pts)}`))
+            .join('  ');
         return `${sum}  =  ${eb.total} base points`;
     }
 
@@ -373,7 +400,9 @@
         if (n < 1 || n > TOTAL_MATCHWEEKS) return;
         currentWeek = n;
         matchStatus = '';
+        revealedPicks = {};
         matchweek = await loadMatchweek(n);
+        revealedPicks = await loadReveal(n);
     }
     async function saveMatchPicks() {
         if (!user) { matchStatus = 'Log in before saving.'; return; }
@@ -744,8 +773,11 @@
                                 {@const awayPct = pct(fixture.probAway)}
                                 {@const drawPct = pct(fixture.probDraw)}
                                 {@const fanPick = fanSide(fixture, fanTeam, predictionsSaved)}
-                                {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved)}
+                                {@const coined = locked && !choice && !fanPick && !!userId}
+                                {@const coinChoice = coined ? coinPick(userId, fixture.id) : null}
+                                {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved, coined)}
                                 {@const hl = cardHighlight(fixture, fanTeam, predictionsSaved)}
+                                {@const reveal = revealedPicks[fixture.id]}
                                 <div class="fixture" class:locked class:golden={fixture.bonus === 'GOLDEN'} class:silver={fixture.bonus === 'SILVER'} class:bronze={fixture.bonus === 'BRONZE'} class:hl={!!hl} style={hl ? `--hl-left:${hl.left}; --hl-right:${hl.right}` : ''}>
                                     <span class="base-badge" title={baseTooltip(eb)}>{eb.total} pts</span>
                                     <div class="fixture-time">
@@ -754,6 +786,7 @@
                                         {#if fixture.bonus === 'SILVER'}<span class="bonus-tag slv">★ Silver match</span>{/if}
                                         {#if fixture.bonus === 'BRONZE'}<span class="bonus-tag brz">★ Bronze match</span>{/if}
                                         {#if fanPick}<span class="bonus-tag team" style={`--tc:${teamById[fanTeam]?.color || '#2c5aa0'}`}>★ Your team</span>{/if}
+                                        {#if coined}<span class="coin-tag" title="You didn't pick before the lock, so a 50/50 coin chose for you — and this match's base drops by {AUTO_PICK_PENALTY}.">🪙 Coin flip &minus;{AUTO_PICK_PENALTY}</span>{/if}
                                         {#if locked}<span class="lock-tag">Locked</span>{/if}
                                     </div>
                                     <div class="pick-row two" class:has-draw={homeMult}>
@@ -761,13 +794,14 @@
                                             class="pick home"
                                             class:selected={choice === 'HOME' || fanPick === 'HOME'}
                                             class:fan-locked={fanPick === 'HOME'}
+                                            class:coin-picked={coinChoice === 'HOME'}
                                             disabled={locked || fanPick !== null}
-                                            title={fanPick === 'HOME' ? `Auto-picked to win — ${home.name} is your fan team, locked for the season.` : ''}
+                                            title={fanPick === 'HOME' ? `Auto-picked to win — ${home.name} is your fan team, locked for the season.` : coinChoice === 'HOME' ? `The coin gave you ${home.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
                                             on:click={() => pick(fixture.id, 'HOME')}
                                         >
                                             <span class="pick-text">
-                                                <span class="team">{home.name}{#if fanPick === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}</span>
-                                                <span class="hint">{fanPick === 'HOME' ? 'Your team (locked)' : 'Home win'}</span>
+                                                <span class="team">{home.name}{#if fanPick === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}{#if coinChoice === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🪙</span>{/if}</span>
+                                                <span class="hint">{fanPick === 'HOME' ? 'Your team (locked)' : coinChoice === 'HOME' ? 'Coin flip' : 'Home win'}</span>
                                             </span>
                                             {#if homeMult}<span class="odds">{homePct}%<span class="mult"> (×{homeMult})</span></span>{/if}
                                         </button>
@@ -781,17 +815,46 @@
                                             class="pick away"
                                             class:selected={choice === 'AWAY' || fanPick === 'AWAY'}
                                             class:fan-locked={fanPick === 'AWAY'}
+                                            class:coin-picked={coinChoice === 'AWAY'}
                                             disabled={locked || fanPick !== null}
-                                            title={fanPick === 'AWAY' ? `Auto-picked to win — ${away.name} is your fan team, locked for the season.` : ''}
+                                            title={fanPick === 'AWAY' ? `Auto-picked to win — ${away.name} is your fan team, locked for the season.` : coinChoice === 'AWAY' ? `The coin gave you ${away.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
                                             on:click={() => pick(fixture.id, 'AWAY')}
                                         >
                                             <span class="pick-text">
-                                                <span class="team">{away.name}{#if fanPick === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}</span>
-                                                <span class="hint">{fanPick === 'AWAY' ? 'Your team (locked)' : 'Away win'}</span>
+                                                <span class="team">{away.name}{#if fanPick === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}{#if coinChoice === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🪙</span>{/if}</span>
+                                                <span class="hint">{fanPick === 'AWAY' ? 'Your team (locked)' : coinChoice === 'AWAY' ? 'Coin flip' : 'Away win'}</span>
                                             </span>
                                             {#if awayMult}<span class="odds">{awayPct}%<span class="mult"> (×{awayMult})</span></span>{/if}
                                         </button>
                                     </div>
+                                    {#if reveal}
+                                        <div class="reveal">
+                                            <div class="reveal-side">
+                                                <span class="reveal-label">{home.name}</span>
+                                                {#if reveal.home.length}
+                                                    <span class="reveal-names">
+                                                        {#each reveal.home as p (p.id)}
+                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} title={p.fan ? `${p.name} — forced, ${home.name} is their fan team` : p.auto ? `${p.name} — never picked, so the coin chose ${home.name} at ${AUTO_PICK_PENALTY} fewer base points` : p.name}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}</span>
+                                                        {/each}
+                                                    </span>
+                                                {:else}
+                                                    <span class="reveal-none">Nobody</span>
+                                                {/if}
+                                            </div>
+                                            <div class="reveal-side">
+                                                <span class="reveal-label">{away.name}</span>
+                                                {#if reveal.away.length}
+                                                    <span class="reveal-names">
+                                                        {#each reveal.away as p (p.id)}
+                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} title={p.fan ? `${p.name} — forced, ${away.name} is their fan team` : p.auto ? `${p.name} — never picked, so the coin chose ${away.name} at ${AUTO_PICK_PENALTY} fewer base points` : p.name}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}</span>
+                                                        {/each}
+                                                    </span>
+                                                {:else}
+                                                    <span class="reveal-none">Nobody</span>
+                                                {/if}
+                                            </div>
+                                        </div>
+                                    {/if}
                                 </div>
                             {/each}
                         </div>
@@ -1094,6 +1157,7 @@
                             <li><b>Predict where all 20 clubs finish.</b> You're scored every completed week on how close each club is to where you placed it.</li>
                             <li>Pick a <b>fan team</b> (you're locked into picking them to win every week; the bonuses offset that, so just take your favorite) and a <b>display name</b>. Both lock at <b>23:59 the day before the season</b>.</li>
                             <li>Three "matches of the week" carry bonus points — <span class="chip gold">Golden +{GOLDEN_BONUS}</span> <span class="chip slv">Silver +{SILVER_BONUS}</span> <span class="chip brz">Bronze +{BRONZE_BONUS}</span> — and your fan team's match is <b>+{FAN_BONUS}</b>. These <b>stack</b>.</li>
+                            <li><b>Miss a pick and a coin flips for you</b> at the lock, with that match's base cut by {AUTO_PICK_PENALTY}. You're never worse off than zero, but you're worse off than picking.</li>
                             <li>Buy-in is <b>$10</b> a head, all of it toward <b>gear for the winner's club</b>. Nothing else to pay, on the day or otherwise.</li>
                             <li>The season closes with a <b>watch party on Super Sunday</b>, where the last games settle the table and the prize is handed over.</li>
                         </ul>
@@ -1129,6 +1193,7 @@
                         <h4>Match picks</h4>
                         <ul>
                             <li>Pick <b>Home</b> or <b>Away</b> for every fixture — draws can't be picked. Each pick locks at that match's kickoff.</li>
+                            <li><b>Forget to pick and a coin picks for you.</b> Any match you leave blank is decided 50/50 at the lock, and that match's base drops by <b>{AUTO_PICK_PENALTY}</b> ({BASE_POINTS} becomes {BASE_POINTS - AUTO_PICK_PENALTY}). You still can't go below zero — a wrong coin is worth 0, same as before — but a right one pays less than if you'd made the call yourself.</li>
                             <li>Score for a match = <b>base × odds multiplier × result</b>, where result is <b>1</b> for a correct winner, <b>0</b> for wrong, and <b>1/3</b> if the match ends in a draw.</li>
                             <li>Each match is then <b>rounded up to the next tenth of a point</b>. Nothing anywhere in the game is scored finer than <b>0.1</b>.</li>
                             <li>The <b>odds multiplier</b> is derived from the betting market (vig removed): a pick on a longer shot is worth more than a heavy favorite. It's shown on each match as <span class="chip">%  (×mult)</span>.</li>
@@ -1336,6 +1401,11 @@
     .fan-lock-icon { font-size: 0.75rem; }
     .fixture-time { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.6rem; padding-right: 3.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .lock-tag { background: #6b7280; color: white; border-radius: 10px; padding: 0.1rem 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .coin-tag { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; border-radius: 10px; padding: 0.1rem 0.5rem; font-size: 0.7rem; font-weight: 700; cursor: help; }
+    /* The side the coin gave you: marked, but visibly not a choice you made */
+    .pick.coin-picked { border-color: #fdba74; border-style: dashed; background: #fff7ed; }
+    .pick.coin-picked .team { color: #9a3412; }
+    .pick.coin-picked .hint { color: #c2410c; }
     .pick-row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; align-items: stretch; }
     .pick-row.two.has-draw { grid-template-columns: 1fr auto 1fr; }
     .draw-box { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 3.4rem; padding: 0.3rem 0.55rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f8fafc; }
@@ -1355,6 +1425,23 @@
     .pick.selected { background: #2c5aa0; border-color: #2c5aa0; }
     .pick.selected .team, .pick.selected .hint, .pick.selected .odds { color: white; }
     .pick:disabled { cursor: not-allowed; }
+
+    /* Who picked what, revealed once a match has kicked off */
+    .reveal { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px dashed #e5e7eb; }
+    .reveal-side { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+    .reveal-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; font-weight: 700; }
+    .reveal-names { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .who { background: #eef2f7; color: #35507a; border: 1px solid #d7e0ec; border-radius: 999px; padding: 0.08rem 0.5rem; font-size: 0.78rem; font-weight: 600; }
+    /* Forced pick: their fan team, so they never had a choice here */
+    .who.fan { background: #fff; border-color: #d4af37; color: #7a5c10; cursor: help; }
+    /* Never picked — the coin decided, at reduced weight. Deliberately drabber than
+       a real pick so the lists read at a glance. */
+    .who.auto { background: #f3f4f6; border-color: #e5e7eb; border-style: dashed; color: #6b7280; font-weight: 500; cursor: help; }
+    .who-star { color: #d4af37; margin-left: 0.15rem; }
+    .who-coin { margin-left: 0.15rem; font-size: 0.7rem; }
+    .who.you { background: #2c5aa0; border-color: #2c5aa0; color: #fff; }
+    .who.you .who-star { color: #ffe9a8; }
+    .reveal-none { font-size: 0.78rem; color: #9ca3af; font-style: italic; }
 
     .save-row { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
     .save-btn { padding: 0.75rem 1.75rem; background: #2c5aa0; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
@@ -1452,5 +1539,7 @@
         .pick.home, .pick.away { flex-direction: row; text-align: left; }
         .pick.home .pick-text, .pick.away .pick-text { align-items: flex-start; }
         .draw-box { flex-direction: row; justify-content: center; gap: 0.5rem; min-width: 0; padding: 0.4rem 0.75rem; }
+        /* Match the stacked pick buttons rather than squeezing two name lists side by side */
+        .reveal { grid-template-columns: 1fr; }
     }
 </style>

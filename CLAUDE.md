@@ -82,12 +82,22 @@ redeclare these locally — they used to be duplicated and drifted apart.
 | `GOLDEN_BONUS` / `SILVER_BONUS` / `BRONZE_BONUS` | 20 / 15 / 10 |
 | `FAN_BONUS` | 10 |
 | `TABLE_REACH` | 10 |
+| `AUTO_PICK_PENALTY` | 20 |
 | `bonusPoints(flag)` | flag → bonus value |
+| `effectiveBasePoints(matchBonus, fanBonus, auto)` | base + bonuses − penalty, floored at 0 |
+| `coinPick(userId, fixtureId)` | the 50/50 for an unmade pick — see below |
 | `tableScoring(distance, week)` | `week × (10 − distance) / 10`, 0 at 10+ places out |
 | `round1(n)` | table sums are exact tenths; float addition isn't |
+| `ceil1(n)` | match points round UP to the next tenth, per match |
 
 Bonus match points and the fan-team bonus **stack** (fan team in the golden match = 50+20+10).
 `PICK_LOCK_LEAD_MS` and `PREDICTIONS_DEADLINE` live in `$lib/season`, imported by both sides.
+
+A match left unpicked at the lock is decided by `coinPick`, at `AUTO_PICK_PENALTY` fewer base
+points. The coin is **derived from (userId, fixtureId), never stored** — that's what keeps the
+leaderboard, the fixture card, and the reveal endpoint showing the same side with nothing having
+to run at lock time. It's deterministic but not exploitable: an auto-pick is always worth less
+than a real one. Precedence everywhere is **fan team > stored pick > coin**.
 
 The rules tab renders these values and calls `tableScoring()` directly, so the copy cannot drift
 from the scoring. Change the numbers here and the rules update themselves.
