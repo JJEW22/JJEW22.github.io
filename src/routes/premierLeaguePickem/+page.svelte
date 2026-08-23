@@ -833,7 +833,7 @@
                                         {#if fixture.bonus === 'BRONZE'}<span class="bonus-tag brz">★ Bronze match</span>{/if}
                                         {#if fanPick}<span class="bonus-tag team" style={`--tc:${teamById[fanTeam]?.color || '#2c5aa0'}`}>★ Your team</span>{/if}
                                         {#if coined}<span class="coin-tag" title="You didn't pick before the lock, so a 50/50 coin chose for you — and this match's base drops by {AUTO_PICK_PENALTY}.">🪙 Coin flip &minus;{AUTO_PICK_PENALTY}</span>{/if}
-                                        {#if locked}<span class="lock-tag">🔒 Locked</span>{/if}
+                                        {#if locked}<span class="lock-tag" title="Picks and odds are both final for this match — the multiplier shown is the one it pays at.">🔒 Locked</span>{/if}
                                     </div>
                                     <div class="pick-row two" class:has-draw={homeMult}>
                                         <button
@@ -1250,6 +1250,7 @@
                             <li>Score for a match = <b>base × odds multiplier × result</b>, where result is <b>1</b> for a correct winner, <b>0</b> for wrong, and <b>1/3</b> if the match ends in a draw.</li>
                             <li>Each match is then <b>rounded up to the next tenth of a point</b>. Nothing anywhere in the game is scored finer than <b>0.1</b>.</li>
                             <li>The <b>odds multiplier</b> is derived from the betting market (vig removed): a pick on a longer shot is worth more than a heavy favorite. It's shown on each match as <span class="chip">%  (×mult)</span>.</li>
+                            <li>Odds track the market until a match <b>locks</b>, and freeze at that moment — <b>the same moment your picks lock</b>, 15 minutes before kickoff. Once a match shows <span class="chip">🔒 Locked</span>, the multiplier on it is the one it pays at and nothing about it can move again.</li>
                             <li>Base points are <b>{BASE_POINTS}</b>, before any bonuses.</li>
                         </ul>
 

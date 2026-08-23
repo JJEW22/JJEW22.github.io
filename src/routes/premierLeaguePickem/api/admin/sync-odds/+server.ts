@@ -1,48 +1,15 @@
 // src/routes/premierLeaguePickem/api/admin/sync-odds/+server.ts
 import { json } from '@sveltejs/kit';
 import { requireAdmin } from '$lib/server/roles';
-import { sql } from '$lib/server/db';
-import { fetchOddsMultipliers } from '$lib/server/odds';
-import { getUpcomingMatches } from '$lib/server/football';
+import { syncOdds } from '$lib/server/sync';
 import type { RequestHandler } from './$types';
 
-// Captures probabilities + multipliers onto upcoming fixtures. Run on a schedule
-// with ?key=<SYNC_SECRET>. Odds freeze at kickoff (started matches are skipped).
-export const POST: RequestHandler = async ({ url, locals }) => {
-    requireAdmin(locals.user, url, 'pickem:admin');
-
-    const [odds, fixtures] = await Promise.all([fetchOddsMultipliers(), getUpcomingMatches(45)]);
-
-    const byPair = new Map<string, { id: string; matchweek: number; kickoff: string }>();
-    for (const f of fixtures) byPair.set(`${f.homeId}|${f.awayId}`, f);
-
-    const now = Date.now();
-    let updated = 0;
-    let unmatched = 0;
-    let frozen = 0;
-
-    for (const o of odds) {
-        const f = byPair.get(`${o.homeId}|${o.awayId}`);
-        if (!f) {
-            unmatched++;
-            continue;
-        }
-        if (new Date(f.kickoff).getTime() <= now) {
-            frozen++;
-            continue;
-        }
-        await sql`insert into results (fixture_id, matchweek, home_id, away_id, mult_home, mult_away, prob_home, prob_draw, prob_away)
-                  values (${f.id}, ${f.matchweek}, ${o.homeId}, ${o.awayId}, ${o.multHome}, ${o.multAway}, ${o.probHome}, ${o.probDraw}, ${o.probAway})
-                  on conflict (fixture_id) do update set
-                    mult_home = excluded.mult_home,
-                    mult_away = excluded.mult_away,
-                    prob_home = excluded.prob_home,
-                    prob_draw = excluded.prob_draw,
-                    prob_away = excluded.prob_away,
-                    home_id = excluded.home_id,
-                    away_id = excluded.away_id`;
-        updated++;
-    }
-
-    return json({ ok: true, updated, unmatched, frozen, oddsEvents: odds.length, fixtures: fixtures.length });
+// Captures probabilities + multipliers onto upcoming fixtures. The job itself lives
+// in $lib/server/sync so the Admin button and the cron tick run the same code — and
+// so the freeze rule (odds stop moving when picks lock) is stated in exactly one place.
+export const POST: RequestHandler = async ({ url, request, locals }) => {
+    // `request.headers` so the odds workflow can authenticate with an x-sync-key
+    // header instead of putting SYNC_SECRET in a query string.
+    requireAdmin(locals.user, url, 'pickem:admin', request.headers);
+    return json({ ok: true, ...(await syncOdds()) });
 };

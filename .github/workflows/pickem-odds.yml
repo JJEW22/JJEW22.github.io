@@ -1,0 +1,53 @@
+# .github/workflows/pickem-odds.yml
+# Refreshes the betting odds behind the points multipliers, twice a day.
+#
+# Why its own workflow rather than a step in pickem-cron.yml: the odds API is a
+# 500-request-a-MONTH plan. The results sync ticks every 15 minutes, which would be
+# ~2,880 calls a month — roughly six times the quota. Twice a day is ~60.
+#
+# Odds move with the market until a match locks (15 minutes before kickoff) and are
+# frozen from that moment, so a run only ever writes fixtures that are still open.
+# Nothing here can touch a match that has already been played.
+#
+# Setup: the same SYNC_SECRET repo secret pickem-cron.yml uses, matching the env var
+# on the Render service byte for byte (watch for a trailing newline).
+# Notes:
+#   - GitHub cron is best-effort and can drift a few minutes; the endpoint is
+#     idempotent, so a late or repeated run is harmless.
+#   - Scheduled workflows are auto-disabled after 60 days of repo inactivity. If that
+#     happens the 15-minute pickem-cron tick still refreshes odds as a backstop,
+#     because /api/cron calls oddsSyncIfDue(), which self-gates to the same 12 hours.
+name: Pickem odds
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  odds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync odds
+        env:
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+        run: |
+          set -uo pipefail
+          # An unset secret interpolates to an empty string, which the server would
+          # just reject as a 403 — fail with something you can actually read instead.
+          if [ -z "${SYNC_SECRET}" ]; then
+            echo "::error::SYNC_SECRET is not set for this repo (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          # Sent as a header, not a query param: no URL encoding to get wrong, and the
+          # secret stays out of the CDN/host access logs.
+          status=$(curl -sS -X POST \
+            -H "x-sync-key: ${SYNC_SECRET}" \
+            -o response.json -w '%{http_code}' \
+            "https://johnjackwilkins.com/premierLeaguePickem/api/admin/sync-odds") || {
+            echo "::error::could not reach the sync-odds endpoint"
+            exit 1
+          }
+          echo "HTTP $status"
+          cat response.json; echo
+          [ "$status" = "200" ] || exit 1
