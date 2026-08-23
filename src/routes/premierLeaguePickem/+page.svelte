@@ -95,6 +95,18 @@
         }
         return {};
     }
+    // Admin-only: who still owes a pick on the matches that haven't locked. Never
+    // carries which side anyone chose — see the endpoint.
+    /** @param {number} n */
+    async function loadPickStatus(n) {
+        try {
+            const r = await fetch(`${API}/admin/pick-status?mw=${n}`);
+            if (r.ok) return (await r.json()).status || {};
+        } catch (_) {
+            /* transient; the cards just render without it */
+        }
+        return {};
+    }
     async function loadLeaderboard() {
         try {
             const r = await fetch(`${API}/leaderboard`);
@@ -144,6 +156,12 @@
      * @type {Record<string, any>}
      */
     let revealedPicks = {};
+    /**
+     * fixture id -> { picked: [], fan: [], missing: [] }, admins only, open matches
+     * only. Whether they've picked, never what they picked.
+     * @type {Record<string, any>}
+     */
+    let pickStatus = {};
 
     let tableOrder = TEAMS.map((t) => t.id);
     let fanTeam = '';
@@ -174,6 +192,7 @@
         await applyMe();
         matchweek = await loadMatchweek(currentWeek);
         revealedPicks = await loadReveal(currentWeek);
+        await refreshPickStatus();
         leaderboard = await loadLeaderboard();
         standings = await loadStandings();
     });
@@ -218,7 +237,17 @@
     }
 
     // pickem:admin (or site:admin) sees the Admin tab.
-    $: isPickemAdmin = roles.includes('site:admin') || roles.includes('pickem:admin');
+    // The function exists because the reactive flag hasn't settled yet inside the
+    // async code that runs immediately after login; `roles &&` keeps Svelte's
+    // dependency tracking, which is syntactic and wouldn't see through the call.
+    const adminNow = () => roles.includes('site:admin') || roles.includes('pickem:admin');
+    $: isPickemAdmin = roles && adminNow();
+
+    // Admin-only, and only for matches still open. Refreshed whenever the week
+    // changes or a pick is saved.
+    async function refreshPickStatus() {
+        pickStatus = adminNow() ? await loadPickStatus(currentWeek) : {};
+    }
 
     // Prediction tabs are gated: must be signed in AND have joined the competition.
     $: predictionsGate = !user || !joined;
@@ -447,8 +476,10 @@
         currentWeek = n;
         matchStatus = '';
         revealedPicks = {};
+        pickStatus = {};
         matchweek = await loadMatchweek(n);
         revealedPicks = await loadReveal(n);
+        await refreshPickStatus();
     }
     async function saveMatchPicks() {
         if (!user) { matchStatus = 'Log in before saving.'; return; }
@@ -464,6 +495,7 @@
         matchSaving = false;
         const n = res.saved ?? picked.length;
         matchStatus = res.ok ? `Saved ${n} pick${n === 1 ? '' : 's'}.` : (res.error || 'Could not save.');
+        if (res.ok) await refreshPickStatus(); // an admin's own save moves them off the missing list
     }
 
     // ---- Table prediction ----
@@ -1047,6 +1079,7 @@
                                 {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved, penalized)}
                                 {@const hl = cardHighlight(fixture, fanTeam, predictionsSaved)}
                                 {@const reveal = revealedPicks[fixture.id]}
+                                {@const pending = pickStatus[fixture.id]}
                                 {@const score = finalScore(fixture)}
                                 {@const homeOutcome = sideOutcome(score, 'HOME')}
                                 {@const awayOutcome = sideOutcome(score, 'AWAY')}
@@ -1105,6 +1138,40 @@
                                             {#if score}<span class="goals">{score.away}</span>{/if}
                                         </button>
                                     </div>
+                                    {#if pending}
+                                        <div class="pick-chase">
+                                            <div class="chase-head">
+                                                <span class="chase-title">Admin — who's picked</span>
+                                                <span class="chase-count" class:all-in={!pending.missing.length}>
+                                                    {pending.picked.length + pending.fan.length} in · {pending.missing.length} to go
+                                                </span>
+                                                <span class="chase-note">Not who they picked — this match is still open.</span>
+                                            </div>
+                                            {#if pending.missing.length}
+                                                <div class="chase-side">
+                                                    <span class="reveal-label">No pick yet</span>
+                                                    <span class="reveal-names">
+                                                        {#each pending.missing as p (p.id)}
+                                                            <span class="who missing" class:you={p.name === myTableName} title="{p.name} hasn't picked this match yet">{p.name}</span>
+                                                        {/each}
+                                                    </span>
+                                                </div>
+                                            {/if}
+                                            {#if pending.picked.length || pending.fan.length}
+                                                <div class="chase-side">
+                                                    <span class="reveal-label">Sorted</span>
+                                                    <span class="reveal-names">
+                                                        {#each pending.picked as p (p.id)}
+                                                            <span class="who done" class:you={p.name === myTableName} title="{p.name} has picked — which side stays hidden until the lock">{p.name}<span class="who-mark" aria-hidden="true">✓</span></span>
+                                                        {/each}
+                                                        {#each pending.fan as p (p.id)}
+                                                            <span class="who fan" class:you={p.name === myTableName} title="{p.name} is auto-picked here — their fan team is playing, so there's nothing for them to do">{p.name}<span class="who-star" aria-hidden="true">★</span></span>
+                                                        {/each}
+                                                    </span>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/if}
                                     {#if reveal}
                                         {@const shown = adminMode ? revealWithPending(fixture.id, reveal) : reveal}
                                         <div class="reveal" class:editable={adminMode}>
@@ -1889,6 +1956,21 @@
     .who.miss .who-mark { color: #b91c1c; }
     .who.tie .who-mark { color: #a16207; }
     .who.you .who-mark { color: #fff; }
+
+    /* ---- Admin: who still owes a pick on an open match ---- */
+    /* Visually separate from .reveal on purpose. That block answers "which side",
+       this one only ever answers "at all" — they must not be mistaken for each other. */
+    .pick-chase { margin-top: 0.7rem; padding: 0.6rem 0.7rem; border: 1px dashed #c7d2e4; border-radius: 8px; background: #f7f9fc; }
+    .chase-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; margin-bottom: 0.45rem; }
+    .chase-title { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; font-weight: 700; }
+    .chase-count { font-size: 0.78rem; font-weight: 700; color: #b45309; font-variant-numeric: tabular-nums; }
+    .chase-count.all-in { color: #15803d; }
+    .chase-note { font-size: 0.72rem; color: #9ca3af; font-style: italic; }
+    .chase-side { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; }
+    .chase-side:last-child { margin-bottom: 0; }
+    /* Still to pick: the one thing an admin is here to act on, so it's the loud one. */
+    .who.missing { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+    .who.done { background: #f0f7f2; border-color: #bcdcc8; color: #276749; }
 
     /* ---- Admin editorial mode ---- */
     /* A name that can be moved to the other side. Reads as a control rather than a
