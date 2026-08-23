@@ -130,8 +130,13 @@
     let loggingIn = false;
 
     let currentWeek = 1;
+    /** @type {any} */
     let matchweek = null;
     let matchPicks = {};
+    // Fixtures where an admin placed the pick but kept the no-pick penalty, so the
+    // card shows the reduced base rather than advertising points that won't land.
+    /** @type {string[]} */
+    let penalizedPicks = [];
     let matchStatus = '';
     let matchSaving = false;
     /**
@@ -182,6 +187,7 @@
             joined = !!me.joined;
             displayName = me.displayName || '';
             matchPicks = me.matchPicks || {};
+            penalizedPicks = me.penalizedPicks || [];
             if (me.tableOrder) tableOrder = me.tableOrder;
             fanTeam = me.fanTeam || '';
             fanQuery = fanTeam && teamById[fanTeam] ? teamById[fanTeam].name : '';
@@ -307,6 +313,9 @@
         joined = false;
         displayName = '';
         matchPicks = {};
+        penalizedPicks = [];
+        adminMode = false;
+        pendingPicks = {};
         tableOrder = TEAMS.map((t) => t.id);
         matchStatus = '';
         seasonStatus = '';
@@ -553,6 +562,206 @@
             seasonStatus = res.error || 'Could not save.';
         }
     }
+
+    // ============================================================
+    //  ADMIN OVERRIDES
+    // ============================================================
+    // Editorial powers, behind an explicit switch so ordinary admin browsing can't
+    // change anything by accident. Two surfaces — moving a player between sides on
+    // a match that has locked, and rewriting someone's season predictions — and both
+    // stage their changes for one confirm dialog, because both are retroactive: the
+    // leaderboard moves the moment they save.
+    let adminMode = false;
+    /** @type {Record<string, any>} */
+    let pendingPicks = {};
+    let confirmKind = ''; // '' | 'picks' | 'season'
+    let overrideNote = '';
+    let overrideSaving = false;
+    let overrideStatus = '';
+
+    // The season editor keeps its own copies. Editing straight into tableOrder /
+    // fanTeam / displayName would overwrite the ADMIN'S own predictions on screen.
+    /** @type {string[]} */
+    let editOrder = [];
+    let editFan = '';
+    let editName = '';
+    /** @type {number|null} */
+    let editingPlayerId = null;
+
+    /** @type {any[]} */
+    let adminEdits = [];
+    let editsLoaded = false;
+
+    $: pendingList = Object.values(pendingPicks);
+    // Leaving admin mode drops anything staged but unsaved, rather than letting it
+    // linger invisibly and get committed later. Keyed on adminMode alone — reading
+    // pendingList here as well would make this statement depend on what it assigns.
+    $: if (!adminMode) pendingPicks = {};
+
+    // Reassigned rather than mutated in place, so the dialog's own warning line
+    // re-renders with the checkbox.
+    /** @param {string} key @param {boolean} value */
+    function togglePenalty(key, value) {
+        if (!pendingPicks[key]) return;
+        pendingPicks = { ...pendingPicks, [key]: { ...pendingPicks[key], autoPenalty: value } };
+    }
+
+    /** @param {any} fixture @param {any} person @param {'HOME'|'AWAY'} fromSide */
+    function stagePickMove(fixture, person, fromSide) {
+        if (!isPickemAdmin || !adminMode) return;
+        const key = `${fixture.id}|${person.id}`;
+        if (pendingPicks[key]) {
+            // Clicking a staged name again puts it back.
+            const next = { ...pendingPicks };
+            delete next[key];
+            pendingPicks = next;
+            return;
+        }
+        pendingPicks = {
+            ...pendingPicks,
+            [key]: {
+                key,
+                fixtureId: fixture.id,
+                matchweek: matchweek?.number,
+                userId: person.id,
+                name: person.name,
+                pick: fromSide === 'HOME' ? 'AWAY' : 'HOME',
+                // Someone the coin decided for keeps the penalty by default: moving
+                // them shouldn't quietly hand back the points they lost by not picking.
+                autoPenalty: !!person.auto,
+                wasAuto: !!person.auto
+            }
+        };
+    }
+
+    // The reveal lists with staged moves applied, so the card previews the change
+    // before anything is written.
+    /** @param {string} fixtureId @param {any} reveal */
+    function revealWithPending(fixtureId, reveal) {
+        if (!reveal) return reveal;
+        const staged = pendingList.filter((p) => p.fixtureId === fixtureId);
+        if (!staged.length) return reveal;
+        const moved = new Map(staged.map((p) => [p.userId, p]));
+        /** @type {any[]} */
+        const home = [];
+        /** @type {any[]} */
+        const away = [];
+        for (const [side, list] of [['HOME', reveal.home], ['AWAY', reveal.away]]) {
+            for (const p of list) {
+                const m = moved.get(p.id);
+                const to = m ? m.pick : side;
+                (to === 'HOME' ? home : away).push(m ? { ...p, staged: true } : p);
+            }
+        }
+        return { home, away };
+    }
+
+    function cancelOverride() {
+        confirmKind = '';
+        overrideNote = '';
+    }
+
+    async function commitPickOverrides() {
+        overrideSaving = true;
+        let saved = 0;
+        let error = '';
+        for (const it of pendingList) {
+            const res = await postJSON('/admin/override', {
+                kind: 'pick',
+                userId: it.userId,
+                fixtureId: it.fixtureId,
+                matchweek: it.matchweek,
+                pick: it.pick,
+                autoPenalty: it.autoPenalty,
+                note: overrideNote
+            });
+            if (res.ok) saved++;
+            else error = res.error || 'Could not save.';
+        }
+        overrideSaving = false;
+        confirmKind = '';
+        overrideNote = '';
+        pendingPicks = {};
+        overrideStatus = error
+            ? `${saved} saved. ${error}`
+            : `Overrode ${saved} pick${saved === 1 ? '' : 's'}.`;
+        // Re-read rather than patch locally: the server decides what actually landed.
+        revealedPicks = await loadReveal(currentWeek);
+        leaderboard = await loadLeaderboard();
+        await loadAdminEdits(true);
+    }
+
+    function startSeasonEdit() {
+        if (!viewedPlayer) return;
+        editingPlayerId = viewedPlayer.id;
+        editOrder = [...viewedPlayer.order];
+        editFan = viewedPlayer.fanTeam || '';
+        editName = viewedPlayer.name;
+        overrideStatus = '';
+    }
+    function cancelSeasonEdit() {
+        editingPlayerId = null;
+        editOrder = [];
+        editFan = '';
+        editName = '';
+    }
+    /** @param {number} i */
+    function editMoveUp(i) {
+        if (i <= 0) return;
+        const a = [...editOrder];
+        [a[i - 1], a[i]] = [a[i], a[i - 1]];
+        editOrder = a;
+    }
+    /** @param {number} i */
+    function editMoveDown(i) {
+        if (i >= editOrder.length - 1) return;
+        const a = [...editOrder];
+        [a[i + 1], a[i]] = [a[i], a[i + 1]];
+        editOrder = a;
+    }
+
+    async function commitSeasonOverride() {
+        overrideSaving = true;
+        const res = await postJSON('/admin/override', {
+            kind: 'season',
+            userId: editingPlayerId,
+            fanTeam: editFan,
+            tableOrder: editOrder,
+            displayName: editName,
+            note: overrideNote
+        });
+        overrideSaving = false;
+        confirmKind = '';
+        overrideNote = '';
+        if (res.ok) {
+            overrideStatus = res.preserved
+                ? `Overrode ${res.player}'s season predictions. Kept ${res.preserved} pick${res.preserved === 1 ? '' : 's'} from their old fan team's played matches.`
+                : `Overrode ${res.player}'s season predictions.`;
+            cancelSeasonEdit();
+            await loadAllTables();
+            leaderboard = await loadLeaderboard();
+            await loadAdminEdits(true);
+        } else {
+            overrideStatus = res.error || 'Could not save.';
+        }
+    }
+
+    /** @param {boolean} force */
+    async function loadAdminEdits(force = false) {
+        if (!isPickemAdmin || (editsLoaded && !force)) return;
+        try {
+            const r = await fetch(`${API}/admin/edits`);
+            if (r.ok) {
+                adminEdits = (await r.json()).edits || [];
+                editsLoaded = true;
+            }
+        } catch (_) {
+            /* transient; the log just stays as it was */
+        }
+    }
+    // Fetched when the tab is opened rather than on load: it's admin-only and
+    // nothing else on the page depends on it.
+    $: if (activeTab === 'admin' && isPickemAdmin && !editsLoaded) loadAdminEdits();
 
     // ---- Derived ----
     // The whole week counts, played or not — a match kicking off shouldn't shrink
@@ -804,6 +1013,22 @@
 
                     {#if matchweek && matchweek.fixtures.length > 0}
                         <p class="progress">{pickedCount} / {weekCount} picked</p>
+                        {#if isPickemAdmin}
+                            <div class="admin-bar" class:on={adminMode}>
+                                <label class="admin-toggle">
+                                    <input type="checkbox" bind:checked={adminMode} />
+                                    <span>Editorial mode</span>
+                                </label>
+                                {#if adminMode}
+                                    <span class="admin-hint">Click a name under a locked match to move them to the other side. Fan-team picks (★) can't be moved — change their fan team instead.</span>
+                                    {#if pendingList.length}
+                                        <button class="save-btn small danger" on:click={() => (confirmKind = 'picks')} disabled={overrideSaving}>Override save ({pendingList.length})</button>
+                                        <button class="link-btn" on:click={() => (pendingPicks = {})}>Discard</button>
+                                    {/if}
+                                {/if}
+                                {#if overrideStatus}<span class="status-msg">{overrideStatus}</span>{/if}
+                            </div>
+                        {/if}
                         <div class="fixtures">
                             {#each matchweek.fixtures as fixture (fixture.id)}
                                 {@const home = teamById[fixture.homeId] || { name: fixture.homeName }}
@@ -818,7 +1043,8 @@
                                 {@const fanPick = fanSide(fixture, fanTeam, predictionsSaved)}
                                 {@const coined = locked && !choice && !fanPick && !!userId}
                                 {@const coinChoice = coined ? coinPick(userId, fixture.id) : null}
-                                {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved, coined)}
+                                {@const penalized = coined || (locked && !fanPick && penalizedPicks.includes(fixture.id))}
+                                {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved, penalized)}
                                 {@const hl = cardHighlight(fixture, fanTeam, predictionsSaved)}
                                 {@const reveal = revealedPicks[fixture.id]}
                                 {@const score = finalScore(fixture)}
@@ -832,7 +1058,7 @@
                                         {#if fixture.bonus === 'SILVER'}<span class="bonus-tag slv">★ Silver match</span>{/if}
                                         {#if fixture.bonus === 'BRONZE'}<span class="bonus-tag brz">★ Bronze match</span>{/if}
                                         {#if fanPick}<span class="bonus-tag team" style={`--tc:${teamById[fanTeam]?.color || '#2c5aa0'}`}>★ Your team</span>{/if}
-                                        {#if coined}<span class="coin-tag" title="You didn't pick before the lock, so a 50/50 coin chose for you — and this match's base drops by {AUTO_PICK_PENALTY}.">🪙 Coin flip &minus;{AUTO_PICK_PENALTY}</span>{/if}
+                                        {#if coined}<span class="coin-tag" title="You didn't pick before the lock, so a 50/50 coin chose for you — and this match's base drops by {AUTO_PICK_PENALTY}.">🪙 Coin flip &minus;{AUTO_PICK_PENALTY}</span>{:else if penalized}<span class="coin-tag" title="An admin set this pick for you, but the no-pick penalty still applies: this match's base drops by {AUTO_PICK_PENALTY}.">No pick &minus;{AUTO_PICK_PENALTY}</span>{/if}
                                         {#if locked}<span class="lock-tag" title="Picks and odds are both final for this match — the multiplier shown is the one it pays at.">🔒 Locked</span>{/if}
                                     </div>
                                     <div class="pick-row two" class:has-draw={homeMult}>
@@ -880,13 +1106,18 @@
                                         </button>
                                     </div>
                                     {#if reveal}
-                                        <div class="reveal">
+                                        {@const shown = adminMode ? revealWithPending(fixture.id, reveal) : reveal}
+                                        <div class="reveal" class:editable={adminMode}>
                                             <div class="reveal-side">
                                                 <span class="reveal-label">{home.name}</span>
-                                                {#if reveal.home.length}
+                                                {#if shown.home.length}
                                                     <span class="reveal-names">
-                                                        {#each reveal.home as p (p.id)}
-                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={whoTitle(p, home.name, homeOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if homeOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(homeOutcome)}</span>{/if}</span>
+                                                        {#each shown.home as p (p.id)}
+                                                            {#if adminMode && !p.fan}
+                                                                <button class="who movable" class:you={p.name === myTableName} class:auto={p.auto} class:staged={p.staged} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={p.staged ? `Staged: move ${p.name} to ${away.name}. Click to undo.` : `Move ${p.name} to ${away.name}`} on:click={() => stagePickMove(fixture, p, 'HOME')}>{p.name}{#if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}<span class="who-move" aria-hidden="true">{p.staged ? '↩' : '→'}</span></button>
+                                                            {:else}
+                                                                <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={adminMode && p.fan ? `${p.name} is locked to their fan team here — change their fan team to move them.` : whoTitle(p, home.name, homeOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if homeOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(homeOutcome)}</span>{/if}</span>
+                                                            {/if}
                                                         {/each}
                                                     </span>
                                                 {:else}
@@ -895,10 +1126,14 @@
                                             </div>
                                             <div class="reveal-side">
                                                 <span class="reveal-label">{away.name}</span>
-                                                {#if reveal.away.length}
+                                                {#if shown.away.length}
                                                     <span class="reveal-names">
-                                                        {#each reveal.away as p (p.id)}
-                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={whoTitle(p, away.name, awayOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if awayOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(awayOutcome)}</span>{/if}</span>
+                                                        {#each shown.away as p (p.id)}
+                                                            {#if adminMode && !p.fan}
+                                                                <button class="who movable" class:you={p.name === myTableName} class:auto={p.auto} class:staged={p.staged} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={p.staged ? `Staged: move ${p.name} to ${home.name}. Click to undo.` : `Move ${p.name} to ${home.name}`} on:click={() => stagePickMove(fixture, p, 'AWAY')}><span class="who-move" aria-hidden="true">{p.staged ? '↩' : '←'}</span>{p.name}{#if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}</button>
+                                                            {:else}
+                                                                <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={adminMode && p.fan ? `${p.name} is locked to their fan team here — change their fan team to move them.` : whoTitle(p, away.name, awayOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if awayOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(awayOutcome)}</span>{/if}</span>
+                                                            {/if}
                                                         {/each}
                                                     </span>
                                                 {:else}
@@ -1060,16 +1295,60 @@
                         <p class="progress">
                             {viewedPlayer.name}'s call for the final table.{#if viewedPlayer.fanTeam} Fan of <b>{(teamById[viewedPlayer.fanTeam] || { name: viewedPlayer.fanTeam }).name}</b> (★).{/if}{#if !viewedPlayer.saved} Not locked in yet.{/if}
                         </p>
-                        <ol class="table-predict">
-                            {#each viewedPlayer.order as teamId, i (teamId)}
-                                {@const team = teamById[teamId] || { name: teamId }}
-                                <li class="predict-row static">
-                                    <span class="pos" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span>
-                                    <span class="predict-team">{team.name}</span>
-                                    {#if teamId === viewedPlayer.fanTeam}<span class="fan-star" title="Their fan team">★</span>{/if}
-                                </li>
-                            {/each}
-                        </ol>
+                        {#if isPickemAdmin && editingPlayerId !== viewedPlayer.id}
+                            <div class="admin-bar">
+                                <button class="save-btn small" on:click={startSeasonEdit}>Edit as admin</button>
+                                <span class="admin-hint">Rewrites {viewedPlayer.name}'s fan team, display name and table. Their table points re-score for every completed week.</span>
+                                {#if overrideStatus}<span class="status-msg">{overrideStatus}</span>{/if}
+                            </div>
+                        {/if}
+
+                        {#if editingPlayerId === viewedPlayer.id}
+                            <div class="admin-bar on">
+                                <b>Editing {viewedPlayer.name}</b>
+                                <button class="save-btn small danger" on:click={() => (confirmKind = 'season')} disabled={overrideSaving || editOrder.length !== 20 || !editFan}>Override save</button>
+                                <button class="link-btn" on:click={cancelSeasonEdit}>Cancel</button>
+                            </div>
+                            <div class="admin-fields">
+                                <label class="admin-field">
+                                    <span>Display name</span>
+                                    <input class="fan-input" type="text" maxlength="40" bind:value={editName} placeholder="Leaderboard name" />
+                                </label>
+                                <label class="admin-field">
+                                    <span>Fan team</span>
+                                    <select class="fan-input" bind:value={editFan}>
+                                        {#each TEAMS as t (t.id)}
+                                            <option value={t.id}>{t.name}</option>
+                                        {/each}
+                                    </select>
+                                </label>
+                            </div>
+                            <ol class="table-predict">
+                                {#each editOrder as teamId, i (teamId)}
+                                    {@const team = teamById[teamId] || { name: teamId }}
+                                    <li class="predict-row">
+                                        <span class="pos" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span>
+                                        <span class="predict-team">{team.name}</span>
+                                        {#if teamId === editFan}<span class="fan-star" title="Their fan team">★</span>{/if}
+                                        <span class="row-controls">
+                                            <button class="move" on:click={() => editMoveUp(i)} disabled={i === 0} aria-label="Move up">&#9650;</button>
+                                            <button class="move" on:click={() => editMoveDown(i)} disabled={i === editOrder.length - 1} aria-label="Move down">&#9660;</button>
+                                        </span>
+                                    </li>
+                                {/each}
+                            </ol>
+                        {:else}
+                            <ol class="table-predict">
+                                {#each viewedPlayer.order as teamId, i (teamId)}
+                                    {@const team = teamById[teamId] || { name: teamId }}
+                                    <li class="predict-row static">
+                                        <span class="pos" class:cl={i < 5} class:rel={i > 16}>{i + 1}</span>
+                                        <span class="predict-team">{team.name}</span>
+                                        {#if teamId === viewedPlayer.fanTeam}<span class="fan-star" title="Their fan team">★</span>{/if}
+                                    </li>
+                                {/each}
+                            </ol>
+                        {/if}
                     {:else}
                         <div class="empty">That player's table isn't available.</div>
                     {/if}
@@ -1324,7 +1603,91 @@
                             Off — only admins can see other players' tables. Leave this until after the prediction deadline.
                         {/if}
                     </p>
+
+                    <h2 class="week-title solo">Override log</h2>
+                    <p class="note">
+                        Every editorial change, newest first. Overrides are made from the Match Predictions tab
+                        (move a player between sides on a locked match) and the Season predictions tab
+                        (edit a player's table). This log is admin-only.
+                        <button class="link-btn" on:click={() => loadAdminEdits(true)}>Refresh</button>
+                    </p>
+                    {#if adminEdits.length}
+                        <div class="table-wrapper">
+                            <table class="grid-table">
+                                <thead>
+                                    <tr><th>When</th><th>Admin</th><th>Player</th><th>Change</th><th>Reason</th></tr>
+                                </thead>
+                                <tbody>
+                                    {#each adminEdits as e (e.id)}
+                                        <tr class:self-edit={e.self}>
+                                            <td>{new Date(e.at).toLocaleString()}</td>
+                                            <td class="strong">{e.admin}{#if e.self}<span class="self-tag" title="An admin editing their own entry">self</span>{/if}</td>
+                                            <td>{e.target}</td>
+                                            <td>
+                                                {#if e.kind === 'pick'}
+                                                    MW{e.matchweek} pick:
+                                                    <b>{e.before?.pick ?? 'no pick'} → {e.after?.pick}</b>
+                                                    {#if e.after?.autoPenalty}<span class="prov-part" title="Kept the no-pick penalty">(&minus;{AUTO_PICK_PENALTY})</span>{/if}
+                                                {:else}
+                                                    Season predictions
+                                                    {#if e.before?.fanTeam !== e.after?.fanTeam}
+                                                        — fan team <b>{teamById[e.before?.fanTeam]?.name ?? 'none'} → {teamById[e.after?.fanTeam]?.name ?? 'none'}</b>
+                                                    {/if}
+                                                {/if}
+                                            </td>
+                                            <td>{e.note || '—'}</td>
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    {:else}
+                        <div class="empty">No overrides yet.</div>
+                    {/if}
                 </section>
+            {/if}
+
+            <!-- Override confirmation. Deliberately a blocking dialog: both paths
+                 rewrite another player's entry and move the leaderboard at once. -->
+            {#if confirmKind}
+                <div class="modal-wrap" role="dialog" aria-modal="true" aria-label="Confirm override">
+                    <div class="modal">
+                        <h3 class="modal-title">⚠️ Override {confirmKind === 'picks' ? 'match picks' : 'season predictions'}</h3>
+                        {#if confirmKind === 'picks'}
+                            <p class="modal-lede">You're changing {pendingList.length} pick{pendingList.length === 1 ? '' : 's'} on {pendingList.length === 1 ? 'a match that has' : 'matches that have'} already locked. Scores update immediately.</p>
+                            <ul class="modal-list">
+                                {#each pendingList as it (it.key)}
+                                    <li>
+                                        <b>{it.name}</b> → {it.pick === 'HOME' ? 'home' : 'away'} side
+                                        <label class="pen-toggle" title="A player who never picked scores {AUTO_PICK_PENALTY} fewer base points. Leave this on to keep that penalty; turn it off to score it as a pick they made.">
+                                            <input type="checkbox" checked={it.autoPenalty} on:change={(e) => togglePenalty(it.key, e.currentTarget.checked)} />
+                                            <span>keep &minus;{AUTO_PICK_PENALTY} no-pick penalty</span>
+                                        </label>
+                                        {#if !it.wasAuto && it.autoPenalty}
+                                            <span class="modal-warn">they had made a real pick — this adds a penalty</span>
+                                        {/if}
+                                    </li>
+                                {/each}
+                            </ul>
+                        {:else}
+                            <p class="modal-lede">You're rewriting <b>{allTables.find((p) => p.id === editingPlayerId)?.name ?? 'this player'}</b>'s fan team, display name and predicted table. Their table points re-score for <b>every completed week</b>.</p>
+                            {#if editFan && viewedPlayer?.fanTeam && editFan !== viewedPlayer.fanTeam}
+                                <p class="modal-lede">Changing their fan team from <b>{teamById[viewedPlayer.fanTeam]?.name ?? viewedPlayer.fanTeam}</b> to <b>{teamById[editFan]?.name ?? editFan}</b>: their picks on {teamById[viewedPlayer.fanTeam]?.name ?? 'the old club'}'s <b>already-played matches are kept as-is</b>, so settled results don't change. From here on they're auto-picked to {teamById[editFan]?.name ?? 'the new club'}, and the fan bonus follows.</p>
+                            {/if}
+                        {/if}
+                        <label class="admin-field">
+                            <span>Reason (optional, kept in the log)</span>
+                            <input class="fan-input" type="text" maxlength="300" bind:value={overrideNote} placeholder="e.g. couldn't log in before kickoff" />
+                        </label>
+                        <p class="modal-warn">This is recorded against your name in the override log.</p>
+                        <div class="modal-actions">
+                            <button class="link-btn" on:click={cancelOverride} disabled={overrideSaving}>Cancel</button>
+                            <button class="save-btn danger" on:click={() => (confirmKind === 'picks' ? commitPickOverrides() : commitSeasonOverride())} disabled={overrideSaving}>
+                                {overrideSaving ? 'Saving…' : 'Yes, override'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             {/if}
         </main>
     </div>
@@ -1526,6 +1889,36 @@
     .who.miss .who-mark { color: #b91c1c; }
     .who.tie .who-mark { color: #a16207; }
     .who.you .who-mark { color: #fff; }
+
+    /* ---- Admin editorial mode ---- */
+    /* A name that can be moved to the other side. Reads as a control rather than a
+       label, so editorial mode is never mistaken for the normal reveal. */
+    .who.movable { cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 600; border-style: dashed; }
+    .who.movable:hover { border-color: #2c5aa0; background: #e8eefa; }
+    .who-move { opacity: 0.55; margin: 0 0.15rem; font-size: 0.7rem; }
+    /* Staged, not saved: loud on purpose — nothing has been written yet. */
+    .who.staged { background: #fff4e5; border-color: #f59e0b; border-style: solid; color: #92400e; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3); }
+    .reveal.editable { border-top-color: #f59e0b; }
+    .admin-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0 0 1rem; padding: 0.6rem 0.85rem; border: 1px solid #e5e7eb; border-radius: 10px; background: #fafbfc; }
+    .admin-bar.on { border-color: #f59e0b; background: #fffbf3; }
+    .admin-hint { font-size: 0.8rem; color: #6b7280; }
+    .admin-fields { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+    .admin-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: #374151; font-weight: 600; }
+    .save-btn.danger { background: #b91c1c; }
+    .save-btn.danger:hover:not(:disabled) { background: #991b1b; }
+    .self-tag { background: #fee2e2; color: #991b1b; border-radius: 8px; padding: 0.02rem 0.35rem; font-size: 0.68rem; font-weight: 700; margin-left: 0.3rem; text-transform: uppercase; }
+    tr.self-edit td { background: #fff7f7; }
+
+    /* Override confirmation dialog */
+    .modal-wrap { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(17, 24, 39, 0.55); padding: 1rem; }
+    .modal { background: #fff; border-radius: 14px; padding: 1.5rem; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); }
+    .modal-title { margin: 0 0 0.5rem; font-size: 1.2rem; color: #1a202c; }
+    .modal-lede { margin: 0 0 0.75rem; color: #374151; line-height: 1.5; }
+    .modal-list { margin: 0 0 1rem; padding-left: 1.1rem; }
+    .modal-list li { margin-bottom: 0.5rem; line-height: 1.4; }
+    .pen-toggle { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: #6b7280; margin-left: 0.4rem; cursor: help; }
+    .modal-warn { font-size: 0.8rem; color: #b91c1c; margin: 0.5rem 0 0; }
+    .modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-top: 1.25rem; }
     .reveal-none { font-size: 0.78rem; color: #9ca3af; font-style: italic; }
 
     .save-row { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }

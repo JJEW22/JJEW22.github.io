@@ -41,8 +41,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     if (!started.length) return json({ number: mw, picks: {} });
 
     const ids = started.map((f) => f.id);
-    const stored = await sql<{ fixture_id: string; pick: string; id: number; name: string }[]>`
-        select p.fixture_id, p.pick, u.id, coalesce(u.display_name, u.username) as name
+    const stored = await sql<{ fixture_id: string; pick: string; auto_penalty: boolean; id: number; name: string }[]>`
+        select p.fixture_id, p.pick, p.auto_penalty, u.id, coalesce(u.display_name, u.username) as name
         from match_picks p join users u on u.id = p.user_id
         where p.fixture_id = any(${ids}) and u.pickem_joined_at is not null`;
 
@@ -88,9 +88,11 @@ export const GET: RequestHandler = async ({ url, locals }) => {
         if (r.pick !== 'HOME' && r.pick !== 'AWAY') continue;
         const forFixture = sides.get(r.fixture_id);
         if (!forFixture) continue; // not a started fixture — must not be revealed
+        // auto_penalty means an admin placed them here but kept the no-pick penalty,
+        // so they read as an auto-pick everywhere the coin ones do.
         forFixture.set(r.id, {
             side: r.pick,
-            picker: { id: r.id, name: r.name, fan: false, auto: false }
+            picker: { id: r.id, name: r.name, fan: false, auto: !!r.auto_penalty }
         });
     }
 

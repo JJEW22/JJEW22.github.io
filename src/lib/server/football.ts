@@ -47,10 +47,13 @@ export interface FinishedMatch {
 
 // A match as the schedule knows it, whether or not it has been played.
 export interface ScheduledMatch {
+    id: string;
     matchweek: number;
     kickoff: string;
     status: string;
     played: boolean;
+    homeId: string;
+    awayId: string;
 }
 
 export interface UpcomingMatch {
@@ -158,10 +161,13 @@ export async function getStandings(): Promise<StandingRow[]> {
 export async function getSeasonMatches(): Promise<ScheduledMatch[]> {
     const data = await fd('/competitions/PL/matches');
     return (data.matches ?? []).map((m: any) => ({
+        id: String(m.id),
         matchweek: m.matchday,
         kickoff: m.utcDate,
         status: m.status,
-        played: m.status === 'FINISHED' || m.status === 'AWARDED'
+        played: m.status === 'FINISHED' || m.status === 'AWARDED',
+        homeId: tlaToId(m.homeTeam.tla),
+        awayId: tlaToId(m.awayTeam.tla)
     }));
 }
 

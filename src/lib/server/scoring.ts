@@ -268,22 +268,24 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
     const users = await sql<{ id: number; username: string; display_name: string | null; fan_team: string | null; predictions_saved_at: Date | null }[]>`
         select id, username, display_name, fan_team, predictions_saved_at
         from users where pickem_joined_at is not null`;
-    const picks = await sql<{ user_id: number; fixture_id: string; pick: string }[]>`
-        select user_id, fixture_id, pick from match_picks`;
+    const picks = await sql<{ user_id: number; fixture_id: string; pick: string; auto_penalty: boolean }[]>`
+        select user_id, fixture_id, pick, auto_penalty from match_picks`;
     const results = await sql<ResultRow[]>`
         select fixture_id, matchweek, winner, home_id, away_id, home_goals, away_goals, mult_home, mult_away, bonus
         from results`;
     const preds = await sql<{ user_id: number; team_order: unknown }[]>`
         select user_id, team_order from table_predictions`;
 
-    const picksByUser = new Map<number, Map<string, string>>();
+    // `autoPenalty` is an admin override: the player is on this side, but the match
+    // still scores at the no-pick rate. A normal pick has it false.
+    const picksByUser = new Map<number, Map<string, { pick: string; autoPenalty: boolean }>>();
     for (const p of picks) {
         let m = picksByUser.get(p.user_id);
         if (!m) {
             m = new Map();
             picksByUser.set(p.user_id, m);
         }
-        m.set(p.fixture_id, p.pick);
+        m.set(p.fixture_id, { pick: p.pick, autoPenalty: !!p.auto_penalty });
     }
 
     const predByUser = new Map<number, string[]>();
@@ -333,7 +335,7 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
     const liveTable = liveWeek ? computeTable(finished) : [];
 
     const board: LeaderRow[] = users.map((u) => {
-        const myPicks = picksByUser.get(u.id) ?? new Map<string, string>();
+        const myPicks = picksByUser.get(u.id) ?? new Map<string, { pick: string; autoPenalty: boolean }>();
         // Fan benefits (auto-pick, 1/2-tie, +5 base) and table points only count
         // once the player has committed their season predictions.
         const saved = u.predictions_saved_at != null;
@@ -354,9 +356,11 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
                 side = 'AWAY';
                 isFanTeamGame = true;
             } else {
-                const manual = myPicks.get(r.fixture_id);
-                if (manual === 'HOME' || manual === 'AWAY') {
-                    side = manual;
+                const stored = myPicks.get(r.fixture_id);
+                if (stored && (stored.pick === 'HOME' || stored.pick === 'AWAY')) {
+                    side = stored.pick;
+                    // An admin can place someone on a side and keep the penalty.
+                    autoPicked = stored.autoPenalty;
                 } else {
                     // No pick, and this match is finished — so it locked long ago.
                     // The coin decides, at a reduced weight. Nothing to look up:
