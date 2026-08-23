@@ -322,6 +322,43 @@
         return new Date(fixture.kickoff).getTime() - PICK_LOCK_LEAD_MS <= Date.now();
     }
 
+    // Final score, once the match is played. Goals ride along on the fixture, so
+    // the card doesn't need a second fetch; a match still to come has none.
+    const PLAYED = ['FINISHED', 'AWARDED'];
+    /** @param {any} fixture */
+    function finalScore(fixture) {
+        if (!PLAYED.includes(fixture.status)) return null;
+        if (fixture.homeGoals == null || fixture.awayGoals == null) return null;
+        return { home: fixture.homeGoals, away: fixture.awayGoals };
+    }
+
+    // How a played match turned out for the people on one side of it. A draw is
+    // NOT a miss — it still pays a third of the base (half in your fan team's
+    // match, see resultMultiplier), so it gets a state of its own rather than
+    // being lumped in with a wrong call.
+    /** @param {{ home: number, away: number } | null} score @param {'HOME' | 'AWAY'} side */
+    function sideOutcome(score, side) {
+        if (!score) return null;
+        if (score.home === score.away) return 'tie';
+        return (score.home > score.away ? 'HOME' : 'AWAY') === side ? 'hit' : 'miss';
+    }
+    /** @param {string} o */
+    function outcomeMark(o) {
+        return o === 'hit' ? '✓' : o === 'tie' ? '=' : '✗';
+    }
+    // Tooltip for a name in the reveal list: why they're on this side, then how it
+    // went. Out of the markup because it's three states crossed with two.
+    /** @param {any} p @param {string} teamName @param {string | null} outcome */
+    function whoTitle(p, teamName, outcome) {
+        const why = p.fan
+            ? `${p.name} — forced, ${teamName} is their fan team`
+            : p.auto
+                ? `${p.name} — never picked, so the coin chose ${teamName} at ${AUTO_PICK_PENALTY} fewer base points`
+                : p.name;
+        if (!outcome) return why;
+        return `${why} · ${outcome === 'hit' ? 'called it' : outcome === 'tie' ? 'drawn, partial credit' : 'wrong'}`;
+    }
+
     // Which side (if any) is auto-picked because it's the player's fan team.
     // Only active once season predictions are saved.
     function fanSide(fixture, fan, saved) {
@@ -518,9 +555,12 @@
     }
 
     // ---- Derived ----
-    $: openCount = (matchweek?.fixtures || []).filter((f) => !kickoffPassed(f)).length;
+    // The whole week counts, played or not — a match kicking off shouldn't shrink
+    // the week you're being measured against. The numerator is picks you actually
+    // own (a saved pick or your fan team), so it stays put once a match locks.
+    $: weekCount = (matchweek?.fixtures || []).length;
     $: pickedCount = (matchweek?.fixtures || []).filter(
-        (f) => !kickoffPassed(f) && (matchPicks[f.id] || fanSide(f, fanTeam, predictionsSaved))
+        (f) => matchPicks[f.id] || fanSide(f, fanTeam, predictionsSaved)
     ).length;
     // `rank` is fixed by total and survives re-sorting, so the # column always
     // says where a player actually stands even when you sort by another column.
@@ -530,7 +570,10 @@
         .map((r, i) => ({ ...r, rank: i + 1 }));
     // Uniform across rows — the highest matchweek with a finished match, which is
     // usually still in progress rather than complete.
+    // Two different weeks: `tableWeek` is the last one that's over (what the Table
+    // column covers), `liveWeek` is the one being played (what Live table previews).
     $: tableWeek = ranked[0]?.tableWeek || 0;
+    $: liveWeek = ranked[0]?.liveWeek || 0;
 
     // Leaderboard columns. Header labels carry both forms so the compact swap and
     // the sort button stay in one place.
@@ -540,8 +583,8 @@
         fanTeam: { label: 'Team', short: 'T', cls: 'crest-col', title: 'Fan team', asc: true, get: (r) => (r.fanTeam && teamById[r.fanTeam] ? teamById[r.fanTeam].name : '') },
         correctPicks: { label: 'Correct', short: '✓', cls: 'num', title: 'Correct picks', asc: false, get: (r) => r.correctPicks || 0 },
         matchPoints: { label: 'Match', short: 'M', cls: 'num', title: 'Match points', asc: false, get: (r) => r.matchPoints || 0 },
-        tablePoints: { label: 'Table', short: 'Tbl', cls: 'num', title: 'Table points', asc: false, get: (r) => r.tablePoints || 0 },
-        currentTablePoints: { label: 'Live table', short: 'LT', cls: 'num', title: 'If this week ended with the standings exactly as they are now, the table score you would get for it', asc: false, get: (r) => r.currentTablePoints || 0 },
+        tablePoints: { label: 'Table', short: 'Tbl', cls: 'num', title: 'Table points awarded, over the matchweeks that are finished — the week being played is not in here', asc: false, get: (r) => r.tablePoints || 0 },
+        currentTablePoints: { label: 'Live table', short: 'LT', cls: 'num', title: 'The week being played: if it ended with the standings exactly as they are now, the table points you would take from it. Not awarded yet, so it is not in Total', asc: false, get: (r) => r.currentTablePoints || 0 },
         total: { label: 'Total', short: 'Tot', cls: 'num hl', title: 'Total points', asc: false, get: (r) => r.total }
     };
     const LB_ORDER = ['player', 'fanTeam', 'correctPicks', 'matchPoints', 'tablePoints', 'currentTablePoints', 'total'];
@@ -760,7 +803,7 @@
                     </div>
 
                     {#if matchweek && matchweek.fixtures.length > 0}
-                        <p class="progress">{pickedCount} / {openCount} picked</p>
+                        <p class="progress">{pickedCount} / {weekCount} picked</p>
                         <div class="fixtures">
                             {#each matchweek.fixtures as fixture (fixture.id)}
                                 {@const home = teamById[fixture.homeId] || { name: fixture.homeName }}
@@ -778,6 +821,9 @@
                                 {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved, coined)}
                                 {@const hl = cardHighlight(fixture, fanTeam, predictionsSaved)}
                                 {@const reveal = revealedPicks[fixture.id]}
+                                {@const score = finalScore(fixture)}
+                                {@const homeOutcome = sideOutcome(score, 'HOME')}
+                                {@const awayOutcome = sideOutcome(score, 'AWAY')}
                                 <div class="fixture" class:locked class:golden={fixture.bonus === 'GOLDEN'} class:silver={fixture.bonus === 'SILVER'} class:bronze={fixture.bonus === 'BRONZE'} class:hl={!!hl} style={hl ? `--hl-left:${hl.left}; --hl-right:${hl.right}` : ''}>
                                     <span class="base-badge" title={baseTooltip(eb)}>{eb.total} pts</span>
                                     <div class="fixture-time">
@@ -787,7 +833,7 @@
                                         {#if fixture.bonus === 'BRONZE'}<span class="bonus-tag brz">★ Bronze match</span>{/if}
                                         {#if fanPick}<span class="bonus-tag team" style={`--tc:${teamById[fanTeam]?.color || '#2c5aa0'}`}>★ Your team</span>{/if}
                                         {#if coined}<span class="coin-tag" title="You didn't pick before the lock, so a 50/50 coin chose for you — and this match's base drops by {AUTO_PICK_PENALTY}.">🪙 Coin flip &minus;{AUTO_PICK_PENALTY}</span>{/if}
-                                        {#if locked}<span class="lock-tag">Locked</span>{/if}
+                                        {#if locked}<span class="lock-tag">🔒 Locked</span>{/if}
                                     </div>
                                     <div class="pick-row two" class:has-draw={homeMult}>
                                         <button
@@ -795,6 +841,8 @@
                                             class:selected={choice === 'HOME' || fanPick === 'HOME'}
                                             class:fan-locked={fanPick === 'HOME'}
                                             class:coin-picked={coinChoice === 'HOME'}
+                                            class:won={homeOutcome === 'hit'}
+                                            class:drew={homeOutcome === 'tie'}
                                             disabled={locked || fanPick !== null}
                                             title={fanPick === 'HOME' ? `Auto-picked to win — ${home.name} is your fan team, locked for the season.` : coinChoice === 'HOME' ? `The coin gave you ${home.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
                                             on:click={() => pick(fixture.id, 'HOME')}
@@ -804,6 +852,7 @@
                                                 <span class="hint">{fanPick === 'HOME' ? 'Your team (locked)' : coinChoice === 'HOME' ? 'Coin flip' : 'Home win'}</span>
                                             </span>
                                             {#if homeMult}<span class="odds">{homePct}%<span class="mult"> (×{homeMult})</span></span>{/if}
+                                            {#if score}<span class="goals">{score.home}</span>{/if}
                                         </button>
                                         {#if homeMult}
                                             <div class="draw-box" aria-hidden="true">
@@ -816,6 +865,8 @@
                                             class:selected={choice === 'AWAY' || fanPick === 'AWAY'}
                                             class:fan-locked={fanPick === 'AWAY'}
                                             class:coin-picked={coinChoice === 'AWAY'}
+                                            class:won={awayOutcome === 'hit'}
+                                            class:drew={awayOutcome === 'tie'}
                                             disabled={locked || fanPick !== null}
                                             title={fanPick === 'AWAY' ? `Auto-picked to win — ${away.name} is your fan team, locked for the season.` : coinChoice === 'AWAY' ? `The coin gave you ${away.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
                                             on:click={() => pick(fixture.id, 'AWAY')}
@@ -825,6 +876,7 @@
                                                 <span class="hint">{fanPick === 'AWAY' ? 'Your team (locked)' : coinChoice === 'AWAY' ? 'Coin flip' : 'Away win'}</span>
                                             </span>
                                             {#if awayMult}<span class="odds">{awayPct}%<span class="mult"> (×{awayMult})</span></span>{/if}
+                                            {#if score}<span class="goals">{score.away}</span>{/if}
                                         </button>
                                     </div>
                                     {#if reveal}
@@ -834,7 +886,7 @@
                                                 {#if reveal.home.length}
                                                     <span class="reveal-names">
                                                         {#each reveal.home as p (p.id)}
-                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} title={p.fan ? `${p.name} — forced, ${home.name} is their fan team` : p.auto ? `${p.name} — never picked, so the coin chose ${home.name} at ${AUTO_PICK_PENALTY} fewer base points` : p.name}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}</span>
+                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={whoTitle(p, home.name, homeOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if homeOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(homeOutcome)}</span>{/if}</span>
                                                         {/each}
                                                     </span>
                                                 {:else}
@@ -846,7 +898,7 @@
                                                 {#if reveal.away.length}
                                                     <span class="reveal-names">
                                                         {#each reveal.away as p (p.id)}
-                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} title={p.fan ? `${p.name} — forced, ${away.name} is their fan team` : p.auto ? `${p.name} — never picked, so the coin chose ${away.name} at ${AUTO_PICK_PENALTY} fewer base points` : p.name}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}</span>
+                                                            <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={whoTitle(p, away.name, awayOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if awayOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(awayOutcome)}</span>{/if}</span>
                                                         {/each}
                                                     </span>
                                                 {:else}
@@ -1062,8 +1114,8 @@
                                         </td>
                                         <td class="num">{row.correctPicks || 0}</td>
                                         <td class="num">{row.matchPoints || 0}</td>
-                                        <td class="num">{row.tablePoints || 0}{#if row.tableProvisional}<span class="prov-star" title="Includes provisional weeks with games in hand — may change once postponed fixtures are played">*</span>{/if}</td>
-                                        <td class="num">{#if tableWeek < 1}<span class="not-scored" title="No matchweek has completed yet, so there is nothing to score the table against">—</span>{:else}{row.currentTablePoints || 0}{#if row.currentTableProvisional}<span class="prov-star" title="Clubs still have games in hand, so this week's value can still move">*</span>{/if}{/if}</td>
+                                        <td class="num">{row.tablePoints || 0}{#if row.provisionalTablePoints > 0}<span class="prov-part" title="{row.provisionalTablePoints} of these points came from clubs that still have games in hand, so they can still change once the postponed fixtures are played">({row.provisionalTablePoints})</span>{/if}</td>
+                                        <td class="num">{#if liveWeek < 1}<span class="not-scored" title="Nothing has been played yet, so there is no table to score predictions against">—</span>{:else}{row.currentTablePoints || 0}{/if}</td>
                                         <td class="num hl">{row.total}</td>
                                     </tr>
                                 {:else}
@@ -1081,13 +1133,14 @@
                                 <span><b>Tot</b> Total</span>
                             </p>
                         {/if}
-                        {#if ranked.some((r) => r.tableProvisional)}
-                            <p class="note">* Table points include provisional weeks (teams with games in hand); these may change once postponed fixtures are played.</p>
-                        {/if}
-                        {#if tableWeek >= 1}
-                            <p class="note">"Live table" is what the standings are worth for matchweek {tableWeek}: <b>if the week ended exactly as it stands, that's the table score each player would take from it</b> — so it shows who's currently reading the table best. Nothing here is settled; it moves with every remaining game of the week. Table points only, and it's the in-progress week's running share of the Table column, so don't add it to Total.</p>
+                        {#if liveWeek >= 1}
+                            <p class="note">"Table" is what you've been <b>awarded</b>, over the matchweeks that are finished{#if tableWeek >= 1} — weeks 1&ndash;{tableWeek}{/if}. A week counts once every match in it has been played or postponed out of the round, so one rescheduled fixture doesn't hold the whole week open.</p>
+                            {#if ranked.some((r) => r.provisionalTablePoints > 0)}
+                                <p class="note">A week scored with a game still outstanding isn't final, so Table reads <b>X(Y)</b>: <b>X</b> is your points, <b>Y</b> is how many of them could still change. A club's points for a week are locked once no result left to come can move it past a rival — until then they're counted, but they're in the Y.</p>
+                            {/if}
+                            <p class="note">"Live table" is an estimate, not a score: it takes <b>matchweek {liveWeek}</b>, the one being played, and asks <b>what you'd get if the standings finished exactly where they stand right now</b>. It moves with every result and nothing in it has been awarded — it's there to show who's reading the table best at this moment, so don't add it to Total.</p>
                         {:else}
-                            <p class="note">"Live table" shows — until the first matchweek completes; there's no table to score predictions against yet.</p>
+                            <p class="note">"Live table" shows — until the season kicks off; there's no table to score predictions against yet.</p>
                         {/if}
                     </div>
                     <p class="note">Match points are {BASE_POINTS} base — plus any Golden/Silver/Bronze and fan-team bonus — times the odds multiplier and the result, rounded up to the next tenth. Table points are the matchweek number for an exact call, less a tenth of it per place out and nothing at {TABLE_REACH}+ places, summed over all 20 clubs every completed week. Full detail on the Rules tab.</p>
@@ -1182,7 +1235,7 @@
                         <h3>Super Sunday</h3>
                         <ul>
                             <li>The season ends with a <b>watch party on Super Sunday</b> — the final matchday, when all ten games kick off at the same time.</li>
-                            <li>It's the last round of picks, and the week that settles the final table, so anything still <span class="prov-star">*</span> provisional resolves there.</li>
+                            <li>It's the last round of picks, and the week that settles the final table, so anything still provisional resolves there.</li>
                             <li>The winner's gear gets handed over at the party. <b>Nothing to chip in on the day</b> — the {money(BUYIN_PRIZE)} buy-in is the only cost all season.</li>
                         </ul>
                     </div>
@@ -1234,7 +1287,9 @@
                                 </div>
                             </li>
                             <li>Your table score is the sum over <b>every club, every completed week</b>, so a club you've read correctly keeps paying out week after week.</li>
-                            <li>Weeks where clubs still have games in hand are <b>provisional</b> (marked <span class="prov-star">*</span>) and can shift once postponed games are played.</li>
+                            <li>A week is <b>completed</b> once every match in it has been played — or postponed out of the round. A rescheduled fixture doesn't hold its week open; the week scores on the table as it stands, and re-scores if that game later changes it.</li>
+                            <li>The week currently being played isn't in your Table total yet. It shows in <b>Live table</b> instead: what that week would pay if the standings finished exactly where they are now.</li>
+                            <li>A club's points for a week are <b>locked</b> once no outstanding result can move it past a rival; while one still can, they're <b>provisional</b>. Provisional points still count — the leaderboard just shows how many of them are in play, as <b>X(Y)</b>: X is your table points, Y is the part that could still change.</li>
                         </ul>
 
                         <h4>Winning</h4>
@@ -1286,7 +1341,9 @@
     .fan-option.sel { background: #2c5aa0; color: white; }
     .fan-none { padding: 0.5rem 0.7rem; color: #9ca3af; font-size: 0.9rem; }
     .disclosure { color: #4b5563; font-size: 0.9rem; line-height: 1.6; margin: 0 0 1.5rem; max-width: 640px; }
-    .prov-star { color: #f59e0b; font-weight: 700; margin-left: 1px; cursor: help; }
+    /* The part of a player's table points that can still move. Quieter than the
+       number it qualifies — it's a caveat, not a second score. */
+    .prov-part { color: #9a7b2f; font-size: 0.82em; font-weight: 600; margin-left: 1px; cursor: help; }
     /* Nothing to compute yet, as opposed to a genuine score of zero */
     .not-scored { color: #9ca3af; cursor: help; }
     /* Fan-team column on the standings table */
@@ -1338,7 +1395,10 @@
 
     .fixtures { display: flex; flex-direction: column; gap: 0.75rem; }
     .fixture { position: relative; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.75rem 1rem 1rem; background: #fafbfc; }
-    .fixture.locked { opacity: 0.6; }
+    /* A locked card stays fully bright — the same call the fan-team lock makes.
+       Fading it out only made settled matches, and the score on them, hard to
+       read; the "Locked" tag and the inert buttons carry the state instead. */
+    .fixture.locked { background: #f3f5f8; border-color: #d7dce3; }
     /* Unified highlight: gradient border + light wash. When split, left/right use
        different colours (fan-team side vs bonus side). Respects border-radius. */
     .fixture.hl {
@@ -1426,6 +1486,17 @@
     .pick.selected .team, .pick.selected .hint, .pick.selected .odds { color: white; }
     .pick:disabled { cursor: not-allowed; }
 
+    /* Final score, on each club's own bar. Both sit on the inner edge, so the row
+       reads as a scoreline across the middle of the card. */
+    .pick .goals { font-size: 1.3rem; font-weight: 800; line-height: 1; color: #1f3a63; font-variant-numeric: tabular-nums; min-width: 1rem; text-align: center; }
+    .pick.selected .goals, .pick.fan-locked .goals { color: #fff; }
+    /* The club that actually won: a ring, so the result reads without dimming
+       anything. A draw rings both — nobody called it, but it isn't a miss either. */
+    .pick.won { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25); }
+    .pick.drew { border-color: #d9b23c; box-shadow: 0 0 0 3px rgba(217, 178, 60, 0.22); }
+    .pick.won .goals { color: #15803d; }
+    .pick.selected.won .goals, .pick.fan-locked.won .goals { color: #fff; }
+
     /* Who picked what, revealed once a match has kicked off */
     .reveal { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px dashed #e5e7eb; }
     .reveal-side { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
@@ -1441,6 +1512,19 @@
     .who-coin { margin-left: 0.15rem; font-size: 0.7rem; }
     .who.you { background: #2c5aa0; border-color: #2c5aa0; color: #fff; }
     .who.you .who-star { color: #ffe9a8; }
+    /* How it turned out for each name, once the match has a score. Drawn as a ring
+       so it layers over the fan / coin / "you" chips instead of replacing them —
+       who you are and how you got here still read at a glance. A draw is its own
+       state: it pays a third of the base (half in your fan team's match), so it is
+       neither a hit nor a miss. */
+    .who.hit { box-shadow: 0 0 0 2px #34a06b; }
+    .who.miss { box-shadow: 0 0 0 2px #dc8b84; }
+    .who.tie { box-shadow: 0 0 0 2px #e0c469; }
+    .who-mark { margin-left: 0.25rem; font-size: 0.72rem; font-weight: 800; }
+    .who.hit .who-mark { color: #15803d; }
+    .who.miss .who-mark { color: #b91c1c; }
+    .who.tie .who-mark { color: #a16207; }
+    .who.you .who-mark { color: #fff; }
     .reveal-none { font-size: 0.78rem; color: #9ca3af; font-style: italic; }
 
     .save-row { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }

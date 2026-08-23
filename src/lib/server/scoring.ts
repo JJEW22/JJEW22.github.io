@@ -1,5 +1,6 @@
 // src/lib/server/scoring.ts
 import { sql } from '$lib/server/db';
+import { getSeasonMatches } from '$lib/server/football';
 import { TEAMS } from '$lib/plTeams';
 import {
     FAN_BONUS,
@@ -164,6 +165,70 @@ export function lockedSet(table: TableEntry[], week: number): Map<string, boolea
     return locked;
 }
 
+// ---------- Which matchweeks are over ----------
+
+// A fixture that has left its round rather than being played. POSTPONED and
+// SUSPENDED can sit for months before a new date is found, and the week they
+// belong to must not stay unscored all that time.
+const MOVED_OUT = new Set(['POSTPONED', 'SUSPENDED', 'CANCELLED']);
+
+export interface WeekMatch {
+    matchweek: number;
+    kickoff: string;
+    status: string;
+    played: boolean;
+}
+
+// The matchweeks that are settled: every match in them has either been played or
+// moved out of the round. "Moved out" is the rescheduling case — a fixture called
+// off, or re-dated to after the NEXT round has already begun, no longer belongs
+// to its week in any practical sense, so it doesn't hold the week open.
+//
+// Anything still scheduled inside its own round does hold it open, which is what
+// keeps a Saturday half-played out of the settled column. Future weeks are never
+// complete: their matches are all scheduled before the following round starts.
+export function completedWeeks(matches: WeekMatch[]): Set<number> {
+    const byWeek = new Map<number, WeekMatch[]>();
+    for (const m of matches) {
+        if (!Number.isFinite(m.matchweek)) continue;
+        const list = byWeek.get(m.matchweek);
+        if (list) list.push(m);
+        else byWeek.set(m.matchweek, [m]);
+    }
+
+    // When each round begins. A fixture pushed past the start of the next round
+    // has been rescheduled out of its own.
+    const startOf = new Map<number, number>();
+    for (const [w, list] of byWeek) {
+        const times = list.map((m) => new Date(m.kickoff).getTime()).filter((t) => Number.isFinite(t));
+        if (times.length) startOf.set(w, Math.min(...times));
+    }
+
+    const done = new Set<number>();
+    for (const [w, list] of byWeek) {
+        // No following round (the last week) means nothing counts as moved out by
+        // date — only an explicit postponement lets that week close.
+        const nextStart = startOf.get(w + 1) ?? Infinity;
+        const blocking = list.some((m) => {
+            if (m.played || MOVED_OUT.has(m.status)) return false;
+            const at = new Date(m.kickoff).getTime();
+            return !Number.isFinite(at) || at < nextStart;
+        });
+        if (!blocking) done.add(w);
+    }
+    return done;
+}
+
+const SEASON_WEEKS = 38;
+
+// The first week that isn't over — the round being played, or the next one up if
+// the last one has just finished. Zero once every week is settled: there is
+// nothing left to preview.
+function firstOpenWeek(done: Set<number>): number {
+    for (let W = 1; W <= SEASON_WEEKS; W++) if (!done.has(W)) return W;
+    return 0;
+}
+
 // ---------- Leaderboard ----------
 
 interface ResultRow {
@@ -188,14 +253,14 @@ export interface LeaderRow {
     lockedTablePoints: number;
     provisionalTablePoints: number;
     tableProvisional: boolean;
-    // If the current week ended with the standings exactly as they are, the table
-    // score this player would take from it. That week is usually still in progress,
-    // so the value moves as its remaining games are played — it is that week's
-    // running share of tablePoints, not a separate award, so never add it to total.
+    // What the LIVE week would pay if it ended with the standings exactly as they
+    // are now. That week is still being played (or hasn't kicked off yet), so it
+    // is not part of tablePoints and must never be added to total — it's a preview
+    // of the next award, and it moves with every result.
     currentTablePoints: number;
     // Uniform across rows; carried here so the flat array response keeps its shape.
-    tableWeek: number;
-    currentTableProvisional: boolean;
+    tableWeek: number; // last matchweek that is over, i.e. what tablePoints covers
+    liveWeek: number; // the week currentTablePoints previews; 0 before a ball is kicked
     total: number;
 }
 
@@ -227,21 +292,45 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         predByUser.set(p.user_id, order);
     }
 
-    // Pre-derive each completed week's table + locked/provisional set from match data.
+    // Pre-derive each SETTLED week's table + locked/provisional set from match data.
+    // Only weeks that are actually over pay out; the week being played is previewed
+    // separately, in currentTablePoints.
     const finished = results.filter((r) => r.home_goals != null && r.away_goals != null);
-    const currentWeek = finished.reduce((mx, r) => Math.max(mx, r.matchweek), 0);
+    const newestPlayedWeek = finished.reduce((mx, r) => Math.max(mx, r.matchweek), 0);
+    const playedWeeks = new Set(finished.map((r) => r.matchweek));
+
+    // The schedule is what tells a finished week from one still being played. A
+    // football-data outage must not 500 the leaderboard, so fall back to treating
+    // the newest week with a result as live and everything before it as settled —
+    // right except in the gap between rounds.
+    let done: Set<number>;
+    try {
+        done = completedWeeks(await getSeasonMatches());
+    } catch (err) {
+        console.error('leaderboard: schedule unavailable, assuming the newest week with a result is live', err);
+        done = new Set();
+        for (let W = 1; W < newestPlayedWeek; W++) done.add(W);
+    }
+
+    // A week no football was played in awards nothing, and counting one would hand
+    // out a free week's worth of points for a table that never moved.
+    const settled = [...done].filter((w) => playedWeeks.has(w)).sort((a, b) => a - b);
+    const tableWeek = settled.length ? settled[settled.length - 1] : 0;
+
     const weekTables: { week: number; table: TableEntry[]; locked: Map<string, boolean> }[] = [];
-    for (let W = 1; W <= currentWeek; W++) {
+    for (const W of settled) {
         const upto = finished.filter((r) => r.matchweek <= W);
         const table = computeTable(upto);
         weekTables.push({ week: W, table, locked: lockedSet(table, W) });
     }
 
-    // The live table is the last week computed. If any club there still has games
-    // in hand, this week's value can still move, so it carries the same * as the
-    // cumulative column.
-    const latest = weekTables[weekTables.length - 1];
-    const currentTableProvisional = latest ? [...latest.locked.values()].some((l) => !l) : false;
+    // The live week, scored against the standings exactly as they are right now —
+    // every match played so far, including one postponed out of an earlier week.
+    // Nothing in it has been awarded; it is what that week pays if it ends here.
+    // No locked/provisional split here: the whole figure is an estimate of a week
+    // that hasn't finished, so marking part of it as unsettled would say nothing.
+    const liveWeek = finished.length ? firstOpenWeek(done) : 0;
+    const liveTable = liveWeek ? computeTable(finished) : [];
 
     const board: LeaderRow[] = users.map((u) => {
         const myPicks = picksByUser.get(u.id) ?? new Map<string, string>();
@@ -313,8 +402,14 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
                     const pts = tableScoring(Math.abs(e.position - pp), wt.week);
                     if (wt.locked.get(e.teamId)) lockedTable += pts;
                     else provTable += pts;
-                    if (wt.week === currentWeek) currentTable += pts;
                 }
+            }
+            // The live week's preview, at that week's rate. Deliberately outside
+            // the sum above: it hasn't been awarded and isn't part of the total.
+            for (const e of liveTable) {
+                const pp = predPos.get(e.teamId);
+                if (pp == null) continue;
+                currentTable += tableScoring(Math.abs(e.position - pp), liveWeek);
             }
         }
 
@@ -330,8 +425,8 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
             provisionalTablePoints: round1(provTable),
             tableProvisional: provTable > 0,
             currentTablePoints: round1(currentTable),
-            tableWeek: currentWeek,
-            currentTableProvisional,
+            tableWeek,
+            liveWeek,
             total: 0
         };
     });

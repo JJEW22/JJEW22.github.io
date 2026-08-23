@@ -70,6 +70,11 @@ export const GET: RequestHandler = async ({ url }) => {
                 homeName: f.homeName,
                 awayName: f.awayName,
                 kickoff: f.kickoff,
+                // Status and goals let the card report the score once it's played.
+                status: f.status,
+                winner: f.winner,
+                homeGoals: f.homeGoals,
+                awayGoals: f.awayGoals,
                 multHome: o ? Number(o.mult_home) : 1,
                 multAway: o ? Number(o.mult_away) : 1,
                 probHome: o && o.prob_home != null ? Number(o.prob_home) : null,

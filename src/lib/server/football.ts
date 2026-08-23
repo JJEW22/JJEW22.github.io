@@ -14,6 +14,8 @@ export interface Fixture {
     homeName: string;
     awayName: string;
     winner: string | null;
+    homeGoals: number | null; // null until the match has a score to report
+    awayGoals: number | null;
 }
 
 export type FormResult = 'W' | 'D' | 'L';
@@ -41,6 +43,14 @@ export interface FinishedMatch {
     awayId: string;
     homeGoals: number | null;
     awayGoals: number | null;
+}
+
+// A match as the schedule knows it, whether or not it has been played.
+export interface ScheduledMatch {
+    matchweek: number;
+    kickoff: string;
+    status: string;
+    played: boolean;
 }
 
 export interface UpcomingMatch {
@@ -76,7 +86,9 @@ export async function getFixtures(matchweek: number): Promise<Fixture[]> {
         awayId: tlaToId(m.awayTeam.tla),
         homeName: m.homeTeam.shortName || m.homeTeam.name,
         awayName: m.awayTeam.shortName || m.awayTeam.name,
-        winner: m.score?.winner ?? null
+        winner: m.score?.winner ?? null,
+        homeGoals: m.score?.fullTime?.home ?? null,
+        awayGoals: m.score?.fullTime?.away ?? null
     }));
 }
 
@@ -138,6 +150,19 @@ export async function getStandings(): Promise<StandingRow[]> {
             formPoints: f?.points ?? 0
         };
     });
+}
+
+// Every match in the season, played or not — one cached call, where getFixtures()
+// is one per week. The leaderboard needs the whole schedule to tell a matchweek
+// that is over from one that is still being played.
+export async function getSeasonMatches(): Promise<ScheduledMatch[]> {
+    const data = await fd('/competitions/PL/matches');
+    return (data.matches ?? []).map((m: any) => ({
+        matchweek: m.matchday,
+        kickoff: m.utcDate,
+        status: m.status,
+        played: m.status === 'FINISHED' || m.status === 'AWARDED'
+    }));
 }
 
 export async function getFinishedMatches(): Promise<FinishedMatch[]> {
