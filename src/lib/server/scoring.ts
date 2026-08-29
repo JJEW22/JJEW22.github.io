@@ -229,6 +229,44 @@ function firstOpenWeek(done: Set<number>): number {
     return 0;
 }
 
+// How long after kickoff a match is certainly over — the same figure the results
+// sync waits before pulling scores (RESYNC_AFTER_MS in sync.ts).
+const MATCH_OVER_AFTER_MS = 135 * 60 * 1000;
+// A finished week stays on screen this long before the picks tab moves everyone on
+// to the next one, so the weekend's results are still what you land on afterwards.
+const WEEK_ROLLOVER_MS = 24 * 60 * 60 * 1000;
+
+// Which matchweek the picks tab opens on: the one being played, and for a day after
+// it ends, then the next. Distinct from firstOpenWeek(), which flips the moment a
+// week completes — here the just-finished week deliberately lingers.
+export function defaultMatchweek(matches: WeekMatch[], now: number = Date.now()): number {
+    const done = completedWeeks(matches);
+
+    // When each week's last PLAYED match kicked off. Unplayed fixtures are excluded
+    // deliberately: one postponed to December must not hold August's week on screen,
+    // and completedWeeks() has already ruled that it doesn't hold the week open.
+    const lastPlayed = new Map<number, number>();
+    for (const m of matches) {
+        if (!Number.isFinite(m.matchweek) || !m.played) continue;
+        const at = new Date(m.kickoff).getTime();
+        if (!Number.isFinite(at)) continue;
+        const cur = lastPlayed.get(m.matchweek);
+        if (cur == null || at > cur) lastPlayed.set(m.matchweek, at);
+    }
+
+    for (let W = 1; W <= SEASON_WEEKS; W++) {
+        // Still being played, or yet to kick off at all: that's the one to show.
+        if (!done.has(W)) return W;
+        const last = lastPlayed.get(W);
+        // Closed with nothing actually played (everything called off) — there are no
+        // results to linger on, so move straight past it.
+        if (last == null) continue;
+        if (now < last + MATCH_OVER_AFTER_MS + WEEK_ROLLOVER_MS) return W;
+    }
+    // Season over and aged out; the last week is the only sensible thing left.
+    return SEASON_WEEKS;
+}
+
 // ---------- Leaderboard ----------
 
 interface ResultRow {
@@ -248,6 +286,16 @@ export interface LeaderRow {
     player: string;
     fanTeam: string | null; // null until the player has saved their season predictions
     correctPicks: number; // outright winners called correctly; draws don't count
+    // The slice of matchPoints that came from matches ending level. A stat, not a
+    // pool of its own — it is ALREADY inside matchPoints, so never add it to total.
+    drawPoints: number;
+    // Where your match points came from, by who you backed. Also slices of
+    // matchPoints, not additions to it. Draws count into these the same as wins.
+    // topDog + underDog + myDog == matchPoints, except for a fixture that never got
+    // odds (mult 1 on both sides, so it has no favourite and lands in none of them).
+    topDogPoints: number; // backed the shorter price, fan team's games excluded
+    underDogPoints: number; // backed the longer price, fan team's games excluded
+    myDogPoints: number; // your fan team's games, which you never chose
     matchPoints: number;
     tablePoints: number;
     lockedTablePoints: number;
@@ -342,6 +390,10 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         const fanActive = saved && u.fan_team ? u.fan_team : null;
         let matchPoints = 0;
         let correctPicks = 0;
+        let drawPoints = 0;
+        let topDogPoints = 0;
+        let underDogPoints = 0;
+        let myDogPoints = 0;
 
         for (const r of results) {
             if (!r.winner) continue;
@@ -387,8 +439,26 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
 
             // Rounded up to the next tenth per match, so a single fixture never
             // contributes a score finer than 0.1 (and neither can the total).
-            const oddsMult = side === 'HOME' ? Number(r.mult_home) : Number(r.mult_away);
-            matchPoints += ceil1(base * oddsMult * resultMultiplier(outcome, isFanTeamGame));
+            const multHome = Number(r.mult_home);
+            const multAway = Number(r.mult_away);
+            const oddsMult = side === 'HOME' ? multHome : multAway;
+            const awarded = ceil1(base * oddsMult * resultMultiplier(outcome, isFanTeamGame));
+            matchPoints += awarded;
+            // Split out for the leaderboard's draw column. Counted here rather than
+            // re-derived later so it uses the same rounded figure the total does.
+            if (outcome === 'TIE') drawPoints += awarded;
+
+            // Favourite/underdog split, by the frozen odds — the shorter multiplier is
+            // the favoured side. Your fan team's matches are their own bucket: you're
+            // locked into backing them, so they say nothing about how you read a price.
+            // No favourite (a fixture that never got odds, both sides at 1) counts in
+            // none of the three rather than being arbitrarily assigned to one.
+            if (isFanTeamGame) myDogPoints += awarded;
+            else if (multHome !== multAway) {
+                const favoured = multHome < multAway ? 'HOME' : 'AWAY';
+                if (side === favoured) topDogPoints += awarded;
+                else underDogPoints += awarded;
+            }
         }
 
         // Table-prediction points, summed over every completed week (only if saved).
@@ -423,6 +493,10 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
             player: u.display_name || u.username,
             fanTeam: fanActive,
             correctPicks,
+            drawPoints: round1(drawPoints),
+            topDogPoints: round1(topDogPoints),
+            underDogPoints: round1(underDogPoints),
+            myDogPoints: round1(myDogPoints),
             matchPoints: round1(matchPoints),
             tablePoints: round1(lockedTable + provTable),
             lockedTablePoints: round1(lockedTable),

@@ -1,12 +1,23 @@
 // src/routes/premierLeaguePickem/api/fixtures/+server.ts
 import { json } from '@sveltejs/kit';
-import { getFixtures } from '$lib/server/football';
-import { pickBonusFixtures, computeTable } from '$lib/server/scoring';
+import { getFixtures, getSeasonMatches } from '$lib/server/football';
+import { pickBonusFixtures, computeTable, defaultMatchweek } from '$lib/server/scoring';
 import { sql } from '$lib/server/db';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url }) => {
-    const mw = Number(url.searchParams.get('mw')) || 1;
+    // No ?mw= means "wherever the season is now" — the week being played, or the one
+    // just gone for a day after it ends. The client reads the week back off `number`.
+    const asked = Number(url.searchParams.get('mw'));
+    let mw = Number.isInteger(asked) && asked >= 1 ? asked : 0;
+    if (!mw) {
+        try {
+            mw = defaultMatchweek(await getSeasonMatches());
+        } catch (err) {
+            console.error('fixtures: schedule unavailable, opening on matchweek 1', err);
+            mw = 1;
+        }
+    }
     const fixtures = await getFixtures(mw);
 
     const ids = fixtures.map((f) => f.id);

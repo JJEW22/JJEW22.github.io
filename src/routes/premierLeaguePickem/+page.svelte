@@ -25,6 +25,8 @@
     const distanceRow = Array.from({ length: TABLE_REACH + 1 }, (v, i) => i);
 
     // Offline fallback so the page still renders before the backend is running.
+    // Keyed by matchweek number; only week 1 is stocked.
+    /** @type {Record<number, any>} */
     const SAMPLE_MATCHWEEKS = {
         1: {
             number: 1,
@@ -44,12 +46,16 @@
     };
 
     // ---- data layer: real fetches, with graceful fallbacks ----
+    // Pass null to let the server pick the week (see defaultMatchweek); the week it
+    // chose comes back on `number`.
+    /** @param {number | null} n */
     async function loadMatchweek(n) {
         try {
-            const r = await fetch(`${API}/fixtures?mw=${n}`);
+            const r = await fetch(`${API}/fixtures${n == null ? '' : `?mw=${n}`}`);
             if (r.ok) return await r.json();
         } catch (_) {}
-        return SAMPLE_MATCHWEEKS[n] || { number: n, fixtures: [] };
+        const w = n ?? 1;
+        return SAMPLE_MATCHWEEKS[w] || { number: w, fixtures: [] };
     }
     async function loadMe() {
         try {
@@ -141,6 +147,7 @@
     let loginError = '';
     let loggingIn = false;
 
+    // Placeholder only — onMount replaces this with whatever week the server opens on.
     let currentWeek = 1;
     /** @type {any} */
     let matchweek = null;
@@ -190,7 +197,10 @@
 
     onMount(async () => {
         await applyMe();
-        matchweek = await loadMatchweek(currentWeek);
+        // The server decides which week to open on. Adopt it before anything else
+        // reads currentWeek, so the header, the reveal and pick-status all agree.
+        matchweek = await loadMatchweek(null);
+        currentWeek = matchweek?.number || 1;
         revealedPicks = await loadReveal(currentWeek);
         await refreshPickStatus();
         leaderboard = await loadLeaderboard();
@@ -825,10 +835,15 @@
         correctPicks: { label: 'Correct', short: '✓', cls: 'num', title: 'Correct picks', asc: false, get: (r) => r.correctPicks || 0 },
         matchPoints: { label: 'Match', short: 'M', cls: 'num', title: 'Match points', asc: false, get: (r) => r.matchPoints || 0 },
         tablePoints: { label: 'Table', short: 'Tbl', cls: 'num', title: 'Table points awarded, over the matchweeks that are finished — the week being played is not in here', asc: false, get: (r) => r.tablePoints || 0 },
+        total: { label: 'Total', short: 'Tot', cls: 'num hl', title: 'Total points', asc: false, get: (r) => r.total },
         currentTablePoints: { label: 'Live table', short: 'LT', cls: 'num', title: 'The week being played: if it ended with the standings exactly as they are now, the table points you would take from it. Not awarded yet, so it is not in Total', asc: false, get: (r) => r.currentTablePoints || 0 },
-        total: { label: 'Total', short: 'Tot', cls: 'num hl', title: 'Total points', asc: false, get: (r) => r.total }
+        drawPoints: { label: 'Draw', short: 'D', cls: 'num', title: 'Match points won from fixtures that ended level. Already counted inside Match points and Total — this just shows how much of your score came from draws', asc: false, get: (r) => r.drawPoints || 0 },
+        topDogPoints: { label: 'Top dog', short: 'TD', cls: 'num', title: 'Match points from backing the favourite — the side with the shorter odds. Your fan team\'s games are excluded (you never chose those). Draws count in', asc: false, get: (r) => r.topDogPoints || 0 },
+        underDogPoints: { label: 'Underdog', short: 'UD', cls: 'num', title: 'Match points from backing the longer price against the favourite. Your fan team\'s games are excluded (you never chose those). Draws count in', asc: false, get: (r) => r.underDogPoints || 0 },
+        myDogPoints: { label: 'My dog', short: 'MD', cls: 'num', title: 'Match points from your own fan team\'s games, favourite or not. Draws count in', asc: false, get: (r) => r.myDogPoints || 0 }
     };
-    const LB_ORDER = ['player', 'fanTeam', 'correctPicks', 'matchPoints', 'tablePoints', 'currentTablePoints', 'total'];
+    // Everything from `total` rightwards is a stat, not a pool that feeds the total.
+    const LB_ORDER = ['player', 'fanTeam', 'correctPicks', 'matchPoints', 'tablePoints', 'total', 'currentTablePoints', 'drawPoints', 'topDogPoints', 'underDogPoints', 'myDogPoints'];
     let lbSort = { key: 'total', asc: false };
     // Array.sort is stable, so ties keep their by-total order underneath.
     $: lbRows = sortRows(ranked, LB_COLS, lbSort);
@@ -1461,11 +1476,15 @@
                                         <td class="num">{row.correctPicks || 0}</td>
                                         <td class="num">{row.matchPoints || 0}</td>
                                         <td class="num">{row.tablePoints || 0}{#if row.provisionalTablePoints > 0}<span class="prov-part" title="{row.provisionalTablePoints} of these points came from clubs that still have games in hand, so they can still change once the postponed fixtures are played">({row.provisionalTablePoints})</span>{/if}</td>
-                                        <td class="num">{#if liveWeek < 1}<span class="not-scored" title="Nothing has been played yet, so there is no table to score predictions against">—</span>{:else}{row.currentTablePoints || 0}{/if}</td>
                                         <td class="num hl">{row.total}</td>
+                                        <td class="num">{#if liveWeek < 1}<span class="not-scored" title="Nothing has been played yet, so there is no table to score predictions against">—</span>{:else}{row.currentTablePoints || 0}{/if}</td>
+                                        <td class="num">{row.drawPoints || 0}</td>
+                                        <td class="num">{row.topDogPoints || 0}</td>
+                                        <td class="num">{row.underDogPoints || 0}</td>
+                                        <td class="num">{row.myDogPoints || 0}</td>
                                     </tr>
                                 {:else}
-                                    <tr><td colspan="8" class="empty-cell">No players yet.</td></tr>
+                                    <tr><td colspan="12" class="empty-cell">No players yet.</td></tr>
                                 {/each}
                             </tbody>
                         </table>
@@ -1475,8 +1494,12 @@
                                 <span><b>✓</b> Correct picks</span>
                                 <span><b>M</b> Match points</span>
                                 <span><b>Tbl</b> Table points</span>
-                                <span><b>LT</b> Live table points</span>
                                 <span><b>Tot</b> Total</span>
+                                <span><b>LT</b> Live table points</span>
+                                <span><b>D</b> Draw points</span>
+                                <span><b>TD</b> Top dog points</span>
+                                <span><b>UD</b> Underdog points</span>
+                                <span><b>MD</b> My dog points</span>
                             </p>
                         {/if}
                         {#if liveWeek >= 1}
