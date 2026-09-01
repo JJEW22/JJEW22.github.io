@@ -316,8 +316,8 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
     const users = await sql<{ id: number; username: string; display_name: string | null; fan_team: string | null; predictions_saved_at: Date | null }[]>`
         select id, username, display_name, fan_team, predictions_saved_at
         from users where pickem_joined_at is not null`;
-    const picks = await sql<{ user_id: number; fixture_id: string; pick: string; auto_penalty: boolean }[]>`
-        select user_id, fixture_id, pick, auto_penalty from match_picks`;
+    const picks = await sql<{ user_id: number; fixture_id: string; pick: string; auto_penalty: boolean; fan_override: boolean }[]>`
+        select user_id, fixture_id, pick, auto_penalty, fan_override from match_picks`;
     const results = await sql<ResultRow[]>`
         select fixture_id, matchweek, winner, home_id, away_id, home_goals, away_goals, mult_home, mult_away, bonus
         from results`;
@@ -326,14 +326,23 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
 
     // `autoPenalty` is an admin override: the player is on this side, but the match
     // still scores at the no-pick rate. A normal pick has it false.
-    const picksByUser = new Map<number, Map<string, { pick: string; autoPenalty: boolean }>>();
+    // `fanOverride` is the other admin flag: use this pick even in the fan team's own
+    // match, which normally outranks anything stored. See sql/014_fan_override.sql.
+    const picksByUser = new Map<
+        number,
+        Map<string, { pick: string; autoPenalty: boolean; fanOverride: boolean }>
+    >();
     for (const p of picks) {
         let m = picksByUser.get(p.user_id);
         if (!m) {
             m = new Map();
             picksByUser.set(p.user_id, m);
         }
-        m.set(p.fixture_id, { pick: p.pick, autoPenalty: !!p.auto_penalty });
+        m.set(p.fixture_id, {
+            pick: p.pick,
+            autoPenalty: !!p.auto_penalty,
+            fanOverride: !!p.fan_override
+        });
     }
 
     const predByUser = new Map<number, string[]>();
@@ -383,7 +392,9 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
     const liveTable = liveWeek ? computeTable(finished) : [];
 
     const board: LeaderRow[] = users.map((u) => {
-        const myPicks = picksByUser.get(u.id) ?? new Map<string, { pick: string; autoPenalty: boolean }>();
+        const myPicks =
+            picksByUser.get(u.id) ??
+            new Map<string, { pick: string; autoPenalty: boolean; fanOverride: boolean }>();
         // Fan benefits (auto-pick, 1/2-tie, +5 base) and table points only count
         // once the player has committed their season predictions.
         const saved = u.predictions_saved_at != null;
@@ -398,30 +409,42 @@ export async function computeLeaderboard(): Promise<LeaderRow[]> {
         for (const r of results) {
             if (!r.winner) continue;
 
+            const stored = myPicks.get(r.fixture_id);
+            const storedSide =
+                stored && (stored.pick === 'HOME' || stored.pick === 'AWAY') ? stored.pick : null;
+            const fanIsHome = !!fanActive && r.home_id === fanActive;
+            const fanIsAway = !!fanActive && r.away_id === fanActive;
+
+            // Precedence: admin fan-override > fan team > stored pick > coin.
             let side: 'HOME' | 'AWAY' | null = null;
-            let isFanTeamGame = false;
             let autoPicked = false;
-            if (fanActive && r.home_id === fanActive) {
+            if (storedSide && stored!.fanOverride) {
+                // The one thing that outranks the fan team, and only because an admin
+                // said so for this fixture by hand. See the override endpoint.
+                side = storedSide;
+                autoPicked = stored!.autoPenalty;
+            } else if (fanIsHome) {
                 side = 'HOME';
-                isFanTeamGame = true;
-            } else if (fanActive && r.away_id === fanActive) {
+            } else if (fanIsAway) {
                 side = 'AWAY';
-                isFanTeamGame = true;
+            } else if (storedSide) {
+                side = storedSide;
+                // An admin can place someone on a side and keep the penalty.
+                autoPicked = stored!.autoPenalty;
             } else {
-                const stored = myPicks.get(r.fixture_id);
-                if (stored && (stored.pick === 'HOME' || stored.pick === 'AWAY')) {
-                    side = stored.pick;
-                    // An admin can place someone on a side and keep the penalty.
-                    autoPicked = stored.autoPenalty;
-                } else {
-                    // No pick, and this match is finished — so it locked long ago.
-                    // The coin decides, at a reduced weight. Nothing to look up:
-                    // reaching this branch at all means the lock has passed.
-                    side = coinPick(u.id, r.fixture_id);
-                    autoPicked = true;
-                }
+                // No pick, and this match is finished — so it locked long ago.
+                // The coin decides, at a reduced weight. Nothing to look up:
+                // reaching this branch at all means the lock has passed.
+                side = coinPick(u.id, r.fixture_id);
+                autoPicked = true;
             }
             if (!side) continue;
+
+            // The fan tie-break (1/2 rather than 1/3) rewards backing your own club,
+            // so it follows the side actually held: an override onto the opposing side
+            // gives it up. The fan BONUS below belongs to the fixture, not the side, so
+            // it is unchanged either way — which is how it has always been paid.
+            const isFanTeamGame = (side === 'HOME' && fanIsHome) || (side === 'AWAY' && fanIsAway);
 
             let outcome: Outcome;
             if (r.winner === 'DRAW') outcome = 'TIE';

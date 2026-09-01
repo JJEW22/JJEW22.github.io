@@ -7,9 +7,11 @@
 //   - RETROACTIVE ONLY. A pick can only be overridden once its match has locked
 //     (15 minutes before kickoff). Editing an upcoming match would mean an admin
 //     could read live picks, which the reveal endpoint is built to prevent.
-//   - FAN TEAM STILL WINS. Precedence in scoring is fan team > stored pick > coin,
-//     and this does not change it. To move someone off their club's side, change
-//     their fan team — one rule, no exceptions.
+//   - THE FAN TEAM CAN BE OVERRIDDEN, ONE MATCH AT A TIME. Precedence in scoring is
+//     fan override > fan team > stored pick > coin. Moving a player off their club in
+//     a match their club plays in requires `fanOverride: true` in the body, which the
+//     client only sends after showing its own warning. The pick is then pinned: a
+//     later fan-team change cannot rewrite it, which is the bug this exists to fix.
 //   - THE PENALTY IS A CHOICE. A player with no pick scores at AUTO_PICK_PENALTY
 //     fewer base points. When an admin places them on a side, `autoPenalty` says
 //     whether that stays: false rewrites history as a real pick, true keeps the
@@ -84,14 +86,20 @@ async function overridePick(
         );
     }
 
-    // Refusing rather than silently writing a row that scoring would ignore.
-    if (target.predictions_saved_at && target.fan_team &&
-        (fixture.homeId === target.fan_team || fixture.awayId === target.fan_team)) {
-        const club = teamById[target.fan_team]?.name ?? target.fan_team;
+    // Moving someone off their own club contradicts a season-long rule, so it needs
+    // the admin to have said so for THIS match — the client shows a specific warning
+    // and only then sends the flag. Refusing without it beats doing it by accident.
+    const fanPlaysHere = !!(
+        target.predictions_saved_at &&
+        target.fan_team &&
+        (fixture.homeId === target.fan_team || fixture.awayId === target.fan_team)
+    );
+    if (fanPlaysHere && !body?.fanOverride) {
+        const club = teamById[target.fan_team!]?.name ?? target.fan_team;
         return json(
             {
                 ok: false,
-                error: `${target.name} is locked to ${club} in this match. Change their fan team instead.`
+                error: `${target.name} is auto-picked to ${club} in this match. Confirm the fan-team override to move them.`
             },
             { status: 409 }
         );
@@ -99,27 +107,41 @@ async function overridePick(
 
     const keepPenalty = !!autoPenalty;
     const existing = (
-        await sql<{ pick: string; auto_penalty: boolean }[]>`
-            select pick, auto_penalty from match_picks
+        await sql<{ pick: string; auto_penalty: boolean; fan_override: boolean }[]>`
+            select pick, auto_penalty, fan_override from match_picks
             where user_id = ${target.id} and fixture_id = ${fixture.id}`
     )[0];
 
+    // Set on EVERY retroactive pick, not just the ones that need it today. This route
+    // only touches matches that have already locked, and an editorial decision about a
+    // settled match should not be silently undone by a later fan-team change — which is
+    // exactly the way picks got rewritten before the flag existed.
+    const fanOverride = true;
+
     await sql.begin(async (tx) => {
-        await tx`insert into match_picks (user_id, matchweek, fixture_id, pick, auto_penalty)
-                 values (${target.id}, ${mw}, ${fixture.id}, ${pick}, ${keepPenalty})
+        await tx`insert into match_picks (user_id, matchweek, fixture_id, pick, auto_penalty, fan_override)
+                 values (${target.id}, ${mw}, ${fixture.id}, ${pick}, ${keepPenalty}, ${fanOverride})
                  on conflict (user_id, fixture_id) do update set
                    pick = excluded.pick,
                    auto_penalty = excluded.auto_penalty,
+                   fan_override = excluded.fan_override,
                    matchweek = excluded.matchweek,
                    updated_at = now()`;
         await tx`insert into admin_edits (admin_id, target_id, kind, fixture_id, matchweek, before, after, note)
                  values (${adminId}, ${target.id}, 'pick', ${fixture.id}, ${mw},
-                         ${tx.json(existing ? { pick: existing.pick, autoPenalty: existing.auto_penalty } : null)},
-                         ${tx.json({ pick, autoPenalty: keepPenalty })},
+                         ${tx.json(existing ? { pick: existing.pick, autoPenalty: existing.auto_penalty, fanOverride: existing.fan_override } : null)},
+                         ${tx.json({ pick, autoPenalty: keepPenalty, fanOverride, overrodeFanTeam: fanPlaysHere })},
                          ${note || null})`;
     });
 
-    return json({ ok: true, player: target.name, fixtureId: fixture.id, pick, autoPenalty: keepPenalty });
+    return json({
+        ok: true,
+        player: target.name,
+        fixtureId: fixture.id,
+        pick,
+        autoPenalty: keepPenalty,
+        overrodeFanTeam: fanPlaysHere
+    });
 }
 
 async function overrideSeason(

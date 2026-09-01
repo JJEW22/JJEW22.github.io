@@ -156,6 +156,10 @@
     // card shows the reduced base rather than advertising points that won't land.
     /** @type {string[]} */
     let penalizedPicks = [];
+    // Fixtures where an admin pinned the pick against the fan-team rule, so the club
+    // is NOT auto-picked here however the season settings read.
+    /** @type {string[]} */
+    let fanOverrides = [];
     let matchStatus = '';
     let matchSaving = false;
     /**
@@ -217,6 +221,7 @@
             displayName = me.displayName || '';
             matchPicks = me.matchPicks || {};
             penalizedPicks = me.penalizedPicks || [];
+            fanOverrides = me.fanOverrides || [];
             if (me.tableOrder) tableOrder = me.tableOrder;
             fanTeam = me.fanTeam || '';
             fanQuery = fanTeam && teamById[fanTeam] ? teamById[fanTeam].name : '';
@@ -353,6 +358,7 @@
         displayName = '';
         matchPicks = {};
         penalizedPicks = [];
+        fanOverrides = [];
         adminMode = false;
         pendingPicks = {};
         tableOrder = TEAMS.map((t) => t.id);
@@ -398,11 +404,13 @@
     // went. Out of the markup because it's three states crossed with two.
     /** @param {any} p @param {string} teamName @param {string | null} outcome */
     function whoTitle(p, teamName, outcome) {
-        const why = p.fan
-            ? `${p.name} — forced, ${teamName} is their fan team`
-            : p.auto
-                ? `${p.name} — never picked, so the coin chose ${teamName} at ${AUTO_PICK_PENALTY} fewer base points`
-                : p.name;
+        const why = p.override
+            ? `${p.name} — an admin pinned ${teamName} for this match, overriding the fan-team auto-pick`
+            : p.fan
+                ? `${p.name} — forced, ${teamName} is their fan team`
+                : p.auto
+                    ? `${p.name} — never picked, so the coin chose ${teamName} at ${AUTO_PICK_PENALTY} fewer base points`
+                    : p.name;
         if (!outcome) return why;
         return `${why} · ${outcome === 'hit' ? 'called it' : outcome === 'tie' ? 'drawn, partial credit' : 'wrong'}`;
     }
@@ -648,6 +656,14 @@
         pendingPicks = { ...pendingPicks, [key]: { ...pendingPicks[key], autoPenalty: value } };
     }
 
+    // Moving someone off their own club needs a flag the server insists on, so the
+    // warning in the confirm dialog can't be skipped. Anything else is a plain move.
+    /** @param {any} p */
+    function movingOffFanTeam(p) {
+        return !!p.wasFan;
+    }
+    $: fanOverrideList = pendingList.filter(movingOffFanTeam);
+
     /** @param {any} fixture @param {any} person @param {'HOME'|'AWAY'} fromSide */
     function stagePickMove(fixture, person, fromSide) {
         if (!isPickemAdmin || !adminMode) return;
@@ -671,7 +687,11 @@
                 // Someone the coin decided for keeps the penalty by default: moving
                 // them shouldn't quietly hand back the points they lost by not picking.
                 autoPenalty: !!person.auto,
-                wasAuto: !!person.auto
+                wasAuto: !!person.auto,
+                // They're on this side because it's their club, not because they chose
+                // it — the dialog warns, and the server requires the flag this drives.
+                wasFan: !!person.fan,
+                fanClub: person.fan ? (fromSide === 'HOME' ? fixture.homeId : fixture.awayId) : null
             }
         };
     }
@@ -715,6 +735,9 @@
                 matchweek: it.matchweek,
                 pick: it.pick,
                 autoPenalty: it.autoPenalty,
+                // The server refuses to move a player off their own club without this.
+                // Sent only for those, so a plain move can't quietly acquire the power.
+                fanOverride: !!it.wasFan,
                 note: overrideNote
             });
             if (res.ok) saved++;
@@ -1088,9 +1111,11 @@
                                 {@const awayPct = pct(fixture.probAway)}
                                 {@const drawPct = pct(fixture.probDraw)}
                                 {@const fanPick = fanSide(fixture, fanTeam, predictionsSaved)}
-                                {@const coined = locked && !choice && !fanPick && !!userId}
+                                {@const fanOverridden = fanOverrides.includes(fixture.id)}
+                                {@const fanLock = fanOverridden ? null : fanPick}
+                                {@const coined = locked && !choice && !fanLock && !!userId}
                                 {@const coinChoice = coined ? coinPick(userId, fixture.id) : null}
-                                {@const penalized = coined || (locked && !fanPick && penalizedPicks.includes(fixture.id))}
+                                {@const penalized = coined || (locked && !fanLock && penalizedPicks.includes(fixture.id))}
                                 {@const eb = effectiveBase(fixture, fanTeam, predictionsSaved, penalized)}
                                 {@const hl = cardHighlight(fixture, fanTeam, predictionsSaved)}
                                 {@const reveal = revealedPicks[fixture.id]}
@@ -1112,18 +1137,18 @@
                                     <div class="pick-row two" class:has-draw={homeMult}>
                                         <button
                                             class="pick home"
-                                            class:selected={choice === 'HOME' || fanPick === 'HOME'}
-                                            class:fan-locked={fanPick === 'HOME'}
+                                            class:selected={choice === 'HOME' || fanLock === 'HOME'}
+                                            class:fan-locked={fanLock === 'HOME'}
                                             class:coin-picked={coinChoice === 'HOME'}
                                             class:won={homeOutcome === 'hit'}
                                             class:drew={homeOutcome === 'tie'}
-                                            disabled={locked || fanPick !== null}
-                                            title={fanPick === 'HOME' ? `Auto-picked to win — ${home.name} is your fan team, locked for the season.` : coinChoice === 'HOME' ? `The coin gave you ${home.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
+                                            disabled={locked || fanLock !== null}
+                                            title={fanLock === 'HOME' ? `Auto-picked to win — ${home.name} is your fan team, locked for the season.` : coinChoice === 'HOME' ? `The coin gave you ${home.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
                                             on:click={() => pick(fixture.id, 'HOME')}
                                         >
                                             <span class="pick-text">
-                                                <span class="team">{home.name}{#if fanPick === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}{#if coinChoice === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🪙</span>{/if}</span>
-                                                <span class="hint">{fanPick === 'HOME' ? 'Your team (locked)' : coinChoice === 'HOME' ? 'Coin flip' : 'Home win'}</span>
+                                                <span class="team">{home.name}{#if fanLock === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}{#if coinChoice === 'HOME'} <span class="fan-lock-icon" aria-hidden="true">🪙</span>{/if}</span>
+                                                <span class="hint">{fanLock === 'HOME' ? 'Your team (locked)' : coinChoice === 'HOME' ? 'Coin flip' : 'Home win'}</span>
                                             </span>
                                             {#if homeMult}<span class="odds">{homePct}%<span class="mult"> (×{homeMult})</span></span>{/if}
                                             {#if score}<span class="goals">{score.home}</span>{/if}
@@ -1136,18 +1161,18 @@
                                         {/if}
                                         <button
                                             class="pick away"
-                                            class:selected={choice === 'AWAY' || fanPick === 'AWAY'}
-                                            class:fan-locked={fanPick === 'AWAY'}
+                                            class:selected={choice === 'AWAY' || fanLock === 'AWAY'}
+                                            class:fan-locked={fanLock === 'AWAY'}
                                             class:coin-picked={coinChoice === 'AWAY'}
                                             class:won={awayOutcome === 'hit'}
                                             class:drew={awayOutcome === 'tie'}
-                                            disabled={locked || fanPick !== null}
-                                            title={fanPick === 'AWAY' ? `Auto-picked to win — ${away.name} is your fan team, locked for the season.` : coinChoice === 'AWAY' ? `The coin gave you ${away.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
+                                            disabled={locked || fanLock !== null}
+                                            title={fanLock === 'AWAY' ? `Auto-picked to win — ${away.name} is your fan team, locked for the season.` : coinChoice === 'AWAY' ? `The coin gave you ${away.name}, at ${AUTO_PICK_PENALTY} fewer base points.` : ''}
                                             on:click={() => pick(fixture.id, 'AWAY')}
                                         >
                                             <span class="pick-text">
-                                                <span class="team">{away.name}{#if fanPick === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}{#if coinChoice === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🪙</span>{/if}</span>
-                                                <span class="hint">{fanPick === 'AWAY' ? 'Your team (locked)' : coinChoice === 'AWAY' ? 'Coin flip' : 'Away win'}</span>
+                                                <span class="team">{away.name}{#if fanLock === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🔒</span>{/if}{#if coinChoice === 'AWAY'} <span class="fan-lock-icon" aria-hidden="true">🪙</span>{/if}</span>
+                                                <span class="hint">{fanLock === 'AWAY' ? 'Your team (locked)' : coinChoice === 'AWAY' ? 'Coin flip' : 'Away win'}</span>
                                             </span>
                                             {#if awayMult}<span class="odds">{awayPct}%<span class="mult"> (×{awayMult})</span></span>{/if}
                                             {#if score}<span class="goals">{score.away}</span>{/if}
@@ -1195,10 +1220,10 @@
                                                 {#if shown.home.length}
                                                     <span class="reveal-names">
                                                         {#each shown.home as p (p.id)}
-                                                            {#if adminMode && !p.fan}
-                                                                <button class="who movable" class:you={p.name === myTableName} class:auto={p.auto} class:staged={p.staged} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={p.staged ? `Staged: move ${p.name} to ${away.name}. Click to undo.` : `Move ${p.name} to ${away.name}`} on:click={() => stagePickMove(fixture, p, 'HOME')}>{p.name}{#if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}<span class="who-move" aria-hidden="true">{p.staged ? '↩' : '→'}</span></button>
+                                                            {#if adminMode}
+                                                                <button class="who movable" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:staged={p.staged} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={p.staged ? `Staged: move ${p.name} to ${away.name}. Click to undo.` : p.fan ? `⚠️ ${home.name} is ${p.name}'s fan team, so this side is automatic. Moving them overrides that for this match only.` : `Move ${p.name} to ${away.name}`} on:click={() => stagePickMove(fixture, p, 'HOME')}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if p.override}<span class="who-ovr" aria-hidden="true">✎</span>{/if}<span class="who-move" aria-hidden="true">{p.staged ? '↩' : '→'}</span></button>
                                                             {:else}
-                                                                <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={adminMode && p.fan ? `${p.name} is locked to their fan team here — change their fan team to move them.` : whoTitle(p, home.name, homeOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if homeOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(homeOutcome)}</span>{/if}</span>
+                                                                <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={homeOutcome === 'hit'} class:miss={homeOutcome === 'miss'} class:tie={homeOutcome === 'tie'} title={whoTitle(p, home.name, homeOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if p.override}<span class="who-ovr" aria-hidden="true">✎</span>{/if}{#if homeOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(homeOutcome)}</span>{/if}</span>
                                                             {/if}
                                                         {/each}
                                                     </span>
@@ -1211,10 +1236,10 @@
                                                 {#if shown.away.length}
                                                     <span class="reveal-names">
                                                         {#each shown.away as p (p.id)}
-                                                            {#if adminMode && !p.fan}
-                                                                <button class="who movable" class:you={p.name === myTableName} class:auto={p.auto} class:staged={p.staged} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={p.staged ? `Staged: move ${p.name} to ${home.name}. Click to undo.` : `Move ${p.name} to ${home.name}`} on:click={() => stagePickMove(fixture, p, 'AWAY')}><span class="who-move" aria-hidden="true">{p.staged ? '↩' : '←'}</span>{p.name}{#if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}</button>
+                                                            {#if adminMode}
+                                                                <button class="who movable" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:staged={p.staged} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={p.staged ? `Staged: move ${p.name} to ${home.name}. Click to undo.` : p.fan ? `⚠️ ${away.name} is ${p.name}'s fan team, so this side is automatic. Moving them overrides that for this match only.` : `Move ${p.name} to ${home.name}`} on:click={() => stagePickMove(fixture, p, 'AWAY')}><span class="who-move" aria-hidden="true">{p.staged ? '↩' : '←'}</span>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if p.override}<span class="who-ovr" aria-hidden="true">✎</span>{/if}</button>
                                                             {:else}
-                                                                <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={adminMode && p.fan ? `${p.name} is locked to their fan team here — change their fan team to move them.` : whoTitle(p, away.name, awayOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if awayOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(awayOutcome)}</span>{/if}</span>
+                                                                <span class="who" class:you={p.name === myTableName} class:fan={p.fan} class:auto={p.auto} class:hit={awayOutcome === 'hit'} class:miss={awayOutcome === 'miss'} class:tie={awayOutcome === 'tie'} title={whoTitle(p, away.name, awayOutcome)}>{p.name}{#if p.fan}<span class="who-star" aria-hidden="true">★</span>{:else if p.auto}<span class="who-coin" aria-hidden="true">🪙</span>{/if}{#if p.override}<span class="who-ovr" aria-hidden="true">✎</span>{/if}{#if awayOutcome}<span class="who-mark" aria-hidden="true">{outcomeMark(awayOutcome)}</span>{/if}</span>
                                                             {/if}
                                                         {/each}
                                                     </span>
@@ -1745,10 +1770,22 @@
                         <h3 class="modal-title">⚠️ Override {confirmKind === 'picks' ? 'match picks' : 'season predictions'}</h3>
                         {#if confirmKind === 'picks'}
                             <p class="modal-lede">You're changing {pendingList.length} pick{pendingList.length === 1 ? '' : 's'} on {pendingList.length === 1 ? 'a match that has' : 'matches that have'} already locked. Scores update immediately.</p>
+                            {#if fanOverrideList.length}
+                                <p class="modal-lede fan-override-warn">
+                                    ⚠️ <b>Overriding a fan-team pick.</b>
+                                    {fanOverrideList.length === 1 ? 'This player is' : 'These players are'}
+                                    on that side automatically because the club is their fan team:
+                                    <b>{fanOverrideList.map((it) => it.name).join(', ')}</b>.
+                                    Moving them replaces the auto-pick <b>for this match only</b> — their fan team,
+                                    the fan bonus and every other match are untouched. The pinned pick also survives
+                                    any later fan-team change, so it won't be rewritten again.
+                                </p>
+                            {/if}
                             <ul class="modal-list">
                                 {#each pendingList as it (it.key)}
                                     <li>
                                         <b>{it.name}</b> → {it.pick === 'HOME' ? 'home' : 'away'} side
+                                        {#if it.wasFan}<span class="fan-override-chip" title="Their club plays in this match, so this side was automatic until now.">★ fan override{#if it.fanClub && teamById[it.fanClub]} ({teamById[it.fanClub].name}){/if}</span>{/if}
                                         <label class="pen-toggle" title="A player who never picked scores {AUTO_PICK_PENALTY} fewer base points. Leave this on to keep that penalty; turn it off to score it as a pick they made.">
                                             <input type="checkbox" checked={it.autoPenalty} on:change={(e) => togglePenalty(it.key, e.currentTarget.checked)} />
                                             <span>keep &minus;{AUTO_PICK_PENALTY} no-pick penalty</span>
@@ -1963,6 +2000,9 @@
        a real pick so the lists read at a glance. */
     .who.auto { background: #f3f4f6; border-color: #e5e7eb; border-style: dashed; color: #6b7280; font-weight: 500; cursor: help; }
     .who-star { color: #d4af37; margin-left: 0.15rem; }
+    /* An admin pinned this pick against the fan-team rule. */
+    .who-ovr { color: #7c3aed; margin-left: 0.15rem; font-size: 0.72rem; font-weight: 800; }
+    .who.you .who-ovr { color: #ddd0ff; }
     .who-coin { margin-left: 0.15rem; font-size: 0.7rem; }
     .who.you { background: #2c5aa0; border-color: #2c5aa0; color: #fff; }
     .who.you .who-star { color: #ffe9a8; }
@@ -2023,6 +2063,26 @@
     .modal-list li { margin-bottom: 0.5rem; line-height: 1.4; }
     .pen-toggle { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: #6b7280; margin-left: 0.4rem; cursor: help; }
     .modal-warn { font-size: 0.8rem; color: #b91c1c; margin: 0.5rem 0 0; }
+    /* The fan-team override warning: louder than the rest of the dialog, because it
+       contradicts a rule that holds all season. */
+    .fan-override-warn {
+        background: #fef3c7;
+        border: 1px solid #d4af37;
+        border-radius: 6px;
+        padding: 0.6rem 0.7rem;
+        color: #78350f;
+    }
+    .fan-override-chip {
+        display: inline-block;
+        margin-left: 0.35rem;
+        padding: 0.05rem 0.35rem;
+        border-radius: 999px;
+        background: #fef3c7;
+        border: 1px solid #d4af37;
+        color: #78350f;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
     .modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-top: 1.25rem; }
     .reveal-none { font-size: 0.78rem; color: #9ca3af; font-style: italic; }
 

@@ -16,6 +16,7 @@ interface Picker {
     name: string;
     fan: boolean; // forced: the club is their fan team
     auto: boolean; // never picked, so the coin decided — at a reduced weight
+    override: boolean; // an admin pinned this side against the fan-team rule
 }
 
 export const GET: RequestHandler = async ({ url, locals }) => {
@@ -41,8 +42,17 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     if (!started.length) return json({ number: mw, picks: {} });
 
     const ids = started.map((f) => f.id);
-    const stored = await sql<{ fixture_id: string; pick: string; auto_penalty: boolean; id: number; name: string }[]>`
-        select p.fixture_id, p.pick, p.auto_penalty, u.id, coalesce(u.display_name, u.username) as name
+    const stored = await sql<
+        {
+            fixture_id: string;
+            pick: string;
+            auto_penalty: boolean;
+            fan_override: boolean;
+            id: number;
+            name: string;
+        }[]
+    >`
+        select p.fixture_id, p.pick, p.auto_penalty, p.fan_override, u.id, coalesce(u.display_name, u.username) as name
         from match_picks p join users u on u.id = p.user_id
         where p.fixture_id = any(${ids}) and u.pickem_joined_at is not null`;
 
@@ -70,16 +80,16 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     const sides = new Map<string, Map<number, { side: string; picker: Picker }>>();
     for (const f of started) sides.set(f.id, new Map());
 
-    // Three passes, weakest first, each overwriting the last — the same precedence
-    // computeLeaderboard() applies: fan team beats a stored pick, a stored pick
-    // beats the coin.
+    // Four passes, weakest first, each overwriting the last — the same precedence
+    // computeLeaderboard() applies: fan team beats a stored pick, a stored pick beats
+    // the coin, and an admin's fan-override beats even the fan team.
     for (const f of started) {
         const forFixture = sides.get(f.id);
         if (!forFixture) continue;
         for (const u of members) {
             forFixture.set(u.id, {
                 side: coinPick(u.id, f.id),
-                picker: { id: u.id, name: u.name, fan: false, auto: true }
+                picker: { id: u.id, name: u.name, fan: false, auto: true, override: false }
             });
         }
     }
@@ -92,7 +102,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
         // so they read as an auto-pick everywhere the coin ones do.
         forFixture.set(r.id, {
             side: r.pick,
-            picker: { id: r.id, name: r.name, fan: false, auto: !!r.auto_penalty }
+            picker: { id: r.id, name: r.name, fan: false, auto: !!r.auto_penalty, override: false }
         });
     }
 
@@ -102,8 +112,25 @@ export const GET: RequestHandler = async ({ url, locals }) => {
         for (const u of fans) {
             const side = f.homeId === u.fan_team ? 'HOME' : f.awayId === u.fan_team ? 'AWAY' : null;
             if (!side) continue;
-            forFixture.set(u.id, { side, picker: { id: u.id, name: u.name, fan: true, auto: false } });
+            forFixture.set(u.id, {
+                side,
+                picker: { id: u.id, name: u.name, fan: true, auto: false, override: false }
+            });
         }
+    }
+
+    // Last word: a pick an admin pinned by hand. `fan: false` on purpose — the point
+    // of the flag is that this player is NOT locked to their club here, so the chip
+    // stays movable and carries its own marker instead of the fan star.
+    for (const r of stored) {
+        if (!r.fan_override) continue;
+        if (r.pick !== 'HOME' && r.pick !== 'AWAY') continue;
+        const forFixture = sides.get(r.fixture_id);
+        if (!forFixture) continue;
+        forFixture.set(r.id, {
+            side: r.pick,
+            picker: { id: r.id, name: r.name, fan: false, auto: !!r.auto_penalty, override: true }
+        });
     }
 
     const byName = (a: Picker, b: Picker) => a.name.localeCompare(b.name);
