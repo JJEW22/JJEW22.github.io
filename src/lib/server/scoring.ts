@@ -80,6 +80,93 @@ export function resultMultiplier(outcome: Outcome, isFanTeamGame: boolean): numb
     return isFanTeamGame ? 1 / 2 : 1 / 3; // tie
 }
 
+// ---------- Club performance against the odds ----------
+
+export interface TeamPerformance {
+    played: number; // finished matches that had real odds
+    delta: number; // + is above the odds, - is below, 0 is exactly to them
+}
+
+// A fixture that never got odds is stored with both multipliers at 1 (the same
+// sentinel the favourite/underdog split keys off). Counting it would add a match
+// to the denominator whose expectation isn't 1, so it is skipped entirely.
+function hasOdds(multHome: number, multAway: number): boolean {
+    return (
+        Number.isFinite(multHome) &&
+        Number.isFinite(multAway) &&
+        multHome > 0 &&
+        multAway > 0 &&
+        !(multHome === 1 && multAway === 1)
+    );
+}
+
+/**
+ * How far each club is running above or below what the bookmakers priced it at.
+ *
+ * Per match a club earns `mult x resultMultiplier`, where the multiplier is
+ * 1 / (P_win + 0.5 * P_draw) (see server/odds.ts) and a draw scores 0.5 — the
+ * fan-team tie-break. Those two are reciprocals by construction, so the expected
+ * value of the product is exactly 1 per match. Sum them, subtract the matches
+ * played, and 0 means a club has performed precisely to its odds.
+ *
+ * Equivalently: what you would have banked backing this club every week as your
+ * fan team, over (BASE_POINTS + FAN_BONUS), less the games played.
+ *
+ * Gold/silver/bronze are deliberately NOT included. They are awarded on how
+ * interesting a fixture looked, not on how a club played, so counting them would
+ * move a club for having been featured — worth up to +1.8 over the first five
+ * matchweeks, enough to reorder the middle of the table.
+ */
+export async function getTeamPerformance(): Promise<Map<string, TeamPerformance>> {
+    const rows = await sql<
+        {
+            home_id: string | null;
+            away_id: string | null;
+            winner: string | null;
+            mult_home: number;
+            mult_away: number;
+        }[]
+    >`select home_id, away_id, winner, mult_home, mult_away
+      from results
+      where winner is not null and home_id is not null and away_id is not null`;
+
+    const out = new Map<string, TeamPerformance>();
+    const entry = (teamId: string) => {
+        let e = out.get(teamId);
+        if (!e) out.set(teamId, (e = { played: 0, delta: 0 }));
+        return e;
+    };
+
+    for (const r of rows) {
+        const multHome = Number(r.mult_home);
+        const multAway = Number(r.mult_away);
+        if (!hasOdds(multHome, multAway)) continue;
+
+        for (const side of ['HOME', 'AWAY'] as const) {
+            const teamId = side === 'HOME' ? r.home_id! : r.away_id!;
+            const outcome: Outcome =
+                r.winner === 'DRAW'
+                    ? 'TIE'
+                    : (side === 'HOME' && r.winner === 'HOME_TEAM') ||
+                        (side === 'AWAY' && r.winner === 'AWAY_TEAM')
+                      ? 'WIN'
+                      : 'LOSS';
+
+            const e = entry(teamId);
+            e.played++;
+            // isFanTeamGame is always true here: the metric asks what this club
+            // would have paid the supporter who backed it every week.
+            e.delta += (side === 'HOME' ? multHome : multAway) * resultMultiplier(outcome, true);
+        }
+    }
+
+    // Two decimals: this is a derived stat, not an awarded score, so the
+    // round-up-to-a-tenth rule for match points doesn't apply — and with 20 clubs
+    // packed close together the extra digit is what separates them.
+    for (const e of out.values()) e.delta = Math.round((e.delta - e.played) * 100) / 100;
+    return out;
+}
+
 // ---------- Table derived from match data ----------
 
 export interface MatchRow {

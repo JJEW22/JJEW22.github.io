@@ -882,9 +882,12 @@
         lost: { label: 'L', cls: 'num', title: 'Lost', asc: false, get: (r) => r.lost },
         gd: { label: 'GD', cls: 'num', title: 'Goal difference', asc: false, get: (r) => r.gd },
         points: { label: 'Pts', cls: 'num hl', title: 'Points', asc: false, get: (r) => r.points },
-        formPoints: { label: 'Last 5', cls: 'num', title: 'Points won in the last 5 matches, most recent first', asc: false, get: (r) => r.formPoints }
+        formPoints: { label: 'Last 5', cls: 'num', title: 'Points won in the last 5 matches, most recent first', asc: false, get: (r) => r.formPoints },
+        // Clubs with nothing to measure sink to the bottom of the default (desc)
+        // sort rather than landing in mid-table on a stand-in zero.
+        performance: { label: 'Performance', cls: 'num', title: 'How far the club is running above or below its odds. What you would have banked backing it every week as your fan team, over one match’s worth of points, less the matches played. 0 is exactly to the odds; + is over, - is under. Gold/silver/bronze are left out — they reward an interesting fixture, not a performance', asc: false, get: (r) => (r.performance == null ? Number.NEGATIVE_INFINITY : r.performance) }
     };
-    const PL_ORDER = ['name', 'played', 'won', 'drawn', 'lost', 'gd', 'points', 'formPoints'];
+    const PL_ORDER = ['name', 'played', 'won', 'drawn', 'lost', 'gd', 'points', 'formPoints', 'performance'];
     let plSort = { key: 'points', asc: false };
     // `pos` is the real league position, so it stays put when you sort by GD or form.
     $: plRows = sortRows((standings || []).map((r, i) => ({ ...r, pos: i + 1 })), PL_COLS, plSort);
@@ -1585,12 +1588,19 @@
                                                 <span class="not-scored" title="No matches played yet">—</span>
                                             {/if}
                                         </td>
+                                        <td class="num">
+                                            {#if row.performance == null}
+                                                <span class="not-scored" title="No finished match with odds on record yet">—</span>
+                                            {:else}
+                                                <span class="perf" class:over={row.performance > 0} class:under={row.performance < 0} title="{row.performance > 0 ? 'Above' : row.performance < 0 ? 'Below' : 'Exactly at'} the odds across {row.performancePlayed} match{row.performancePlayed === 1 ? '' : 'es'}">{row.performance > 0 ? '+' : ''}{row.performance.toFixed(2)}</span>
+                                            {/if}
+                                        </td>
                                     </tr>
                                 {/each}
                             </tbody>
                         </table>
                     </div>
-                    <p class="note">Pulled from football-data.org via the standings route. Zeroed until matches are played. <b>Last 5</b> is points won in the club's five most recent matches, newest first — the ringed result is the latest. Click any header to sort.</p>
+                    <p class="note">Pulled from football-data.org via the standings route. Zeroed until matches are played. <b>Last 5</b> is points won in the club's five most recent matches, newest first — the ringed result is the latest. <b>Performance</b> is what the club has paid against its price: exactly what you'd have banked backing it every week as your fan team, divided by one match's worth of points ({BASE_POINTS} + {FAN_BONUS}), less the matches played. <b>0 means it has performed precisely to the odds</b> — a win over a strong favourite earns well under 1, beating long odds earns several times that. Gold/silver/bronze are excluded, since they reward an interesting fixture rather than a performance. Click any header to sort.</p>
                 </section>
 
             {:else if activeTab === 'rules'}
@@ -1837,6 +1847,11 @@
     .prov-part { color: #9a7b2f; font-size: 0.82em; font-weight: 600; margin-left: 1px; cursor: help; }
     /* Nothing to compute yet, as opposed to a genuine score of zero */
     .not-scored { color: #9ca3af; cursor: help; }
+    /* Over/under the odds. Sign carries the meaning, so colour only reinforces it —
+       a value exactly at 0 stays neutral rather than being forced into a camp. */
+    .perf { font-variant-numeric: tabular-nums; font-weight: 600; cursor: help; }
+    .perf.over { color: #15803d; }
+    .perf.under { color: #b91c1c; }
     /* Fan-team column on the standings table */
     .crest-col { width: 3.25rem; text-align: center; }
     .crest { width: 1.5rem; height: 1.5rem; object-fit: contain; vertical-align: middle; cursor: help; }
