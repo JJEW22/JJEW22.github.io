@@ -1,19 +1,35 @@
 <script>
     import { onMount } from 'svelte';
     
+    // The live bracket, assembled from the database.
+    export let apiPath = '/pizzaBracket/api/bracket';
+    // The last spreadsheet-era snapshot, still in static/. Shipped as a fallback so
+    // the bracket renders before the backend is up rather than showing an error —
+    // same reasoning as the pickem page's SAMPLE_MATCHWEEKS.
     export let dataPath = '/pizzaBracket/pizzaBracket.json';
-    
+
     let bracket = null;
     let loading = true;
     let error = null;
-    
+    // True when the API was unreachable and the static snapshot is what's on screen.
+    let stale = false;
+
+    async function fetchBracket(path) {
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`Failed to load: ${response.status}`);
+        return response.json();
+    }
+
     onMount(async () => {
         try {
-            const response = await fetch(dataPath);
-            if (!response.ok) throw new Error(`Failed to load: ${response.status}`);
-            bracket = await response.json();
-        } catch (err) {
-            error = err.message;
+            bracket = await fetchBracket(apiPath);
+        } catch (apiErr) {
+            try {
+                bracket = await fetchBracket(dataPath);
+                stale = true;
+            } catch (_) {
+                error = apiErr.message;
+            }
         } finally {
             loading = false;
         }
@@ -154,7 +170,13 @@
                 </div>
             {/if}
         </header>
-        
+
+        {#if stale}
+            <p class="pb-stale">
+                Live results are unavailable — showing the last saved snapshot.
+            </p>
+        {/if}
+
         <!-- Top half -->
         <div class="bracket-half">
             {@render divisionLeft(bracket.divisions[0])}
@@ -341,6 +363,12 @@
     
     .pb-loading, .pb-error { text-align: center; padding: 3rem; color: #6b7280; }
     .pb-error { color: #dc2626; }
+
+    .pb-stale {
+        text-align: center; font-size: 0.8rem; color: #92400e;
+        background: #fef3c7; border-radius: 6px;
+        padding: 0.4rem 0.75rem; margin: 0 auto 0.75rem auto; max-width: 32rem;
+    }
     
     @media (max-width: 1000px) {
         .bracket-half { flex-direction: column; gap: 0.75rem; }

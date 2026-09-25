@@ -2,7 +2,7 @@
 <script>
     import { onMount } from 'svelte';
 
-    const KNOWN_ROLES = ['site:admin', 'pickem:admin'];
+    const KNOWN_ROLES = ['site:admin', 'pickem:admin', 'pizza:admin'];
 
     let status = 'loading'; // loading | denied | ready
     let emailsText = '';

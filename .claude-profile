@@ -1,0 +1,5 @@
+# Which Claude Code accounts may work in this project.
+# Enforced by ~/.claude-profile-guard.sh: the claude-school / claude-biz launchers
+# refuse to start here, and a session that bypasses them has every tool call blocked.
+# Values: school, biz, any (commas or spaces). Applies to subdirectories too.
+school
