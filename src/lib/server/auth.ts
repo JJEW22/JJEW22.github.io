@@ -19,9 +19,15 @@ export function verifyPassword(storedHash: string, raw: string): Promise<boolean
     return argonVerify(storedHash, raw);
 }
 
-// We hand the user a random token but only ever store its hash.
-function hashToken(token: string): string {
+// We hand the user a random token but only ever store its hash. Shared with
+// password resets, which follow the same rule.
+export function hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// A fresh, unguessable token for a link. 32 bytes from the CSPRNG.
+export function newToken(): string {
+    return crypto.randomBytes(32).toString('base64url');
 }
 
 export async function createSession(userId: number): Promise<{ token: string; expiresAt: Date }> {

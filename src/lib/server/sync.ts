@@ -20,6 +20,11 @@ const ODDS_SYNC_EVERY_MS = 12 * 60 * 60 * 1000;
 const ODDS_RETRY_MS = 60 * 60 * 1000;
 const ODDS_NEXT_KEY = 'next_odds_sync_ms';
 
+// Pick reminders go out this long before a matchweek's first kickoff. Tied to the
+// fixtures rather than a weekday: matchweeks move for TV, so a fixed Wednesday was
+// three days early for a Saturday opener and already too late for a Tuesday one.
+const REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
+
 // Pull finished results, store goals/winner, and (re)designate the current
 // week's golden/silver/bronze bonus matches. Idempotent.
 export async function syncResults() {
@@ -152,17 +157,31 @@ export async function resultsSyncIfDue() {
     return { ran: true as const, moment: new Date(moment).toISOString(), ...summary };
 }
 
-// On Wednesday (ET), email enrolled players who still have unmade picks for the
-// upcoming matchweek. Sends once per matchweek.
+// REMINDER_LEAD_MS before the next matchweek's first kickoff, email the enrolled
+// players who still have unmade picks in it. Once per matchweek, and nothing at all
+// to anyone whose week is already complete.
 export async function sendPickRemindersIfDue() {
-    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'long' }).format(new Date());
-    if (weekday !== 'Wednesday') return { ran: false as const, reason: 'not Wednesday' };
-
     const upcoming = (await getMatchesInWindow(0, 9)).filter((m) => new Date(m.kickoff).getTime() > Date.now());
     if (!upcoming.length) return { ran: false as const, reason: 'no upcoming matches' };
     const mw = Math.min(...upcoming.map((m) => m.matchweek));
 
     if (Number((await getMeta('last_reminder_mw')) || 0) === mw) return { ran: false as const, reason: 'already reminded' };
+
+    // Read off the matches already in hand, rather than a second upstream call on
+    // every tick of a week that hasn't come due yet.
+    //
+    // `upcoming` is only the kickoffs still ahead, so this is the first one LEFT in
+    // the matchweek. While a reminder is pending that is also the matchweek's true
+    // opener, because none of it has been played. The two differ only if the cron
+    // was down through the deadline — and then aiming at the next remaining fixture
+    // is what we want anyway, rather than firing instantly about a week underway.
+    const firstKickoff = Math.min(
+        ...upcoming.filter((m) => m.matchweek === mw).map((m) => new Date(m.kickoff).getTime())
+    );
+    const dueAt = firstKickoff - REMINDER_LEAD_MS;
+    if (Date.now() < dueAt) {
+        return { ran: false as const, reason: `reminder due ${new Date(dueAt).toISOString()}` };
+    }
 
     const fixtures = await getFixtures(mw);
     const users = await sql<{ id: number; email: string | null; fan_team: string | null; predictions_saved_at: Date | null }[]>`
@@ -174,6 +193,9 @@ export async function sendPickRemindersIfDue() {
         pickedByUser.get(p.user_id)!.add(p.fixture_id);
     }
     const link = (env.ORIGIN || '') + '/premierLeaguePickem';
+    // From the real gap, so the copy stays honest if this ever fires late.
+    const hoursToKickoff = Math.max(1, Math.round((firstKickoff - Date.now()) / (60 * 60 * 1000)));
+    const lockMinutes = PICK_LOCK_LEAD_MS / (60 * 1000);
 
     let sent = 0;
     for (const u of users) {
@@ -185,13 +207,16 @@ export async function sendPickRemindersIfDue() {
             const fanHere = fan && (f.homeId === fan || f.awayId === fan);
             return !has && !fanHere;
         });
+        // A complete week gets nothing. A fan-team fixture already counted as
+        // covered above, since that pick is made for them.
         if (missing.length === 0) continue;
         await sendEmail({
             to: u.email,
             subject: `Make your Matchweek ${mw} picks`,
             text:
-                `You still have ${missing.length} unmade pick${missing.length === 1 ? '' : 's'} for Matchweek ${mw}.\n\n` +
-                `Each pick locks 15 minutes before that match kicks off, so get them in early.\n\n` +
+                `Matchweek ${mw} kicks off in about ${hoursToKickoff} hour${hoursToKickoff === 1 ? '' : 's'}, ` +
+                `and you still have ${missing.length} unmade pick${missing.length === 1 ? '' : 's'}.\n\n` +
+                `Each pick locks ${lockMinutes} minutes before that match starts, so get them in early.\n\n` +
                 `Make your picks: ${link}`
         });
         sent++;

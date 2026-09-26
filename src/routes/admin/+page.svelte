@@ -9,6 +9,7 @@
     let generated = [];
     let inviteList = [];
     let users = [];
+    let resetLinks = {}; // userId -> { link, expiresAt }
     let msg = '';
     let busy = false;
 
@@ -76,6 +77,24 @@
         else msg = 'Could not save roles.';
     }
 
+    // Mints a link for someone who is locked out; you deliver it yourself. Works
+    // with no mail provider configured, which is the point of having it.
+    async function makeResetLink(u) {
+        msg = '';
+        const r = await fetch('/api/admin/reset-link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: u.id })
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || data.ok === false) {
+            msg = data?.message || data?.error || 'Could not create a reset link.';
+            return;
+        }
+        resetLinks = { ...resetLinks, [u.id]: { link: data.link, expiresAt: data.expiresAt } };
+        msg = `Reset link for ${data.username} — send it to them, it works once and expires in 24h.`;
+    }
+
     async function copy(text) {
         try { await navigator.clipboard.writeText(text); } catch (_) {}
     }
@@ -107,11 +126,13 @@
                     <button class="btn" on:click={generateInvites} disabled={busy}>{busy ? 'Generating…' : 'Generate invite links'}</button>
 
                     {#if generated.length}
-                        <h3>New links — send each person theirs</h3>
+                        <h3>New invites</h3>
+                        <p class="muted">Emailed automatically. Anything marked <b>not sent</b> needs passing on by hand — the link is valid either way.</p>
                         <ul class="links">
                             {#each generated as g}
                                 <li>
                                     <span class="who">{g.email}</span>
+                                    <span class={g.sent ? 'sent' : 'unsent'}>{g.sent ? '✓ emailed' : '! not sent'}</span>
                                     <input readonly value={g.link} />
                                     <button class="mini" on:click={() => copy(g.link)}>Copy</button>
                                 </li>
@@ -148,8 +169,19 @@
                                     {#each KNOWN_ROLES as r}
                                         <td class="rc"><input type="checkbox" checked={(u.roles || []).includes(r)} on:change={() => toggleRole(u, r)} /></td>
                                     {/each}
-                                    <td><button class="mini" on:click={() => saveRoles(u)}>Save</button></td>
+                                    <td class="actions">
+                                        <button class="mini" on:click={() => saveRoles(u)}>Save</button>
+                                        <button class="mini" on:click={() => makeResetLink(u)}>Reset link</button>
+                                    </td>
                                 </tr>
+                                {#if resetLinks[u.id]}
+                                    <tr class="reset-row">
+                                        <td colspan={KNOWN_ROLES.length + 3}>
+                                            <code class="reset-link">{resetLinks[u.id].link}</code>
+                                            <button class="mini" on:click={() => copy(resetLinks[u.id].link)}>Copy</button>
+                                        </td>
+                                    </tr>
+                                {/if}
                             {/each}
                         </tbody>
                     </table>
@@ -176,6 +208,12 @@
     .btn { padding: 0.6rem 1.4rem; background: #2c5aa0; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
     .btn:disabled { opacity: 0.6; cursor: not-allowed; }
     .mini { padding: 0.3rem 0.7rem; background: #2c5aa0; color: white; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+    .actions { display: flex; gap: 0.35rem; white-space: nowrap; }
+    .reset-row td { background: #f8fafc; }
+    .reset-link { font-size: 0.75rem; word-break: break-all; margin-right: 0.5rem; }
+    /* Whether the invite actually went out, or still needs passing on by hand */
+    .sent { color: #166534; font-size: 0.75rem; }
+    .unsent { color: #b45309; font-size: 0.75rem; }
     .links { list-style: none; padding: 0; }
     .links li { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
     .links .who { min-width: 12rem; font-size: 0.85rem; color: #374151; }
