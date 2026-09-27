@@ -12,6 +12,9 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
+	// The word-of-the-day bot is a git submodule with its own repo, its own
+	// language (Python) and its own conventions. Nothing here applies to it.
+	{ ignores: ['discord-wod-bot/'] },
 	js.configs.recommended,
 	...ts.configs.recommended,
 	...svelte.configs.recommended,

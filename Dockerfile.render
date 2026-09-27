@@ -1,0 +1,60 @@
+# Production image for Render: the SvelteKit server AND the Python word-of-the-day
+# bot in one container, so both run on a single paid service.
+#
+# NOT used by docker compose — `Dockerfile` is still the dev image. Point Render's
+# "Dockerfile Path" at this file.
+#
+# The bot only starts if TOKEN and CHANNEL_ID are set (see docker-entrypoint.sh), so
+# this image can be rolled out website-first and the bot switched on afterwards by
+# adding two environment variables. That keeps the risky change (moving the service
+# to Docker) separate from the new one (running a second process).
+
+FROM node:20-slim
+
+WORKDIR /app
+
+# python3      — the bot's runtime; the website is Node, the bot is discord.py
+# libenchant-2 — pyenchant links against it, and the hunspell dictionaries are what
+#                `enchant.Dict('en_US')` actually reads. Without these the bot cannot
+#                decide whether a word is real.
+# hunspell-en-gb — the bot accepts a word found in EITHER dictionary
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        python3 \
+        python3-pip \
+        python3-venv \
+        libenchant-2-2 \
+        hunspell-en-us \
+        hunspell-en-gb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Debian bookworm marks its Python as externally managed (PEP 668), so pip refuses
+# to install system-wide. A venv is the supported way round it.
+ENV VIRTUAL_ENV=/opt/botenv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+COPY discord-wod-bot/requirements.txt ./bot-requirements.txt
+RUN pip install --no-cache-dir -r bot-requirements.txt
+
+# nltk's word_tokenize needs the punkt corpus at RUNTIME, and downloading it then
+# would mean a network call on every boot — and a silent fall back to naive
+# splitting if it failed. Baked into the image instead. punkt_tab is what nltk 3.9
+# actually looks for; punkt is kept for older call paths.
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -m nltk.downloader -d $NLTK_DATA punkt punkt_tab
+
+# Node deps first, so a source-only change doesn't reinstall them.
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# adapter-node serves on this; Render maps its own port in via $PORT.
+ENV NODE_ENV=production
+EXPOSE 10000
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

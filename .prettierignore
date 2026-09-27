@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Submodule with its own repo and its own style
+discord-wod-bot/

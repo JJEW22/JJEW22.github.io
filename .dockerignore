@@ -1,14 +1,47 @@
+# Keep the build context small, and keep two specific things OUT of the image.
+#
+# node_modules: the host's are built for Windows. Copying them over the image's
+# `npm ci` result would ship native modules for the wrong platform — @node-rs/argon2
+# would fail to load and every login would break.
+#
+# .env: secrets belong in Render's environment, never baked into a layer.
+
 node_modules
-npm-debug.log
-.dockerignore
-.git
-.gitignore
-README.md
+**/node_modules
+
 .env
 .env.*
 !.env.example
+
+**/.git
+**/.gitignore
+
+.svelte-kit
+build
+test-results
+playwright-report
+
+# Python
+__pycache__
+**/__pycache__
+*.pyc
+discord-wod-bot/env
+
+# Editor / OS / logs -- these were in the original .dockerignore and are kept
+npm-debug.log
+.dockerignore
+README.md
 .vscode
 .idea
-build
-.svelte-kit
 .DS_Store
+
+# Local-only
+.screenshots
+.claude
+.claude-profile
+*.zip
+secrets.json
+*secrets*
+Dockerfile
+docker-compose.yml
+e2e
