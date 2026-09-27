@@ -1,0 +1,3 @@
+[submodule "discord-wod-bot"]
+	path = discord-wod-bot
+	url = https://github.com/JJEW22/word-of-the-day-bot.git
