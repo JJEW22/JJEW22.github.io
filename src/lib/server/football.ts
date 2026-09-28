@@ -90,8 +90,16 @@ async function fd(path: string): Promise<any> {
     return data;
 }
 
-export async function getFixtures(matchweek: number): Promise<Fixture[]> {
-    const data = await fd(`/competitions/PL/matches?matchday=${matchweek}`);
+// EVERY match in the season, fully mapped, from a single cached call.
+//
+// /competitions/PL/matches returns all 380 fixtures across all 38 matchdays with
+// every field below, so the per-week, whole-season and finished-only lists are all
+// just filters over this. They used to be four different API paths -- and because
+// `?matchday=N` is a distinct cache key per week, paging through the season was one
+// upstream request per week and tripped football-data's 10-per-minute limit around
+// week 11.
+async function allMatches(): Promise<Fixture[]> {
+    const data = await fd('/competitions/PL/matches');
     return (data.matches ?? []).map((m: any) => ({
         id: String(m.id),
         matchweek: m.matchday,
@@ -105,6 +113,14 @@ export async function getFixtures(matchweek: number): Promise<Fixture[]> {
         homeGoals: m.score?.fullTime?.home ?? null,
         awayGoals: m.score?.fullTime?.away ?? null
     }));
+}
+
+export async function getFixtures(matchweek: number): Promise<Fixture[]> {
+    // Sorted explicitly rather than trusting the upstream order, so a week's cards
+    // always appear earliest-first.
+    return (await allMatches())
+        .filter((m) => m.matchweek === matchweek)
+        .sort((a, b) => a.kickoff.localeCompare(b.kickoff));
 }
 
 // Last-5 form per club, most recent first. Derived from finished matches rather
@@ -184,34 +200,35 @@ export async function getStandings(): Promise<StandingRow[]> {
     });
 }
 
-// Every match in the season, played or not — one cached call, where getFixtures()
-// is one per week. The leaderboard needs the whole schedule to tell a matchweek
-// that is over from one that is still being played.
+// Every match in the season, played or not. The leaderboard needs the whole
+// schedule to tell a matchweek that is over from one that is still being played.
 export async function getSeasonMatches(): Promise<ScheduledMatch[]> {
-    const data = await fd('/competitions/PL/matches');
-    return (data.matches ?? []).map((m: any) => ({
-        id: String(m.id),
-        matchweek: m.matchday,
-        kickoff: m.utcDate,
+    return (await allMatches()).map((m) => ({
+        id: m.id,
+        matchweek: m.matchweek,
+        kickoff: m.kickoff,
         status: m.status,
         played: m.status === 'FINISHED' || m.status === 'AWARDED',
-        homeId: tlaToId(m.homeTeam.tla),
-        awayId: tlaToId(m.awayTeam.tla)
+        homeId: m.homeId,
+        awayId: m.awayId
     }));
 }
 
 export async function getFinishedMatches(): Promise<FinishedMatch[]> {
-    const data = await fd('/competitions/PL/matches?status=FINISHED');
-    return (data.matches ?? []).map((m: any) => ({
-        id: String(m.id),
-        matchweek: m.matchday,
-        kickoff: m.utcDate,
-        winner: m.score?.winner ?? 'DRAW',
-        homeId: tlaToId(m.homeTeam.tla),
-        awayId: tlaToId(m.awayTeam.tla),
-        homeGoals: m.score?.fullTime?.home ?? null,
-        awayGoals: m.score?.fullTime?.away ?? null
-    }));
+    // Exactly what ?status=FINISHED returned: AWARDED is deliberately NOT included,
+    // matching the previous behaviour rather than getSeasonMatches' broader `played`.
+    return (await allMatches())
+        .filter((m) => m.status === 'FINISHED')
+        .map((m) => ({
+            id: m.id,
+            matchweek: m.matchweek,
+            kickoff: m.kickoff,
+            winner: m.winner ?? 'DRAW',
+            homeId: m.homeId,
+            awayId: m.awayId,
+            homeGoals: m.homeGoals,
+            awayGoals: m.awayGoals
+        }));
 }
 
 // Matches within a date window relative to now: `daysBack` days in the past to
