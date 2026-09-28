@@ -31,6 +31,14 @@ create table if not exists wod_submissions (
         check (status in ('accepted', 'recycled', 'duplicate_day', 'invalid'))
 );
 
+-- Was this word in the hunspell dictionaries at the time it was judged? Recorded
+-- rather than re-derived because the database has no dictionary to consult.
+--
+-- It is what keeps the "words left to claim" figure honest: a word accepted by POLL
+-- was never among the dictionary's stems, so accepting it must not decrement them.
+-- Only an accepted word that WAS in the dictionary consumes one.
+alter table wod_submissions add column if not exists from_dictionary boolean;
+
 -- A stem can be claimed by exactly one accepted word. Enforced here rather than
 -- trusted to the bot, so a double-post race can't put two winners on one stem.
 create unique index if not exists wod_submissions_stem_uq

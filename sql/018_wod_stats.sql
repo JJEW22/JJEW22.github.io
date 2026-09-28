@@ -37,6 +37,24 @@ create table if not exists wod_users (
     updated_at   timestamptz not null default now()
 );
 
+-- How big the playable space is. One row, refreshed by
+-- discord-wod-bot/src/count_dictionary.py, which reads the hunspell files the bot
+-- actually validates against and stems every entry.
+--
+-- total_stems is the meaningful denominator, not total_words: claiming
+-- `chauvinist` also consumes `chauvinistic`, so the number of distinct PLAYS
+-- available is the number of distinct stems.
+--
+-- Stored rather than derived because stemming 124k words takes seconds, which is
+-- far too slow to do on every /leaderboard.
+create table if not exists wod_dictionary (
+    -- Single-row table: the check keeps it that way.
+    id          smallint primary key default 1 check (id = 1),
+    total_words int not null,
+    total_stems int not null,
+    computed_at timestamptz not null default now()
+);
+
 drop view if exists wod_leaderboard cascade;
 drop view if exists wod_server_stats cascade;
 drop view if exists wod_user_stats cascade;
@@ -70,7 +88,8 @@ with grouped as (
     from wod_user_days where accepted > 0
 ),
 runs as (
-    select user_id, island, count(*)::int as length, max(day) as ended
+    select user_id, island, count(*)::int as length,
+           min(day) as started, max(day) as ended
     from grouped group by 1, 2
 )
 select user_id,
@@ -79,7 +98,12 @@ select user_id,
        -- shouldn't look broken just because nobody has posted yet this morning.
        coalesce(max(length) filter (
            where ended >= (now() at time zone 'America/New_York')::date - 1
-       ), 0)::int as current_day_streak
+       ), 0)::int as current_day_streak,
+       -- Total days they landed a word, and the first of them. Summed across runs
+       -- rather than taken from the accepted COUNT: the two are equal today only
+       -- because of the one-word-per-day rule, and this stays right regardless.
+       sum(length)::int as accepted_days,
+       min(started)     as first_accepted_day
 from runs group by user_id;
 
 -- ---------- streak 2: accepted submissions in a row, no error between ----------
@@ -218,6 +242,18 @@ select s.user_id,
        coalesce(co.distinct_thieves, 0)                          as distinct_thieves,
        co.most_contested_word,
        coalesce(co.most_contested_count, 0)                      as most_contested_count,
+       -- Turnout: days with a word, over every day since their first one.
+       -- Measured to TODAY, not to their last word, so it decays for someone who
+       -- has stopped playing -- which is what "% of days since joining" means.
+       coalesce(d.accepted_days, 0)                              as accepted_days,
+       coalesce(
+           ((now() at time zone 'America/New_York')::date - d.first_accepted_day) + 1, 0
+       )                                                         as days_since_first,
+       case when d.first_accepted_day is null then 0
+            else round(d.accepted_days::numeric / greatest(
+                     ((now() at time zone 'America/New_York')::date - d.first_accepted_day) + 1, 1
+                 ) * 100, 1)
+       end                                                       as submission_rate_pct,
        min(s.posted_at)                                          as first_at,
        max(s.posted_at)                                          as last_at
 from wod_submissions s
@@ -231,7 +267,8 @@ group by s.user_id, u.display_name,
          d.current_day_streak, d.longest_day_streak,
          cr.current_clean_run, cr.longest_clean_run,
          co.times_plagiarised, co.self_recycles, co.distinct_thieves,
-         co.most_contested_word, co.most_contested_count;
+         co.most_contested_word, co.most_contested_count,
+         d.accepted_days, d.first_accepted_day;
 
 -- ---------- the ranking ----------
 
@@ -258,19 +295,58 @@ from wod_user_stats;
 -- ---------- the whole channel ----------
 
 create view wod_server_stats as
-select
-    (select count(*) from wod_submissions)::int                                as submitted,
-    (select count(*) from wod_submissions where status = 'accepted')::int      as accepted,
-    (select count(*) from wod_submissions where status = 'recycled')::int      as recycled,
-    (select count(*) from wod_submissions where status = 'duplicate_day')::int as duplicate_day,
-    (select count(*) from wod_submissions where status = 'invalid')::int       as invalid,
-    (select count(distinct user_id) from wod_submissions)::int                 as participants,
-    (select count(*) from wod_word_rulings)::int                              as rulings,
-    -- DISTINCT day: wod_user_days holds one row per person-day, so counting rows
-    -- would just restate the submission total.
-    (select count(distinct day) from wod_user_days where accepted > 0)::int    as active_days,
-    (select min(posted_at) from wod_submissions)                               as first_at,
-    (select max(posted_at) from wod_submissions)                               as last_at,
+-- A CTE rather than a wall of scalar subqueries, so the derived figures (errors,
+-- accuracy, turnout) can be built from the raw counts instead of repeating them.
+with base as (
+    select count(*)::int                                            as submitted,
+           count(*) filter (where status = 'accepted')::int          as accepted,
+           count(*) filter (where status = 'recycled')::int          as recycled,
+           count(*) filter (where status = 'duplicate_day')::int     as duplicate_day,
+           count(*) filter (where status = 'invalid')::int           as invalid,
+           count(distinct user_id)::int                              as participants,
+           -- Accepted words that came OUT of the dictionary. Poll-whitelisted words
+           -- are excluded: they were never among the dictionary's stems, so they
+           -- cannot consume one.
+           count(*) filter (where status = 'accepted' and from_dictionary)::int
+                                                                     as accepted_from_dictionary,
+           min(posted_at)                                            as first_at,
+           max(posted_at)                                            as last_at,
+           -- Measured to TODAY, not to the last word: a channel that has gone
+           -- quiet has still been running, and its turnout should reflect that.
+           (((now() at time zone 'America/New_York')::date
+             - min((posted_at at time zone 'America/New_York')::date)) + 1)::int as days_running
+    from wod_submissions
+),
+days as (
+    select count(distinct day)::int as active_days
+    from wod_user_days where accepted > 0
+)
+select b.submitted,
+       b.accepted,
+       b.recycled,
+       b.duplicate_day,
+       b.invalid,
+       b.participants,
+       b.first_at,
+       b.last_at,
+       b.days_running,
+       d.active_days,
+       -- Everything that wasn't accepted. Note this includes duplicate_day, so the
+       -- sub-categories only sum to it if that one is shown alongside them.
+       (b.submitted - b.accepted)                                    as errors,
+       round(b.accepted::numeric / greatest(b.submitted, 1) * 100, 1) as accuracy_pct,
+       round(d.active_days::numeric / greatest(b.days_running, 1) * 100, 1) as pct_days_with_word,
+       (select count(*) from wod_word_rulings)::int                  as rulings,
+       -- How much of the dictionary is gone. Null until count_dictionary.py has run,
+       -- which the formatter treats as "unknown" rather than showing a wrong zero.
+       (select total_words from wod_dictionary where id = 1)          as dictionary_words,
+       (select total_stems from wod_dictionary where id = 1)          as dictionary_stems,
+       b.accepted_from_dictionary,
+       round(b.accepted_from_dictionary::numeric
+             / greatest((select total_stems from wod_dictionary where id = 1), 1) * 100, 2)
+                                                                     as pct_dictionary_used,
+       ((select total_stems from wod_dictionary where id = 1) - b.accepted_from_dictionary)
+                                                                     as words_remaining,
 
     -- Current leader, by the leaderboard's own ordering.
     (select user_id      from wod_leaderboard where rank = 1)                  as leader_user_id,
@@ -288,10 +364,12 @@ select
     (select display_name from wod_user_stats order by longest_clean_run desc, accepted desc, user_id limit 1) as record_clean_run_name,
     (select longest_clean_run from wod_user_stats order by longest_clean_run desc, accepted desc, user_id limit 1) as record_clean_run,
 
-    -- Collisions across the channel.
+    -- Collisions across the channel. thefts = you took someone else's word;
+    -- self_recycles = you took your own back. They sum to `recycled`.
     (select sum(times_stolen) from wod_word_collisions)::int                   as total_thefts,
     (select sum(times_self_recycled) from wod_word_collisions)::int            as total_self_recycles,
     (select word          from wod_word_collisions order by times_recycled desc, word limit 1) as most_contested_word,
     (select times_recycled from wod_word_collisions order by times_recycled desc, word limit 1) as most_contested_count,
     (select owner_user_id from wod_word_collisions order by times_recycled desc, word limit 1) as most_contested_owner_id,
-    (select owner_name    from wod_word_collisions order by times_recycled desc, word limit 1) as most_contested_owner_name;
+    (select owner_name    from wod_word_collisions order by times_recycled desc, word limit 1) as most_contested_owner_name
+from base b cross join days d;
