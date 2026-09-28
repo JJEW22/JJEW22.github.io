@@ -20,6 +20,18 @@ export interface Fixture {
 
 export type FormResult = 'W' | 'D' | 'L';
 
+// One match in a club's recent form. Carries enough to explain the result on
+// hover -- who it was against, the score from THIS club's point of view, and
+// which ground -- rather than just the letter.
+export interface FormEntry {
+    result: FormResult;
+    opponentId: string;
+    home: boolean;
+    gf: number; // goals for, from this club's perspective
+    ga: number;
+    kickoff: string;
+}
+
 export interface StandingRow {
     teamId: string;
     name: string;
@@ -30,7 +42,7 @@ export interface StandingRow {
     lost: number;
     gd: number;
     points: number;
-    form: FormResult[]; // last 5 results, MOST RECENT FIRST; shorter early in the season
+    form: FormEntry[]; // last 5 matches, MOST RECENT FIRST; shorter early in the season
     formPoints: number; // points won across those matches (0-15)
 }
 
@@ -99,12 +111,12 @@ export async function getFixtures(matchweek: number): Promise<Fixture[]> {
 // than football-data's `form` field, which is absent on some plans and doesn't
 // document which end is most recent. Ordered by kickoff rather than matchweek, so
 // a postponed game counts as recent when it was actually played.
-function formGuide(matches: FinishedMatch[]): Map<string, { form: FormResult[]; points: number }> {
-    const played = new Map<string, { at: number; result: FormResult }[]>();
-    const add = (teamId: string, at: number, result: FormResult) => {
+function formGuide(matches: FinishedMatch[]): Map<string, { form: FormEntry[]; points: number }> {
+    const played = new Map<string, { at: number; entry: FormEntry }[]>();
+    const add = (teamId: string, at: number, entry: FormEntry) => {
         const list = played.get(teamId);
-        if (list) list.push({ at, result });
-        else played.set(teamId, [{ at, result }]);
+        if (list) list.push({ at, entry });
+        else played.set(teamId, [{ at, entry }]);
     };
 
     for (const m of matches) {
@@ -112,14 +124,31 @@ function formGuide(matches: FinishedMatch[]): Map<string, { form: FormResult[]; 
         const at = new Date(m.kickoff).getTime();
         if (!Number.isFinite(at)) continue;
         const home: FormResult = m.homeGoals > m.awayGoals ? 'W' : m.homeGoals < m.awayGoals ? 'L' : 'D';
-        add(m.homeId, at, home);
-        add(m.awayId, at, home === 'W' ? 'L' : home === 'L' ? 'W' : 'D');
+        // Goals are stored per club rather than per fixture, so each side reads its
+        // own row as "we scored gf, they scored ga" with no perspective flipping
+        // left to the UI.
+        add(m.homeId, at, {
+            result: home,
+            opponentId: m.awayId,
+            home: true,
+            gf: m.homeGoals,
+            ga: m.awayGoals,
+            kickoff: m.kickoff
+        });
+        add(m.awayId, at, {
+            result: home === 'W' ? 'L' : home === 'L' ? 'W' : 'D',
+            opponentId: m.homeId,
+            home: false,
+            gf: m.awayGoals,
+            ga: m.homeGoals,
+            kickoff: m.kickoff
+        });
     }
 
-    const guide = new Map<string, { form: FormResult[]; points: number }>();
+    const guide = new Map<string, { form: FormEntry[]; points: number }>();
     for (const [teamId, list] of played) {
-        const form = list.sort((a, b) => b.at - a.at).slice(0, 5).map((e) => e.result);
-        const points = form.reduce((n, r) => n + (r === 'W' ? 3 : r === 'D' ? 1 : 0), 0);
+        const form = list.sort((a, b) => b.at - a.at).slice(0, 5).map((e) => e.entry);
+        const points = form.reduce((n, e) => n + (e.result === 'W' ? 3 : e.result === 'D' ? 1 : 0), 0);
         guide.set(teamId, { form, points });
     }
     return guide;
@@ -129,7 +158,7 @@ export async function getStandings(): Promise<StandingRow[]> {
     const data = await fd('/competitions/PL/standings');
     // The form guide is a second upstream call. If it fails, still return the
     // table — losing form is a missing column, losing the table is a blank tab.
-    let guide = new Map<string, { form: FormResult[]; points: number }>();
+    let guide = new Map<string, { form: FormEntry[]; points: number }>();
     try {
         guide = formGuide(await getFinishedMatches());
     } catch (err) {

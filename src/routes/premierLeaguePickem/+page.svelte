@@ -888,6 +888,21 @@
         performance: { label: 'Performance', cls: 'num', title: 'How far the club is running above or below its odds. What you would have banked backing it every week as your fan team, over one match’s worth of points, less the matches played. 0 is exactly to the odds; + is over, - is under. Gold/silver/bronze are left out — they reward an interesting fixture, not a performance', asc: false, get: (r) => (r.performance == null ? Number.NEGATIVE_INFINITY : r.performance) }
     };
     const PL_ORDER = ['name', 'played', 'won', 'drawn', 'lost', 'gd', 'points', 'formPoints', 'performance'];
+
+    // Which form pip has been tapped open, as 'teamId:index'. Hover handles the
+    // desktop case in CSS; this is what gives touch devices the same detail,
+    // since there is no hover to fall back on.
+    let openPip = null;
+
+    function formLabel(r, k) {
+        const opp = teamById[r.opponentId];
+        const who = opp ? opp.name : r.opponentId;
+        const outcome = r.result === 'W' ? 'Won' : r.result === 'D' ? 'Drew' : 'Lost';
+        // 'v' for home, 'away to' for away -- shorter than repeating (H)/(A).
+        const where = r.home ? 'v ' : 'away to ';
+        const when = new Date(r.kickoff).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+        return (k === 0 ? 'Latest: ' : '') + outcome + ' ' + r.gf + '-' + r.ga + ' ' + where + who + ', ' + when;
+    }
     let plSort = { key: 'points', asc: false };
     // `pos` is the real league position, so it stays put when you sort by GD or form.
     $: plRows = sortRows((standings || []).map((r, i) => ({ ...r, pos: i + 1 })), PL_COLS, plSort);
@@ -1003,6 +1018,15 @@
         activeTab = choice;
     }
 </script>
+
+<!-- A tapped-open form tooltip closes on the next tap anywhere, on scroll, or
+     on Escape. The pip itself stops propagation, so opening one does not
+     immediately re-close it. -->
+<svelte:window
+    on:click={() => (openPip = null)}
+    on:scroll={() => (openPip = null)}
+    on:keydown={(e) => e.key === 'Escape' && (openPip = null)}
+/>
 
 <svelte:head>
     <title>Premier League Pickem</title>
@@ -1580,7 +1604,15 @@
                                                     <span class="form-pts">{row.formPoints}</span>
                                                     <span class="form-run">
                                                         {#each row.form as r, k (k)}
-                                                            <span class="pip" class:w={r === 'W'} class:d={r === 'D'} class:l={r === 'L'} class:latest={k === 0} title="{k === 0 ? 'Most recent — ' : ''}{r === 'W' ? 'Win' : r === 'D' ? 'Draw' : 'Loss'}">{r === 'W' ? '✓' : r === 'D' ? '–' : '✕'}</span>
+                                                            {@const pipKey = row.teamId + ':' + k}
+                                                            <span class="pip-wrap">
+                                                                <button type="button"
+                                                                    class="pip" class:w={r.result === 'W'} class:d={r.result === 'D'} class:l={r.result === 'L'} class:latest={k === 0}
+                                                                    aria-label={formLabel(r, k)}
+                                                                    on:click|stopPropagation={() => (openPip = openPip === pipKey ? null : pipKey)}
+                                                                >{r.result === 'W' ? '✓' : r.result === 'D' ? '–' : '✕'}</button>
+                                                                <span class="pip-tip" class:open={openPip === pipKey}>{formLabel(r, k)}</span>
+                                                            </span>
                                                         {/each}
                                                     </span>
                                                 </span>
@@ -2169,7 +2201,32 @@
     .form-cell { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
     .form-pts { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 1ch; }
     .form-run { display: inline-flex; gap: 0.3rem; }
-    .pip { width: 1.05rem; height: 1.05rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; line-height: 1; color: #fff; cursor: help; }
+    /* The pip is a real <button>: it has to be tappable and keyboard-reachable now
+       that it carries information, which a <span> with a title never was. */
+    .pip-wrap { position: relative; display: inline-flex; }
+    .pip { width: 1.05rem; height: 1.05rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; line-height: 1; color: #fff; cursor: help; border: none; padding: 0; font-family: inherit; }
+    .pip:focus-visible { outline: 2px solid #2c5aa0; outline-offset: 2px; }
+
+    /* Shown on hover for a mouse, and on .open for a tap. Both paths use the same
+       element, so the two never disagree about content or position. */
+    .pip-tip {
+        position: absolute; bottom: calc(100% + 0.4rem); left: 50%; transform: translateX(-50%);
+        background: #1f2937; color: #fff; border-radius: 6px;
+        padding: 0.3rem 0.5rem; font-size: 0.72rem; font-weight: 500; line-height: 1.25;
+        white-space: nowrap; z-index: 20; pointer-events: none;
+        opacity: 0; visibility: hidden; transition: opacity 0.12s;
+    }
+    .pip-tip::after {
+        content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+        border: 4px solid transparent; border-top-color: #1f2937;
+    }
+    .pip-wrap:hover .pip-tip, .pip-tip.open { opacity: 1; visibility: visible; }
+    /* Hover tooltips on a touch screen stick after the tap that "hovered" them, so
+       only the explicit .open state applies there. */
+    @media (hover: none) {
+        .pip-wrap:hover .pip-tip { opacity: 0; visibility: hidden; }
+        .pip-tip.open { opacity: 1; visibility: visible; }
+    }
     .pip.w { background: #16a34a; }
     .pip.d { background: #9ca3af; }
     .pip.l { background: #dc2626; }
