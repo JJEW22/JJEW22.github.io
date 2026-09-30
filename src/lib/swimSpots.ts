@@ -2,10 +2,14 @@
 // The swim-spot vocabulary and validation, in one client-safe place.
 //
 // Not under $lib/server, because all three consumers need it: the map at /meSoup
-// colors its dots and builds its legend from WATER_TYPES, the admin form builds
-// its dropdown from the same array, and the API validates writes with
+// colors its dots and builds its legend from the water types, the admin form
+// builds its dropdown from the same list, and the API validates writes with
 // normalizeSpot() so the form and the endpoint can never disagree about what a
-// valid spot is. The database deliberately holds no copy of this list.
+// valid spot is.
+//
+// The built-in types live here and nowhere else. Types typed in under "Other"
+// are stored in swim_water_types and merged in with withCustomTypes(); the
+// database holds only those additions, never a copy of the built-ins.
 
 export interface WaterTypeMeta {
 	id: string;
@@ -30,12 +34,98 @@ export const WATER_TYPES: WaterTypeMeta[] = [
 
 export const DEFAULT_WATER_TYPE = 'other';
 
-const BY_ID = new Map(WATER_TYPES.map((t) => [t.id, t]));
+// Whose map /meSoup shows when no ?user= is given. Everyone else's is at
+// /meSoup?user=<username>.
+export const MESOUP_OWNER = 'JJEW22';
+
+const OTHER = WATER_TYPES.find((t) => t.id === DEFAULT_WATER_TYPE)!;
+
+// Colors handed to custom types in the order they are created. None of them is
+// a built-in color, so a custom dot never reads as a lake or a pool.
+export const CUSTOM_TYPE_COLORS = [
+	'#7b4fb8',
+	'#d9534f',
+	'#1a9c9c',
+	'#b8860b',
+	'#4f6fd9',
+	'#a0522d',
+	'#3c8d5a',
+	'#c05fb0'
+];
+
+// The full list: built-ins, then custom types, with `other` still last.
+export function withCustomTypes(custom: WaterTypeMeta[]): WaterTypeMeta[] {
+	const known = new Set(WATER_TYPES.map((t) => t.id));
+	const extra = custom.filter((t) => !known.has(t.id));
+	return [...WATER_TYPES.filter((t) => t !== OTHER), ...extra, OTHER];
+}
+
+// 'Hot Spring!' -> 'hot-spring'. The id a typed-in type is stored under, so
+// "hot spring" and "Hot Spring" land on the same type instead of two.
+export function waterTypeId(label: string): string {
+	return label
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+}
 
 // Always returns something. An unknown id can only come from a row written before
 // a type was renamed, and a dot with no color is worse than a grey one.
-export function waterType(id: string | null | undefined): WaterTypeMeta {
-	return BY_ID.get(id ?? '') ?? BY_ID.get(DEFAULT_WATER_TYPE)!;
+export function waterType(
+	id: string | null | undefined,
+	types: WaterTypeMeta[] = WATER_TYPES
+): WaterTypeMeta {
+	return types.find((t) => t.id === id) ?? OTHER;
+}
+
+// --- degrees, minutes, seconds ---
+
+export interface Dms {
+	d: string;
+	m: string;
+	s: string;
+	hemi: string; // 'N' | 'S' for latitude, 'E' | 'W' for longitude
+}
+
+// What a DMS field set holds, turned into signed decimal degrees. The range
+// check against ±90/±180 is left to normalizeSpot, so both formats fail with
+// the same message.
+export function dmsToDecimal(
+	dms: Dms,
+	axis: 'Latitude' | 'Longitude'
+): { ok: true; value: number } | { ok: false; error: string } {
+	const part = (v: string) => (v.trim() === '' ? 0 : Number(v));
+	if (dms.d.trim() === '') return { ok: false, error: `${axis} needs its degrees.` };
+	const d = part(dms.d);
+	const m = part(dms.m);
+	const s = part(dms.s);
+	if (![d, m, s].every(Number.isFinite) || d < 0 || m < 0 || s < 0) {
+		return { ok: false, error: `${axis} degrees, minutes and seconds must be positive numbers.` };
+	}
+	if (m >= 60 || s >= 60) {
+		return { ok: false, error: `${axis} minutes and seconds must each be under 60.` };
+	}
+	const value = d + m / 60 + s / 3600;
+	return { ok: true, value: dms.hemi === 'S' || dms.hemi === 'W' ? -value : value };
+}
+
+// The other way, for filling the DMS fields from a saved spot. Seconds keep one
+// decimal (about 3 m), and rounding that up to 60.0 carries into the minutes.
+export function decimalToDms(value: number, axis: 'Latitude' | 'Longitude'): Dms {
+	const hemi = axis === 'Latitude' ? (value < 0 ? 'S' : 'N') : value < 0 ? 'W' : 'E';
+	let tenths = Math.round(Math.abs(value) * 36000);
+	const d = Math.floor(tenths / 36000);
+	tenths -= d * 36000;
+	const m = Math.floor(tenths / 600);
+	const s = (tenths - m * 600) / 10;
+	return { d: String(d), m: String(m), s: String(s), hemi };
+}
+
+// '42°26′20.4″N' -- for the admin table when it is showing DMS.
+export function formatDms(value: number, axis: 'Latitude' | 'Longitude'): string {
+	const { d, m, s, hemi } = decimalToDms(value, axis);
+	return `${d}°${m}′${s}″${hemi}`;
 }
 
 export interface SwimSpot {
@@ -65,12 +155,24 @@ function text(value: unknown): string | null {
 // Accepts what a text input actually produces -- strings, blanks, the odd stray
 // degree sign -- and either hands back a row ready for the database or says in
 // one sentence what is wrong with it.
-export function normalizeSpot(input: SwimSpotInput): Normalized {
+//
+// `types` is the list the water type is checked against: the built-ins, or the
+// built-ins plus the custom types when the caller has them.
+export function normalizeSpot(
+	input: SwimSpotInput,
+	types: WaterTypeMeta[] = WATER_TYPES
+): Normalized {
 	const name = text(input.name);
 	if (!name) return { ok: false, error: 'A spot needs a name.' };
 
-	const lat = Number(String(input.lat ?? '').replace(/[^0-9.+-]/g, ''));
-	const lon = Number(String(input.lon ?? '').replace(/[^0-9.+-]/g, ''));
+	// A blank coordinate is missing, not zero -- Number('') is 0, which would
+	// quietly drop the spot in the Gulf of Guinea.
+	const coord = (v: unknown) => {
+		const s = String(v ?? '').replace(/[^0-9.+-]/g, '');
+		return s === '' ? NaN : Number(s);
+	};
+	const lat = coord(input.lat);
+	const lon = coord(input.lon);
 	if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
 		return { ok: false, error: 'Latitude must be a number between -90 and 90.' };
 	}
@@ -86,7 +188,8 @@ export function normalizeSpot(input: SwimSpotInput): Normalized {
 	}
 
 	const wt = text(input.waterType) ?? DEFAULT_WATER_TYPE;
-	if (!BY_ID.has(wt)) return { ok: false, error: `"${wt}" is not one of the water types.` };
+	if (!types.some((t) => t.id === wt))
+		return { ok: false, error: `"${wt}" is not one of the water types.` };
 
 	return {
 		ok: true,

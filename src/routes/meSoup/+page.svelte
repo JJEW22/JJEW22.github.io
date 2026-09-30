@@ -9,18 +9,34 @@
 	Like every page here it is prerendered (src/routes/+layout.js), so the spots
 	arrive from /meSoup/api/spots in the browser and an unreachable API costs the
 	dots, not the page.
+
+	Everyone signed in keeps their own map. With no ?user= this is the site
+	owner's (MESOUP_OWNER); /meSoup?user=<name> is anyone else's. Because the
+	page is prerendered, the query is read in the browser, not in a load.
 -->
 <script lang="ts">
 	import '../../app.css';
 	import { onMount } from 'svelte';
 	import WorldMap from './WorldMap.svelte';
-	import { WATER_TYPES, waterType, summarize, formatDate, formatCoords } from '$lib/swimSpots';
-	import type { SwimSpot } from '$lib/swimSpots';
+	import {
+		WATER_TYPES,
+		MESOUP_OWNER,
+		waterType,
+		summarize,
+		formatDate,
+		formatCoords
+	} from '$lib/swimSpots';
+	import type { SwimSpot, WaterTypeMeta } from '$lib/swimSpots';
 
 	let spots: SwimSpot[] = [];
+	// Built-ins until the API answers with the custom types added in the admin.
+	let waterTypes: WaterTypeMeta[] = WATER_TYPES;
 	let loading = true;
 	let loadFailed = false;
-	let isAdmin = false;
+	// Whose map this is, as the API spells it, and who is signed in (if anyone).
+	let owner = MESOUP_OWNER;
+	let notFound = '';
+	let me: string | null = null;
 	let selectedId: number | null = null;
 
 	// Water types the reader has switched off. Empty means everything shows —
@@ -31,16 +47,23 @@
 	let hidden: string[] = [];
 
 	onMount(() => {
+		owner = new URLSearchParams(location.search).get('user')?.trim() || MESOUP_OWNER;
 		loadSpots();
-		checkAdmin();
+		checkUser();
 	});
 
 	async function loadSpots() {
 		try {
-			const res = await fetch('/meSoup/api/spots');
+			const res = await fetch(`/meSoup/api/spots?user=${encodeURIComponent(owner)}`);
+			if (res.status === 404) {
+				notFound = owner;
+				return;
+			}
 			if (!res.ok) throw new Error(String(res.status));
 			const data = await res.json();
+			if (data.owner) owner = data.owner;
 			spots = data.spots ?? [];
+			if (data.waterTypes?.length) waterTypes = data.waterTypes;
 		} catch {
 			loadFailed = true;
 		} finally {
@@ -48,18 +71,19 @@
 		}
 	}
 
-	// Only to decide whether to show the admin link. The endpoints do the real
-	// gating, so being wrong here reveals nothing.
-	async function checkAdmin() {
+	// Only to decide which link to show. The endpoint scopes every write to the
+	// signed-in user, so being wrong here reveals nothing.
+	async function checkUser() {
 		try {
-			const me = await fetch('/api/auth/me').then((r) => r.json());
-			const roles = me.roles ?? [];
-			isAdmin =
-				Boolean(me.user) && (roles.includes('site:admin') || roles.includes('mesoup:admin'));
+			const res = await fetch('/api/auth/me').then((r) => r.json());
+			me = res.user ?? null;
 		} catch {
-			isAdmin = false;
+			me = null;
 		}
 	}
+
+	$: isSiteOwner = owner.toLowerCase() === MESOUP_OWNER.toLowerCase();
+	$: isMine = me !== null && owner.toLowerCase() === me.toLowerCase();
 
 	function toggleType(id: string) {
 		hidden = hidden.includes(id) ? hidden.filter((h) => h !== id) : [...hidden, id];
@@ -75,7 +99,7 @@
 		acc[s.waterType] = (acc[s.waterType] ?? 0) + 1;
 		return acc;
 	}, {});
-	$: present = WATER_TYPES.filter((t) => counts[t.id]);
+	$: present = waterTypes.filter((t) => counts[t.id]);
 
 	$: visible = spots.filter((s) => !hidden.includes(s.waterType));
 	$: summary = summarize(visible);
@@ -97,16 +121,29 @@
 <div class="container">
 	<nav class="breadcrumb">
 		<a href="/me">← Back to Me</a>
-		{#if isAdmin}<a class="admin-link" href="/meSoup/admin">Admin</a>{/if}
+		{#if me}
+			<span class="nav-links">
+				{#if !isMine}<a href="/meSoup?user={encodeURIComponent(me)}">My map</a>{/if}
+				<a class="admin-link" href="/meSoup/admin">{isMine ? 'Edit my spots' : 'Add my spots'}</a>
+			</span>
+		{/if}
 	</nav>
 
 	<main>
 		<header class="head">
-			<h1>meSoup</h1>
-			<p class="intro">
-				Every body of water I've managed to get into, plotted. Hover a dot — or tap one on a phone —
-				for what it was and when.
-			</p>
+			{#if isSiteOwner}
+				<h1>meSoup</h1>
+				<p class="intro">
+					Every body of water I've managed to get into, plotted. Hover a dot — or tap one on a phone
+					— for what it was and when.
+				</p>
+			{:else}
+				<h1>{owner}'s soup</h1>
+				<p class="intro">
+					Every body of water {owner} has managed to get into, plotted. Hover a dot — or tap one on a
+					phone — for what it was and when.
+				</p>
+			{/if}
 		</header>
 
 		<section class="stats" aria-label="Totals">
@@ -146,17 +183,21 @@
 			</section>
 		{/if}
 
-		<WorldMap spots={visible} bind:selectedId />
+		<WorldMap spots={visible} {waterTypes} bind:selectedId />
 
 		{#if loading}
 			<p class="note">Loading spots…</p>
+		{:else if notFound}
+			<p class="note warn">
+				There's no one called {notFound} here. <a href="/meSoup">Back to meSoup.</a>
+			</p>
 		{:else if loadFailed}
 			<p class="note warn">
 				Couldn't reach the spot list, so the map is empty. The map itself is fine — try a reload.
 			</p>
 		{:else if !spots.length}
 			<p class="note">
-				No spots yet.{#if isAdmin}
+				No spots yet.{#if isMine}
 					<a href="/meSoup/admin">Add the first one.</a>
 				{/if}
 			</p>
@@ -172,7 +213,8 @@
 								class:on={spot.id === selectedId}
 								on:click={() => (selectedId = selectedId === spot.id ? null : spot.id)}
 							>
-								<span class="swatch" style:background={waterType(spot.waterType).color}></span>
+								<span class="swatch" style:background={waterType(spot.waterType, waterTypes).color}
+								></span>
 								<span class="row-main">
 									<span class="row-name">{spot.name}</span>
 									{#if place(spot)}<span class="row-place">{place(spot)}</span>{/if}
@@ -213,6 +255,12 @@
 
 	.breadcrumb a:hover {
 		color: #0066cc;
+	}
+
+	.nav-links {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
 	}
 
 	.admin-link {

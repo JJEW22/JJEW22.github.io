@@ -17,11 +17,14 @@
 	import { onMount, createEventDispatcher } from 'svelte';
 	import { geoNaturalEarth1, geoPath, geoGraticule10 } from 'd3-geo';
 	import { feature } from 'topojson-client';
-	import { waterType, formatDate, formatCoords } from '$lib/swimSpots';
-	import type { SwimSpot } from '$lib/swimSpots';
+	import { WATER_TYPES, waterType, formatDate, formatCoords } from '$lib/swimSpots';
+	import type { SwimSpot, WaterTypeMeta } from '$lib/swimSpots';
 	import type { Feature, FeatureCollection, Geometry } from 'geojson';
 
 	export let spots: SwimSpot[] = [];
+	// Built-ins plus custom types, from the API. Without it a custom-typed dot
+	// still draws, just grey.
+	export let waterTypes: WaterTypeMeta[] = WATER_TYPES;
 	export let topoPath = '/meSoup/countries-110m.json';
 	// Bindable, so the list beside the map and the map itself highlight together.
 	export let selectedId: number | null = null;
@@ -258,7 +261,7 @@
 
 			{#each spots as spot (spot.id)}
 				{@const xyPt = xy(spot)}
-				{@const meta = waterType(spot.waterType)}
+				{@const meta = waterType(spot.waterType, waterTypes)}
 				{@const on = spot.id === activeId}
 				<g class="dot">
 					<circle
@@ -305,7 +308,7 @@
 		<div class="tip" style:left="{tip.left}px" style:top="{tip.top}px">
 			<strong>{active.name}</strong>
 			<span class="tip-meta">
-				{waterType(active.waterType).label} · {formatDate(active.swumOn)}
+				{waterType(active.waterType, waterTypes).label} ·{formatDate(active.swumOn)}
 			</span>
 			{#if active.country || active.region}
 				<span class="tip-meta">
