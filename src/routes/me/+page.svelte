@@ -39,6 +39,13 @@
             image: 'none',
             display: true
         },
+        {
+            title: "meSoup",
+            description: "A map of every body of water I've swum in — ocean, lake, river, quarry and the odd hotel pool.",
+            link: "/meSoup",
+            image: 'none',
+            display: true
+        },
     ];
 
 // Filter to only show projects where display is true

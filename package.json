@@ -24,7 +24,9 @@
 		"@sveltejs/adapter-static": "^3.0.9",
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
+		"@types/d3-geo": "^3.1.1",
 		"@types/node": "^20",
+		"@types/topojson-client": "^3.1.5",
 		"eslint": "^9.22.0",
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-svelte": "^3.0.0",
@@ -40,7 +42,9 @@
 	},
 	"dependencies": {
 		"@node-rs/argon2": "^2.0.2",
+		"d3-geo": "^3.1.1",
 		"postgres": "^3.4.9",
+		"topojson-client": "^3.1.0",
 		"xlsx": "^0.18.5"
 	}
 }
