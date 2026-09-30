@@ -27,7 +27,12 @@ export const SNOW_ADMIN_ROLE = 'snow:admin';
 // Dates are `date` columns, and postgres.js would hand them back as a Date at
 // LOCAL midnight — a day earlier than stored, once rendered west of Greenwich.
 // That is exactly the bug the old page worked around. Read them as text.
-const SEASON_COLUMNS = sql`
+// A function, not a constant: `sql` is a lazy proxy whose first call opens the
+// connection, so building this fragment at module scope would need
+// DATABASE_URL at import time. The production image has no database
+// environment, and SvelteKit's analyse step imports this module during the
+// build -- which is exactly how that broke the Render deploy.
+const seasonColumns = () => sql`
 	slug,
 	label,
 	to_char(deadline, 'YYYY-MM-DD') as deadline,
@@ -63,7 +68,7 @@ function toSeason(r: SeasonRow): SnowSeason {
 // Newest first, so the current season is the leftmost tab.
 export async function listSeasons(): Promise<SnowSeason[]> {
 	const rows = await sql<SeasonRow[]>`
-		select ${SEASON_COLUMNS} from snow_seasons order by slug desc
+		select ${seasonColumns()} from snow_seasons order by slug desc
 	`;
 	return rows.map(toSeason);
 }
@@ -72,9 +77,9 @@ export async function listSeasons(): Promise<SnowSeason[]> {
 // the most recent. A site with seasons in it should never answer "no season".
 export async function getSeason(slug?: string): Promise<SnowSeason | null> {
 	const rows = slug
-		? await sql<SeasonRow[]>`select ${SEASON_COLUMNS} from snow_seasons where slug = ${slug}`
+		? await sql<SeasonRow[]>`select ${seasonColumns()} from snow_seasons where slug = ${slug}`
 		: await sql<SeasonRow[]>`
-				select ${SEASON_COLUMNS} from snow_seasons
+				select ${seasonColumns()} from snow_seasons
 				order by is_current desc, slug desc limit 1
 			`;
 	return rows[0] ? toSeason(rows[0]) : null;

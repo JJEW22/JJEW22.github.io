@@ -11,7 +11,13 @@ export const SWIM_ADMIN_ROLE = 'mesoup:admin';
 // swum_on is a `date`, and postgres.js would hand it back as a Date at LOCAL
 // midnight -- which, rendered anywhere west of Greenwich, is the day before. The
 // column never had a time in it to lose, so it is read out as the text it is.
-const COLUMNS = sql`
+//
+// A function, not a constant: `sql` is a lazy proxy whose first call opens the
+// connection, so building this fragment at module scope would need
+// DATABASE_URL at import time. The production image has no database
+// environment, and SvelteKit's analyse step imports this module during the
+// build -- which is exactly how that broke the Render deploy.
+const columns = () => sql`
 	id,
 	name,
 	lat,
@@ -56,7 +62,7 @@ function toSpot(r: Row): SwimSpot {
 // across reloads instead of whatever the planner felt like.
 export async function listSpots(): Promise<SwimSpot[]> {
 	const rows = await sql<Row[]>`
-		select ${COLUMNS} from swim_spots
+		select ${columns()} from swim_spots
 		order by swum_on desc nulls last, name asc
 	`;
 	return rows.map(toSpot);
@@ -71,7 +77,7 @@ export async function createSpot(spot: NewSpot): Promise<SwimSpot> {
 			${spot.name}, ${spot.lat}, ${spot.lon}, ${spot.swumOn},
 			${spot.waterType}, ${spot.country}, ${spot.region}, ${spot.note}
 		)
-		returning ${COLUMNS}
+		returning ${columns()}
 	`;
 	return toSpot(row);
 }
@@ -91,7 +97,7 @@ export async function updateSpot(id: number, spot: NewSpot): Promise<SwimSpot | 
 			note = ${spot.note},
 			updated_at = now()
 		where id = ${id}
-		returning ${COLUMNS}
+		returning ${columns()}
 	`;
 	return row ? toSpot(row) : null;
 }

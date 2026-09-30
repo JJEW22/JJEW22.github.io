@@ -55,7 +55,12 @@ interface SeasonRow {
 	away_venue: string;
 }
 
-const SEASON_COLUMNS = sql`
+// A function, not a constant: `sql` is a lazy proxy whose first call opens the
+// connection, so building this fragment at module scope would need
+// DATABASE_URL at import time. The production image has no database
+// environment, and SvelteKit's analyse step imports this module during the
+// build -- which is exactly how that broke the Render deploy.
+const seasonColumns = () => sql`
 	id, slug, label, season_number, is_current, is_published, home_venue, away_venue
 `;
 
@@ -77,9 +82,9 @@ const toSeason = (r: SeasonRow): Season => ({
 export async function listSeasons(includeUnpublished = false): Promise<Season[]> {
 	const rows = includeUnpublished
 		? await sql<SeasonRow[]>`
-				select ${SEASON_COLUMNS} from jpflicks_seasons order by season_number desc`
+				select ${seasonColumns()} from jpflicks_seasons order by season_number desc`
 		: await sql<SeasonRow[]>`
-				select ${SEASON_COLUMNS} from jpflicks_seasons
+				select ${seasonColumns()} from jpflicks_seasons
 				where is_published order by season_number desc`;
 	return rows.map(toSeason);
 }
@@ -91,15 +96,15 @@ export async function listSeasons(includeUnpublished = false): Promise<Season[]>
 async function seasonRow(slug?: string, includeUnpublished = false): Promise<SeasonRow | null> {
 	if (slug) {
 		const rows = await sql<SeasonRow[]>`
-			select ${SEASON_COLUMNS} from jpflicks_seasons where slug = ${slug}`;
+			select ${seasonColumns()} from jpflicks_seasons where slug = ${slug}`;
 		return rows[0] ?? null;
 	}
 	const rows = includeUnpublished
 		? await sql<SeasonRow[]>`
-				select ${SEASON_COLUMNS} from jpflicks_seasons
+				select ${seasonColumns()} from jpflicks_seasons
 				order by is_current desc, season_number desc limit 1`
 		: await sql<SeasonRow[]>`
-				select ${SEASON_COLUMNS} from jpflicks_seasons
+				select ${seasonColumns()} from jpflicks_seasons
 				where is_published
 				order by is_current desc, season_number desc limit 1`;
 	return rows[0] ?? null;
