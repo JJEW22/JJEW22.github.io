@@ -17,7 +17,7 @@
 	import { onMount, createEventDispatcher } from 'svelte';
 	import { geoNaturalEarth1, geoPath, geoGraticule10 } from 'd3-geo';
 	import { feature } from 'topojson-client';
-	import { WATER_TYPES, waterType, formatDate, formatCoords } from '$lib/swimSpots';
+	import { WATER_TYPES, waterType, formatSwims, formatCoords } from '$lib/swimSpots';
 	import type { SwimSpot, WaterTypeMeta } from '$lib/swimSpots';
 	import type { Feature, FeatureCollection, Geometry } from 'geojson';
 
@@ -25,6 +25,9 @@
 	// Built-ins plus custom types, from the API. Without it a custom-typed dot
 	// still draws, just grey.
 	export let waterTypes: WaterTypeMeta[] = WATER_TYPES;
+	// The signed-out map: its spots have no date to show, and "date unknown" on
+	// every dot would read as missing data rather than withheld data.
+	export let anonymous = false;
 	export let topoPath = '/meSoup/countries-110m.json';
 	// Bindable, so the list beside the map and the map itself highlight together.
 	export let selectedId: number | null = null;
@@ -307,15 +310,22 @@
 	{#if active && tip && !tip.offScreen}
 		<div class="tip" style:left="{tip.left}px" style:top="{tip.top}px">
 			<strong>{active.name}</strong>
-			<span class="tip-meta">
-				{waterType(active.waterType, waterTypes).label} ·{formatDate(active.swumOn)}
-			</span>
+			{#if !anonymous}
+				<span class="tip-meta">
+					{waterType(active.waterType, waterTypes).label} · {formatSwims(active.dates)}
+				</span>
+			{/if}
 			{#if active.country || active.region}
 				<span class="tip-meta">
 					{[active.region, active.country].filter(Boolean).join(', ')}
 				</span>
 			{/if}
 			<span class="tip-coords">{formatCoords(active.lat, active.lon)}</span>
+			{#if active.owner}
+				<span class="tip-meta">
+					{[active.owner, ...(active.tagged ?? [])].join(', ')}
+				</span>
+			{/if}
 			{#if active.note}<span class="tip-note">{active.note}</span>{/if}
 		</div>
 	{/if}

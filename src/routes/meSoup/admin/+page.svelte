@@ -26,7 +26,9 @@
 		waterType,
 		dmsToDecimal,
 		decimalToDms,
-		formatDms
+		formatDms,
+		formatDate,
+		formatSwims
 	} from '$lib/swimSpots';
 	import type { SwimSpot, WaterTypeMeta, Dms } from '$lib/swimSpots';
 
@@ -35,6 +37,8 @@
 	// with; ids come from an identity column, so nothing is ever negative.
 	const DRAFT_ID = -1;
 	const DMS_PREF_KEY = 'mesoup:admin:dms';
+	// /account sends you back here once you've signed in.
+	const SIGN_IN_URL = '/account?redirect=/meSoup/admin';
 
 	let status = 'loading'; // loading | denied | ready
 	let username = '';
@@ -61,14 +65,81 @@
 			name: '',
 			lat: '',
 			lon: '',
-			swumOn: '',
+			// Every visit, newest first. A regular swimming hole collects many.
+			dates: [] as string[],
 			waterType: DEFAULT_WATER_TYPE,
 			// What was typed beside "Other"; the server turns it into a new type.
 			otherLabel: '',
 			country: '',
 			region: '',
-			note: ''
+			note: '',
+			// Usernames of the other people who were there. No limit.
+			tagged: [] as string[]
 		};
+	}
+
+	// --- dates ---
+
+	let dateInput = '';
+
+	function addDate() {
+		const d = dateInput;
+		dateInput = '';
+		if (!d || draft.dates.includes(d)) return;
+		draft.dates = [...draft.dates, d].sort().reverse();
+	}
+
+	function removeDate(d: string) {
+		draft.dates = draft.dates.filter((x) => x !== d);
+	}
+
+	// --- tagging ---
+
+	let tagInput = '';
+	let suggestions: string[] = [];
+	let suggestTimer: ReturnType<typeof setTimeout> | undefined;
+
+	// Names are checked against real accounts on save, not here: the server
+	// is the one that knows, and a stale suggestion list shouldn't block a tag.
+	function addTag() {
+		const name = tagInput.trim().replace(/^@/, '');
+		tagInput = '';
+		suggestions = [];
+		if (!name || name.toLowerCase() === username.toLowerCase()) return;
+		if (draft.tagged.some((t) => t.toLowerCase() === name.toLowerCase())) return;
+		draft.tagged = [...draft.tagged, name];
+	}
+
+	function removeTag(name: string) {
+		draft.tagged = draft.tagged.filter((t) => t !== name);
+	}
+
+	// Enter or a comma adds the name instead of submitting the whole form;
+	// Backspace in an empty box takes the last one back off.
+	function tagKey(e: KeyboardEvent) {
+		if (e.key === 'Enter' || e.key === ',') {
+			e.preventDefault();
+			addTag();
+		} else if (e.key === 'Backspace' && tagInput === '' && draft.tagged.length) {
+			draft.tagged = draft.tagged.slice(0, -1);
+		}
+	}
+
+	function suggest() {
+		clearTimeout(suggestTimer);
+		const q = tagInput.trim().replace(/^@/, '');
+		if (!q) {
+			suggestions = [];
+			return;
+		}
+		suggestTimer = setTimeout(async () => {
+			const data = await fetch(`/meSoup/api/users?q=${encodeURIComponent(q)}`)
+				.then((r) => (r.ok ? r.json() : null))
+				.catch(() => null);
+			suggestions = (data?.users ?? []).filter(
+				(u: string) => !draft.tagged.some((t) => t.toLowerCase() === u.toLowerCase())
+			);
+		}, 150);
 	}
 
 	function blankDms(hemi: string): Dms {
@@ -115,18 +186,103 @@
 			.catch(() => ({ user: null }));
 		if (!me.user) {
 			status = 'denied';
+			// replace, not assign: Back from the sign-in page shouldn't land on a
+			// page that immediately sends you forward again.
+			window.location.replace(SIGN_IN_URL);
 			return;
 		}
 		username = me.user;
 		await load();
 	});
 
+	// Signing out here goes straight back to sign-in, so switching accounts is
+	// one click and a sign-in.
+	async function signOut() {
+		busy = true;
+		await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
+		window.location.replace(SIGN_IN_URL);
+	}
+
+	// --- sharing the whole map ---
+
+	const SHARES_API = '/meSoup/api/shares';
+	let shares: string[] = [];
+	let shareInput = '';
+	let shareSuggestions: string[] = [];
+	let shareTimer: ReturnType<typeof setTimeout> | undefined;
+	let shareError = '';
+	let shareBusy = false;
+
+	async function loadShares() {
+		const data = await fetch(SHARES_API)
+			.then((r) => (r.ok ? r.json() : null))
+			.catch(() => null);
+		shares = data?.shares ?? [];
+	}
+
+	// Add or remove one person; the server answers with the whole list.
+	async function changeShare(method: 'POST' | 'DELETE', name: string) {
+		shareBusy = true;
+		shareError = '';
+		try {
+			const r = await fetch(SHARES_API, {
+				method,
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ username: name })
+			});
+			const data = await r.json().catch(() => null);
+			if (!r.ok) {
+				shareError = data?.error || `Couldn't update sharing (${r.status}).`;
+				return;
+			}
+			shares = data.shares ?? [];
+			if (method === 'POST') shareInput = '';
+		} catch (err) {
+			shareError = `Couldn't update sharing: ${err instanceof Error ? err.message : String(err)}`;
+		} finally {
+			shareBusy = false;
+		}
+	}
+
+	function addShare() {
+		const name = shareInput.trim().replace(/^@/, '');
+		shareSuggestions = [];
+		if (name) changeShare('POST', name);
+	}
+
+	function shareKey(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			addShare();
+		}
+	}
+
+	function suggestShare() {
+		clearTimeout(shareTimer);
+		const q = shareInput.trim().replace(/^@/, '');
+		if (!q) {
+			shareSuggestions = [];
+			return;
+		}
+		shareTimer = setTimeout(async () => {
+			const data = await fetch(`/meSoup/api/users?q=${encodeURIComponent(q)}`)
+				.then((r) => (r.ok ? r.json() : null))
+				.catch(() => null);
+			shareSuggestions = (data?.users ?? []).filter(
+				(u: string) => !shares.some((x) => x.toLowerCase() === u.toLowerCase())
+			);
+		}, 150);
+	}
+
 	async function load() {
+		loadShares();
 		const r = await fetch(API);
 		const data = await r.json().catch(() => null);
 		if (!r.ok) {
 			error = data?.error || data?.message || `Could not load the spots (${r.status}).`;
 			status = r.status === 401 ? 'denied' : 'ready';
+			// The session expired between the check above and this load.
+			if (r.status === 401) window.location.replace(SIGN_IN_URL);
 			return;
 		}
 		spots = data.spots ?? [];
@@ -179,13 +335,18 @@
 			name: spot.name,
 			lat: String(spot.lat),
 			lon: String(spot.lon),
-			swumOn: spot.swumOn ?? '',
+			dates: [...spot.dates],
 			waterType: spot.waterType,
 			otherLabel: '',
 			country: spot.country ?? '',
 			region: spot.region ?? '',
-			note: spot.note ?? ''
+			note: spot.note ?? '',
+			// Every tag, not just accepted ones -- otherwise saving an edit would
+			// quietly drop everyone who hasn't answered yet.
+			tagged: (spot.tags ?? []).map((t) => t.username)
 		};
+		tagInput = '';
+		dateInput = '';
 		fillDms(draft.lat, draft.lon);
 		selectedId = DRAFT_ID;
 		msg = '';
@@ -194,6 +355,8 @@
 
 	function reset() {
 		draft = blank();
+		dateInput = '';
+		tagInput = '';
 		latDms = blankDms(latDms.hemi);
 		lonDms = blankDms(lonDms.hemi);
 	}
@@ -218,6 +381,14 @@
 			const payload: Record<string, unknown> = { ...checked.spot };
 			if (editingId !== null) payload.id = editingId;
 			if (isOther && draft.otherLabel.trim()) payload.otherLabel = draft.otherLabel.trim();
+			// Same for a date picked but never added.
+			if (dateInput) {
+				addDate();
+				payload.dates = draft.dates;
+			}
+			// A name typed but never Entered is still meant as a tag.
+			if (tagInput.trim()) addTag();
+			payload.tagged = draft.tagged;
 			const r = await fetch(API, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -276,9 +447,15 @@
 
 <div class="container">
 	<nav class="breadcrumb">
-		<a href={username ? `/meSoup?user=${encodeURIComponent(username)}` : '/meSoup'}>
+		<a href="/meSoup">
 			← Back to {username ? 'my' : 'the'} map
 		</a>
+		{#if username}
+			<span class="account">
+				Signed in as <b>{username}</b>
+				<button type="button" class="link" on:click={signOut} disabled={busy}>Sign out</button>
+			</span>
+		{/if}
 	</nav>
 
 	<main>
@@ -287,8 +464,7 @@
 		{:else if status === 'denied'}
 			<h1>Sign in first</h1>
 			<p class="note">
-				Sign in to keep a map of everywhere you've swum, or go back to <a href="/meSoup">the map</a
-				>.
+				Taking you to <a href={SIGN_IN_URL}>sign in</a> — your spots are tied to your account.
 			</p>
 		{:else}
 			<h1>My spots</h1>
@@ -388,10 +564,27 @@
 						</label>
 					{/if}
 
-					<label>
-						<span>Date swum</span>
-						<input type="date" bind:value={draft.swumOn} />
-					</label>
+					<div class="wide dates">
+						<label for="date-input"><span>Dates swum</span></label>
+						<div class="date-add">
+							<input id="date-input" type="date" bind:value={dateInput} />
+							<button type="button" on:click={addDate} disabled={!dateInput}>Add date</button>
+						</div>
+						{#if draft.dates.length}
+							<div class="date-list">
+								{#each draft.dates as d (d)}
+									<span class="tag">
+										{formatDate(d)}
+										<button
+											type="button"
+											aria-label="Remove {formatDate(d)}"
+											on:click={() => removeDate(d)}>×</button
+										>
+									</span>
+								{/each}
+							</div>
+						{/if}
+					</div>
 
 					<label>
 						<span>Water</span>
@@ -423,6 +616,39 @@
 						<span>Note</span>
 						<input bind:value={draft.note} placeholder="Freezing. Worth it." />
 					</label>
+
+					<div class="wide full tags">
+						<label for="tag-input"><span>Who else was there</span></label>
+						<div class="tag-box">
+							{#each draft.tagged as t (t)}
+								<span class="tag">
+									{t}
+									<button type="button" aria-label="Remove {t}" on:click={() => removeTag(t)}>
+										×
+									</button>
+								</span>
+							{/each}
+							<input
+								id="tag-input"
+								bind:value={tagInput}
+								list="mesoup-users"
+								autocomplete="off"
+								placeholder={draft.tagged.length ? 'Add another' : 'Username, then Enter'}
+								on:input={suggest}
+								on:keydown={tagKey}
+							/>
+							{#if tagInput.trim()}
+								<button type="button" class="add-tag" on:click={addTag}>Add</button>
+							{/if}
+						</div>
+						<datalist id="mesoup-users">
+							{#each suggestions as u (u)}<option value={u}></option>{/each}
+						</datalist>
+						<p class="hint">
+							They'll be asked to accept next time they're signed in. Once they do, it's on their
+							map and their name is on yours.
+						</p>
+					</div>
 				</div>
 
 				{#if draftError}<p class="banner bad">{draftError}</p>{/if}
@@ -437,6 +663,45 @@
 				</div>
 			</form>
 
+			<section class="form share">
+				<h2>Share my map</h2>
+				<p class="hint">
+					Everyone here sees your whole map as <b>{username}Soup</b> — every spot, in full. Remove someone
+					to take it away.
+				</p>
+				{#if shareError}<p class="banner bad">{shareError}</p>{/if}
+				<div class="tag-box">
+					{#each shares as p (p)}
+						<span class="tag">
+							{p}
+							<button
+								type="button"
+								aria-label="Stop sharing with {p}"
+								disabled={shareBusy}
+								on:click={() => changeShare('DELETE', p)}>×</button
+							>
+						</span>
+					{/each}
+					<input
+						bind:value={shareInput}
+						list="mesoup-share-users"
+						autocomplete="off"
+						aria-label="Share my map with"
+						placeholder={shares.length ? 'Add someone else' : 'Username, then Enter'}
+						on:input={suggestShare}
+						on:keydown={shareKey}
+					/>
+					{#if shareInput.trim()}
+						<button type="button" class="add-tag" disabled={shareBusy} on:click={addShare}>
+							Share
+						</button>
+					{/if}
+				</div>
+				<datalist id="mesoup-share-users">
+					{#each shareSuggestions as u (u)}<option value={u}></option>{/each}
+				</datalist>
+			</section>
+
 			{#if spots.length}
 				<table>
 					<thead>
@@ -444,6 +709,7 @@
 							<th></th>
 							<th>Name</th>
 							<th>Where</th>
+							<th>With</th>
 							<th>Date</th>
 							<th class="num">Lat</th>
 							<th class="num">Lon</th>
@@ -467,7 +733,13 @@
 								<td class="sub">
 									{[spot.region, spot.country].filter(Boolean).join(', ') || '—'}
 								</td>
-								<td class="sub">{spot.swumOn ?? '—'}</td>
+								<td class="sub">
+									{#each spot.tags ?? [] as t, i (t.username)}{i ? ', ' : ''}<span
+											class="tag-status {t.status}"
+											title={t.status}>{t.username}</span
+										>{/each}{#if !spot.tags?.length}—{/if}
+								</td>
+								<td class="sub">{spot.dates.length ? formatSwims(spot.dates) : '—'}</td>
 								<td class="num">
 									{useDms ? formatDms(spot.lat, 'Latitude') : spot.lat.toFixed(4)}
 								</td>
@@ -504,7 +776,36 @@
 	}
 
 	.breadcrumb {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
 		margin-bottom: 2rem;
+	}
+
+	.account {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-size: 0.9rem;
+		color: #666;
+	}
+
+	.account b {
+		color: #1a1a1a;
+	}
+
+	button.link {
+		padding: 0;
+		background: none;
+		border: 0;
+		color: #0066cc;
+		font-size: 0.9rem;
+	}
+
+	button.link:hover:not(:disabled) {
+		text-decoration: underline;
 	}
 
 	.breadcrumb a {
@@ -541,7 +842,6 @@
 		color: #666;
 		font-size: 0.95rem;
 	}
-
 
 	.banner {
 		margin: 0 0 1rem 0;
@@ -580,6 +880,108 @@
 
 	.grid .wide {
 		grid-column: span 2;
+	}
+
+	.grid .full {
+		grid-column: 1 / -1;
+	}
+
+	.dates {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+
+	.date-add {
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	.date-add input {
+		flex: 1;
+	}
+
+	.date-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+
+	.share .hint {
+		margin-bottom: 0.75rem;
+	}
+
+	.tags {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+
+	.tag-box {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.3rem 0.4rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+	}
+
+	.tag-box:focus-within {
+		border-color: #0066cc;
+	}
+
+	.tag-box input {
+		flex: 1 1 10rem;
+		padding: 0.15rem 0.25rem;
+		border: 0;
+	}
+
+	.tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.15rem 0.3rem 0.15rem 0.55rem;
+		background: #eaf2fb;
+		border-radius: 20px;
+		font-size: 0.85rem;
+		color: #0b4f8a;
+	}
+
+	.tag button {
+		padding: 0 0.3rem;
+		background: none;
+		border: 0;
+		font-size: 0.95rem;
+		line-height: 1;
+		color: inherit;
+	}
+
+	.tag-box .add-tag {
+		padding: 0.2rem 0.6rem;
+		font-size: 0.8rem;
+	}
+
+	/* Accepted names read normally; the others say where they stand. */
+	.tag-status.pending {
+		font-style: italic;
+	}
+
+	.tag-status.pending::after {
+		content: ' (pending)';
+	}
+
+	.tag-status.declined {
+		text-decoration: line-through;
+	}
+
+	.hint {
+		margin: 0;
+		font-size: 0.8rem;
+		color: #888;
 	}
 
 	label {

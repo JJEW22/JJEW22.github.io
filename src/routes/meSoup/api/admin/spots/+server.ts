@@ -5,14 +5,14 @@
 // this is where that is actually enforced -- the page only decides what to draw.
 import { error, json } from '@sveltejs/kit';
 import {
-	createSpot,
 	deleteSpot,
 	ensureWaterType,
 	listSpots,
 	listWaterTypes,
-	updateSpot
+	resolveTags,
+	saveSpot
 } from '$lib/server/swimSpots';
-import { DEFAULT_WATER_TYPE, normalizeSpot } from '$lib/swimSpots';
+import { DEFAULT_WATER_TYPE, normalizeSpot, normalizeTags } from '$lib/swimSpots';
 import type { SessionUser } from '$lib/server/auth';
 import type { RequestHandler } from './$types';
 
@@ -52,27 +52,31 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const result = normalizeSpot(body, await listWaterTypes(userId));
 	if (!result.ok) return badRequest(result.error);
 
+	// Every tagged name has to be a real account before anything is written.
+	const tags = normalizeTags(body.tagged);
+	if (!tags.ok) return badRequest(tags.error);
+	const tagged = await resolveTags(userId, tags.tags);
+	if (!tagged.ok) return badRequest(tagged.error);
+
+	let id: number | null = null;
+	if (body.id !== undefined && body.id !== null && body.id !== '') {
+		id = Number(body.id);
+		if (!Number.isInteger(id) || id <= 0) return badRequest(`"${body.id}" is not a spot id.`);
+	}
+
 	// "Other" with something typed beside it: that text becomes a type of its
 	// own, kept for every spot after this one. Only once the rest of the spot
 	// has passed, so a rejected save can't leave a stray type behind.
 	const otherLabel = typeof body.otherLabel === 'string' ? body.otherLabel.trim() : '';
 	if (result.spot.waterType === DEFAULT_WATER_TYPE && otherLabel) {
 		if (otherLabel.length > 40) return badRequest('Keep the water type under 40 characters.');
-		const id = await ensureWaterType(userId, otherLabel);
-		if (!id) return badRequest(`"${otherLabel}" needs a letter or number in it.`);
-		result.spot.waterType = id;
+		const typeId = await ensureWaterType(userId, otherLabel);
+		if (!typeId) return badRequest(`"${otherLabel}" needs a letter or number in it.`);
+		result.spot.waterType = typeId;
 	}
 
-	if (body.id === undefined || body.id === null || body.id === '') {
-		await createSpot(userId, result.spot);
-		return listPayload(userId);
-	}
-
-	const id = Number(body.id);
-	if (!Number.isInteger(id) || id <= 0) return badRequest(`"${body.id}" is not a spot id.`);
-
-	const updated = await updateSpot(userId, id, result.spot);
-	if (!updated) return json({ ok: false, error: `No spot with id ${id}.` }, { status: 404 });
+	const saved = await saveSpot(userId, id, result.spot, tagged.ids);
+	if (saved === null) return json({ ok: false, error: `No spot with id ${id}.` }, { status: 404 });
 	return listPayload(userId);
 };
 

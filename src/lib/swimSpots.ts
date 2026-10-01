@@ -34,10 +34,6 @@ export const WATER_TYPES: WaterTypeMeta[] = [
 
 export const DEFAULT_WATER_TYPE = 'other';
 
-// Whose map /meSoup shows when no ?user= is given. Everyone else's is at
-// /meSoup?user=<username>.
-export const MESOUP_OWNER = 'JJEW22';
-
 const OTHER = WATER_TYPES.find((t) => t.id === DEFAULT_WATER_TYPE)!;
 
 // Colors handed to custom types in the order they are created. None of them is
@@ -133,11 +129,65 @@ export interface SwimSpot {
 	name: string;
 	lat: number;
 	lon: number;
-	swumOn: string | null; // 'YYYY-MM-DD'
+	swumOn: string | null; // 'YYYY-MM-DD', the most recent of `dates`
+	// Every date it was swum, newest first. A regular swimming hole has many;
+	// empty means swum, date forgotten (and always, on the anonymized map).
+	dates: string[];
 	waterType: string;
 	country: string | null;
 	region: string | null;
 	note: string | null;
+	// Who logged it and who else was there. Absent on the anonymized map,
+	// which carries neither.
+	owner?: string;
+	tagged?: string[]; // accepted tags only
+	// Every tag with where it stands. Only ever sent to the spot's owner.
+	tags?: SpotTag[];
+}
+
+export type TagStatus = 'pending' | 'accepted' | 'declined';
+
+export interface SpotTag {
+	username: string;
+	status: TagStatus;
+}
+
+// A tag waiting on the signed-in user, as the banner on /meSoup shows it.
+// Someone whose swims you can see on /meSoup, and how much of them: their
+// whole map (they shared it with you) or just the swims they tagged you in.
+export interface Sharer {
+	username: string;
+	fullMap: boolean;
+}
+
+export interface PendingTag {
+	spotId: number;
+	name: string;
+	owner: string;
+	swumOn: string | null;
+	waterLabel: string;
+	country: string | null;
+	region: string | null;
+}
+
+// Tags as they come off the admin form: usernames, trimmed, each once however
+// it was capitalised. No cap on how many -- a swim with the whole club is a
+// swim with the whole club.
+export function normalizeTags(
+	input: unknown
+): { ok: true; tags: string[] } | { ok: false; error: string } {
+	if (input === undefined || input === null) return { ok: true, tags: [] };
+	if (!Array.isArray(input)) return { ok: false, error: 'Tags must be a list of usernames.' };
+	const seen = new Set<string>();
+	const tags: string[] = [];
+	for (const raw of input) {
+		if (typeof raw !== 'string') return { ok: false, error: 'Tags must be usernames.' };
+		const name = raw.trim();
+		if (!name || seen.has(name.toLowerCase())) continue;
+		seen.add(name.toLowerCase());
+		tags.push(name);
+	}
+	return { ok: true, tags };
 }
 
 // A spot as the admin form holds it, before anything has been checked.
@@ -180,12 +230,23 @@ export function normalizeSpot(
 		return { ok: false, error: 'Longitude must be a number between -180 and 180.' };
 	}
 
-	const swumOn = text(input.swumOn);
-	// A date input gives 'YYYY-MM-DD' or nothing, but the endpoint is also
-	// reachable by hand, and a half-typed year should not reach the column.
-	if (swumOn && (!DATE_RE.test(swumOn) || Number.isNaN(Date.parse(swumOn)))) {
-		return { ok: false, error: `"${swumOn}" is not a date in YYYY-MM-DD form.` };
+	// `dates` is the list; a lone `swumOn` is still accepted so a hand-made
+	// request in the old shape keeps working.
+	const rawDates = Array.isArray(input.dates) ? input.dates : [input.swumOn];
+	const seen = new Set<string>();
+	for (const raw of rawDates) {
+		const d = text(raw);
+		if (!d) continue;
+		// A date input gives 'YYYY-MM-DD' or nothing, but the endpoint is also
+		// reachable by hand, and a half-typed year should not reach the column.
+		if (!DATE_RE.test(d) || Number.isNaN(Date.parse(d))) {
+			return { ok: false, error: `"${d}" is not a date in YYYY-MM-DD form.` };
+		}
+		seen.add(d);
 	}
+	// ISO dates sort as strings; newest first.
+	const dates = [...seen].sort().reverse();
+	const swumOn = dates[0] ?? null;
 
 	const wt = text(input.waterType) ?? DEFAULT_WATER_TYPE;
 	if (!types.some((t) => t.id === wt))
@@ -198,6 +259,7 @@ export function normalizeSpot(
 			lat,
 			lon,
 			swumOn,
+			dates,
 			waterType: wt,
 			country: text(input.country),
 			region: text(input.region),
@@ -208,6 +270,8 @@ export function normalizeSpot(
 
 export interface SwimSummary {
 	spots: number;
+	// Visits, counting an undated spot as one: it was swum at least once.
+	swims: number;
 	countries: number;
 	waterTypes: number;
 	firstYear: number | null;
@@ -220,13 +284,17 @@ export function summarize(spots: SwimSpot[]): SwimSummary {
 	const countries = new Set<string>();
 	const types = new Set<string>();
 	const years: number[] = [];
+	let swims = 0;
 	for (const s of spots) {
 		if (s.country) countries.add(s.country.toLowerCase());
 		types.add(s.waterType);
-		if (s.swumOn && DATE_RE.test(s.swumOn)) years.push(Number(s.swumOn.slice(0, 4)));
+		const dates = s.dates ?? (s.swumOn ? [s.swumOn] : []);
+		swims += Math.max(dates.length, 1);
+		for (const d of dates) if (DATE_RE.test(d)) years.push(Number(d.slice(0, 4)));
 	}
 	return {
 		spots: spots.length,
+		swims,
 		countries: countries.size,
 		waterTypes: types.size,
 		firstYear: years.length ? Math.min(...years) : null,
@@ -253,4 +321,11 @@ export function formatDate(swumOn: string | null): string {
 		day: 'numeric',
 		timeZone: 'UTC'
 	});
+}
+
+// 'Jul 4, 2025', or '12 swims · latest Jul 4, 2025' for a regular spot.
+export function formatSwims(dates: string[] | undefined): string {
+	if (!dates?.length) return 'date unknown';
+	if (dates.length === 1) return formatDate(dates[0]);
+	return `${dates.length} swims · latest ${formatDate(dates[0])}`;
 }
