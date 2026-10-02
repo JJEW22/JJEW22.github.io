@@ -304,11 +304,16 @@ with base as (
            count(*) filter (where status = 'duplicate_day')::int     as duplicate_day,
            count(*) filter (where status = 'invalid')::int           as invalid,
            count(distinct user_id)::int                              as participants,
-           -- Accepted words that came OUT of the dictionary. Poll-whitelisted words
-           -- are excluded: they were never among the dictionary's stems, so they
-           -- cannot consume one.
+           -- Accepted words that came OUT of the dictionary, i.e. consumed one of
+           -- its stems.
            count(*) filter (where status = 'accepted' and from_dictionary)::int
                                                                      as accepted_from_dictionary,
+           -- Accepted words the dictionary didn't have, let in by a dispute poll.
+           -- Each one GROWS the vocabulary as well as claiming a word from it, so
+           -- it goes on both sides of the fraction below. Null from_dictionary
+           -- (not yet backfilled) counts as neither -- unknown, not zero.
+           count(*) filter (where status = 'accepted' and from_dictionary = false)::int
+                                                                     as accepted_by_poll,
            min(posted_at)                                            as first_at,
            max(posted_at)                                            as last_at,
            -- Measured to TODAY, not to the last word: a channel that has gone
@@ -337,16 +342,28 @@ select b.submitted,
        round(b.accepted::numeric / greatest(b.submitted, 1) * 100, 1) as accuracy_pct,
        round(d.active_days::numeric / greatest(b.days_running, 1) * 100, 1) as pct_days_with_word,
        (select count(*) from wod_word_rulings)::int                  as rulings,
-       -- How much of the dictionary is gone. Null until count_dictionary.py has run,
-       -- which the formatter treats as "unknown" rather than showing a wrong zero.
+       -- How much of the vocabulary is gone. Null until count_dictionary.py has
+       -- run, which the formatter treats as "unknown" rather than showing a wrong
+       -- zero.
+       --
+       -- The vocabulary is the dictionary's stems PLUS every word a poll let in:
+       -- a poll word is claimed (numerator) and also enlarges the pool it was
+       -- claimed from (denominator). Leaving it out of both would undercount the
+       -- words played; counting it only on top would let polls push past 100%.
+       -- words_remaining is unaffected either way -- a poll word adds one to each
+       -- side -- so it still equals stems minus dictionary words claimed.
        (select total_words from wod_dictionary where id = 1)          as dictionary_words,
        (select total_stems from wod_dictionary where id = 1)          as dictionary_stems,
        b.accepted_from_dictionary,
-       round(b.accepted_from_dictionary::numeric
-             / greatest((select total_stems from wod_dictionary where id = 1), 1) * 100, 2)
-                                                                     as pct_dictionary_used,
-       ((select total_stems from wod_dictionary where id = 1) - b.accepted_from_dictionary)
-                                                                     as words_remaining,
+       b.accepted_by_poll,
+       ((select total_stems from wod_dictionary where id = 1) + b.accepted_by_poll)
+                                                                     as vocab_size,
+       (b.accepted_from_dictionary + b.accepted_by_poll)             as vocab_claimed,
+       round((b.accepted_from_dictionary + b.accepted_by_poll)::numeric
+             / greatest((select total_stems from wod_dictionary where id = 1) + b.accepted_by_poll, 1)
+             * 100, 2)                                               as pct_dictionary_used,
+       ((select total_stems from wod_dictionary where id = 1) + b.accepted_by_poll
+        - (b.accepted_from_dictionary + b.accepted_by_poll))         as words_remaining,
 
     -- Current leader, by the leaderboard's own ordering.
     (select user_id      from wod_leaderboard where rank = 1)                  as leader_user_id,
