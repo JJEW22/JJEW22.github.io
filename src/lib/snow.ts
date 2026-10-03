@@ -11,6 +11,8 @@
 // (local) and the two differ by a day west of Greenwich, which is what put a
 // workaround date into actualSnowDate and named the wrong winner.
 
+import { checkName } from '$lib/names';
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -227,9 +229,12 @@ export function checkPrediction(
 	name: unknown,
 	date: unknown
 ): Checked<{ name: string; date: string }> {
-	const trimmed = typeof name === 'string' ? name.trim() : '';
-	if (!trimmed) return { ok: false, error: 'A prediction needs a name.' };
-	if (trimmed.length > 60) return { ok: false, error: 'That name is too long (60 characters).' };
+	const named = checkName(name);
+	if (!named.ok) {
+		const empty = typeof name !== 'string' || !name.trim();
+		return { ok: false, error: empty ? 'A prediction needs a name.' : named.error };
+	}
+	const trimmed = named.value;
 
 	const day = typeof date === 'string' ? date.trim() : '';
 	if (!isDay(day)) return { ok: false, error: 'Pick a date in YYYY-MM-DD form.' };
