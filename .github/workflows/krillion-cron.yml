@@ -1,0 +1,39 @@
+# .github/workflows/krillion-cron.yml
+# Drives Krillion, rescored (/krillion). Runs hourly; the endpoint self-gates:
+#   - fetches from krillion.io only ONCE a day, on the first tick at/after 11:00 ET
+#     (until Krillion's developer agrees to more)
+#   - sends final-score emails on the first tick after midnight ET
+# Hourly rather than two fixed times so daylight-saving shifts need no edits.
+#
+# Setup: the same repo Actions secret SYNC_SECRET as the pickem cron (it must
+# match the SYNC_SECRET env var on the Render service byte for byte).
+name: Krillion cron
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger cron endpoint
+        env:
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+        run: |
+          set -uo pipefail
+          if [ -z "${SYNC_SECRET}" ]; then
+            echo "::error::SYNC_SECRET is not set for this repo (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          status=$(curl -sS -X POST \
+            -H "x-sync-key: ${SYNC_SECRET}" \
+            -o response.json -w '%{http_code}' \
+            "https://johnjackwilkins.com/krillion/api/cron") || {
+            echo "::error::could not reach the cron endpoint"
+            exit 1
+          }
+          echo "HTTP $status"
+          cat response.json; echo
+          [ "$status" = "200" ] || exit 1

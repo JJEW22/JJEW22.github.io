@@ -46,6 +46,13 @@
             image: 'none',
             display: true
         },
+        {
+            title: "Krillion, rescored",
+            description: "Paste your Krillion end screen and get a score based on how many players actually gave each answer.",
+            link: "/krillion",
+            image: 'none',
+            display: true
+        },
     ];
 
 // Filter to only show projects where display is true
