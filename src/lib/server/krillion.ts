@@ -460,3 +460,156 @@ export async function sendFinalEmailsIfDue(now = new Date()) {
 	}
 	return { sent, checked: due.length };
 }
+
+// ---------------- leaderboard ----------------
+//
+// Signed-in dives only, and totals only: no answers, so today's board can't
+// spoil today's dive. Names are the account name (users.real_name, set on
+// /account) with the username as the fallback.
+
+export const KRILLION_ADMIN_ROLE = 'krillion:admin';
+
+export interface LeaderRow {
+	name: string;
+	gameScore: number | null;
+	updatedScore: number | null; // null while the day's counts aren't in
+	isYou: boolean;
+}
+
+export async function leaderboardForDate(
+	date: string,
+	viewerId: number | null
+): Promise<LeaderRow[]> {
+	const rows = await sql<
+		{ user_id: string; name: string; game_score: number | null; updated_score: number | null }[]
+	>`
+		select s.user_id, coalesce(u.real_name, u.username) as name, s.game_score, s.updated_score
+		from krillion_submissions s join users u on u.id = s.user_id
+		where s.date = ${date}
+		order by s.updated_score desc nulls last, s.game_score desc nulls last,
+			lower(coalesce(u.real_name, u.username))
+	`;
+	return rows.map((r) => ({
+		name: r.name,
+		gameScore: r.game_score,
+		updatedScore: r.updated_score,
+		isYou: viewerId !== null && Number(r.user_id) === viewerId
+	}));
+}
+
+export interface AllTimeRow {
+	name: string;
+	dives: number;
+	average: number;
+	best: number;
+	averageGame: number | null;
+	isYou: boolean;
+}
+
+// Every signed-in player with at least one scored dive, by average rescored total.
+export async function leaderboardAllTime(viewerId: number | null): Promise<AllTimeRow[]> {
+	const rows = await sql<
+		{
+			user_id: string;
+			name: string;
+			dives: number;
+			average: number;
+			best: number;
+			average_game: number | null;
+		}[]
+	>`
+		select s.user_id, coalesce(u.real_name, u.username) as name,
+			count(*)::int as dives, avg(s.updated_score)::float8 as average,
+			max(s.updated_score)::float8 as best, avg(s.game_score)::float8 as average_game
+		from krillion_submissions s join users u on u.id = s.user_id
+		where s.updated_score is not null
+		group by s.user_id, u.real_name, u.username
+		order by average desc, dives desc
+	`;
+	return rows.map((r) => ({
+		name: r.name,
+		dives: r.dives,
+		average: r.average,
+		best: r.best,
+		averageGame: r.average_game,
+		isYou: viewerId !== null && Number(r.user_id) === viewerId
+	}));
+}
+
+// Days we have counts for, newest first, for the day pickers.
+export async function listScoredDays(): Promise<{ date: string; dayNumber: number }[]> {
+	const rows = await sql<{ date: string; day_number: number }[]>`
+		select to_char(date, 'YYYY-MM-DD') as date, day_number from krillion_days order by date desc
+	`;
+	return rows.map((r) => ({ date: r.date, dayNumber: r.day_number }));
+}
+
+// ---------------- admin: every answer's score ----------------
+//
+// Today's answer scores would spoil today's dive, so an admin sees them only
+// after submitting their own dive for the day. A finished day is open.
+
+export interface AdminAnswer {
+	answer: string;
+	count: number;
+	share: number;
+	gameScore: number | null;
+	points: number;
+}
+
+export interface AdminDay {
+	date: string;
+	dayNumber: number;
+	prompts: { id: string; text: string; fit: PromptFit | null; answers: AdminAnswer[] }[];
+}
+
+export async function adminAnswers(userId: number, date: string): Promise<AdminDay> {
+	if (date === etDate()) {
+		const [mine] = await sql`
+			select 1 from krillion_submissions where user_id = ${userId} and date = ${date}
+		`;
+		if (!mine) {
+			throw new KrillionError(
+				"Submit your own dive for today first: today's answer scores stay hidden until you have.",
+				403
+			);
+		}
+	}
+	const [day] = await sql<
+		{
+			day_number: number;
+			prompts: { id: string; text: string }[];
+			model: Record<string, PromptFit>;
+		}[]
+	>`
+		select day_number, prompts, model from krillion_days where date = ${date}
+	`;
+	if (!day) throw new KrillionError(`No counts for ${date} yet.`, 404);
+	const rows = await sql<AnswerRow[]>`
+		select prompt_id, answer, count, game_score, points from krillion_answers where date = ${date}
+		order by prompt_id, points desc
+	`;
+	const totals = new Map<string, number>();
+	for (const r of rows) totals.set(r.prompt_id, (totals.get(r.prompt_id) ?? 0) + r.count);
+	return {
+		date,
+		dayNumber: day.day_number,
+		prompts: day.prompts.map((p) => {
+			const total = totals.get(p.id) ?? 0;
+			return {
+				id: p.id,
+				text: p.text,
+				fit: day.model?.[p.id] ?? null,
+				answers: rows
+					.filter((r) => r.prompt_id === p.id)
+					.map((r) => ({
+						answer: r.answer,
+						count: r.count,
+						share: total > 0 ? r.count / total : 0,
+						gameScore: r.game_score,
+						points: r.points
+					}))
+			};
+		})
+	};
+}

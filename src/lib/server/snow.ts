@@ -8,6 +8,7 @@
 // other people guessed is no protection at all.
 
 import { sql } from '$lib/server/db';
+import { getAccountName } from '$lib/server/accountNames';
 import { hasRole } from '$lib/server/roles';
 import type { SessionUser } from '$lib/server/auth';
 import {
@@ -119,6 +120,8 @@ export interface SnowState {
 		canEditOwn: boolean;
 		canManageOthers: boolean;
 		myPredictionId: number | null;
+		// The name on the signed-in account (users.real_name), if set.
+		name: string | null;
 	};
 	today: string;
 }
@@ -141,7 +144,8 @@ export async function loadState(user: SessionUser | null, slug?: string): Promis
 				hasSubmitted: false,
 				canEditOwn: false,
 				canManageOthers: false,
-				myPredictionId: null
+				myPredictionId: null,
+				name: user ? await getAccountName(user.id) : null
 			},
 			today
 		};
@@ -177,7 +181,8 @@ export async function loadState(user: SessionUser | null, slug?: string): Promis
 			...viewer,
 			canEditOwn: Boolean(user) && canEditOwn(season, viewer, today),
 			canManageOthers: canManageOthers(season, viewer, today),
-			myPredictionId: mine ? Number(mine.id) : null
+			myPredictionId: mine ? Number(mine.id) : null,
+			name: user ? await getAccountName(user.id) : null
 		},
 		today
 	};
@@ -306,6 +311,13 @@ export async function upsertOnBehalf(
 		}
 	}
 
+	// An entry linked to an account shows that account's name, when it has one —
+	// names are set on /account and overridden on /admin, not here.
+	if (input.userId) {
+		const accountName = await getAccountName(input.userId);
+		if (accountName) input = { ...input, name: accountName };
+	}
+
 	try {
 		if (input.id) {
 			await sql`
@@ -383,11 +395,13 @@ export async function saveSeason(input: {
 	});
 }
 
-// Accounts an admin can attach an entry to. Usernames only — no email, since the
-// dropdown is just for linking a name to a login.
-export async function listAccounts(): Promise<{ id: number; username: string }[]> {
-	const rows = await sql<{ id: string | number; username: string }[]>`
-		select id, username from users order by lower(username)
+// Accounts an admin can attach an entry to, with each one's name for the
+// "Account names" panel. No email: neither use needs it.
+export async function listAccounts(): Promise<
+	{ id: number; username: string; name: string | null }[]
+> {
+	const rows = await sql<{ id: string | number; username: string; real_name: string | null }[]>`
+		select id, username, real_name from users order by lower(username)
 	`;
-	return rows.map((r) => ({ id: Number(r.id), username: r.username }));
+	return rows.map((r) => ({ id: Number(r.id), username: r.username, name: r.real_name }));
 }

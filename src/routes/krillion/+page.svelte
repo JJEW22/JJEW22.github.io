@@ -62,7 +62,52 @@
 	let error = '';
 	let result: Result | null = null;
 
+	// Leaderboard: signed-in dives, totals only.
+	interface LeaderRow {
+		name: string;
+		gameScore: number | null;
+		updatedScore: number | null;
+		isYou: boolean;
+	}
+	interface AllTimeRow {
+		name: string;
+		dives: number;
+		average: number;
+		best: number;
+		averageGame: number | null;
+		isYou: boolean;
+	}
+	let boardView: 'day' | 'all' = 'day';
+	let boardDate = '';
+	let boardDay: LeaderRow[] = [];
+	let boardAll: AllTimeRow[] = [];
+	let boardDays: { date: string; dayNumber: number }[] = [];
+	let boardDayNumber: number | null = null;
+	let isAdmin = false;
+
+	async function loadBoard(dayNumber: number | null = boardDayNumber) {
+		try {
+			const qs = dayNumber ? `?day=${dayNumber}` : '';
+			const b = await fetch(`/krillion/api/leaderboard${qs}`).then((x) => x.json());
+			boardDate = b.date;
+			boardDay = b.day ?? [];
+			boardAll = b.allTime ?? [];
+			boardDays = b.days ?? [];
+			boardDayNumber = dayNumber;
+		} catch {
+			boardDay = [];
+		}
+	}
+
 	onMount(async () => {
+		loadBoard(null);
+		fetch('/api/auth/me')
+			.then((x) => x.json())
+			.then((m) => {
+				const roles: string[] = m.roles ?? [];
+				isAdmin = roles.includes('site:admin') || roles.includes('krillion:admin');
+			})
+			.catch(() => (isAdmin = false));
 		try {
 			const r = await fetch('/krillion/api/day?answers=1');
 			if (!r.ok) throw new Error(String(r.status));
@@ -123,6 +168,7 @@
 			if (me) {
 				const m = await fetch('/krillion/api/mine').then((x) => x.json());
 				myDives = m.dives ?? [];
+				loadBoard(boardDayNumber);
 			}
 		} catch (err) {
 			error = `Couldn't submit: ${err instanceof Error ? err.message : String(err)}`;
@@ -156,7 +202,10 @@
 <div class="container">
 	<nav class="breadcrumb">
 		<a href="/me">← Back to Me</a>
-		{#if !me}<a class="pill" href="/account?redirect=/krillion">Sign in</a>{/if}
+		<span class="nav-right">
+			{#if isAdmin}<a class="pill" href="/krillion/admin">Admin</a>{/if}
+			{#if !me}<a class="pill" href="/account?redirect=/krillion">Sign in</a>{/if}
+		</span>
 	</nav>
 
 	<main>
@@ -364,6 +413,97 @@
 				</table>
 			</section>
 		{/if}
+
+		<section class="card board">
+			<div class="board-head">
+				<h2>Leaderboard</h2>
+				<div class="tabs">
+					<button
+						type="button"
+						class:on={boardView === 'day'}
+						aria-pressed={boardView === 'day'}
+						on:click={() => (boardView = 'day')}>By day</button
+					>
+					<button
+						type="button"
+						class:on={boardView === 'all'}
+						aria-pressed={boardView === 'all'}
+						on:click={() => (boardView = 'all')}>All time</button
+					>
+				</div>
+			</div>
+			<p class="hint">
+				Everyone who submits while signed in, by rescored total. Totals only — no answers, so it
+				never spoils the dive.{#if !me}
+					<a href="/account?redirect=/krillion">Sign in</a> to be on it.{/if}
+			</p>
+
+			{#if boardView === 'day'}
+				<label class="day-pick">
+					<span>Dive</span>
+					<select
+						value={boardDayNumber ?? ''}
+						on:change={(e) => loadBoard(Number(e.currentTarget.value) || null)}
+					>
+						<option value="">Today</option>
+						{#each boardDays as d (d.date)}
+							<option value={d.dayNumber}>#{d.dayNumber} ({d.date})</option>
+						{/each}
+					</select>
+				</label>
+				{#if boardDay.length}
+					<table>
+						<thead>
+							<tr><th>#</th><th>Name</th><th class="num">Game</th><th class="num">Rescored</th></tr>
+						</thead>
+						<tbody>
+							{#each boardDay as r, i (r.name + i)}
+								<tr class:you={r.isYou}>
+									<td>{r.updatedScore === null ? '—' : i + 1}</td>
+									<td
+										>{r.name}{#if r.isYou}<span class="you-flag">you</span>{/if}</td
+									>
+									<td class="num">{r.gameScore ?? '—'}</td>
+									<td class="num"
+										><b>{r.updatedScore === null ? 'waiting' : r.updatedScore.toFixed(1)}</b></td
+									>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{:else}
+					<p class="sub">
+						Nobody signed in has submitted {boardDate ? `for ${boardDate}` : ''} yet.
+					</p>
+				{/if}
+			{:else if boardAll.length}
+				<table>
+					<thead>
+						<tr
+							><th>#</th><th>Name</th><th class="num">Dives</th><th class="num">Average</th><th
+								class="num">Best</th
+							><th class="num">Avg game</th></tr
+						>
+					</thead>
+					<tbody>
+						{#each boardAll as r, i (r.name + i)}
+							<tr class:you={r.isYou}>
+								<td>{i + 1}</td>
+								<td
+									>{r.name}{#if r.isYou}<span class="you-flag">you</span>{/if}</td
+								>
+								<td class="num">{r.dives}</td>
+								<td class="num"><b>{r.average.toFixed(1)}</b></td>
+								<td class="num">{r.best.toFixed(1)}</td>
+								<td class="num">{r.averageGame === null ? '—' : r.averageGame.toFixed(0)}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{:else}
+				<p class="sub">No scored dives yet.</p>
+			{/if}
+		</section>
 
 		<section class="how">
 			<h2>How the rescoring works</h2>
@@ -627,6 +767,55 @@
 	.totals .l {
 		font-size: 0.85rem;
 		color: #666;
+	}
+
+	.nav-right {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.board-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	.board-head h2 {
+		margin: 0;
+	}
+
+	.board .tabs {
+		margin: 0;
+	}
+
+	.day-pick {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.9rem;
+		color: #555;
+	}
+
+	.day-pick select {
+		padding: 0.3rem 0.5rem;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+	}
+
+	tr.you td {
+		background: #f0f7ff;
+	}
+
+	.you-flag {
+		margin-left: 0.4rem;
+		padding: 0.05rem 0.4rem;
+		background: #0b62a4;
+		border-radius: 10px;
+		font-size: 0.7rem;
+		color: #fff;
 	}
 
 	.how ul {

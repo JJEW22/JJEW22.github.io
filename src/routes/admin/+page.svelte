@@ -2,12 +2,13 @@
 <script>
     import { onMount } from 'svelte';
 
-    const KNOWN_ROLES = ['site:admin', 'pickem:admin', 'pizza:admin'];
+    const KNOWN_ROLES = ['site:admin', 'pickem:admin', 'pizza:admin', 'krillion:admin'];
 
     let status = 'loading'; // loading | denied | ready
     let emailsText = '';
     let generated = [];
     let inviteList = [];
+    /** @type {{ id: number, username: string, email: string | null, roles: string[], real_name: string | null, nameDraft?: string }[]} */
     let users = [];
     let resetLinks = {}; // userId -> { link, expiresAt }
     let msg = '';
@@ -28,6 +29,7 @@
     }
     async function loadUsers() {
         users = await fetch('/api/admin/users').then((r) => (r.ok ? r.json() : [])).catch(() => []);
+        for (const u of users) u.nameDraft = u.real_name ?? '';
     }
 
     async function generateInvites() {
@@ -79,6 +81,26 @@
 
     // Mints a link for someone who is locked out; you deliver it yourself. Works
     // with no mail provider configured, which is the point of having it.
+    // A person's name, site-wide (users.real_name), separate from their username.
+    /** @param {{ id: number, username: string, real_name: string | null, nameDraft?: string }} u */
+    async function saveName(u) {
+        msg = '';
+        const r = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ userId: u.id, name: u.nameDraft ?? '' })
+        });
+        const data = await r.json().catch(() => null);
+        if (r.ok) {
+            u.real_name = data?.name ?? null;
+            u.nameDraft = u.real_name ?? '';
+            users = users;
+            msg = u.real_name ? `${u.username} is now "${u.real_name}".` : `Cleared ${u.username}'s name.`;
+        } else {
+            msg = data?.error || 'Could not save the name.';
+        }
+    }
+
     async function makeResetLink(u) {
         msg = '';
         const r = await fetch('/api/admin/reset-link', {
@@ -158,13 +180,17 @@
 
                 <section class="card">
                     <h2>Accounts &amp; roles</h2>
-                    <p class="muted">Grant site-wide or feature-specific admin. site:admin implies everything.</p>
+                    <p class="muted">Grant site-wide or feature-specific admin. site:admin implies everything. <b>Name</b> is the person's name across the site (separate from their username); saving it here overrides theirs and updates their snow predictions.</p>
                     <table>
-                        <thead><tr><th>User</th><th>Email</th>{#each KNOWN_ROLES as r}<th class="rc">{r}</th>{/each}<th></th></tr></thead>
+                        <thead><tr><th>User</th><th>Name</th><th>Email</th>{#each KNOWN_ROLES as r}<th class="rc">{r}</th>{/each}<th></th></tr></thead>
                         <tbody>
                             {#each users as u}
                                 <tr>
                                     <td class="strong">{u.username}</td>
+                                    <td class="name-cell">
+                                        <input class="name-input" bind:value={u.nameDraft} placeholder="(no name)" maxlength="60" />
+                                        <button class="mini" on:click={() => saveName(u)} disabled={(u.nameDraft ?? '').trim() === (u.real_name ?? '')}>Save name</button>
+                                    </td>
                                     <td class="muted">{u.email}</td>
                                     {#each KNOWN_ROLES as r}
                                         <td class="rc"><input type="checkbox" checked={(u.roles || []).includes(r)} on:change={() => toggleRole(u, r)} /></td>
@@ -176,7 +202,7 @@
                                 </tr>
                                 {#if resetLinks[u.id]}
                                     <tr class="reset-row">
-                                        <td colspan={KNOWN_ROLES.length + 3}>
+                                        <td colspan={KNOWN_ROLES.length + 4}>
                                             <code class="reset-link">{resetLinks[u.id].link}</code>
                                             <button class="mini" on:click={() => copy(resetLinks[u.id].link)}>Copy</button>
                                         </td>
@@ -195,6 +221,8 @@
     .page-background { min-height: 100vh; background-color: #4a9b9b; padding: 1rem 0; }
     .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
     .breadcrumb { margin-bottom: 1.5rem; }
+    .name-cell { white-space: nowrap; }
+    .name-input { width: 9rem; padding: 0.25rem 0.4rem; border: 1px solid #d5dae1; border-radius: 5px; font: inherit; font-size: 0.85rem; }
     .breadcrumb a { color: #666; text-decoration: none; font-size: 0.9rem; }
     main { background: white; border-radius: 12px; padding: 2.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     h1 { font-size: 2rem; margin: 0 0 1.5rem; color: #1a1a1a; }

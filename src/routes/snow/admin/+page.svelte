@@ -23,6 +23,7 @@
 	interface Account {
 		id: number;
 		username: string;
+		name: string | null; // users.real_name
 	}
 
 	interface Viewer {
@@ -353,7 +354,7 @@
 							<select bind:value={pUserId}>
 								<option value="">— none —</option>
 								{#each accounts as a (a.id)}
-									<option value={String(a.id)}>{a.username}</option>
+									<option value={String(a.id)}>{a.username}{a.name ? ` (${a.name})` : ''}</option>
 								{/each}
 							</select>
 						</label>

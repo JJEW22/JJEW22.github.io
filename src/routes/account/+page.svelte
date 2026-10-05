@@ -8,6 +8,7 @@
     const DELIVERY_MINUTES = 15;
 
     let mode = 'loading'; // loading | signedin | signup | login | forgot | reset
+    /** @type {{ user: string, roles: string[], email?: string, name: string | null } | null} */
     let me = null;
     let inviteToken = '';
     let resetToken = '';
@@ -64,6 +65,27 @@
             mode = 'login';
         }
     });
+
+    // Your name, site-wide (separate from your username).
+    let nameDraft = '';
+    let nameMsg = '';
+    $: if (me && nameDraft === '' && me.name) nameDraft = me.name;
+
+    async function saveName() {
+        nameMsg = '';
+        const r = await fetch('/api/auth/name', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: nameDraft })
+        });
+        const data = await r.json().catch(() => null);
+        if (r.ok) {
+            if (me) me = { ...me, name: data.name };
+            nameMsg = 'Saved.';
+        } else {
+            nameMsg = data?.error || 'Could not save your name.';
+        }
+    }
 
     function go() {
         window.location.href = redirectTo;
@@ -160,7 +182,13 @@
             {#if mode === 'loading'}
                 <p class="muted">Loading…</p>
             {:else if mode === 'signedin'}
-                <p>Signed in as <b>{me.user}</b>{#if me.email} — {me.email}{/if}.</p>
+                <p>Signed in as <b>{me?.user}</b>{#if me?.email} — {me.email}{/if}.</p>
+                <form class="name-form" on:submit|preventDefault={saveName}>
+                    <label for="real-name">Your name</label>
+                    <input id="real-name" bind:value={nameDraft} placeholder="e.g. Jack Wilkins" maxlength="60" />
+                    <button class="btn" type="submit" disabled={!nameDraft.trim() || nameDraft.trim() === (me?.name ?? '')}>Save name</button>
+                    <p class="muted">Shown on the site wherever your name appears (like Snow Predictions) — separate from your username.{#if nameMsg} <b>{nameMsg}</b>{/if}</p>
+                </form>
                 <button class="btn" on:click={doLogout}>Log out</button>
             {:else if mode === 'signup'}
                 <p class="muted">You're invited. Your email is set by your invite — pick a username and password.</p>

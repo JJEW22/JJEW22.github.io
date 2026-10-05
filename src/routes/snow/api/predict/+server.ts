@@ -5,12 +5,13 @@
 import { json } from '@sveltejs/kit';
 import { checkPrediction } from '$lib/snow';
 import { SnowError, deleteOwn, loadState, submitOwn } from '$lib/server/snow';
+import { AccountNameError, getAccountName, setAccountName } from '$lib/server/accountNames';
 import type { RequestHandler } from './$types';
 
 export const prerender = false;
 
 function fail(err: unknown): Response {
-	if (err instanceof SnowError) {
+	if (err instanceof SnowError || err instanceof AccountNameError) {
 		return json({ ok: false, error: err.message }, { status: err.status });
 	}
 	throw err;
@@ -32,13 +33,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const slug = typeof body?.season === 'string' ? body.season : '';
 	if (!slug) return json({ ok: false, error: 'Which season?' }, { status: 400 });
 
-	// An empty display name falls back to the username, so the common case is
-	// just picking a date.
-	const checked = checkPrediction(body?.name || locals.user.username, body?.date);
+	// Your prediction always shows your account's name. A name sent with the
+	// pick becomes the account's name; without one, the account's existing name
+	// is used, and the username only if the account has none yet.
+	const accountName = await getAccountName(locals.user.id);
+	const checked = checkPrediction(body?.name || accountName || locals.user.username, body?.date);
 	if (!checked.ok) return json({ ok: false, error: checked.error }, { status: 400 });
 
 	try {
 		await submitOwn(locals.user, slug, checked.value.name, checked.value.date);
+		if (checked.value.name !== accountName)
+			await setAccountName(locals.user.id, checked.value.name);
 	} catch (err) {
 		return fail(err);
 	}

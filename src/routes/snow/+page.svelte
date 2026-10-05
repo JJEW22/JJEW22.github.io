@@ -41,6 +41,7 @@
 		canEditOwn: boolean;
 		canManageOthers: boolean;
 		myPredictionId: number | null;
+		name: string | null; // the name on your account (users.real_name)
 	}
 
 	let seasons: SeasonTab[] = [];
@@ -52,7 +53,8 @@
 		hasSubmitted: false,
 		canEditOwn: false,
 		canManageOthers: false,
-		myPredictionId: null
+		myPredictionId: null,
+		name: null
 	};
 	let today = '';
 
@@ -67,6 +69,8 @@
 	let formDate = '';
 	let formName = '';
 	let formReady = false;
+	// The standalone name editor, for when your pick itself can't be edited.
+	let nameDraft = '';
 
 	onMount(() => {
 		const fromUrl = new URLSearchParams(location.search).get('season');
@@ -105,7 +109,9 @@
 
 		const mine = predictions.find((p) => p.isYou);
 		formDate = mine?.date ?? '';
-		formName = mine?.name ?? viewer.username ?? '';
+		// Your account's name first: it is what every prediction of yours shows.
+		formName = viewer.name ?? mine?.name ?? viewer.username ?? '';
+		nameDraft = viewer.name ?? mine?.name ?? '';
 		formReady = true;
 	}
 
@@ -154,6 +160,30 @@
 		}
 	}
 
+	// Your name is site-wide (also on /account); saving it here updates every
+	// prediction of yours, so reload the season to show it.
+	async function saveName() {
+		busy = true;
+		msg = '';
+		error = '';
+		try {
+			const res = await fetch('/api/auth/name', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ name: nameDraft })
+			});
+			const data = await res.json().catch(() => null);
+			if (!res.ok) {
+				error = data?.error || `That didn't work (${res.status}).`;
+				return;
+			}
+			msg = 'Name saved.';
+			await load(season?.slug);
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function withdraw() {
 		if (!confirm('Withdraw your prediction for this season?')) return;
 		if (await send('/snow/api/predict', 'DELETE', {})) msg = 'Prediction withdrawn.';
@@ -167,6 +197,12 @@
 	// win if it snowed today", so the two cases share one ranking.
 	$: target = season?.firstSnow ?? today;
 	$: ranked = revealed && target ? rankPredictions(predictions, target) : ([] as Ranked[]);
+	// The table reads in calendar order, so the winning ranges run top to bottom.
+	// Rank still comes from `ranked`; only the row order changes. ISO days sort
+	// correctly as strings.
+	$: byDate = [...ranked].sort(
+		(a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name)
+	);
 	$: ranges = revealed ? winningRanges(predictions) : new Map<number, WinRange>();
 	$: leaders = ranked.filter((r) => r.rank === 1);
 	$: runnerUp = ranked.find((r) => r.rank > 1) ?? null;
@@ -317,8 +353,12 @@
 								<input type="date" bind:value={formDate} required />
 							</label>
 							<label>
-								<span>Shown as</span>
+								<span>Your name</span>
 								<input bind:value={formName} placeholder={viewer.username} maxlength="60" />
+								<small class="field-hint"
+									>Your name across the site — also editable on <a href="/account">your account</a
+									>.</small
+								>
 							</label>
 							<div class="pick-actions">
 								<button type="submit" class="primary" disabled={busy || !formDate}>
@@ -364,6 +404,21 @@
 				</section>
 			{/if}
 
+			{#if viewer.username && !(canSubmit && formReady && !season.locked)}
+				<form class="name-form" on:submit|preventDefault={saveName}>
+					<label>
+						<span>Your name on predictions</span>
+						<input bind:value={nameDraft} placeholder={viewer.username} maxlength="60" />
+					</label>
+					<button
+						type="submit"
+						disabled={busy || !nameDraft.trim() || nameDraft.trim() === viewer.name}
+					>
+						Save name
+					</button>
+				</form>
+			{/if}
+
 			<h2>{revealed ? 'All predictions' : "Who's in"}</h2>
 
 			{#if !predictions.length}
@@ -394,7 +449,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each ranked as p (p.id)}
+							{#each byDate as p (p.id)}
 								<tr class:winner={p.rank === 1} class:you={p.isYou}>
 									<td class="rank-cell">
 										{#if p.rank === 1}<span class="medal">🏆</span>{:else}{p.rank}{/if}
@@ -554,6 +609,27 @@
 
 	.winner-content {
 		text-align: center;
+	}
+
+	.field-hint {
+		font-size: 0.8rem;
+		color: #888;
+	}
+
+	.name-form {
+		display: flex;
+		align-items: flex-end;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		margin: 0 0 1.5rem 0;
+	}
+
+	.name-form label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		font-size: 0.85rem;
+		color: #555;
 	}
 
 	.winner-name {

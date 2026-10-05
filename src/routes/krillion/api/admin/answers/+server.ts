@@ -1,0 +1,41 @@
+// src/routes/krillion/api/admin/answers/+server.ts
+// Every answer's count, game points and rescored points for one day, per
+// prompt. krillion:admin (or site:admin) only, and today's only once the admin
+// has submitted their own dive -- enforced in adminAnswers().
+import { json } from '@sveltejs/kit';
+import { dateForDay, etDate } from '$lib/krillion';
+import { hasRole } from '$lib/server/roles';
+import {
+	KRILLION_ADMIN_ROLE,
+	KrillionError,
+	adminAnswers,
+	listScoredDays
+} from '$lib/server/krillion';
+import type { RequestHandler } from './$types';
+
+export const prerender = false;
+
+export const GET: RequestHandler = async ({ url, locals }) => {
+	if (!locals.user) return json({ ok: false, error: 'Sign in first.' }, { status: 401 });
+	if (!hasRole(locals.user, KRILLION_ADMIN_ROLE)) {
+		return json({ ok: false, error: 'This page needs the krillion:admin role.' }, { status: 403 });
+	}
+	const n = Number(url.searchParams.get('day'));
+	const date = Number.isInteger(n) && n > 0 ? dateForDay(n) : etDate();
+	const days = await listScoredDays();
+	try {
+		const data = await adminAnswers(locals.user.id, date);
+		return json(
+			{ ok: true, today: etDate(), days, ...data },
+			{ headers: { 'cache-control': 'private, no-store' } }
+		);
+	} catch (err) {
+		if (err instanceof KrillionError) {
+			return json(
+				{ ok: false, error: err.message, gated: err.status === 403, today: etDate(), days, date },
+				{ status: err.status }
+			);
+		}
+		throw err;
+	}
+};
