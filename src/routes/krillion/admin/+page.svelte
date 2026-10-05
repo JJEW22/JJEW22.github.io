@@ -10,12 +10,13 @@
 <script lang="ts">
 	import '../../../app.css';
 	import { onMount } from 'svelte';
-	import { TOP_SCORE } from '$lib/krillion';
 
 	interface Fit {
 		a: number;
 		b: number;
 		bottom: number;
+		top?: number;
+		breadth?: number;
 		gameMean: number;
 		targetMean: number;
 		fittedMean: number;
@@ -45,6 +46,14 @@
 	let picked: number | null = null; // the dropdown: null = today
 	let days: { date: string; dayNumber: number }[] = [];
 	let prompts: Prompt[] = [];
+	let range: {
+		min: number;
+		minDate: string;
+		minPrompt: string;
+		max: number;
+		maxDate: string;
+		maxPrompt: string;
+	} | null = null;
 	let promptId = '';
 
 	let search = '';
@@ -83,8 +92,41 @@
 		date = data.date;
 		dayNumber = data.dayNumber;
 		prompts = data.prompts ?? [];
+		range = data.range ?? null;
 		if (!prompts.some((p) => p.id === promptId)) promptId = prompts[0]?.id ?? '';
 		status = 'ready';
+	}
+
+	// "Fetch now": today's counts right away, whatever the time; the 11am
+	// scheduled fetch still runs as normal.
+	let fetching = false;
+	let fetchMsg = '';
+	let fetchBad = false;
+
+	async function fetchNow() {
+		if (
+			!confirm("Fetch today's counts from krillion.io now? Every dive submitted today is rescored.")
+		)
+			return;
+		fetching = true;
+		fetchMsg = '';
+		fetchBad = false;
+		try {
+			const r = await fetch('/krillion/api/admin/fetch', { method: 'POST' });
+			const data = await r.json().catch(() => null);
+			if (!r.ok || !data?.ok) {
+				fetchBad = true;
+				fetchMsg = data?.error ?? `Fetch failed (${r.status}).`;
+				return;
+			}
+			fetchMsg = `Fetched dive for ${data.date}: ${data.prompts} prompts, ${data.answers.toLocaleString()} answers; ${data.rescoredDives} submitted ${data.rescoredDives === 1 ? 'dive' : 'dives'} rescored.`;
+			await load(picked);
+		} catch (err) {
+			fetchBad = true;
+			fetchMsg = `Fetch failed: ${err instanceof Error ? err.message : String(err)}`;
+		} finally {
+			fetching = false;
+		}
 	}
 
 	function sortBy(key: SortKey) {
@@ -138,6 +180,19 @@
 			</label>
 		{/if}
 
+		{#if status !== 'denied' && status !== 'loading'}
+			<div class="fetch-now">
+				<button type="button" on:click={fetchNow} disabled={fetching}>
+					{fetching ? 'Fetching…' : 'Fetch now'}
+				</button>
+				<span class="sub"
+					>Pulls today's counts from krillion.io immediately (before 11am too) and rescores today's
+					dives. The scheduled 11am fetch still runs.</span
+				>
+			</div>
+			{#if fetchMsg}<p class="fetch-msg" class:bad={fetchBad}>{fetchMsg}</p>{/if}
+		{/if}
+
 		{#if status === 'loading'}
 			<p class="note">Loading…</p>
 		{:else if status === 'denied'}
@@ -154,8 +209,15 @@
 		{:else}
 			<p class="note">
 				Dive #{dayNumber} ({date}) — every answer on the sheet or in the counts, with the game's
-				points and the rescored points (bottom score to {TOP_SCORE}).
+				points and the rescored points (bottom score up to each prompt's top score, 90–125).
 			</p>
+
+			{#if range}
+				<p class="sub">
+					All-time breadth range: {range.min.toFixed(0)} (narrowest, top 90: “{range.minPrompt}”,
+					{range.minDate}) to {range.max.toFixed(0)} (broadest, top 125: “{range.maxPrompt}”, {range.maxDate}).
+				</p>
+			{/if}
 
 			<div class="tabs" role="tablist">
 				{#each prompts as p, i (p.id)}
@@ -178,7 +240,8 @@
 				{#if prompt.fit}
 					<p class="sub fit">
 						{prompt.answers.length.toLocaleString()} answers · bottom {prompt.fit.bottom.toFixed(1)}
-						· a {prompt.fit.a.toFixed(3)}, b {prompt.fit.b.toFixed(3)} · mean {prompt.fit.fittedMean.toFixed(
+						· top {prompt.fit.top?.toFixed(1) ?? '—'} (breadth {prompt.fit.breadth?.toFixed(0) ??
+							'—'}) · a {prompt.fit.a.toFixed(3)}, b {prompt.fit.b.toFixed(3)} · mean {prompt.fit.fittedMean.toFixed(
 							1
 						)} (target {prompt.fit.targetMean.toFixed(1)}, game {prompt.fit.gameMean.toFixed(1)}) ·
 						SD {prompt.fit.fittedSd.toFixed(1)} (target {prompt.fit.targetSd.toFixed(1)})
@@ -301,6 +364,45 @@
 		padding: 0.1rem 0.35rem;
 		background: #f3f4f6;
 		border-radius: 4px;
+	}
+
+	.fetch-now {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin: 0 0 0.75rem 0;
+	}
+
+	.fetch-now button {
+		flex: none;
+		padding: 0.45rem 1rem;
+		background: #0066cc;
+		border: 1px solid #0066cc;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.9rem;
+		color: #fff;
+		cursor: pointer;
+	}
+
+	.fetch-now button:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+
+	.fetch-msg {
+		margin: 0 0 1rem 0;
+		padding: 0.55rem 0.8rem;
+		background: #eaf7ee;
+		border-radius: 8px;
+		font-size: 0.9rem;
+		color: #1e6b36;
+	}
+
+	.fetch-msg.bad {
+		background: #fdeeee;
+		color: #9a2c2c;
 	}
 
 	.day-pick {

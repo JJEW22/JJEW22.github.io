@@ -19,8 +19,10 @@ import {
 	dayForDate,
 	etDate,
 	etHour,
+	MIN_DIVES_FOR_AVERAGE,
+	breadth,
 	matchAnswer,
-	scorePrompt,
+	scoreDay,
 	type PastedRound,
 	type PromptFit
 } from '$lib/krillion';
@@ -57,8 +59,11 @@ async function getJson<T>(path: string): Promise<T> {
 	return (await res.json()) as T;
 }
 
+// `scheduled` marks the day's cron fetch as done; an admin's "Fetch now" leaves
+// it unset, so the scheduled fetch still runs at its time.
 export async function fetchAndScore(
-	date: string
+	date: string,
+	scheduled = true
 ): Promise<{ date: string; answers: number; prompts: number }> {
 	const today = await getJson<{
 		date: string;
@@ -76,19 +81,10 @@ export async function fetchAndScore(
 		prompts: Record<string, Record<string, number>>;
 	}>(`/api/answer-popularity?date=${date}`);
 
-	const model: Record<string, PromptFit> = {};
-	const rows: {
-		date: string;
-		prompt_id: string;
-		answer: string;
-		count: number;
-		game_score: number | null;
-		points: number;
-	}[] = [];
-	for (const p of today.prompts) {
-		// Counted answers keep Krillion's spelling from the counts; sheet answers
-		// nobody gave come in at 0; counted answers the sheet groups (some p7
-		// birds on 2026-10-02) keep a null game score.
+	// Counted answers keep Krillion's spelling from the counts; sheet answers
+	// nobody gave come in at 0; counted answers the sheet groups (some p7 birds
+	// on 2026-10-02) keep a null game score.
+	const lists = today.prompts.map((p) => {
 		const merged = new Map<string, { answer: string; count: number; gameScore: number | null }>();
 		for (const [answer, count] of Object.entries(pop.prompts[p.id] ?? {})) {
 			merged.set(answer.toLowerCase(), { answer, count, gameScore: null });
@@ -98,29 +94,20 @@ export async function fetchAndScore(
 			if (hit) hit.gameScore = a.score;
 			else merged.set(a.answer.toLowerCase(), { answer: a.answer, count: 0, gameScore: a.score });
 		}
-		const answers = [...merged.values()];
-		if (!answers.length) continue;
-		const { points, fit } = scorePrompt(answers);
-		model[p.id] = fit;
-		answers.forEach((a, i) =>
-			rows.push({
-				date,
-				prompt_id: p.id,
-				answer: a.answer,
-				count: a.count,
-				game_score: a.gameScore,
-				points: points[i]
-			})
-		);
-	}
+		return [...merged.values()];
+	});
+	const { model, rows } = await scoreLists(date, today.prompts, lists);
 
 	await sql.begin(async (tx) => {
 		await tx`
-			insert into krillion_days (date, day_number, prompts, fetched_at, counts_as_of, model)
-			values (${date}, ${today.dayNumber}, ${tx.json(today.prompts)}, now(), ${pop.asOf}, ${tx.json(model as never)})
+			insert into krillion_days
+				(date, day_number, prompts, fetched_at, counts_as_of, model, cron_fetched_at)
+			values (${date}, ${today.dayNumber}, ${tx.json(today.prompts)}, now(), ${pop.asOf},
+				${tx.json(model as never)}, ${scheduled ? new Date() : null})
 			on conflict (date) do update set
 				day_number = excluded.day_number, prompts = excluded.prompts, fetched_at = excluded.fetched_at,
-				counts_as_of = excluded.counts_as_of, model = excluded.model, updated_at = now()
+				counts_as_of = excluded.counts_as_of, model = excluded.model, updated_at = now(),
+				cron_fetched_at = coalesce(excluded.cron_fetched_at, krillion_days.cron_fetched_at)
 		`;
 		await tx`delete from krillion_answers where date = ${date}`;
 		// A few thousand rows; chunked to stay well under the parameter limit.
@@ -130,6 +117,177 @@ export async function fetchAndScore(
 	});
 	await rescoreDate(date);
 	return { date, answers: rows.length, prompts: Object.keys(model).length };
+}
+
+type AnswerInsert = {
+	date: string;
+	prompt_id: string;
+	answer: string;
+	count: number;
+	game_score: number | null;
+	points: number;
+};
+
+// ---------------- the all-time breadth range ----------------
+
+export interface StoredRange {
+	min: number;
+	minDate: string;
+	minPrompt: string;
+	max: number;
+	maxDate: string;
+	maxPrompt: string;
+}
+
+export async function getBreadthRange(): Promise<StoredRange | null> {
+	try {
+		const [r] = await sql<
+			{
+				min_breadth: number;
+				min_date: string;
+				min_prompt: string;
+				max_breadth: number;
+				max_date: string;
+				max_prompt: string;
+			}[]
+		>`
+			select min_breadth, to_char(min_date, 'YYYY-MM-DD') as min_date, min_prompt,
+				max_breadth, to_char(max_date, 'YYYY-MM-DD') as max_date, max_prompt
+			from krillion_breadth_range where id = 1
+		`;
+		return r
+			? {
+					min: r.min_breadth,
+					minDate: r.min_date,
+					minPrompt: r.min_prompt,
+					max: r.max_breadth,
+					maxDate: r.max_date,
+					maxPrompt: r.max_prompt
+				}
+			: null;
+	} catch (err) {
+		// Before sql/031 is applied: no stored range, so the day's own range is used.
+		if ((err as { code?: string })?.code === '42P01') return null;
+		throw err;
+	}
+}
+
+// Widen the stored range with a scored day's breadths (never narrow it).
+async function widenBreadthRange(
+	date: string,
+	prompts: { id: string; text: string }[],
+	model: Record<string, PromptFit>
+): Promise<void> {
+	const cur = await getBreadthRange();
+	let next: StoredRange | null = cur ? { ...cur } : null;
+	for (const p of prompts) {
+		const b = model[p.id]?.breadth;
+		if (b === undefined || !Number.isFinite(b) || b <= 0) continue;
+		if (!next) {
+			next = { min: b, minDate: date, minPrompt: p.text, max: b, maxDate: date, maxPrompt: p.text };
+			continue;
+		}
+		if (b < next.min) Object.assign(next, { min: b, minDate: date, minPrompt: p.text });
+		if (b > next.max) Object.assign(next, { max: b, maxDate: date, maxPrompt: p.text });
+	}
+	if (!next) return;
+	await sql`
+		insert into krillion_breadth_range
+			(id, min_breadth, min_date, min_prompt, max_breadth, max_date, max_prompt, updated_at)
+		values (1, ${next.min}, ${next.minDate}, ${next.minPrompt}, ${next.max}, ${next.maxDate},
+			${next.maxPrompt}, now())
+		on conflict (id) do update set
+			min_breadth = excluded.min_breadth, min_date = excluded.min_date, min_prompt = excluded.min_prompt,
+			max_breadth = excluded.max_breadth, max_date = excluded.max_date, max_prompt = excluded.max_prompt,
+			updated_at = now()
+	`;
+}
+
+// Rebuild the range from every stored day's counts (breadth needs only the
+// counts, which every stored day has), replacing what's stored.
+export async function rebuildBreadthRange(): Promise<StoredRange | null> {
+	const days = await sql<{ date: string; prompts: { id: string; text: string }[] }[]>`
+		select to_char(date, 'YYYY-MM-DD') as date, prompts from krillion_days order by date
+	`;
+	await sql`delete from krillion_breadth_range`;
+	for (const d of days) {
+		const rows = await sql<{ prompt_id: string; count: number }[]>`
+			select prompt_id, count from krillion_answers where date = ${d.date}
+		`;
+		const model: Record<string, PromptFit> = {};
+		for (const p of d.prompts) {
+			const answers = rows
+				.filter((r) => r.prompt_id === p.id)
+				.map((r) => ({ answer: '', count: r.count, gameScore: null }));
+			if (answers.length) model[p.id] = { breadth: breadth(answers) } as PromptFit;
+		}
+		await widenBreadthRange(d.date, d.prompts, model);
+	}
+	return getBreadthRange();
+}
+
+// Score a day's answer lists together: each prompt's top score depends on its
+// breadth against the all-time range (widened by this day), then lay them out
+// for the tables. Widens the stored range with the day afterwards.
+async function scoreLists(
+	date: string,
+	prompts: { id: string; text: string }[],
+	lists: { answer: string; count: number; gameScore: number | null }[][]
+): Promise<{ model: Record<string, PromptFit>; rows: AnswerInsert[] }> {
+	const keep = prompts.map((p, i) => ({ p, answers: lists[i] })).filter((x) => x.answers.length);
+	const range = await getBreadthRange();
+	const scored = scoreDay(
+		keep.map((x) => x.answers),
+		range ? { min: range.min, max: range.max } : null
+	);
+	const model: Record<string, PromptFit> = {};
+	const rows: AnswerInsert[] = [];
+	keep.forEach(({ p, answers }, i) => {
+		model[p.id] = scored[i].fit;
+		answers.forEach((a, j) =>
+			rows.push({
+				date,
+				prompt_id: p.id,
+				answer: a.answer,
+				count: a.count,
+				game_score: a.gameScore,
+				points: scored[i].points[j]
+			})
+		);
+	});
+	await widenBreadthRange(date, prompts, model);
+	return { model, rows };
+}
+
+// Re-run the scoring on a day we already have, from its stored counts -- no
+// request to krillion.io. For when the model changes; every dive submitted
+// that day is rescored with it.
+export async function rescoreStoredDay(date: string): Promise<{ date: string; answers: number }> {
+	const [day] = await sql<{ prompts: { id: string; text: string }[] }[]>`
+		select prompts from krillion_days where date = ${date}
+	`;
+	if (!day) throw new KrillionError(`No stored counts for ${date}.`, 404);
+	const stored = await sql<
+		{ prompt_id: string; answer: string; count: number; game_score: number | null }[]
+	>`
+		select prompt_id, answer, count, game_score from krillion_answers where date = ${date}
+		order by prompt_id, count desc, answer
+	`;
+	const lists = day.prompts.map((p) =>
+		stored
+			.filter((r) => r.prompt_id === p.id)
+			.map((r) => ({ answer: r.answer, count: r.count, gameScore: r.game_score }))
+	);
+	const { model, rows } = await scoreLists(date, day.prompts, lists);
+	await sql.begin(async (tx) => {
+		await tx`update krillion_days set model = ${tx.json(model as never)}, updated_at = now() where date = ${date}`;
+		await tx`delete from krillion_answers where date = ${date}`;
+		for (let i = 0; i < rows.length; i += 1000) {
+			await tx`insert into krillion_answers ${tx(rows.slice(i, i + 1000))}`;
+		}
+	});
+	await rescoreDate(date);
+	return { date, answers: rows.length };
 }
 
 // ---------------- the day as the page sees it ----------------
@@ -209,10 +367,13 @@ function scoreRounds(
 		if (!byPrompt.has(a.prompt_id)) byPrompt.set(a.prompt_id, []);
 		byPrompt.get(a.prompt_id)!.push(a);
 	}
+	const norm = (t: string) =>
+		t.toLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 	const scored = rounds.map((r, i) => {
-		// The paste carries the prompt text; typed-in rounds go by round number.
+		// The paste carries the prompt text (capitalised, on mobile); typed-in
+		// rounds go by round number.
 		const p =
-			prompts.find((x) => x.text.toLowerCase() === (r.prompt ?? '').toLowerCase()) ??
+			(r.prompt ? prompts.find((x) => norm(x.text) === norm(r.prompt)) : undefined) ??
 			prompts[r.round - 1] ??
 			prompts[i];
 		const hit = !r.miss && r.answer && p ? matchAnswer(byPrompt.get(p.id) ?? [], r.answer) : null;
@@ -223,12 +384,20 @@ function scoreRounds(
 			submitted: r.answer,
 			match: hit?.answer ?? null,
 			miss: r.miss || !hit,
-			gamePoints: r.gamePoints ?? hit?.game_score ?? null,
+			// The sheet's points for whatever answer was matched, so editing an
+			// answer can't leave the pasted points behind. A miss scores 0.
+			gamePoints: hit ? (hit.game_score ?? r.gamePoints ?? null) : r.miss || !r.answer ? 0 : null,
 			points: hit ? hit.points : 0,
 			count: hit ? hit.count : null
 		};
 	});
 	return { scored, total: scored.reduce((s, r) => s + r.points, 0) };
+}
+
+// The game's total, when every round's game points are known.
+function gameTotal(rounds: { gamePoints: number | null }[]): number | null {
+	if (rounds.some((r) => r.gamePoints === null || r.gamePoints === undefined)) return null;
+	return rounds.reduce((s, r) => s + (r.gamePoints as number), 0);
 }
 
 export async function rescoreDate(date: string): Promise<number> {
@@ -244,7 +413,8 @@ export async function rescoreDate(date: string): Promise<number> {
 		const { scored, total } = scoreRounds(s.rounds, day.prompts, answers);
 		await sql`
 			update krillion_submissions
-			set scored = ${sql.json(scored as never)}, updated_score = ${total}, scored_at = now()
+			set scored = ${sql.json(scored as never)}, updated_score = ${total}, scored_at = now(),
+				game_score = coalesce(game_score, ${gameTotal(scored)})
 			where id = ${s.id}
 		`;
 	}
@@ -276,6 +446,10 @@ export interface SubmitResult {
 	notify: boolean;
 }
 
+function okTotal(v: unknown): number | null {
+	return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 770 ? v : null;
+}
+
 export async function submitDive(userId: number | null, input: SubmitInput): Promise<SubmitResult> {
 	const date = dateForDay(input.dayNumber);
 	const today = etDate();
@@ -290,6 +464,8 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 	}
 	if (input.rounds.length !== 7)
 		throw new KrillionError('A dive has 7 rounds; this one has ' + input.rounds.length + '.');
+	const okPoints = (v: unknown) =>
+		typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 110 ? v : null;
 
 	let email: string | null = null;
 	if (!userId && input.notify) {
@@ -303,17 +479,20 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		prompt: String(r.prompt ?? '').slice(0, 300),
 		answer: r.answer ? String(r.answer).slice(0, 200) : null,
 		typed: r.typed ? String(r.typed).slice(0, 200) : null,
-		miss: Boolean(r.miss) || !r.answer,
+		miss: Boolean(r.miss) || !r.answer || !String(r.answer).trim(),
 		othersChose: Number.isFinite(r.othersChose) ? r.othersChose : null,
-		gamePoints: Number.isFinite(r.gamePoints) ? r.gamePoints : null
+		gamePoints: !r.answer || !String(r.answer).trim() ? 0 : okPoints(r.gamePoints),
+		found: Boolean(r.found)
 	}));
+	// The game's total: the paste's own figure if it had one, else the rounds' sum.
+	const gameScore = okTotal(input.gameScore) ?? gameTotal(rounds);
 
 	let id: number;
 	if (userId) {
 		const [row] = await sql<{ id: string }[]>`
 			insert into krillion_submissions (date, day_number, user_id, notify, rounds, game_score, game_better_than)
 			values (${date}, ${input.dayNumber}, ${userId}, ${input.notify}, ${sql.json(rounds as never)},
-				${input.gameScore}, ${input.betterThan})
+				${gameScore}, ${input.betterThan})
 			on conflict (user_id, date) where user_id is not null do update set
 				notify = excluded.notify, rounds = excluded.rounds, game_score = excluded.game_score,
 				game_better_than = excluded.game_better_than, scored = null, updated_score = null,
@@ -325,7 +504,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		const [row] = await sql<{ id: string }[]>`
 			insert into krillion_submissions (date, day_number, email, notify, rounds, game_score, game_better_than)
 			values (${date}, ${input.dayNumber}, ${email}, ${input.notify && Boolean(email)},
-				${sql.json(rounds as never)}, ${input.gameScore}, ${input.betterThan})
+				${sql.json(rounds as never)}, ${gameScore}, ${input.betterThan})
 			returning id
 		`;
 		id = Number(row.id);
@@ -337,7 +516,8 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		`;
 		const { scored, total } = scoreRounds(rounds, day.prompts, answers);
 		await sql`
-			update krillion_submissions set scored = ${sql.json(scored as never)}, updated_score = ${total}, scored_at = now()
+			update krillion_submissions set scored = ${sql.json(scored as never)}, updated_score = ${total},
+				scored_at = now(), game_score = coalesce(game_score, ${gameTotal(scored)})
 			where id = ${id}
 		`;
 		return {
@@ -346,7 +526,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 			dayNumber: input.dayNumber,
 			status: 'scored',
 			rounds: scored,
-			gameScore: input.gameScore,
+			gameScore: gameScore ?? gameTotal(scored),
 			updatedScore: total,
 			countsAsOf: day.countsAsOf,
 			notify: input.notify
@@ -358,7 +538,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		dayNumber: input.dayNumber,
 		status: 'waiting',
 		rounds,
-		gameScore: input.gameScore,
+		gameScore,
 		updatedScore: null,
 		countsAsOf: null,
 		notify: input.notify
@@ -389,9 +569,37 @@ export async function fetchIfDue(now = new Date()) {
 	const date = etDate(now);
 	if (etHour(now) < FETCH_HOUR_ET)
 		return { fetched: false, reason: `before ${FETCH_HOUR_ET}:00 ET` };
-	const [have] = await sql`select 1 from krillion_days where date = ${date}`;
-	if (have) return { fetched: false, reason: `already have ${date}` };
-	return { fetched: true, ...(await fetchAndScore(date)) };
+	// Gate on the scheduled fetch having run, not on any snapshot existing: an
+	// admin's "Fetch now" earlier in the day must not cancel the 11am one.
+	const [have] = await sql`
+		select 1 from krillion_days where date = ${date} and cron_fetched_at is not null
+	`;
+	if (have) return { fetched: false, reason: `already fetched ${date} on schedule` };
+	return { fetched: true, ...(await fetchAndScore(date, true)) };
+}
+
+// An admin's "Fetch now": today's counts and sheet, right away, whatever the
+// time -- before 11am included -- and every dive submitted today rescored.
+// Doesn't count as the scheduled fetch. A short cooldown keeps repeated clicks
+// from hammering krillion.io.
+const FORCE_COOLDOWN_MS = 2 * 60_000;
+
+export async function forceFetch(now = new Date()) {
+	const date = etDate(now);
+	const [last] = await sql<{ fetched_at: Date }[]>`
+		select fetched_at from krillion_days where date = ${date}
+	`;
+	if (last && now.getTime() - new Date(last.fetched_at).getTime() < FORCE_COOLDOWN_MS) {
+		const wait = Math.ceil(
+			(FORCE_COOLDOWN_MS - (now.getTime() - new Date(last.fetched_at).getTime())) / 1000
+		);
+		throw new KrillionError(`Fetched less than 2 minutes ago — try again in ${wait}s.`, 429);
+	}
+	const result = await fetchAndScore(date, false);
+	const [rescored] = await sql<{ n: number }[]>`
+		select count(*)::int as n from krillion_submissions where date = ${date}
+	`;
+	return { ...result, rescoredDives: rescored.n };
 }
 
 // Final scores, once the day is over (any date before today's in ET).
@@ -473,6 +681,8 @@ export interface LeaderRow {
 	name: string;
 	gameScore: number | null;
 	updatedScore: number | null; // null while the day's counts aren't in
+	dives: number; // the player's scored dives, all time
+	average: number | null; // their all-time average rescored total
 	isYou: boolean;
 }
 
@@ -481,10 +691,24 @@ export async function leaderboardForDate(
 	viewerId: number | null
 ): Promise<LeaderRow[]> {
 	const rows = await sql<
-		{ user_id: string; name: string; game_score: number | null; updated_score: number | null }[]
+		{
+			user_id: string;
+			name: string;
+			game_score: number | null;
+			updated_score: number | null;
+			dives: number;
+			average: number | null;
+		}[]
 	>`
-		select s.user_id, coalesce(u.real_name, u.username) as name, s.game_score, s.updated_score
-		from krillion_submissions s join users u on u.id = s.user_id
+		select s.user_id, coalesce(u.real_name, u.username) as name, s.game_score, s.updated_score,
+			coalesce(a.dives, 0) as dives, a.average
+		from krillion_submissions s
+		join users u on u.id = s.user_id
+		left join (
+			select user_id, count(*)::int as dives, avg(updated_score)::float8 as average
+			from krillion_submissions where user_id is not null and updated_score is not null
+			group by user_id
+		) a on a.user_id = s.user_id
 		where s.date = ${date}
 		order by s.updated_score desc nulls last, s.game_score desc nulls last,
 			lower(coalesce(u.real_name, u.username))
@@ -493,6 +717,8 @@ export async function leaderboardForDate(
 		name: r.name,
 		gameScore: r.game_score,
 		updatedScore: r.updated_score,
+		dives: r.dives,
+		average: r.average,
 		isYou: viewerId !== null && Number(r.user_id) === viewerId
 	}));
 }
@@ -503,10 +729,13 @@ export interface AllTimeRow {
 	average: number;
 	best: number;
 	averageGame: number | null;
+	qualified: boolean; // at least MIN_DIVES_FOR_AVERAGE dives: ranked by average
 	isYou: boolean;
 }
 
-// Every signed-in player with at least one scored dive, by average rescored total.
+// Every signed-in player with a scored dive. Players with MIN_DIVES_FOR_AVERAGE
+// or more are ranked first, by average rescored total; the rest follow, still
+// building up to it, so one lucky dive can't top the board.
 export async function leaderboardAllTime(viewerId: number | null): Promise<AllTimeRow[]> {
 	const rows = await sql<
 		{
@@ -524,7 +753,7 @@ export async function leaderboardAllTime(viewerId: number | null): Promise<AllTi
 		from krillion_submissions s join users u on u.id = s.user_id
 		where s.updated_score is not null
 		group by s.user_id, u.real_name, u.username
-		order by average desc, dives desc
+		order by (count(*) >= ${MIN_DIVES_FOR_AVERAGE}) desc, average desc, dives desc
 	`;
 	return rows.map((r) => ({
 		name: r.name,
@@ -532,6 +761,7 @@ export async function leaderboardAllTime(viewerId: number | null): Promise<AllTi
 		average: r.average,
 		best: r.best,
 		averageGame: r.average_game,
+		qualified: r.dives >= MIN_DIVES_FOR_AVERAGE,
 		isYou: viewerId !== null && Number(r.user_id) === viewerId
 	}));
 }

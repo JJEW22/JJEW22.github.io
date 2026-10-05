@@ -10,7 +10,7 @@
 <script lang="ts">
 	import '../../app.css';
 	import { onMount } from 'svelte';
-	import { parsePaste, TOP_SCORE, type PastedDive } from '$lib/krillion';
+	import { MIN_DIVES_FOR_AVERAGE, parsePaste, TOP_MAX, TOP_MIN } from '$lib/krillion';
 
 	interface Day {
 		date: string;
@@ -53,9 +53,35 @@
 		updated_score: number | null;
 	}[] = [];
 
-	let mode: 'paste' | 'type' = 'paste';
+	// One flow: paste the end screen (optional), then review the seven answers.
+	// The paste fills in whatever rounds it covers; the rest are typed. Editing
+	// the paste refills the rows; editing a row never touches the paste.
+	interface Row {
+		answer: string;
+		original: string; // what the paste said, to tell an edit from a pasted answer
+		typed: string | null; // a miss's typed text, from the paste
+		gamePoints: number | null;
+		othersChose: number | null;
+		prompt: string;
+		found: boolean;
+	}
+	const blankRow = (): Row => ({
+		answer: '',
+		original: '',
+		typed: null,
+		gamePoints: null,
+		othersChose: null,
+		prompt: '',
+		found: false
+	});
 	let paste = '';
-	let typed = ['', '', '', '', '', '', ''];
+	let rows: Row[] = [0, 1, 2, 3, 4, 5, 6].map(blankRow);
+	let pasted: {
+		dayNumber: number | null;
+		score: number | null;
+		betterThan: number | null;
+		found: number;
+	} | null = null;
 	let notify = false;
 	let email = '';
 	let busy = false;
@@ -67,6 +93,8 @@
 		name: string;
 		gameScore: number | null;
 		updatedScore: number | null;
+		dives: number;
+		average: number | null;
 		isYou: boolean;
 	}
 	interface AllTimeRow {
@@ -75,6 +103,7 @@
 		average: number;
 		best: number;
 		averageGame: number | null;
+		qualified: boolean;
 		isYou: boolean;
 	}
 	let boardView: 'day' | 'all' = 'day';
@@ -126,34 +155,61 @@
 		}
 	});
 
-	$: dive = paste.trim() ? parsePaste(paste) : null;
-	$: pasteProblem = describeProblem(dive);
-	$: typedCount = typed.filter((t) => t.trim()).length;
+	function readPaste() {
+		if (!paste.trim()) {
+			pasted = null;
+			return;
+		}
+		const d = parsePaste(paste, day?.scored ? day.prompts : []);
+		rows = d.rounds.map((r) => ({
+			answer: r.answer ?? '',
+			original: r.answer ?? '',
+			typed: r.typed,
+			gamePoints: r.gamePoints,
+			othersChose: r.othersChose,
+			prompt: r.prompt,
+			found: r.found
+		}));
+		pasted = { dayNumber: d.dayNumber, score: d.score, betterThan: d.betterThan, found: d.found };
+	}
+
+	function clearAll() {
+		paste = '';
+		pasted = null;
+		rows = [0, 1, 2, 3, 4, 5, 6].map(blankRow);
+	}
+
+	$: answered = rows.filter((r) => r.answer.trim()).length;
+	$: edited = rows.some((r) => r.answer.trim() !== r.original);
 	$: canSubmit =
 		!busy &&
-		(mode === 'paste' ? Boolean(dive && dive.complete) : typedCount > 0) &&
+		answered > 0 &&
 		(!notify || Boolean(me) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
-
-	function describeProblem(d: PastedDive | null): string {
-		if (!d) return '';
-		if (d.dayNumber === null)
-			return "Couldn't find 'Dive #… complete' — copy the whole end screen.";
-		if (!d.complete)
-			return `Found ${d.rounds.length} of 7 rounds — copy the whole end screen, including "the catch".`;
-		if (!d.totalMatchesScore)
-			return 'The rounds don’t add up to the score shown; check the paste is complete.';
-		return '';
-	}
 
 	async function submit() {
 		busy = true;
 		error = '';
 		result = null;
 		try {
-			const body =
-				mode === 'paste'
-					? { paste, notify, email: me ? null : email.trim() }
-					: { answers: typed, notify, email: me ? null : email.trim() };
+			const body = {
+				dayNumber: pasted?.dayNumber ?? null,
+				// The paste's own total only describes the paste, not edits to it.
+				gameScore: edited ? null : (pasted?.score ?? null),
+				betterThan: pasted?.betterThan ?? null,
+				rounds: rows.map((r) => {
+					const same = r.answer.trim() === r.original;
+					return {
+						answer: r.answer.trim(),
+						typed: r.answer.trim() ? null : r.typed,
+						gamePoints: same ? r.gamePoints : null,
+						othersChose: same ? r.othersChose : null,
+						prompt: r.prompt,
+						found: r.found && same
+					};
+				}),
+				notify,
+				email: me ? null : email.trim()
+			};
 			const r = await fetch('/krillion/api/submit', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -178,7 +234,10 @@
 	}
 
 	function promptLabel(i: number): string {
-		return day?.scored && day.prompts[i] ? day.prompts[i].text : `Round ${i + 1}`;
+		if (day?.scored && day.prompts[i]) return day.prompts[i].text;
+		// Before the day's counts arrive, the paste's own prompt text is the best label.
+		const p = rows[i]?.prompt;
+		return p ? p.charAt(0) + p.slice(1).toLowerCase() : `Round ${i + 1}`;
 	}
 
 	function time(iso: string | null): string {
@@ -214,8 +273,9 @@
 			<p class="intro">
 				<a href="https://krillion.io" target="_blank" rel="noopener">Krillion</a> scores answers in
 				six hand-picked tiers. This rescores every answer by how many players actually gave it: the
-				most common answer on each prompt scores a little, the rarest scores {TOP_SCORE}, and
-				everything in between follows the counts.
+				most common answer on each prompt scores a little, the rarest scores {TOP_MIN}–{TOP_MAX} (more
+				on broad prompts, where it really is one of a handful; less on narrow ones), and everything in
+				between follows the counts.
 			</p>
 			<p class="notice">
 				Your rescored total can change during the day as more people play. Final scores are locked
@@ -239,72 +299,69 @@
 		</section>
 
 		<section class="card">
-			<div class="tabs" role="tablist">
-				<button
-					type="button"
-					role="tab"
-					aria-selected={mode === 'paste'}
-					class:on={mode === 'paste'}
-					on:click={() => (mode = 'paste')}>Paste my end screen</button
-				>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={mode === 'type'}
-					class:on={mode === 'type'}
-					on:click={() => (mode = 'type')}>Type my answers</button
-				>
-			</div>
+			<h2>Your dive</h2>
+			<p class="hint">
+				Paste your end screen from krillion.io — the whole page or just the part with your answers
+				(on a phone, select what you can and copy). Whatever rounds it finds fill in below; type or
+				fix the rest. Leave a round blank if you missed it.
+			</p>
+			<textarea
+				bind:value={paste}
+				on:input={readPaste}
+				rows="5"
+				placeholder="Paste your end screen here (optional)…"
+			></textarea>
+			{#if pasted}
+				<p class="found" class:warn={pasted.found < 7}>
+					{#if pasted.found === 7}
+						Found all 7 rounds{pasted.dayNumber ? ` from dive #${pasted.dayNumber}` : ''}. Check
+						them below, then submit.
+					{:else if pasted.found === 0}
+						Couldn't find any rounds in that paste — type your answers below instead.
+					{:else}
+						Found {pasted.found} of 7 rounds — fill in the rest below.
+					{/if}
+					{#if pasted.found > 0 && !pasted.dayNumber}
+						<span class="sub">(No dive number in the paste, so this counts as today's dive.)</span>
+					{/if}
+				</p>
+			{/if}
 
-			{#if mode === 'paste'}
-				<p class="hint">
-					On krillion.io's end screen: select all and copy (Ctrl/⌘ + A, then C — on a phone,
-					long-press and Select All), then paste it here.
-				</p>
-				<textarea bind:value={paste} rows="8" placeholder="Paste the whole end screen here…"
-				></textarea>
-				{#if dive}
-					{#if pasteProblem}
-						<p class="warn">{pasteProblem}</p>
+			<div class="rows">
+				{#each rows as r, i (i)}
+					<label
+						class="row"
+						class:from-paste={r.found && r.answer.trim() === r.original && r.answer}
+					>
+						<span class="row-label"><b>{i + 1}.</b> {promptLabel(i)}</span>
+						<span class="row-input">
+							<input
+								bind:value={r.answer}
+								list="k-answers-{i}"
+								autocomplete="off"
+								placeholder={r.typed ? `missed — you typed "${r.typed}"` : 'answer (blank = miss)'}
+							/>
+							<span class="row-tag">
+								{#if r.found && r.answer && r.answer.trim() === r.original}
+									from paste{#if r.gamePoints !== null}&nbsp;· {r.gamePoints} pts{/if}
+								{:else if r.answer.trim()}
+									typed
+								{:else if r.found}
+									miss
+								{/if}
+							</span>
+						</span>
+					</label>
+					{#if day?.answers && day.prompts[i]}
+						<datalist id="k-answers-{i}">
+							{#each day.answers[day.prompts[i].id] ?? [] as a (a)}<option value={a}
+								></option>{/each}
+						</datalist>
 					{/if}
-					{#if dive.rounds.length}
-						<table class="preview">
-							<thead
-								><tr><th>#</th><th>Prompt</th><th>Answer</th><th class="num">Game</th></tr></thead
-							>
-							<tbody>
-								{#each dive.rounds as r (r.round)}
-									<tr class:miss={r.miss}>
-										<td>{r.round}</td>
-										<td class="sub">{r.prompt}</td>
-										<td>{r.answer ?? (r.typed ? `miss ("${r.typed}")` : 'miss')}</td>
-										<td class="num">{r.gamePoints ?? '—'}</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-						<p class="sub">Dive #{dive.dayNumber} · game score {dive.score ?? '—'}</p>
-					{/if}
-				{/if}
-			{:else}
-				<p class="hint">
-					Today's dive only. Leave a round blank if you missed it. Suggestions appear once today's
-					counts are in.
-				</p>
-				<div class="typed">
-					{#each [0, 1, 2, 3, 4, 5, 6] as i (i)}
-						<label>
-							<span>{promptLabel(i)}</span>
-							<input bind:value={typed[i]} list="k-answers-{i}" autocomplete="off" />
-						</label>
-						{#if day?.answers && day.prompts[i]}
-							<datalist id="k-answers-{i}">
-								{#each day.answers[day.prompts[i].id] ?? [] as a (a)}<option value={a}
-									></option>{/each}
-							</datalist>
-						{/if}
-					{/each}
-				</div>
+				{/each}
+			</div>
+			{#if paste || answered}
+				<button type="button" class="link" on:click={clearAll}>Clear and start over</button>
 			{/if}
 
 			<div class="notify">
@@ -433,8 +490,9 @@
 				</div>
 			</div>
 			<p class="hint">
-				Everyone who submits while signed in, by rescored total. Totals only — no answers, so it
-				never spoils the dive.{#if !me}
+				Everyone who submits while signed in, by rescored total. All time ranks average rescored
+				total, once you have {MIN_DIVES_FOR_AVERAGE} dives. Totals only — no answers, so it never spoils
+				the dive.{#if !me}
 					<a href="/account?redirect=/krillion">Sign in</a> to be on it.{/if}
 			</p>
 
@@ -454,7 +512,13 @@
 				{#if boardDay.length}
 					<table>
 						<thead>
-							<tr><th>#</th><th>Name</th><th class="num">Game</th><th class="num">Rescored</th></tr>
+							<tr
+								><th>#</th><th>Name</th><th class="num">Game</th><th class="num">Rescored</th><th
+									class="num"
+									title="All-time average rescored total, once a player has {MIN_DIVES_FOR_AVERAGE} dives"
+									>Avg</th
+								></tr
+							>
 						</thead>
 						<tbody>
 							{#each boardDay as r, i (r.name + i)}
@@ -466,6 +530,11 @@
 									<td class="num">{r.gameScore ?? '—'}</td>
 									<td class="num"
 										><b>{r.updatedScore === null ? 'waiting' : r.updatedScore.toFixed(1)}</b></td
+									>
+									<td class="num sub"
+										>{r.dives >= MIN_DIVES_FOR_AVERAGE && r.average !== null
+											? r.average.toFixed(1)
+											: `${r.dives}/${MIN_DIVES_FOR_AVERAGE}`}</td
 									>
 								</tr>
 							{/each}
@@ -487,12 +556,19 @@
 					</thead>
 					<tbody>
 						{#each boardAll as r, i (r.name + i)}
-							<tr class:you={r.isYou}>
-								<td>{i + 1}</td>
+							{#if !r.qualified && (i === 0 || boardAll[i - 1].qualified)}
+								<tr class="divider">
+									<td colspan="6"
+										>Still building to {MIN_DIVES_FOR_AVERAGE} dives — not ranked on average yet</td
+									>
+								</tr>
+							{/if}
+							<tr class:you={r.isYou} class:unranked={!r.qualified}>
+								<td>{r.qualified ? i + 1 : '—'}</td>
 								<td
 									>{r.name}{#if r.isYou}<span class="you-flag">you</span>{/if}</td
 								>
-								<td class="num">{r.dives}</td>
+								<td class="num">{r.qualified ? r.dives : `${r.dives}/${MIN_DIVES_FOR_AVERAGE}`}</td>
 								<td class="num"><b>{r.average.toFixed(1)}</b></td>
 								<td class="num">{r.best.toFixed(1)}</td>
 								<td class="num">{r.averageGame === null ? '—' : r.averageGame.toFixed(0)}</td>
@@ -514,7 +590,11 @@
 				</li>
 				<li>
 					The most common answer on a prompt scores a small amount that's higher when no single
-					answer dominates; the rarest scores {TOP_SCORE}.
+					answer dominates; the rarest scores between {TOP_MIN} and {TOP_MAX}, placed by how broad
+					the prompt is against every prompt so far, on a log scale: {TOP_MAX} for the broadest we've
+					seen, {TOP_MIN}
+					for the narrowest (say, ten possible countries). Breadth is √(possible answers) ÷ the sum of
+					each answer's squared share.
 				</li>
 				<li>
 					Each prompt's curve is shaped so its average and spread sit close to Krillion's own —
@@ -657,21 +737,61 @@
 		border-color: #0066cc;
 	}
 
-	.typed {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.6rem;
+	.found {
+		margin: 0.5rem 0 0 0;
+		font-size: 0.9rem;
+		color: #1e6b36;
 	}
 
-	.typed label {
+	.found.warn {
+		color: #9a5b00;
+	}
+
+	.rows {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		margin-top: 1rem;
+	}
+
+	.row {
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
 	}
 
-	.typed label span {
+	.row-label {
 		font-size: 0.85rem;
 		color: #555;
+	}
+
+	.row-input {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.row-tag {
+		flex: none;
+		min-width: 6rem;
+		font-size: 0.75rem;
+		color: #888;
+	}
+
+	.row.from-paste input {
+		border-color: #9fd3b0;
+		background: #f4fbf6;
+	}
+
+	button.link {
+		margin-top: 0.5rem;
+		padding: 0;
+		background: none;
+		border: 0;
+		font: inherit;
+		font-size: 0.85rem;
+		color: #0066cc;
+		cursor: pointer;
 	}
 
 	.notify {
@@ -803,6 +923,17 @@
 		border: 1px solid #d5dae1;
 		border-radius: 6px;
 		font: inherit;
+	}
+
+	tr.divider td {
+		padding-top: 0.9rem;
+		font-size: 0.8rem;
+		color: #888;
+		border-bottom: 1px solid #eee;
+	}
+
+	tr.unranked td {
+		color: #777;
 	}
 
 	tr.you td {

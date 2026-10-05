@@ -9,6 +9,7 @@ import {
 	KRILLION_ADMIN_ROLE,
 	KrillionError,
 	adminAnswers,
+	getBreadthRange,
 	listScoredDays
 } from '$lib/server/krillion';
 import type { RequestHandler } from './$types';
@@ -25,8 +26,9 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const days = await listScoredDays();
 	try {
 		const data = await adminAnswers(locals.user.id, date);
+		const range = await getBreadthRange();
 		return json(
-			{ ok: true, today: etDate(), days, ...data },
+			{ ok: true, today: etDate(), days, range, ...data },
 			{ headers: { 'cache-control': 'private, no-store' } }
 		);
 	} catch (err) {

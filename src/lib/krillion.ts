@@ -6,7 +6,9 @@
 //   - the scoring model itself: a continuous, count-based score per answer
 //
 // The model was worked out in a spreadsheet analysis of dives #79-80 (2026-10-02/03):
-//   points = bottom + (TOP - bottom) * F(u; a, b),   F = 1 - (1 - u^a)^b  (Kumaraswamy CDF)
+//   points = bottom + (top - bottom) * F(u; a, b),   F = 1 - (1 - u^a)^b  (Kumaraswamy CDF)
+//   top    = 90-125 per prompt by breadth (topScores): placed by where ln(breadth)
+//            sits between the ALL-TIME smallest (90) and largest (125)
 //   u      = surprisal relative to the prompt's most-given answer, scaled so the
 //            most-given answer is 0 and the rarest is 1
 //   bottom = BOTTOM_SCALE * q,  q = -ln(top share) / ln(answers on the prompt)
@@ -16,10 +18,17 @@
 // No cheater removal and no standings yet: both need the score histogram, which
 // we don't request until Krillion's developer agrees.
 
-export const TOP_SCORE = 110;
+// The rarest answer on a prompt scores between these, by how broad the prompt is
+// compared with every prompt so far: the all-time narrowest gets TOP_MIN, the
+// all-time broadest TOP_MAX.
+export const TOP_MIN = 90;
+export const TOP_MAX = 125;
+export const TOP_SCORE = TOP_MAX; // the most any answer can score
 export const BOTTOM_SCALE = 20;
 export const SPLIT_W = 0.25;
 export const SMOOTH_ALPHA = 1;
+// Dives a player needs before their average counts on the leaderboard.
+export const MIN_DIVES_FOR_AVERAGE = 5;
 
 // ---------------- dates ----------------
 
@@ -59,28 +68,83 @@ export function etHour(at: Date = new Date()): number {
 export interface PastedRound {
 	round: number;
 	prompt: string;
-	answer: string | null; // the game's matched answer; null on a miss
+	answer: string | null; // the game's matched answer; null on a miss or when not found
 	typed: string | null; // what was typed, shown only on a miss
 	miss: boolean;
 	othersChose: number | null;
 	gamePoints: number | null;
+	found: boolean; // false = this round wasn't in the paste; the player fills it in
 }
 
 export interface PastedDive {
-	dayNumber: number | null;
+	dayNumber: number | null; // null when the paste didn't include "Dive #N complete"
 	score: number | null;
 	betterThan: number | null;
-	rounds: PastedRound[];
-	complete: boolean; // all 7 rounds found
-	totalMatchesScore: boolean; // the rounds add up to the score shown
+	rounds: PastedRound[]; // always 7, in round order
+	found: number; // how many of the 7 the paste covered
+	complete: boolean; // all 7 found
+	totalMatchesScore: boolean; // the found rounds add up to the score shown
 }
 
 const OTHERS_RE = /^([\d,]+)\s+other players? chose this$/i;
+// Desktop copies the points and the "+" on separate lines; mobile joins them ("10+").
+const POINTS_RE = /^(\d{1,3})\s*\+?$/;
+const ROUND_RE = /^[1-7]$/;
+const PROMPT_RE = /^name\b/i;
+
+// Prompts compared loosely: mobile copies them in capitals, and quote styles vary.
+function normPrompt(s: string): string {
+	return s.toLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
+}
+
+function emptyRound(round: number): PastedRound {
+	return {
+		round,
+		prompt: '',
+		answer: null,
+		typed: null,
+		miss: false,
+		othersChose: null,
+		gamePoints: null,
+		found: false
+	};
+}
+
+// Read one round's tail starting at the answer line: answer, optional
+// "N other players chose this", optional points. Returns the round's fields and
+// the index just past them.
+function readTail(lines: string[], j: number) {
+	const shown = lines[j] ?? '';
+	const quoted = /^".*"$/.test(shown) || shown === '?';
+	let k = j + 1;
+	let others: number | null = null;
+	const m = (lines[k] ?? '').match(OTHERS_RE);
+	if (m) {
+		others = Number(m[1].replace(/,/g, ''));
+		k++;
+	}
+	const pm = (lines[k] ?? '').match(POINTS_RE);
+	// Not the next round's number ("<1-7>" followed by its prompt).
+	const nextRound = ROUND_RE.test(lines[k] ?? '') && PROMPT_RE.test(lines[k + 1] ?? '');
+	const points = pm && !nextRound ? Number(pm[1]) : null;
+	if (points !== null) k++;
+	return {
+		answer: quoted ? null : shown,
+		typed: quoted && shown !== '?' ? shown.slice(1, -1) : null,
+		miss: quoted || points === 0,
+		othersChose: others,
+		gamePoints: points,
+		next: k
+	};
+}
 
 // The end screen copies as one item per line. Each round reads:
-//   <round n>, <prompt>, <answer | "typed text" on a miss>, [<N> other players chose this], <points>, +
-// Anything else on the page (menus, legend, shop link) is ignored.
-export function parsePaste(text: string): PastedDive {
+//   <round n>, <prompt>, <answer | "typed text" on a miss>, [<N> other players chose this], <points>[+]
+// Anything else on the page (menus, legend, shop link) is ignored, and so is a
+// paste that only covers part of the page: whatever rounds it holds are found,
+// the rest come back as found: false for the player to fill in. With the day's
+// prompts, rounds are also found by their prompt text alone.
+export function parsePaste(text: string, prompts: { text: string }[] = []): PastedDive {
 	const lines = text
 		.replace(/\r/g, '')
 		.split('\n')
@@ -95,45 +159,78 @@ export function parsePaste(text: string): PastedDive {
 		.map((l) => l.match(/^better than (\d+)% of today's players$/i))
 		.find(Boolean);
 
-	const start = Math.max(
-		0,
-		lines.findIndex((l) => /^the catch$/i.test(l))
-	);
-	const rounds: PastedRound[] = [];
-	for (let i = start; i < lines.length && rounds.length < 7; i++) {
-		if (lines[i] !== String(rounds.length + 1)) continue;
-		const prompt = lines[i + 1];
-		if (!prompt || !/^name /i.test(prompt)) continue;
-		let j = i + 2;
-		const shown = lines[j++] ?? '';
-		const quoted = /^".*"$/.test(shown) || shown === '?';
-		let others: number | null = null;
-		const m = (lines[j] ?? '').match(OTHERS_RE);
-		if (m) {
-			others = Number(m[1].replace(/,/g, ''));
-			j++;
-		}
-		const points = /^\d{1,3}$/.test(lines[j] ?? '') ? Number(lines[j]) : null;
-		rounds.push({
-			round: rounds.length + 1,
-			prompt,
-			answer: quoted ? null : shown,
-			typed: quoted && shown !== '?' ? shown.slice(1, -1) : null,
-			miss: quoted || points === 0,
-			othersChose: others,
-			gamePoints: points
-		});
-		i = j;
+	const rounds: PastedRound[] = [1, 2, 3, 4, 5, 6, 7].map(emptyRound);
+	const known = prompts.map((p) => normPrompt(p.text));
+	// Lines already read into a round, so no later step reads them twice.
+	const used = new Set<number>();
+	const take = (from: number, to: number) => {
+		for (let k = from; k < to; k++) used.add(k);
+	};
+
+	// 1. Rounds with their number and prompt: "<n>" then "Name ...".
+	let firstMarker = -1;
+	for (let i = 0; i < lines.length - 1; i++) {
+		if (!ROUND_RE.test(lines[i]) || !PROMPT_RE.test(lines[i + 1])) continue;
+		const n = Number(lines[i]);
+		if (rounds[n - 1].found) continue;
+		if (firstMarker < 0) firstMarker = i;
+		const tail = readTail(lines, i + 2);
+		rounds[n - 1] = { round: n, prompt: lines[i + 1], ...tail, found: true };
+		take(i, tail.next);
+		i = tail.next - 1;
 	}
 
-	const total = rounds.reduce((s, r) => s + (r.gamePoints ?? 0), 0);
+	// 2. With the day's prompts: a prompt line on its own (its number cut off).
+	for (let r = 0; r < 7 && known.length === 7; r++) {
+		if (rounds[r].found) continue;
+		const at = lines.findIndex((l, k) => !used.has(k) && normPrompt(l) === known[r]);
+		if (at >= 0 && at + 1 < lines.length) {
+			const tail = readTail(lines, at + 1);
+			rounds[r] = { round: r + 1, prompt: lines[at], ...tail, found: true };
+			take(at, tail.next);
+		}
+	}
+
+	// 3. A round cut off at the top of the paste: before the first numbered round
+	//    there's just "<answer>", "<N> other players chose this", "<points>". It
+	//    belongs to the round before the first one found.
+	const firstFound = rounds.findIndex((r) => r.found);
+	if (firstMarker > 0 && firstFound > 0 && !rounds[firstFound - 1].found) {
+		let o = -1;
+		for (let i = firstMarker - 1; i >= 1; i--) {
+			if (used.has(i)) break; // anything above a claimed line isn't the cut-off round
+			if (OTHERS_RE.test(lines[i])) {
+				o = i;
+				break;
+			}
+		}
+		if (
+			o >= 1 &&
+			!used.has(o - 1) &&
+			!PROMPT_RE.test(lines[o - 1]) &&
+			!ROUND_RE.test(lines[o - 1])
+		) {
+			const tail = readTail(lines, o - 1);
+			const n = firstFound; // zero-based index of the round before
+			rounds[n - 1] = {
+				round: n,
+				prompt: known[n - 1] ? prompts[n - 1].text : '',
+				...tail,
+				found: true
+			};
+		}
+	}
+
+	const foundRounds = rounds.filter((r) => r.found);
+	const total = foundRounds.reduce((s, r) => s + (r.gamePoints ?? 0), 0);
 	return {
 		dayNumber,
 		score,
 		betterThan: better ? Number(better[1]) : null,
 		rounds,
-		complete: rounds.length === 7,
-		totalMatchesScore: score !== null && total === score
+		found: foundRounds.length,
+		complete: foundRounds.length === 7,
+		totalMatchesScore: score !== null && foundRounds.length === 7 && total === score
 	};
 }
 
@@ -158,6 +255,8 @@ export interface PromptFit {
 	targetSd: number;
 	fittedMean: number;
 	fittedSd: number;
+	top: number; // what the rarest answer on this prompt scores (TOP_MIN..TOP_MAX)
+	breadth: number; // sqrt(n) / sum of squared shares; the all-time largest gets TOP_MAX
 }
 
 function kuma(u: number, a: number, b: number): number {
@@ -188,7 +287,10 @@ function geomspace(lo: number, hi: number, n: number): number[] {
 // Score every answer on one prompt. Returns the points (same order as `answers`)
 // and the fit. Answers with no players still get points (they just carry no
 // weight in the fit).
-export function scorePrompt(answers: ModelAnswer[]): { points: number[]; fit: PromptFit } {
+export function scorePrompt(
+	answers: ModelAnswer[],
+	topScore: number = TOP_MAX
+): { points: number[]; fit: PromptFit } {
 	const n = answers.length;
 	const K = answers.map((x) => Math.max(0, x.count));
 	const L = K.reduce((s, k) => s + k, 0);
@@ -223,7 +325,7 @@ export function scorePrompt(answers: ModelAnswer[]): { points: number[]; fit: Pr
 	const targetMean = SPLIT_W * gameMean + (1 - SPLIT_W) * sortedMean;
 	const targetSd = SPLIT_W * gameSd + (1 - SPLIT_W) * sortedSd;
 
-	const pts = (a: number, b: number) => u.map((v) => bottom + (TOP_SCORE - bottom) * kuma(v, a, b));
+	const pts = (a: number, b: number) => u.map((v) => bottom + (topScore - bottom) * kuma(v, a, b));
 	const err = (a: number, b: number) => {
 		const [m, sd] = weightedMoments(K, pts(a, b));
 		const em = targetMean > 0 ? (m - targetMean) / targetMean : 0;
@@ -282,9 +384,58 @@ export function scorePrompt(answers: ModelAnswer[]): { points: number[]; fit: Pr
 			targetMean,
 			targetSd,
 			fittedMean,
-			fittedSd
+			fittedSd,
+			top: topScore,
+			breadth: breadth(answers)
 		}
 	};
+}
+
+// How broad a prompt is: sqrt(answers on it) / sum of squared shares. The
+// denominator (the Herfindahl index) is near 1 when one answer takes everything
+// and small when players spread out; sqrt(n) rewards a long list of options.
+export function breadth(answers: ModelAnswer[]): number {
+	const counts = answers.map((a) => Math.max(0, a.count));
+	const total = counts.reduce((s, c) => s + c, 0);
+	if (total <= 0 || !answers.length) return 0;
+	const hhi = counts.reduce((s, c) => s + (c / total) ** 2, 0);
+	return Math.sqrt(answers.length) / hhi;
+}
+
+// The all-time breadth range the tops are placed along.
+export interface BreadthRange {
+	min: number;
+	max: number;
+}
+
+// Where breadth z sits between the all-time smallest x and largest y, on a LOG
+// scale, as a top score: TOP_MIN + (TOP_MAX - TOP_MIN) x (ln z - ln x) / (ln y - ln x).
+// Log because breadth spans orders of magnitude (31 to 103,890 by dive #82): on
+// a straight line one record-breaking prompt squeezed every other prompt down to
+// TOP_MIN. The range passed in is widened by these prompts first, so a new
+// record lands exactly on an end.
+export function topScores(prompts: ModelAnswer[][], range: BreadthRange | null = null): number[] {
+	const b = prompts.map(breadth);
+	const positive = b.filter((z) => z > 0);
+	const lo = Math.min(range?.min ?? Infinity, ...positive);
+	const hi = Math.max(range?.max ?? -Infinity, ...positive);
+	return b.map((z) => {
+		if (z <= 0) return TOP_MIN; // a prompt nobody answered
+		if (!(hi > lo)) return (TOP_MIN + TOP_MAX) / 2;
+		return (
+			TOP_MIN + (TOP_MAX - TOP_MIN) * ((Math.log(z) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)))
+		);
+	});
+}
+
+// Score a whole day: every prompt's top from its breadth against the all-time
+// range, then each prompt.
+export function scoreDay(
+	prompts: ModelAnswer[][],
+	range: BreadthRange | null = null
+): { points: number[]; fit: PromptFit }[] {
+	const tops = topScores(prompts, range);
+	return prompts.map((answers, i) => scorePrompt(answers, tops[i]));
 }
 
 // ---------------- matching a typed answer to the sheet ----------------
