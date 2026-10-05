@@ -554,9 +554,11 @@ export async function mySubmissions(userId: number) {
 			updated_score: number | null;
 			notify: boolean;
 			scored: ScoredRound[] | null;
+			rounds: PastedRound[];
 		}[]
 	>`
-		select to_char(date, 'YYYY-MM-DD') as date, day_number, game_score, updated_score, notify, scored
+		select to_char(date, 'YYYY-MM-DD') as date, day_number, game_score, updated_score, notify,
+			scored, rounds
 		from krillion_submissions where user_id = ${userId}
 		order by date desc limit 30
 	`;
@@ -793,18 +795,80 @@ export interface AdminDay {
 	prompts: { id: string; text: string; fit: PromptFit | null; answers: AdminAnswer[] }[];
 }
 
-export async function adminAnswers(userId: number, date: string): Promise<AdminDay> {
-	if (date === etDate()) {
-		const [mine] = await sql`
-			select 1 from krillion_submissions where user_id = ${userId} and date = ${date}
-		`;
-		if (!mine) {
-			throw new KrillionError(
-				"Submit your own dive for today first: today's answer scores stay hidden until you have.",
-				403
-			);
-		}
+// Today's answers and dives stay hidden from an admin until they've submitted
+// their own dive, so the admin page can't be used to look up a good answer.
+export async function assertAdminCanSee(userId: number, date: string): Promise<void> {
+	if (date !== etDate()) return;
+	const [mine] = await sql`
+		select 1 from krillion_submissions where user_id = ${userId} and date = ${date}
+	`;
+	if (!mine) {
+		throw new KrillionError(
+			"Submit your own dive for today first: today's answer scores stay hidden until you have.",
+			403
+		);
 	}
+}
+
+export interface AdminSubmission {
+	id: number;
+	name: string; // account name, or "Guest"
+	guest: boolean;
+	gameScore: number | null;
+	betterThan: number | null;
+	updatedScore: number | null; // null while the day's counts aren't in
+	submittedAt: string;
+	rounds: ScoredRound[];
+}
+
+// Every dive submitted for a day, signed in or not, with each round's
+// conversion. Guest emails are never included.
+export async function adminSubmissions(userId: number, date: string): Promise<AdminSubmission[]> {
+	await assertAdminCanSee(userId, date);
+	const rows = await sql<
+		{
+			id: number;
+			name: string | null;
+			game_score: number | null;
+			game_better_than: number | null;
+			updated_score: number | null;
+			created_at: Date;
+			rounds: PastedRound[];
+			scored: ScoredRound[] | null;
+		}[]
+	>`
+		select s.id::int as id, coalesce(u.real_name, u.username) as name, s.game_score,
+			s.game_better_than, s.updated_score, s.created_at, s.rounds, s.scored
+		from krillion_submissions s left join users u on u.id = s.user_id
+		where s.date = ${date}
+		order by s.updated_score desc nulls last, s.game_score desc nulls last, s.created_at
+	`;
+	return rows.map((r) => ({
+		id: r.id,
+		name: r.name ?? 'Guest',
+		guest: r.name === null,
+		gameScore: r.game_score,
+		betterThan: r.game_better_than,
+		updatedScore: r.updated_score,
+		submittedAt: r.created_at.toISOString(),
+		rounds:
+			r.scored ??
+			r.rounds.map((x) => ({
+				round: x.round,
+				promptId: null,
+				prompt: x.prompt,
+				submitted: x.answer,
+				match: null,
+				miss: x.miss || !x.answer,
+				gamePoints: x.gamePoints,
+				points: 0,
+				count: null
+			}))
+	}));
+}
+
+export async function adminAnswers(userId: number, date: string): Promise<AdminDay> {
+	await assertAdminCanSee(userId, date);
 	const [day] = await sql<
 		{
 			day_number: number;

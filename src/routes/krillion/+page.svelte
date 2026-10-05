@@ -10,7 +10,14 @@
 <script lang="ts">
 	import '../../app.css';
 	import { onMount } from 'svelte';
-	import { MIN_DIVES_FOR_AVERAGE, parsePaste, TOP_MAX, TOP_MIN } from '$lib/krillion';
+	import {
+		MIN_DIVES_FOR_AVERAGE,
+		etDate,
+		parsePaste,
+		TOP_MAX,
+		TOP_MIN,
+		type PastedRound
+	} from '$lib/krillion';
 
 	interface Day {
 		date: string;
@@ -46,12 +53,21 @@
 	let day: Day | null = null;
 	let dayFailed = false;
 	let me: string | null = null;
-	let myDives: {
+	interface MyDive {
 		date: string;
 		day_number: number;
 		game_score: number | null;
 		updated_score: number | null;
-	}[] = [];
+		notify: boolean;
+		scored: ScoredRound[] | null;
+		rounds: PastedRound[];
+	}
+	let myDives: MyDive[] = [];
+	// True when the result card shows a dive saved earlier rather than one just submitted.
+	let restored = false;
+	// The answer form collapses to a one-line bar once today's dive is in; "Edit
+	// answers" opens it again, still filled in.
+	let formOpen = true;
 
 	// One flow: paste the end screen (optional), then review the seven answers.
 	// The paste fills in whatever rounds it covers; the rest are typed. Editing
@@ -149,11 +165,50 @@
 			if (r.signedIn) {
 				me = r.username;
 				myDives = r.dives ?? [];
+				restoreToday();
 			}
 		} catch {
 			me = null;
 		}
 	});
+
+	// Signed in and already submitted today: show that dive again, with the
+	// latest scores, and put its answers back in the boxes so it can be edited
+	// and resubmitted (a resubmission replaces it).
+	function restoreToday() {
+		const today = etDate();
+		const mine = myDives.find((d) => d.date === today);
+		if (!mine || result) return;
+		const scoredRounds: ScoredRound[] =
+			mine.scored ??
+			mine.rounds.map((r) => ({
+				round: r.round,
+				prompt: r.prompt,
+				submitted: r.answer,
+				match: r.answer,
+				miss: r.miss || !r.answer,
+				gamePoints: r.gamePoints,
+				points: 0,
+				count: null
+			}));
+		result = {
+			dayNumber: mine.day_number,
+			date: mine.date,
+			status: mine.scored ? 'scored' : 'waiting',
+			rounds: scoredRounds,
+			gameScore: mine.game_score,
+			updatedScore: mine.updated_score,
+			countsAsOf: day?.countsAsOf ?? null,
+			notify: mine.notify
+		};
+		restored = true;
+		formOpen = false;
+		notify = mine.notify;
+		rows = scoredRounds.map((r) => {
+			const text = r.miss ? '' : (r.match ?? r.submitted ?? '');
+			return { ...blankRow(), answer: text, original: text, prompt: r.prompt ?? '' };
+		});
+	}
 
 	function readPaste() {
 		if (!paste.trim()) {
@@ -221,6 +276,8 @@
 				return;
 			}
 			result = data;
+			restored = false;
+			formOpen = false;
 			if (me) {
 				const m = await fetch('/krillion/api/mine').then((x) => x.json());
 				myDives = m.dives ?? [];
@@ -298,110 +355,143 @@
 			{/if}
 		</section>
 
-		<section class="card">
-			<h2>Your dive</h2>
-			<p class="hint">
-				Paste your end screen from krillion.io — the whole page or just the part with your answers
-				(on a phone, select what you can and copy). Whatever rounds it finds fill in below; type or
-				fix the rest. Leave a round blank if you missed it.
-			</p>
-			<textarea
-				bind:value={paste}
-				on:input={readPaste}
-				rows="5"
-				placeholder="Paste your end screen here (optional)…"
-			></textarea>
-			{#if pasted}
-				<p class="found" class:warn={pasted.found < 7}>
-					{#if pasted.found === 7}
-						Found all 7 rounds{pasted.dayNumber ? ` from dive #${pasted.dayNumber}` : ''}. Check
-						them below, then submit.
-					{:else if pasted.found === 0}
-						Couldn't find any rounds in that paste — type your answers below instead.
-					{:else}
-						Found {pasted.found} of 7 rounds — fill in the rest below.
-					{/if}
-					{#if pasted.found > 0 && !pasted.dayNumber}
-						<span class="sub">(No dive number in the paste, so this counts as today's dive.)</span>
-					{/if}
+		{#if !formOpen && result}
+			<section class="card compact">
+				<span
+					>✓ Your dive #{result.dayNumber} is submitted{#if result.status === 'waiting'}
+						— scored when today's counts arrive{/if}.</span
+				>
+				<button type="button" class="small" on:click={() => (formOpen = true)}>Edit answers</button>
+			</section>
+		{:else}
+			<section class="card">
+				<h2>Your dive</h2>
+				<p class="hint">
+					Paste your end screen from krillion.io — the whole page or just the part with your answers
+					(on a phone, select what you can and copy). Whatever rounds it finds fill in below; type
+					or fix the rest. Leave a round blank if you missed it.
 				</p>
-			{/if}
-
-			<div class="rows">
-				{#each rows as r, i (i)}
-					<label
-						class="row"
-						class:from-paste={r.found && r.answer.trim() === r.original && r.answer}
-					>
-						<span class="row-label"><b>{i + 1}.</b> {promptLabel(i)}</span>
-						<span class="row-input">
-							<input
-								bind:value={r.answer}
-								list="k-answers-{i}"
-								autocomplete="off"
-								placeholder={r.typed ? `missed — you typed "${r.typed}"` : 'answer (blank = miss)'}
-							/>
-							<span class="row-tag">
-								{#if r.found && r.answer && r.answer.trim() === r.original}
-									from paste{#if r.gamePoints !== null}&nbsp;· {r.gamePoints} pts{/if}
-								{:else if r.answer.trim()}
-									typed
-								{:else if r.found}
-									miss
-								{/if}
-							</span>
-						</span>
-					</label>
-					{#if day?.answers && day.prompts[i]}
-						<datalist id="k-answers-{i}">
-							{#each day.answers[day.prompts[i].id] ?? [] as a (a)}<option value={a}
-								></option>{/each}
-						</datalist>
-					{/if}
-				{/each}
-			</div>
-			{#if paste || answered}
-				<button type="button" class="link" on:click={clearAll}>Clear and start over</button>
-			{/if}
-
-			<div class="notify">
-				{#if me}
-					<label class="check">
-						<input type="checkbox" bind:checked={notify} />
-						<span>Email me my final score after midnight ET</span>
-					</label>
-					<p class="sub">
-						Signed in as <b>{me}</b> — your final score is saved to your account either way.
-					</p>
-				{:else}
-					<label class="check">
-						<input type="checkbox" bind:checked={notify} />
-						<span>Email me my final score after midnight ET</span>
-					</label>
-					{#if notify}
-						<input type="email" bind:value={email} placeholder="you@example.com" class="email" />
-						<p class="sub">Used for this one email, then deleted.</p>
-					{/if}
-					<p class="sub">
-						<a href="/account?redirect=/krillion">Sign in</a> to keep your scores on your account.
+				<textarea
+					bind:value={paste}
+					on:input={readPaste}
+					rows="5"
+					placeholder="Paste your end screen here (optional)…"
+				></textarea>
+				{#if pasted}
+					<p class="found" class:warn={pasted.found < 7}>
+						{#if pasted.found === 7}
+							Found all 7 rounds{pasted.dayNumber ? ` from dive #${pasted.dayNumber}` : ''}. Check
+							them below, then submit.
+						{:else if pasted.found === 0}
+							Couldn't find any rounds in that paste — type your answers below instead.
+						{:else}
+							Found {pasted.found} of 7 rounds — fill in the rest below.
+						{/if}
+						{#if pasted.found > 0 && !pasted.dayNumber}
+							<span class="sub">(No dive number in the paste, so this counts as today's dive.)</span
+							>
+						{/if}
 					</p>
 				{/if}
-			</div>
 
-			<button type="button" class="primary" disabled={!canSubmit} on:click={submit}>
-				{busy ? 'Scoring…' : 'Rescore my dive'}
-			</button>
-			{#if error}<p class="warn">{error}</p>{/if}
-		</section>
+				<div class="rows">
+					{#each rows as r, i (i)}
+						<label
+							class="row"
+							class:from-paste={r.found && r.answer.trim() === r.original && r.answer}
+						>
+							<span class="row-label"><b>{i + 1}.</b> {promptLabel(i)}</span>
+							<span class="row-input">
+								<input
+									bind:value={r.answer}
+									list="k-answers-{i}"
+									autocomplete="off"
+									placeholder={r.typed
+										? `missed — you typed "${r.typed}"`
+										: 'answer (blank = miss)'}
+								/>
+								<span class="row-tag">
+									{#if r.found && r.answer && r.answer.trim() === r.original}
+										from paste{#if r.gamePoints !== null}&nbsp;· {r.gamePoints} pts{/if}
+									{:else if r.answer.trim()}
+										typed
+									{:else if r.found}
+										miss
+									{/if}
+								</span>
+							</span>
+						</label>
+						{#if day?.answers && day.prompts[i]}
+							<datalist id="k-answers-{i}">
+								{#each day.answers[day.prompts[i].id] ?? [] as a (a)}<option value={a}
+									></option>{/each}
+							</datalist>
+						{/if}
+					{/each}
+				</div>
+				{#if paste || answered}
+					<button type="button" class="link" on:click={clearAll}>Clear and start over</button>
+				{/if}
+
+				<div class="notify">
+					{#if me}
+						<label class="check">
+							<input type="checkbox" bind:checked={notify} />
+							<span>Email me my final score after midnight ET</span>
+						</label>
+						<p class="sub">
+							Signed in as <b>{me}</b> — your final score is saved to your account either way.
+						</p>
+					{:else}
+						<label class="check">
+							<input type="checkbox" bind:checked={notify} />
+							<span>Email me my final score after midnight ET</span>
+						</label>
+						{#if notify}
+							<input type="email" bind:value={email} placeholder="you@example.com" class="email" />
+							<p class="sub">Used for this one email, then deleted.</p>
+						{/if}
+						<p class="sub">
+							<a href="/account?redirect=/krillion">Sign in</a> to keep your scores on your account.
+						</p>
+					{/if}
+				</div>
+
+				<button type="button" class="primary" disabled={!canSubmit} on:click={submit}>
+					{busy ? 'Scoring…' : 'Rescore my dive'}
+				</button>
+				{#if error}<p class="warn">{error}</p>{/if}
+			</section>
+		{/if}
 
 		{#if result}
 			<section class="card result">
-				<h2>Dive #{result.dayNumber}</h2>
+				<h2>
+					Dive #{result.dayNumber}{#if restored}<span class="saved-flag">your saved dive</span>{/if}
+				</h2>
+				{#if restored}
+					<p class="sub">
+						You already submitted today. Here it is with the latest scores — change any answer above
+						and submit again to replace it.
+					</p>
+				{/if}
 				{#if result.status === 'waiting'}
 					<p>
 						Saved. Today's counts arrive at {day?.nextFetch ?? '11:00 ET'} — come back then for your
 						rescored total{#if result.notify}, or watch for the email after midnight{/if}.
 					</p>
+					<table>
+						<thead><tr><th>#</th><th>Your answer</th><th class="num">Game</th></tr></thead>
+						<tbody>
+							{#each result.rounds as r (r.round)}
+								<tr class:miss={r.miss}>
+									<td>{r.round}</td>
+									<td>{r.miss ? 'miss' : r.submitted}</td>
+									<td class="num">{r.gamePoints ?? '—'}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
 				{:else}
 					<div class="totals">
 						<div>
@@ -735,6 +825,46 @@
 	input:focus {
 		outline: none;
 		border-color: #0066cc;
+	}
+
+	.card.compact {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		padding: 0.7rem 1rem;
+		font-size: 0.9rem;
+		color: #1e6b36;
+		background: #f4fbf6;
+		border-color: #cfe8d6;
+	}
+
+	button.small {
+		padding: 0.3rem 0.8rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.85rem;
+		color: #333;
+		cursor: pointer;
+	}
+
+	button.small:hover {
+		border-color: #0066cc;
+		color: #0066cc;
+	}
+
+	.saved-flag {
+		margin-left: 0.6rem;
+		padding: 0.1rem 0.5rem;
+		background: #eaf7ee;
+		border-radius: 10px;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: #1e6b36;
+		vertical-align: middle;
 	}
 
 	.found {

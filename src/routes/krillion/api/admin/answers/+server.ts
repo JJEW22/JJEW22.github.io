@@ -1,7 +1,8 @@
 // src/routes/krillion/api/admin/answers/+server.ts
 // Every answer's count, game points and rescored points for one day, per
-// prompt. krillion:admin (or site:admin) only, and today's only once the admin
-// has submitted their own dive -- enforced in adminAnswers().
+// prompt, plus every dive submitted that day with its per-round conversion.
+// krillion:admin (or site:admin) only, and today's only once the admin has
+// submitted their own dive -- enforced in assertAdminCanSee().
 import { json } from '@sveltejs/kit';
 import { dateForDay, etDate } from '$lib/krillion';
 import { hasRole } from '$lib/server/roles';
@@ -9,6 +10,7 @@ import {
 	KRILLION_ADMIN_ROLE,
 	KrillionError,
 	adminAnswers,
+	adminSubmissions,
 	getBreadthRange,
 	listScoredDays
 } from '$lib/server/krillion';
@@ -25,10 +27,23 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const date = Number.isInteger(n) && n > 0 ? dateForDay(n) : etDate();
 	const days = await listScoredDays();
 	try {
-		const data = await adminAnswers(locals.user.id, date);
+		const submissions = await adminSubmissions(locals.user.id, date);
+		let data;
+		try {
+			data = await adminAnswers(locals.user.id, date);
+		} catch (err) {
+			// No counts yet (before 11am): the dives are still worth seeing.
+			if (err instanceof KrillionError && err.status === 404) {
+				return json(
+					{ ok: false, error: err.message, today: etDate(), days, date, submissions },
+					{ status: 404, headers: { 'cache-control': 'private, no-store' } }
+				);
+			}
+			throw err;
+		}
 		const range = await getBreadthRange();
 		return json(
-			{ ok: true, today: etDate(), days, range, ...data },
+			{ ok: true, today: etDate(), days, range, submissions, ...data },
 			{ headers: { 'cache-control': 'private, no-store' } }
 		);
 	} catch (err) {
