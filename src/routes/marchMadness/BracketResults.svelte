@@ -1,17 +1,11 @@
 <script>
     import { onMount } from 'svelte';
     import { 
-        SCORE_FOR_ROUND, 
-        SEED_FACTOR,
         SCORE_DIFF_BUCKETS,
-        regionPositions,
-        matchupPairs,
-        createEmptyBracket,
         initializeBracketWithTeams,
         computeScore,
         computePossibleRemaining,
         computeStakeInGame,
-        letterToNumber,
         loadScoringConfig
     } from './BracketStructure.js';
     import { loadBracketFromPath } from './bracketIO.js';
@@ -92,7 +86,7 @@
             if (response.ok) {
                 scoringConfig = await response.json();
             }
-        } catch (e) {
+        } catch {
             console.warn('Could not load scoring config for star bonuses');
         }
     }
@@ -173,13 +167,6 @@
      */
     function getStarPoints(name) {
         return participantStarPoints[name.toLowerCase()] || 0;
-    }
-    
-    /**
-     * Get award count for a participant (case-insensitive)
-     */
-    function getAwardCount(name) {
-        return participantAwardCount[name.toLowerCase()] || 0;
     }
     
     /**
@@ -274,21 +261,6 @@
             return award.Winners.reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
         } else {
             return award.Winners.length;
-        }
-    }
-    
-    /**
-     * Check if an award has any winners (handles split awards)
-     */
-    function awardHasWinners(award) {
-        if (!award.Winners || award.Winners.length === 0) return false;
-        
-        const isSplitAward = award.name.includes('/') && Array.isArray(award.Winners[0]);
-        
-        if (isSplitAward) {
-            return award.Winners.some(list => Array.isArray(list) && list.length > 0);
-        } else {
-            return award.Winners.length > 0;
         }
     }
     
@@ -631,17 +603,10 @@
         // Try to load results (loadBracketFromPath tries JSON first, then Excel)
         try {
             resultsBracket = await loadBracketFromPath(RESULTS_FILE, teams, teamsList);
-        } catch (e) {
+        } catch {
             console.log('No results file found, using empty bracket');
             resultsBracket = initializeBracketWithTeams(teamsList);
         }
-    }
-    
-    function parseResultsCSV(csvText) {
-        // Parse results CSV and populate resultsBracket
-        // This would parse the same format as the bracket Excel files
-        const lines = csvText.trim().split('\n');
-        // Implementation depends on CSV format
     }
     
     async function loadParticipants() {
@@ -670,7 +635,7 @@
                 participants = ['player1', 'player2'];
                 participantDisplayNames = { player1: 'player1', player2: 'player2' };
             }
-        } catch (e) {
+        } catch {
             participants = ['player1', 'player2'];
             participantDisplayNames = { player1: 'player1', player2: 'player2' };
         }
@@ -720,7 +685,7 @@
                 nextGamePreferences = {};
                 nextGameLosePreferences = {};
             }
-        } catch (e) {
+        } catch {
             console.log('No win probabilities file found');
             winProbabilities = {};
             loseProbabilities = {};
@@ -806,13 +771,9 @@
     async function tryLoadBatchSinglePattern(unresolved, urlFn, ext) {
         const promises = [...unresolved].map(async (name) => {
             const url = urlFn(name);
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Not found');
-                return { name, url, ext, response };
-            } catch (e) {
-                throw e;
-            }
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Not found');
+            return { name, url, ext, response };
         });
         
         const results = await Promise.allSettled(promises);
@@ -959,11 +920,12 @@
         }
     }
     
+    // Stub: CSV brackets are not parsed yet, so csvText goes unused for now.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     function parseBracketCSV(csvText) {
         // Initialize bracket with teams
         const bracket = initializeBracketWithTeams(teamsList);
-        
-        const lines = csvText.trim().split('\n');
+
         // Parse CSV and extract winners for each game
         // Format depends on how you export the CSV
         
@@ -1074,8 +1036,8 @@
     }
     
     function extractRegionWinners(sheet, bracket, region, startIndex, config) {
-        const { r1Rows, r2Rows, s16Rows, e8Rows, f4Row, r1Col, r2Col, s16Col, e8Col, f4Col,
-                r1ScoreCol, r2ScoreCol, s16ScoreCol, e8ScoreCol, f4ScoreCol } = config;
+        const { r1Rows, r2Rows, s16Rows, e8Rows, f4Row, r2Col, s16Col, e8Col, f4Col,
+                r1ScoreCol, r2ScoreCol, s16ScoreCol, e8ScoreCol } = config;
         
         // Round 1 winners (from Round 2 cells) and scores
         for (let i = 0; i < 8; i++) {
@@ -1675,11 +1637,6 @@
     })();
     
     /**
-     * Check if current scenario is a losing scenario (for styling)
-     */
-    $: isLosingScenario = typeof selectedScenario === 'string' && selectedScenario.startsWith('losing-');
-    
-    /**
      * Format a probability for display.
      * - 2 decimal places for normal values
      * - Scientific notation for values < 0.01%
@@ -1708,12 +1665,6 @@
                 setTimeout(() => gameElement.classList.remove('highlighted'), 2000);
             }
         }, 100);
-    }
-    
-    function getWinnerDisplay(game) {
-        if (!game) return '';
-        if (!game.winner) return 'TBD';
-        return game.winner.name;
     }
     
     function getRoundName(round) {
@@ -1769,7 +1720,7 @@
             if (cleaned.length <= len) return cleaned;
             
             // Try to use capital letters / word starts
-            const words = cleaned.split(/[\s\/]+/);
+            const words = cleaned.split(/[\s/]+/);
             if (words.length > 1) {
                 // Multi-word: use first letter of each word (all caps for acronym)
                 const initials = words.map(w => w[0]).join('').toUpperCase();
@@ -1884,11 +1835,11 @@
      * @param {string} gameKey - The game key
      * @param {string} team - 'team1', 'team2', or 'none'
      */
-    function getSortedStakeEntries(gameKey, team, gameInfo) {
+    function getSortedStakeEntries(gameKey, team) {
         const entries = Object.entries(stakeData[gameKey] || {});
         
         // Filter to the relevant column
-        const filtered = entries.filter(([name, stake]) => {
+        const filtered = entries.filter(([, stake]) => {
             if (team === 'team1') return stake && stake.team1 > 0;
             if (team === 'team2') return stake && stake.team2 > 0;
             return !stake || (!stake.team1 && !stake.team2);
@@ -1987,7 +1938,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#each standings as entry}
+                            {#each standings as entry, si (si)}
                                 <tr class:highlight={selectedParticipant === entry.submitter}>
                                     <td class="rank">
                                         {#if entry.rank === 1}🥇
@@ -2086,7 +2037,7 @@
                         <label for="participant-select">Select Participant:</label>
                         <select id="participant-select" bind:value={selectedParticipant} on:change={() => selectedScenario = null}>
                             <option value={null}>-- Choose --</option>
-                            {#each Object.keys(participantBrackets) as name}
+                            {#each Object.keys(participantBrackets) as name (name)}
                                 <option value={name}>{participantDisplayNames[name] || name}{participantDisplayNames[name] && participantDisplayNames[name] !== name ? ` (${name})` : ''}</option>
                             {/each}
                         </select>
@@ -2098,7 +2049,7 @@
                                 <option value="optimal">⭐ Optimal Bracket (Max Possible Score)</option>
                                 {#if winningScenarios[selectedParticipant]?.length > 0}
                                     <optgroup label="🏆 Winning Scenarios">
-                                        {#each winningScenarios[selectedParticipant] as scenario, i}
+                                        {#each winningScenarios[selectedParticipant] as scenario, i (i)}
                                             <option value={`winning-${i}`} class="winning-option">Win {i + 1} - {getScenarioChampion(scenario)} wins ({formatProbability(scenario.probability)})</option>
                                         {/each}
                                     </optgroup>
@@ -2107,7 +2058,7 @@
                                 {/if}
                                 {#if losingScenarios[selectedParticipant]?.length > 0}
                                     <optgroup label="💀 Losing Scenarios">
-                                        {#each losingScenarios[selectedParticipant] as scenario, i}
+                                        {#each losingScenarios[selectedParticipant] as scenario, i (i)}
                                             <option value={`losing-${i}`} class="losing-option">Lose {i + 1} - {getScenarioChampion(scenario)} wins ({formatProbability(scenario.probability)})</option>
                                         {/each}
                                     </optgroup>
@@ -2193,7 +2144,7 @@
                     {#if upcomingGames.length === 0}
                         <p class="no-data">No upcoming games found. The tournament may be complete or results haven't been entered.</p>
                     {:else}
-                        {#each upcomingGames as gameInfo}
+                        {#each upcomingGames as gameInfo, gi (gi)}
                             {@const gameKey = `r${gameInfo.round}-${gameInfo.index}`}
                             {@const odds = getGameOdds(gameInfo.team1, gameInfo.team2, gameInfo.round)}
                             {@const schedule = getScheduleInfo(gameInfo.game)}
@@ -2225,12 +2176,12 @@
                                             <span class="vegas-odds">{formatOdds(odds.team1Odds)}</span>
                                         </h4>
                                         <ul class="stake-list">
-                                            {#each getSortedStakeEntries(gameKey, 'team1', gameInfo) as [name, stake]}
+                                            {#each getSortedStakeEntries(gameKey, 'team1') as [name, stake] (name)}
                                                     {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team1}</span>
-                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part, pi (pi)}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
                                                     </li>
                                             {/each}
                                         </ul>
@@ -2242,12 +2193,12 @@
                                             <span class="vegas-odds">{formatOdds(odds.team2Odds)}</span>
                                         </h4>
                                         <ul class="stake-list">
-                                            {#each getSortedStakeEntries(gameKey, 'team2', gameInfo) as [name, stake]}
+                                            {#each getSortedStakeEntries(gameKey, 'team2') as [name, stake] (name)}
                                                     {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
                                                         <span class="stake-points">+{stake.team2}</span>
-                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part, pi (pi)}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
                                                     </li>
                                             {/each}
                                         </ul>
@@ -2256,11 +2207,11 @@
                                     <div class="stake-column no-stake">
                                         <h4>No Stake</h4>
                                         <ul class="stake-list">
-                                            {#each getSortedStakeEntries(gameKey, 'none', gameInfo) as [name, stake]}
+                                            {#each getSortedStakeEntries(gameKey, 'none') as [name] (name)}
                                                     {@const pref = getPreference(gameKey, name)}
                                                     <li>
                                                         <span class="stake-name">{name}</span>
-                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
+                                                        <span class="stake-pref" class:lose-pref={pref?.isLosePreference}>({#each formatPreferenceParts(pref, gameInfo.team1.name, gameInfo.team2.name) as part, pi (pi)}<span class:zero-prob={part.isZero} class:zero-prob-lose={part.isZero && !pref?.isLosePreference} class:zero-prob-win={part.isZero && pref?.isLosePreference}>{part.text}</span>{/each})</span>
                                                     </li>
                                             {/each}
                                         </ul>
@@ -2286,14 +2237,14 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each participants.sort((a, b) => getStarPoints(b) - getStarPoints(a)) as name}
+                                {#each participants.sort((a, b) => getStarPoints(b) - getStarPoints(a)) as name, ni (ni)}
                                     {@const earnedBadges = getEarnedBadges(name)}
                                     <tr>
                                         <td class="name">{name}</td>
                                         <td class="badges-earned">
                                             {#if earnedBadges.length > 0}
                                                 <div class="mini-badges">
-                                                    {#each earnedBadges as badge}
+                                                    {#each earnedBadges as badge, bi (bi)}
                                                         {@const badgeSlug = badge.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
                                                         <button 
                                                             class="mini-badge" 
@@ -2333,13 +2284,13 @@
                     <!-- Awards by Round -->
                     <div class="awards-by-round">
                         <h3>Awards by Round</h3>
-                        {#each getSortedRoundKeys(getStarBonusesByRound()) as roundKey}
+                        {#each getSortedRoundKeys(getStarBonusesByRound()) as roundKey (roundKey)}
                             {@const roundAwards = getStarBonusesByRound()[roundKey]}
                             {@const preparedAwards = prepareAwardsForDisplay(roundAwards)}
                             <div class="round-section">
                                 <h4>{getRoundDisplayName(roundKey)}</h4>
                                 <div class="badges-grid">
-                                    {#each preparedAwards as award}
+                                    {#each preparedAwards as award, ai (ai)}
                                         {@const awardPoints = getAwardPoints(award.totalWinnersForPoints)}
                                         {@const badgeSlug = award.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
                                         <div 
@@ -2353,7 +2304,7 @@
                                                 {#if award.isSplit}
                                                     <!-- Split award: show multiple images with slashes -->
                                                     <div class="split-badge-row">
-                                                        {#each award.splitNames as splitName, i}
+                                                        {#each award.splitNames as splitName, i (i)}
                                                             {@const splitImagePath = award.splitImages[i]}
                                                             {@const splitHasWinner = Array.isArray(award.Winners[i]) && award.Winners[i].length > 0}
                                                             {#if i > 0}

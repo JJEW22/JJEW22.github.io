@@ -10,6 +10,7 @@
 	spoiler gate (today's scores only after you've submitted today's dive).
 -->
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import '../../../app.css';
 	import { onMount } from 'svelte';
 
@@ -250,7 +251,7 @@
 </svelte:head>
 
 <div class="container">
-	<nav class="breadcrumb"><a href="/krillion">← Back to Krillion, rescored</a></nav>
+	<nav class="breadcrumb"><a href={resolve('/krillion')}>← Back to Krillion, rescored</a></nav>
 
 	<main>
 		<h1>Krillion admin</h1>
@@ -304,11 +305,11 @@
 		{:else if status === 'denied'}
 			<p class="note">
 				{error} This page needs the <code>krillion:admin</code> role (or site admin) — grant it on
-				<a href="/admin">/admin</a>.
+				<a href={resolve('/admin')}>/admin</a>.
 			</p>
 		{:else if status === 'gated'}
 			<p class="banner warn">
-				{error} <a href="/krillion">Submit today's dive →</a>
+				{error} <a href={resolve('/krillion')}>Submit today's dive →</a>
 			</p>
 		{:else if view === 'submissions'}
 			{#if status === 'missing'}

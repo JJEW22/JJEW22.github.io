@@ -76,10 +76,40 @@ export interface UpcomingMatch {
     awayId: string;
 }
 
-const cache = new Map<string, { at: number; data: any }>();
+// The slices of football-data.org's v4 responses this file reads.
+interface FdTeam {
+    tla: string;
+    name: string;
+    shortName?: string;
+    crest?: string;
+}
+interface FdMatch {
+    id: number;
+    matchday: number;
+    utcDate: string;
+    status: string;
+    homeTeam: FdTeam;
+    awayTeam: FdTeam;
+    score?: { winner?: string | null; fullTime?: { home: number | null; away: number | null } };
+}
+interface FdTableRow {
+    team: FdTeam;
+    playedGames: number;
+    won: number;
+    draw: number;
+    lost: number;
+    goalDifference: number;
+    points: number;
+}
+interface FdResponse {
+    matches?: FdMatch[];
+    standings?: { type: string; table: FdTableRow[] }[];
+}
+
+const cache = new Map<string, { at: number; data: FdResponse }>();
 const TTL_MS = 60 * 1000;
 
-async function fd(path: string): Promise<any> {
+async function fd(path: string): Promise<FdResponse> {
     const hit = cache.get(path);
     if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
     if (!env.FOOTBALL_DATA_TOKEN) throw new Error('FOOTBALL_DATA_TOKEN is not set');
@@ -100,7 +130,7 @@ async function fd(path: string): Promise<any> {
 // week 11.
 async function allMatches(): Promise<Fixture[]> {
     const data = await fd('/competitions/PL/matches');
-    return (data.matches ?? []).map((m: any) => ({
+    return (data.matches ?? []).map((m) => ({
         id: String(m.id),
         matchweek: m.matchday,
         kickoff: m.utcDate,
@@ -180,8 +210,8 @@ export async function getStandings(): Promise<StandingRow[]> {
     } catch (err) {
         console.error('standings: form guide unavailable, returning table without it', err);
     }
-    const total = (data.standings ?? []).find((s: any) => s.type === 'TOTAL') ?? data.standings?.[0];
-    return (total?.table ?? []).map((r: any) => {
+    const total = (data.standings ?? []).find((s) => s.type === 'TOTAL') ?? data.standings?.[0];
+    return (total?.table ?? []).map((r) => {
         const teamId = tlaToId(r.team.tla);
         const f = guide.get(teamId);
         return {
@@ -238,7 +268,7 @@ export async function getMatchesInWindow(daysBack = 0, daysAhead = 10): Promise<
     const from = new Date(Date.now() - daysBack * 86400000).toISOString().slice(0, 10);
     const to = new Date(Date.now() + daysAhead * 86400000).toISOString().slice(0, 10);
     const data = await fd(`/competitions/PL/matches?dateFrom=${from}&dateTo=${to}`);
-    return (data.matches ?? []).map((m: any) => ({
+    return (data.matches ?? []).map((m) => ({
         id: String(m.id),
         matchweek: m.matchday,
         kickoff: m.utcDate,

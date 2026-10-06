@@ -2,7 +2,6 @@
     import { onMount } from 'svelte';
     import { 
         loadScoringConfig,
-        createEmptyBracket,
         initializeBracketWithTeams,
         regionPositions
     } from './BracketStructure.js';

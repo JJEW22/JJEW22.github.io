@@ -13,6 +13,7 @@
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import '../../../app.css';
 	import type { Match, Season, Team, Viewer } from '$lib/jpFlicks';
 
@@ -248,7 +249,7 @@
 </svelte:head>
 
 <div class="container">
-	<nav class="breadcrumb"><a href="/jpFlicks">← Back to the league</a></nav>
+	<nav class="breadcrumb"><a href={resolve('/jpFlicks')}>← Back to the league</a></nav>
 
 	<main>
 		{#if status === 'loading'}
@@ -257,7 +258,7 @@
 			<h1>Not an admin</h1>
 			<p class="note">
 				This page needs the <code>jpflicks:admin</code> role. Sign in with an account that has it,
-				or go back to <a href="/jpFlicks">the league</a>.
+				or go back to <a href={resolve('/jpFlicks')}>the league</a>.
 			</p>
 		{:else}
 			<h1>JP Flicks admin</h1>
@@ -341,7 +342,7 @@
 					is missing from the tabs on the league page and is never the season a visitor lands on —
 					but it still opens for anyone given the direct link
 					{#if season && !season.isPublished}
-						(<a href="/jpFlicks?season={season.slug}">this one's</a>),
+						(<a href="{resolve('/jpFlicks')}?season={season.slug}">this one's</a>),
 					{:else}
 						,
 					{/if}
@@ -487,7 +488,7 @@
 					doesn't disturb the games already played.
 					{#if season}
 						Enter and correct individual results on
-						<a href="/jpFlicks?season={season.slug}#results">the league page</a>.
+						<a href="{resolve('/jpFlicks')}?season={season.slug}#results">the league page</a>.
 					{/if}
 				</p>
 			</section>

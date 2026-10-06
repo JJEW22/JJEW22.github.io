@@ -27,7 +27,7 @@
             try {
                 bracket = await fetchBracket(dataPath);
                 stale = true;
-            } catch (_) {
+            } catch {
                 error = apiErr.message;
             }
         } finally {
@@ -77,33 +77,33 @@
         <div class="div-grid left-grid">
             <!-- R1 standard (5v6) — top-left -->
             <div class="cell cell-r1-std">
-                {#each division.rounds[0].matches.filter(m => m.type === 'standard') as match}
+                {#each division.rounds[0].matches.filter(m => m.type === 'standard') as match, i (i)}
                     <div class="match-card" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
             <!-- R2 (1-seed vs 5v6 winner) — top-middle, same row as 5v6 -->
             <div class="cell cell-r2">
-                {#each division.rounds[1].matches as match}
+                {#each division.rounds[1].matches as match, i (i)}
                     <div class="match-card" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
             <!-- Division Final — spans both rows, centered right -->
             <div class="cell cell-final">
-                {#each division.rounds[2].matches as match}
+                {#each division.rounds[2].matches as match, i (i)}
                     <div class="match-card div-final" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
             <!-- R1 triple (2v3v4) — bottom-left, spans R1+R2 columns -->
             <div class="cell cell-r1-triple">
-                {#each division.rounds[0].matches.filter(m => m.type === 'triple') as match}
+                {#each division.rounds[0].matches.filter(m => m.type === 'triple') as match, i (i)}
                     <div class="match-card triple" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
@@ -117,33 +117,33 @@
         <div class="div-grid right-grid">
             <!-- Division Final — spans both rows, centered left -->
             <div class="cell cell-final-r">
-                {#each division.rounds[2].matches as match}
+                {#each division.rounds[2].matches as match, i (i)}
                     <div class="match-card div-final" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
             <!-- R2 (1-seed vs 5v6 winner) — top-middle -->
             <div class="cell cell-r2-r">
-                {#each division.rounds[1].matches as match}
+                {#each division.rounds[1].matches as match, i (i)}
                     <div class="match-card" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
             <!-- R1 standard (5v6) — top-right -->
             <div class="cell cell-r1-std-r">
-                {#each division.rounds[0].matches.filter(m => m.type === 'standard') as match}
+                {#each division.rounds[0].matches.filter(m => m.type === 'standard') as match, i (i)}
                     <div class="match-card" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
             <!-- R1 triple (2v3v4) — bottom-right, spans R2+R1 columns -->
             <div class="cell cell-r1-triple-r">
-                {#each division.rounds[0].matches.filter(m => m.type === 'triple') as match}
+                {#each division.rounds[0].matches.filter(m => m.type === 'triple') as match, i (i)}
                     <div class="match-card triple" class:completed={match.winner}>
-                        {#each match.teams as team}{@render teamRowMarkup(team, match)}{/each}
+                        {#each match.teams as team, j (j)}{@render teamRowMarkup(team, match)}{/each}
                     </div>
                 {/each}
             </div>
@@ -186,7 +186,7 @@
                 <div class="semifinal-col">
                     <div class="match-card sf-card" class:completed={sf.winner}>
                         <div class="round-label">Semifinal</div>
-                        {#each sf.teams as team}{@render teamRowMarkup(team, sf)}{/each}
+                        {#each sf.teams as team, j (j)}{@render teamRowMarkup(team, sf)}{/each}
                     </div>
                 </div>
             {/if}
@@ -200,7 +200,7 @@
             <div class="championship-row">
                 <div class="match-card championship-card" class:completed={final.winner}>
                     <div class="round-label champ-label">🍕 Championship 🍕</div>
-                    {#each final.teams as team}
+                    {#each final.teams as team, j (j)}
                         <div class="team-row champ-row" class:winner={isWinner(team, final)} class:loser={isLoser(team, final)} class:tbd={!team.name || team.name === 'TBD'}>
                             <span class="name">{team.name || 'TBD'}</span>
                             <span class="stats">
@@ -222,7 +222,7 @@
                 <div class="semifinal-col">
                     <div class="match-card sf-card" class:completed={sf2.winner}>
                         <div class="round-label">Semifinal</div>
-                        {#each sf2.teams as team}{@render teamRowMarkup(team, sf2)}{/each}
+                        {#each sf2.teams as team, j (j)}{@render teamRowMarkup(team, sf2)}{/each}
                     </div>
                 </div>
             {/if}

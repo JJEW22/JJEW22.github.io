@@ -17,11 +17,11 @@ function client(): Sql {
 // import time. This keeps the module safe to import during the build's route
 // analysis, where DATABASE_URL isn't set. `sql\`...\`` and `sql.json(...)` both work.
 export const sql = new Proxy(function () {} as unknown as Sql, {
-    apply(_target, _thisArg, args: any[]) {
-        return (client() as any)(...args);
+    apply(_target, _thisArg, args: unknown[]) {
+        return (client() as unknown as (...a: unknown[]) => unknown)(...args);
     },
     get(_target, prop) {
-        const c = client() as any;
+        const c = client() as unknown as Record<string | symbol, unknown>;
         const value = c[prop];
         return typeof value === 'function' ? value.bind(c) : value;
     }

@@ -1,4 +1,5 @@
 <script>
+    import { resolve } from '$app/paths';
     import '../../app.css';
 </script>
 
@@ -9,7 +10,7 @@
 
 <div class="container">
     <nav class="breadcrumb">
-        <a href="/">← Back to Home</a>
+        <a href={resolve('/')}>← Back to Home</a>
     </nav>
     
     <main>

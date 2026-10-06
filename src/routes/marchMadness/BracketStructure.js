@@ -84,7 +84,7 @@ export async function loadRegionPositions(configPath = '/marchMadness/2026/regio
             console.log('Loaded region positions:', regionPositions);
             return true;
         }
-    } catch (e) {
+    } catch {
         console.log('Using default region positions');
     }
     return false;

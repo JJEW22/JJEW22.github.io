@@ -2,6 +2,7 @@
     import BracketCreate from './BracketCreate.svelte';
     import BracketResults from './BracketResults.svelte';
     import '../../app.css';
+    import { resolve } from '$app/paths';
 
     const bracketMode = 'results' // either create or results
 </script>
@@ -13,7 +14,7 @@
 
 <div class="container">
     <nav class="breadcrumb">
-        <a href="/">← Back to Home</a>
+        <a href={resolve('/')}>← Back to Home</a>
     </nav>
     
     <main>

@@ -1,6 +1,7 @@
 <!-- src/routes/premierLeaguePickem/+page.svelte -->
 <script>
     import { onMount, tick } from 'svelte';
+    import { resolve } from '$app/paths';
     import { TEAMS, teamById } from '$lib/plTeams';
     import {
         BASE_POINTS,
@@ -53,7 +54,9 @@
         try {
             const r = await fetch(`${API}/fixtures${n == null ? '' : `?mw=${n}`}`);
             if (r.ok) return await r.json();
-        } catch (_) {}
+        } catch {
+            /* offline or no backend yet: fall through to the fallback */
+        }
         const w = n ?? 1;
         return SAMPLE_MATCHWEEKS[w] || { number: w, fixtures: [] };
     }
@@ -61,7 +64,9 @@
         try {
             const r = await fetch(`${API}/me`);
             if (r.ok) return await r.json();
-        } catch (_) {}
+        } catch {
+            /* offline or no backend yet: fall through to the fallback */
+        }
         return { user: null };
     }
     async function login(identifier, password) {
@@ -73,7 +78,7 @@
             });
             const data = await r.json();
             return r.ok ? { ok: true } : { ok: false, error: data.error };
-        } catch (_) {
+        } catch {
             return { ok: false, error: 'Network error.' };
         }
     }
@@ -85,7 +90,7 @@
                 body: JSON.stringify(body)
             });
             return await r.json();
-        } catch (_) {
+        } catch {
             return { ok: false, error: 'Network error.' };
         }
     }
@@ -96,7 +101,7 @@
         try {
             const r = await fetch(`${API}/reveal?mw=${n}`);
             if (r.ok) return (await r.json()).picks || {};
-        } catch (_) {
+        } catch {
             /* transient; the cards just render without the reveal */
         }
         return {};
@@ -108,7 +113,7 @@
         try {
             const r = await fetch(`${API}/admin/pick-status?mw=${n}`);
             if (r.ok) return (await r.json()).status || {};
-        } catch (_) {
+        } catch {
             /* transient; the cards just render without it */
         }
         return {};
@@ -117,14 +122,18 @@
         try {
             const r = await fetch(`${API}/leaderboard`);
             if (r.ok) return await r.json();
-        } catch (_) {}
+        } catch {
+            /* offline or no backend yet: fall through to the fallback */
+        }
         return [];
     }
     async function loadStandings() {
         try {
             const r = await fetch(`${API}/standings`);
             if (r.ok) return await r.json();
-        } catch (_) {}
+        } catch {
+            /* offline or no backend yet: fall through to the fallback */
+        }
         return TEAMS.map((t) => ({ teamId: t.id, name: t.name, crest: null, played: 0, won: 0, drawn: 0, lost: 0, gd: 0, points: 0, form: [], formPoints: 0 }));
     }
 
@@ -245,7 +254,7 @@
                 allTables = data.players || [];
                 tablesRevealed = !!data.revealed;
             }
-        } catch (_) {
+        } catch {
             /* transient; leave the viewer as-is */
         }
         tablesLoading = false;
@@ -291,7 +300,7 @@
                 joined = true;
                 loadAllTables(); // the tables endpoint only answers members
             }
-        } catch (_) {
+        } catch {
             /* transient; leave un-joined */
         }
         joining = false;
@@ -313,7 +322,7 @@
             } else {
                 syncStatus = data?.message || data?.error || `Could not update (${r.status}).`;
             }
-        } catch (_) {
+        } catch {
             syncStatus = 'Network error.';
         }
         revealSaving = false;
@@ -330,7 +339,7 @@
             } else {
                 syncStatus = JSON.stringify(data);
             }
-        } catch (_) {
+        } catch {
             syncStatus = 'Network error.';
         }
         syncing = false;
@@ -424,9 +433,6 @@
         return null;
     }
 
-    // The golden match this week (kept for possible display use).
-    $: goldenFixture = (matchweek?.fixtures || []).find((f) => f.bonus === 'GOLDEN') || null;
-
     // Per-person effective base for a fixture. Values and bonusPoints() come from
     // $lib/pickemScoring, the same module the server scores with.
     // Gold/silver/bronze apply to their match for everyone; the fan-team bonus
@@ -481,9 +487,6 @@
     // Show the points multiplier only once real odds exist (default sentinel is 1).
     function fmtOdds(m) {
         return m && m !== 1 ? Number(m).toFixed(2) : null;
-    }
-    function fmtNum(n) {
-        return n === null || n === undefined ? null : Number(n).toFixed(2);
     }
     // Probability fraction (0..1) -> whole-number percent.
     function pct(p) {
@@ -818,14 +821,17 @@
             const r = await fetch(`${API}/admin/edits`);
             if (r.ok) {
                 adminEdits = (await r.json()).edits || [];
+                // Guarded by the `!editsLoaded` check below, so this can't loop.
+                // eslint-disable-next-line svelte/infinite-reactive-loop
                 editsLoaded = true;
             }
-        } catch (_) {
+        } catch {
             /* transient; the log just stays as it was */
         }
     }
     // Fetched when the tab is opened rather than on load: it's admin-only and
     // nothing else on the page depends on it.
+    // eslint-disable-next-line svelte/infinite-reactive-loop -- runs once: loadAdminEdits sets editsLoaded
     $: if (activeTab === 'admin' && isPickemAdmin && !editsLoaded) loadAdminEdits();
 
     // ---- Derived ----
@@ -910,6 +916,7 @@
     // when that fetch falls back, so the crest cell degrades to a colour + code chip.
     let crestById = new Map();
     $: {
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- built then assigned whole, not mutated
         const m = new Map();
         for (const s of standings || []) if (s.crest) m.set(s.teamId, s.crest);
         crestById = m;
@@ -1036,7 +1043,7 @@
 
 <div class="page-background">
     <div class="container">
-        <nav class="breadcrumb"><a href="/">&larr; Back to Home</a></nav>
+        <nav class="breadcrumb"><a href={resolve('/')}>&larr; Back to Home</a></nav>
 
         <main>
             <h1>Premier League Pickem</h1>
@@ -1059,7 +1066,7 @@
                     <input class="auth-input" type="password" placeholder="Password" bind:value={loginCode} on:keydown={(e) => e.key === 'Enter' && doLogin()} />
                     <button class="save-btn small" on:click={doLogin} disabled={loggingIn}>{loggingIn ? 'Signing in…' : 'Sign in'}</button>
                     {#if loginError}<span class="status-msg err">{loginError}</span>{/if}
-                    <span class="auth-note">Sign in with email or username. New here? You'll need an <a href="/account">invite link</a>.</span>
+                    <span class="auth-note">Sign in with email or username. New here? You'll need an <a href={resolve('/account')}>invite link</a>.</span>
                 {/if}
             </div>
 
@@ -1071,16 +1078,16 @@
             >
                 {#if compactTabs}
                     <select class="tab-select" aria-label="Choose a section" value={activeTab} on:change={onTabSelect}>
-                        {#each visibleTabs as t}
+                        {#each visibleTabs as t (t.id)}
                             <option value={t.id}>{t.label}</option>
                         {/each}
                         <option value={FEATURES_OPTION}>Feature Requests ↗</option>
                     </select>
                 {:else}
-                    {#each TABS as t}
+                    {#each TABS as t (t.id)}
                         <button class="tab" class:active={activeTab === t.id} on:click={() => (activeTab = t.id)}>{t.label}</button>
                     {/each}
-                    <a class="tab tab-link" href="/featureRequests">Feature Requests ↗</a>
+                    <a class="tab tab-link" href={resolve('/featureRequests')}>Feature Requests ↗</a>
                     {#if isPickemAdmin}
                         <button class="tab" class:active={activeTab === 'admin'} on:click={() => (activeTab = 'admin')}>Admin</button>
                     {/if}
@@ -1337,7 +1344,7 @@
                         />
                         {#if showFanList && !predictionsLocked}
                             <ul class="fan-list">
-                                {#each fanMatches as t}
+                                {#each fanMatches as t (t.id)}
                                     <li><button type="button" class="fan-option" class:sel={t.id === fanTeam} on:click={() => selectFan(t)}>{t.name}</button></li>
                                 {:else}
                                     <li class="fan-none">No teams match.</li>
@@ -1718,7 +1725,7 @@
                             <li>So the table matters more and more as the season runs on — week 1 is worth almost nothing, week 38 is worth 38 times as much — and every score lands on a single decimal place.</li>
                             <li>Week 38 in full, by how many places you're out:
                                 <div class="score-row">
-                                    {#each distanceRow as d}
+                                    {#each distanceRow as d (d)}
                                         <span class="score-cell"><b>{d}</b><span>{tableScoring(d, TOTAL_MATCHWEEKS)}</span></span>
                                     {/each}
                                 </div>

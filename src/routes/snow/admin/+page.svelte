@@ -13,6 +13,7 @@
 	admin who could read everyone's picks and then submit would just pick the gap.
 -->
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import '../../../app.css';
 	import { formatDay, type SnowPrediction, type SnowSeason } from '$lib/snow';
@@ -238,7 +239,7 @@
 </svelte:head>
 
 <div class="container">
-	<nav class="breadcrumb"><a href="/snow">← Back to the predictions</a></nav>
+	<nav class="breadcrumb"><a href={resolve('/snow')}>← Back to the predictions</a></nav>
 
 	<main>
 		{#if status === 'loading'}
@@ -247,7 +248,7 @@
 			<h1>Not an admin</h1>
 			<p class="note">
 				This page needs the <code>snow:admin</code> role. Sign in with an account that has it, or go
-				back to <a href="/snow">the predictions</a>.
+				back to <a href={resolve('/snow')}>the predictions</a>.
 			</p>
 		{:else}
 			<h1>❄️ Snow admin</h1>
@@ -327,7 +328,7 @@
 				{:else}
 					<p class="note">
 						You haven't predicted yet, so the rest of the field is sealed from you too.
-						<a href="/snow">Make your pick →</a> Once it's in it's final, and you'll be able to enter
+						<a href={resolve('/snow')}>Make your pick →</a> Once it's in it's final, and you'll be able to enter
 						predictions for other people here.
 					</p>
 				{/if}

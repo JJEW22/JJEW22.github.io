@@ -60,10 +60,25 @@ export const POST: RequestHandler = async ({ url, request, locals }) => {
     return json({ ok: false, error: 'Unknown override kind.' }, { status: 400 });
 };
 
+// The request body, as the Admin tab sends it. Every field is still checked
+// before use: these only say what to expect, not what arrived.
+interface PickBody {
+    fixtureId?: string | number;
+    matchweek?: string | number;
+    pick?: string;
+    autoPenalty?: boolean;
+    fanOverride?: boolean;
+}
+interface SeasonBody {
+    fanTeam?: string;
+    tableOrder?: string[];
+    displayName?: unknown;
+}
+
 async function overridePick(
     adminId: number,
     target: Target,
-    body: any,
+    body: PickBody | null,
     note: string
 ): Promise<Response> {
     const { fixtureId, matchweek, pick, autoPenalty } = body ?? {};
@@ -147,7 +162,7 @@ async function overridePick(
 async function overrideSeason(
     adminId: number,
     target: Target,
-    body: any,
+    body: SeasonBody | null,
     note: string
 ): Promise<Response> {
     const { fanTeam, tableOrder, displayName } = body ?? {};

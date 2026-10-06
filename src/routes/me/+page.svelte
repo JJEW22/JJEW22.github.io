@@ -1,4 +1,5 @@
 <script>
+    import { resolve } from '$app/paths';
     import '../../app.css';
     import { onMount } from 'svelte';
 
@@ -176,7 +177,7 @@ function getProjectImage(project, index) {
 
 <div class="container">
     <nav class="breadcrumb">
-        <a href="/">← Back to Home</a>
+        <a href={resolve('/')}>← Back to Home</a>
     </nav>
     
     <main>
@@ -189,7 +190,8 @@ function getProjectImage(project, index) {
         </section>
         
         <div class="projects-grid">
-            {#each displayedProjects as project, index}
+            {#each displayedProjects as project, index (index)}
+                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- links come from the static project list above; resolve() only takes a literal route -->
                 <a href={project.link} class="project-card">
                     {#if getProjectImage(project, index)}
                         <div class="card-image" style="background-image: url({getProjectImage(project, index)})"></div>

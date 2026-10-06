@@ -1,4 +1,5 @@
 <script>
+    import { resolve } from '$app/paths';
     // Education data
     const education = [
         {
@@ -181,7 +182,7 @@
 
 <div class="container">
     <nav class="breadcrumb no-print">
-        <a href="/">← Back to Home</a>
+        <a href={resolve('/')}>← Back to Home</a>
     </nav>
     
     <main>
@@ -202,6 +203,7 @@
                 <span>•</span>
                 <span>{contact.phone}</span>
                 <span>•</span>
+                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
                 <a href={contact.githubUrl} target="_blank">{contact.github}</a>
             </div>
         </header>
@@ -209,7 +211,7 @@
         <!-- Education -->
         <section class="cv-section">
             <h2>Education</h2>
-            {#each education as edu}
+            {#each education as edu, i (i)}
                 <div class="entry">
                     <div class="entry-header">
                         <div class="entry-title">
@@ -221,7 +223,7 @@
                         <div class="entry-location">{edu.location}</div>
                     </div>
                     <div class="entry-details">
-                        {#each edu.degrees as degree}
+                        {#each edu.degrees as degree, j (j)}
                             <div class="degree-info">
                                 <div>
                                     <strong>{degree.degree}</strong>
@@ -287,7 +289,7 @@
         <!-- Experience -->
         <section class="cv-section">
             <h2>Experience</h2>
-            {#each experience as exp}
+            {#each experience as exp, i (i)}
                 <div class="entry">
                     <div class="entry-header">
                         <div class="entry-title">
@@ -299,7 +301,7 @@
                         </div>
                     </div>
                     <ul class="accomplishments">
-                        {#each exp.accomplishments as accomplishment}
+                        {#each exp.accomplishments as accomplishment, j (j)}
                             <li>{accomplishment}</li>
                         {/each}
                     </ul>
@@ -310,7 +312,7 @@
         <!-- Projects -->
         <section class="cv-section">
             <h2>Projects</h2>
-            {#each projects as project}
+            {#each projects as project, i (i)}
                 <div class="entry">
                     <div class="entry-header">
                         <div class="entry-title">
@@ -320,7 +322,7 @@
                         <div class="entry-date">{project.startDate} - {project.endDate}</div>
                     </div>
                     <ul class="accomplishments">
-                        {#each project.accomplishments as accomplishment}
+                        {#each project.accomplishments as accomplishment, j (j)}
                             <li>{accomplishment}</li>
                         {/each}
                     </ul>

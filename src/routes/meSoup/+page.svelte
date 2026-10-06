@@ -158,6 +158,8 @@
 				: view.startsWith('user:')
 					? `user=${encodeURIComponent(view.slice(5))}`
 					: '';
+		// The path is resolved; the rule can't see through the template literal.
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
 		replaceState(query ? `${resolve('/meSoup')}?${query}` : resolve('/meSoup'), {});
 	}
 
@@ -217,11 +219,11 @@
 
 <div class="container">
 	<nav class="breadcrumb">
-		<a href="/me">← Back to Me</a>
+		<a href={resolve('/me')}>← Back to Me</a>
 		{#if me}
-			<a class="admin-link" href="/meSoup/admin">Edit my spots</a>
+			<a class="admin-link" href={resolve('/meSoup/admin')}>Edit my spots</a>
 		{:else if !loading}
-			<a class="admin-link" href="/account?redirect=/meSoup">Sign in</a>
+			<a class="admin-link" href="{resolve('/account')}?redirect=/meSoup">Sign in</a>
 		{/if}
 	</nav>
 
@@ -273,7 +275,7 @@
 					Everywhere people on this site have got in the water, with the people taken out — no
 					names, dates or who was there.
 					{#if !me}
-						<a href="/account?redirect=/meSoup">Sign in</a> to see your own swims and the ones you've
+						<a href="{resolve('/account')}?redirect=/meSoup">Sign in</a> to see your own swims and the ones you've
 						been tagged in.
 					{/if}
 				</p>
@@ -365,7 +367,7 @@
 		{:else if !spots.length}
 			<p class="note">
 				No spots yet.{#if me && !anonymous && !person}
-					<a href="/meSoup/admin">Add your first one.</a>
+					<a href={resolve('/meSoup/admin')}>Add your first one.</a>
 				{/if}
 			</p>
 		{:else if !anonymous}

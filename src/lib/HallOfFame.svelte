@@ -91,26 +91,22 @@
 			}
 		}
 	];
-
-	function formatRecord(record) {
-		// Check if this is a league record (has score and seriesRecord) or tournament record
-		if (record.score !== undefined && record.seriesRecord !== undefined) {
-			// League format: Score W-D-L on first line, (seriesRecord PD) on second line
-			return `${record.score} ${record.record}<br>(${record.seriesRecord} ${record.PD})`;
-		} else {
-			// Tournament format: Just W-D-L and PD on single line
-			return `${record.record}<br>(${record.PD})`;
-		}
-	}
-
-	function formatTeamName(teamName, members) {
-		if (members === undefined || members === 'NA') {
-			return `<span class="bold-name">${teamName}</span>`;
-		} else {
-			return `<span class="bold-name">${teamName}</span><br><span class="members">(${members})</span>`;
-		}
-	}
 </script>
+
+{#snippet recordCell(record)}
+	<!-- League records have a score and series record; tournament records just W-D-L and PD -->
+	{#if record.score !== undefined && record.seriesRecord !== undefined}
+		{record.score} {record.record}<br />({record.seriesRecord} {record.PD})
+	{:else}
+		{record.record}<br />({record.PD})
+	{/if}
+{/snippet}
+
+{#snippet teamName(name, members)}
+	<span class="bold-name">{name}</span>{#if members !== undefined && members !== 'NA'}<br /><span
+			class="members">({members})</span
+		>{/if}
+{/snippet}
 
 <div class="hall-of-fame-container">
 	<div class="trophy-header">
@@ -133,15 +129,15 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each hallOfFameEntries as entry, index}
+				{#each hallOfFameEntries as entry (entry.eventName)}
 					<tr class="champion-row">
 						<td class="season-cell">
 							<div class="season-badge">{entry.eventName}</div>
 						</td>
-						<td class="team-name">{@html formatTeamName(entry.champion, entry.members)}</td>
-						<td class="record-cell">{@html formatRecord(entry.record)}</td>
-						<td class="team-name">{@html formatTeamName(entry.runnerUp, entry.runnerUpMembers)}</td>
-						<td class="record-cell">{@html formatRecord(entry.runnerUpRecord)}</td>
+						<td class="team-name">{@render teamName(entry.champion, entry.members)}</td>
+						<td class="record-cell">{@render recordCell(entry.record)}</td>
+						<td class="team-name">{@render teamName(entry.runnerUp, entry.runnerUpMembers)}</td>
+						<td class="record-cell">{@render recordCell(entry.runnerUpRecord)}</td>
 					</tr>
 				{/each}
 			</tbody>

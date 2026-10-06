@@ -16,6 +16,7 @@
 	the page instead of being overwritten each November.
 -->
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import '../../app.css';
 	import {
@@ -231,8 +232,8 @@
 
 <div class="container">
 	<nav class="breadcrumb">
-		<a href="/">← Back to Home</a>
-		{#if viewer.isAdmin}<a class="admin-link" href="/snow/admin">Admin</a>{/if}
+		<a href={resolve('/')}>← Back to Home</a>
+		{#if viewer.isAdmin}<a class="admin-link" href={resolve('/snow/admin')}>Admin</a>{/if}
 	</nav>
 
 	<main>
@@ -342,7 +343,7 @@
 
 					{#if !viewer.username}
 						<p class="note">
-							<a href="/account">Sign in</a> to log a prediction. You'll see your own pick right
+							<a href={resolve('/account')}>Sign in</a> to log a prediction. You'll see your own pick right
 							away; everyone else's stays sealed until
 							{season.deadline ? formatDay(season.deadline) : 'the snow falls'}.
 						</p>
@@ -356,7 +357,7 @@
 								<span>Your name</span>
 								<input bind:value={formName} placeholder={viewer.username} maxlength="60" />
 								<small class="field-hint"
-									>Your name across the site — also editable on <a href="/account">your account</a
+									>Your name across the site — also editable on <a href={resolve('/account')}>your account</a
 									>.</small
 								>
 							</label>
@@ -386,7 +387,7 @@
 								{#if viewer.isAdmin}
 									Admins can't change their pick — submitting it is what opened everyone else's to
 									you.
-									<a href="/snow/admin">Enter someone else's →</a>
+									<a href={resolve('/snow/admin')}>Enter someone else's →</a>
 								{:else}
 									This season is locked.
 								{/if}

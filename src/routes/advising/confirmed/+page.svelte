@@ -1,4 +1,5 @@
 <script>
+	import { resolve } from '$app/paths';
 </script>
 
 <svelte:head>
@@ -11,7 +12,7 @@
         <h1>You're All Set!</h1>
         <p>Your consultation has been booked. You'll receive a confirmation email from Calendly shortly.</p>
         <p class="sub">Looking forward to speaking with you.</p>
-        <a href="/advising" class="btn">← Back to Advising</a>
+        <a href={resolve('/advising')} class="btn">← Back to Advising</a>
     </div>
 </div>
 

@@ -1,5 +1,6 @@
 <!-- src/routes/admin/+page.svelte -->
 <script>
+    import { resolve } from '$app/paths';
     import { onMount } from 'svelte';
 
     const KNOWN_ROLES = ['site:admin', 'pickem:admin', 'pizza:admin', 'krillion:admin'];
@@ -61,6 +62,7 @@
     }
 
     function toggleRole(u, role) {
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set; u.roles is what's reactive
         const set = new Set(u.roles || []);
         if (set.has(role)) set.delete(role);
         else set.add(role);
@@ -118,7 +120,7 @@
     }
 
     async function copy(text) {
-        try { await navigator.clipboard.writeText(text); } catch (_) {}
+        try { await navigator.clipboard.writeText(text); } catch { /* no clipboard access: the link is still selectable */ }
     }
 </script>
 
@@ -129,7 +131,7 @@
 
 <div class="page-background">
     <div class="container">
-        <nav class="breadcrumb"><a href="/">&larr; Back to Home</a></nav>
+        <nav class="breadcrumb"><a href={resolve('/')}>&larr; Back to Home</a></nav>
         <main>
             <h1>Site admin</h1>
 
@@ -137,7 +139,7 @@
                 <p class="muted">Loading…</p>
             {:else if status === 'denied'}
                 <p class="muted">You don't have access to this page.</p>
-                <p><a href="/account">Sign in</a> with a site-admin account.</p>
+                <p><a href={resolve('/account')}>Sign in</a> with a site-admin account.</p>
             {:else}
                 {#if msg}<p class="msg">{msg}</p>{/if}
 
@@ -151,7 +153,7 @@
                         <h3>New invites</h3>
                         <p class="muted">Emailed automatically. Anything marked <b>not sent</b> needs passing on by hand — the link is valid either way.</p>
                         <ul class="links">
-                            {#each generated as g}
+                            {#each generated as g, i (i)}
                                 <li>
                                     <span class="who">{g.email}</span>
                                     <span class={g.sent ? 'sent' : 'unsent'}>{g.sent ? '✓ emailed' : '! not sent'}</span>
@@ -167,7 +169,7 @@
                         <table>
                             <thead><tr><th>Email</th><th>Status</th></tr></thead>
                             <tbody>
-                                {#each inviteList as inv}
+                                {#each inviteList as inv, i (i)}
                                     <tr>
                                         <td>{inv.email}</td>
                                         <td>{inv.used_by ? `used by ${inv.used_by}` : 'unused'}</td>
@@ -182,9 +184,9 @@
                     <h2>Accounts &amp; roles</h2>
                     <p class="muted">Grant site-wide or feature-specific admin. site:admin implies everything. <b>Name</b> is the person's name across the site (separate from their username); saving it here overrides theirs and updates their snow predictions.</p>
                     <table>
-                        <thead><tr><th>User</th><th>Name</th><th>Email</th>{#each KNOWN_ROLES as r}<th class="rc">{r}</th>{/each}<th></th></tr></thead>
+                        <thead><tr><th>User</th><th>Name</th><th>Email</th>{#each KNOWN_ROLES as r (r)}<th class="rc">{r}</th>{/each}<th></th></tr></thead>
                         <tbody>
-                            {#each users as u}
+                            {#each users as u (u.id)}
                                 <tr>
                                     <td class="strong">{u.username}</td>
                                     <td class="name-cell">
@@ -192,7 +194,7 @@
                                         <button class="mini" on:click={() => saveName(u)} disabled={(u.nameDraft ?? '').trim() === (u.real_name ?? '')}>Save name</button>
                                     </td>
                                     <td class="muted">{u.email}</td>
-                                    {#each KNOWN_ROLES as r}
+                                    {#each KNOWN_ROLES as r (r)}
                                         <td class="rc"><input type="checkbox" checked={(u.roles || []).includes(r)} on:change={() => toggleRole(u, r)} /></td>
                                     {/each}
                                     <td class="actions">

@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import Collapsible from '$lib/Collapsible.svelte';
 	import HallOfFame from '$lib/HallOfFame.svelte';
 	import brownJPFlicksLogo from '$lib/assets/brownJPFlicksLogo.svg';
@@ -15,7 +16,7 @@
 	let team_names = []; // will store the name of all teams
 	let teams_info = undefined; // will store all the teams info
 	let tournamentPoints = {}; // will store tournament points per team
-	$: teamsWithRanking = undefined;
+	let teamsWithRanking = undefined;
 
 	// --- season state, from /jpFlicks/api/season ---
 	/** @typedef {import('$lib/jpFlicks').Season} Season */
@@ -84,7 +85,6 @@
 
 	const WIN_SCORE = 2;
 	const TIES_SCORE = 1;
-	const LOSS_SCORE = 0;
 	const SERIES_WIN_SCORE = 1;
 	const UNPLAYED_STRING = 'UNPLAYED';
 	const WONT_PLAY_STRING = 'XXX';
@@ -109,14 +109,12 @@
 	// file information
 	const HOME_GAMES_PAGE_NAME = 'HomeGames';
 	const AWAY_GAMES_PAGE_NAME = 'AwayGames';
-	const TEAM_INFO_PAGE_NAME = 'TeamInfo';
 
 	// access constants
 	const TEAM_NAME = 'teamName';
 	const PLAYER_ONE = 'player1';
 	const PLAYER_TWO = 'player2';
 	const IS_HOME = 'isHome';
-	const PLAYED = 'played';
 	const PLAYER1_TEAM1 = 'player1_team1';
 	const PLAYER2_TEAM1 = 'player2_team1';
 	const PLAYER1_TEAM2 = 'player1_team2';
@@ -124,6 +122,7 @@
 
 	// Get the date of the next Thursday (or today if Thursday) for consistent seeding
 	function getThursdaySeed() {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local, not reactive state
 		const today = new Date();
 		const dayOfWeek = today.getDay(); // 0 = Sunday, 4 = Thursday
 
@@ -154,7 +153,6 @@
 
 	// Get the current Thursday seed
 	const thursdaySeed = getThursdaySeed();
-	const random = seededRandom(thursdaySeed);
 	console.log('ðŸ—“ï¸ THURSDAY SEED:', thursdaySeed);
 
 	/**
@@ -222,7 +220,7 @@
 		});
 
 		// Step 4: Cap multi-team players at 3 games (unless X1 + X2 > 3)
-		Object.entries(playerTeams).forEach(([player, teams]) => {
+		Object.values(playerTeams).forEach((teams) => {
 			if (teams.length > 1) {
 				const totalGames = teams.reduce((sum, t) => sum + (gamesPerTeam[t] || 0), 0);
 				const totalX = teams.reduce((sum, t) => sum + (teamXValues[t] || 0), 0);
@@ -311,6 +309,7 @@
 	) {
 		if (!gamesPerTeam || !unplayedGames || unplayedGames.length === 0) return new Set();
 
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const selectedGameIds = new Set();
 		const selectedGames = []; // Keep track of actual game objects for constraint checking
 
@@ -318,6 +317,7 @@
 		const remainingNeeded = { ...gamesPerTeam };
 
 		// Track which team pairings have been scheduled (to prevent full series in one day)
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const scheduledPairings = new Set();
 
 		function getPairingKey(team1, team2) {
@@ -346,13 +346,6 @@
 		// Helper: Get opponent players from a game
 		function getOpponentPlayers(game, myTeam) {
 			return getPlayersForTeam(game, getOpponentTeam(game, myTeam));
-		}
-
-		// Helper: Check if two teams share any players
-		function teamsSharePlayers(game1, team1, game2, team2) {
-			const players1 = getPlayersForTeam(game1, getOpponentTeam(game1, team1));
-			const players2 = getPlayersForTeam(game2, getOpponentTeam(game2, team2));
-			return players1.some((p) => players2.includes(p));
 		}
 
 		// CONSTRAINT #2: Check if adding a game would complete a series (both home & away)
@@ -401,6 +394,7 @@
 			.map((item) => item.game);
 
 		// Greedy matching: iterate through shuffled games, add if neither team is matched yet
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const matchedTeams = new Set();
 
 		for (const game of availableGames) {
@@ -459,7 +453,7 @@
 
 			// Find teams that still need games
 			const teamsNeedingGames = Object.entries(remainingNeeded)
-				.filter(([team, needed]) => needed > 0)
+				.filter(([, needed]) => needed > 0)
 				.map(([team]) => team);
 
 			if (teamsNeedingGames.length === 0) break;
@@ -846,8 +840,8 @@
 		// Handle scroll events
 		const handleScroll = () => {
 			// Update scroll progress
-			const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
-			const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+			// const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+			// const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
 			// scrollProgress = (winScroll / height) * 100;
 
 			// // Show/hide back to top button
@@ -1143,20 +1137,6 @@
 		return excelData[sheetName][format];
 	}
 
-	function getColumnData(sheetName, columnIndex) {
-		const sheet = excelData[sheetName];
-		if (!sheet) return [];
-
-		return sheet.rows.map((row) => row[columnIndex] || '');
-	}
-
-	function getRowData(sheetName, rowIndex) {
-		const sheet = excelData[sheetName];
-		if (!sheet) return [];
-
-		return sheet.rows[rowIndex] || [];
-	}
-
 	function getTeams(sheetName) {
 		const sheet = excelData[sheetName];
 		const tempTeams = [...sheet.headers];
@@ -1262,7 +1242,7 @@
 	function pullWinsInfo(teamInfo) {
 		const homeGames = getSheetData(HOME_GAMES_PAGE_NAME, 'json');
 		const awayGames = getSheetData(AWAY_GAMES_PAGE_NAME, 'json');
-		return teamInfo.map((val, idx) => {
+		return teamInfo.map((val) => {
 			let teamInfo = {
 				...val,
 				wins: 0,
@@ -1409,8 +1389,10 @@
 	// State variables
 	let playerName = '';
 	let filteredGames = [];
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- component state; reassigned to trigger updates
 	let hiddenTeams = new Set(); // Teams to hide from the display
 	let teamGameCounts = {};
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- component state; reassigned to trigger updates
 	let rebalancedGameIds = new Set(); // Track games added through rebalancing
 
 	// Generate a unique ID for a game (for tracking suggestions)
@@ -1483,10 +1465,12 @@
 		console.log('Games needed:', gamesNeeded);
 
 		// Track which games have been used as replacements
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const usedGameIds = new Set();
 
 		// Track which opponent pairings have been made (to prevent same opponent twice)
 		// Key: "teamA-teamB" (sorted alphabetically), Value: true
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const usedPairings = new Set();
 
 		function getPairingKey(teamA, teamB) {
@@ -1571,6 +1555,7 @@
 
 		// Debug: Log current game counts for all players
 		console.log('ðŸŽ® REBALANCING - Player game counts:');
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const allPlayersInGame = new Set();
 		teams_info?.forEach((team) => {
 			if (team.player1) allPlayersInGame.add(team.player1.toLowerCase());
@@ -1591,7 +1576,6 @@
 
 		// Phase 1: Match teams that lost games with each other
 		console.log('--- PHASE 1: Matching teams that lost games with each other ---');
-		const teamsInNeedSet = new Set(teamsNeedingGames);
 
 		for (const teamA of teamsNeedingGames) {
 			while (gamesNeeded[teamA] > 0) {
@@ -1631,12 +1615,13 @@
 		}
 
 		// Log remaining games needed after Phase 1
-		const remainingAfterPhase1 = Object.entries(gamesNeeded).filter(([t, c]) => c > 0);
+		const remainingAfterPhase1 = Object.entries(gamesNeeded).filter(([, c]) => c > 0);
 		console.log('--- END PHASE 1 ---');
 		console.log('Games still needed after Phase 1:', Object.fromEntries(remainingAfterPhase1));
 
 		// Phase 2: Match remaining teams with teams that didn't lose games
 		console.log('--- PHASE 2: Matching with teams that did not lose games ---');
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const teamsGivenGamesInPhase2 = new Set();
 
 		for (const teamA of teamsNeedingGames) {
@@ -1687,7 +1672,7 @@
 		}
 
 		console.log('--- END PHASE 2 ---');
-		const remainingAfterPhase2 = Object.entries(gamesNeeded).filter(([t, c]) => c > 0);
+		const remainingAfterPhase2 = Object.entries(gamesNeeded).filter(([, c]) => c > 0);
 		if (remainingAfterPhase2.length > 0) {
 			console.log(
 				'⚠️ Games still needed after Phase 2 (unfulfilled):',
@@ -1832,6 +1817,7 @@
 	function getAllPlayers() {
 		if (!teams_info) return [];
 
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 		const playersSet = new Set();
 		teams_info.forEach((team) => {
 			if (team.player1) playersSet.add(team.player1);
@@ -2135,7 +2121,6 @@
 	}
 
 	// Compute weekly schedule when data is ready
-	let weeklyGamesPerTeam = {};
 	let remainingGamesPerTeam = {};
 	let selectedGamesThisWeek = new Set();
 	let flexOrder = {};
@@ -2168,7 +2153,6 @@
 				actualGamesPerTeam[game.team2] = (actualGamesPerTeam[game.team2] || 0) + 1;
 			}
 		});
-		weeklyGamesPerTeam = actualGamesPerTeam;
 
 		// Step 3: Assign flex order for rebalancing (using actual scheduled games, not targets)
 		flexOrder = assignFlexOrder(
@@ -2256,6 +2240,7 @@
 				.map((item) => item.game);
 
 			const forfeitedGames = [];
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
 			const forfeitedOpponents = new Set();
 
 			if (numForfeits <= shuffledScheduled.length) {
@@ -2333,7 +2318,7 @@
 <div class="page-background" bind:this={pageBackground}>
 	<div class="container">
 		<nav class="breadcrumb">
-			<a href="/">← Back to Home</a>
+			<a href={resolve('/')}>← Back to Home</a>
 		</nav>
 
 		<main>
@@ -2360,7 +2345,7 @@
 						</button>
 					{/each}
 					{#if viewer.isAdmin}
-						<a class="season-tab admin" href="/jpFlicks/admin">Admin</a>
+						<a class="season-tab admin" href={resolve('/jpFlicks/admin')}>Admin</a>
 					{/if}
 				</div>
 			{/if}
@@ -2370,7 +2355,7 @@
 					<b>{activeSeason.label} isn't published.</b> It doesn't appear in the season tabs and
 					nobody lands on it by default — but this link works for anyone who has it.
 					{#if viewer.isAdmin}
-						Publish it from <a href="/jpFlicks/admin">the admin page</a>.
+						Publish it from <a href={resolve('/jpFlicks/admin')}>the admin page</a>.
 					{/if}
 				</p>
 			{/if}
@@ -2482,7 +2467,7 @@
 						<li>In the event of a tie in a series each team is awarded 0.5 points</li>
 					</ul>
 
-					<h3 id="tournaments-section"><a href="/jpFlicks/tournament">Tournaments</a></h3>
+					<h3 id="tournaments-section"><a href={resolve('/jpFlicks/tournament')}>Tournaments</a></h3>
 					This year we have 2 tournaments! Anyone including (those not in the league) can compete so
 					if you can only come for 1 day these are the ones to do it! The exact format of the tournament
 					will depend on the number of players but it will follow a round robin + elimination set up.
@@ -2692,7 +2677,7 @@
 								<div class="team-summary">
 									<h4>Filter by player:</h4>
 									<div class="player-pills">
-										{#each allPlayers as player}
+										{#each allPlayers as player (player)}
 											<button
 												class="player-pill"
 												class:hidden={isPlayerHidden(player)}
@@ -2711,7 +2696,7 @@
 
 									<h4>Games by team:</h4>
 									<div class="team-pills">
-										{#each Object.entries(teamGameCounts) as [team, count]}
+										{#each Object.entries(teamGameCounts) as [team, count] (team)}
 											<button
 												class="team-pill"
 												class:hidden={hiddenTeams.has(team)}
@@ -2739,7 +2724,7 @@
 										<div class="active-filters">
 											<h4>Active filters (hidden teams):</h4>
 											<div class="filter-tags">
-												{#each [...hiddenTeams] as team}
+												{#each [...hiddenTeams] as team (team)}
 													<div class="filter-tag">
 														<span>{team}</span>
 														<button
@@ -2773,7 +2758,7 @@
 											</tr>
 										</thead>
 										<tbody>
-											{#each filteredGames as game}
+											{#each filteredGames as game, i (i)}
 												{@const playerTeam = getPlayerTeam(game)}
 												{@const opponentTeam = getOpponentTeam(game)}
 												{@const isTeam1 = playerTeam === game.team1}
@@ -2883,7 +2868,7 @@
 									<strong>{FORFEIT_POINT_DIFF}</strong> point differential).
 								</p>
 
-								{#each forfeitData as forfeit}
+								{#each forfeitData as forfeit, i (i)}
 									<div class="forfeit-team-group">
 										<div class="forfeit-team-header">
 											<span class="forfeit-team-name">{forfeit.team}</span>
@@ -2907,7 +2892,7 @@
 													</tr>
 												</thead>
 												<tbody>
-													{#each forfeit.games as game}
+													{#each forfeit.games as game, i (i)}
 														<tr>
 															<td data-label="Forfeiting team" class="team-name forfeit-loser"
 																>{forfeit.team}</td
@@ -2939,7 +2924,7 @@
 							<div class="played-games-section">
 								<h3>Completed Games ({playedGames.length})</h3>
 
-								{#each Object.entries(playedGamesByTeam) as [teamName, seriesList]}
+								{#each Object.entries(playedGamesByTeam) as [teamName, seriesList] (teamName)}
 									{@const totalGames = seriesList.reduce((sum, s) => sum + s.games.length, 0)}
 									<div class="team-games-group">
 										<h4>{teamName} ({totalGames} {totalGames === 1 ? 'game' : 'games'})</h4>
@@ -2957,8 +2942,8 @@
 													</tr>
 												</thead>
 												<tbody>
-													{#each seriesList as series}
-														{#each series.games as game, gameIdx}
+													{#each seriesList as series, i (i)}
+														{#each series.games as game, gameIdx (gameIdx)}
 															<tr
 																class:series-group-border={gameIdx === 0 &&
 																	seriesList.indexOf(series) > 0}
@@ -3022,7 +3007,7 @@
 
 					{#if !viewer.username}
 						<p class="result-note">
-							<a href="/account">Sign in</a> to enter the scores for your games. An admin can enter any
+							<a href={resolve('/account')}>Sign in</a> to enter the scores for your games. An admin can enter any
 							result.
 						</p>
 					{:else if !isCurrentSeason}
@@ -3323,7 +3308,7 @@
 
 							<!-- Update tbody to use sortedTeams instead of rankedTeams -->
 							<tbody>
-								{#each sortedTeams as team, index}
+								{#each sortedTeams as team, index (index)}
 									<tr
 										class:top-three={sortColumn === 'score' &&
 											sortDirection === 'desc' &&

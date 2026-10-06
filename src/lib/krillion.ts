@@ -455,3 +455,76 @@ export function matchAnswer<T extends { answer: string; count: number }>(
 	}
 	return best;
 }
+
+// ---- Share text ----
+//
+// krillion.io's own share line is `Krillion #N 🦐 <score>  <7 tier emojis>`,
+// one emoji per round by tier (each tier has fixed game points). The rescored
+// share keeps that row and adds where each round landed after rescoring.
+
+export const MISS_EMOJI = '⬛';
+
+// krillion.io's tiers: game points → emoji.
+export const GAME_TIERS: { points: number; emoji: string; name: string }[] = [
+	{ points: 10, emoji: '🫧', name: 'Plankton' },
+	{ points: 15, emoji: '🤡', name: 'Too Clever' },
+	{ points: 30, emoji: '🐟', name: 'Schooler' },
+	{ points: 60, emoji: '🦑', name: 'Rare' },
+	{ points: 85, emoji: '🏮', name: 'Deep Cut' },
+	{ points: 100, emoji: '🌟', name: 'One in a Krillion' }
+];
+
+// Rescored points are continuous, so they're banded into tiers: roughly the
+// midpoints between the game's tier points, with Deep Cut topping out at 90
+// and One in a Krillion running 90-105. Too Clever is
+// left out -- it's krillion.io's hand-picked "famously obscure" label, not a
+// rarity level, so rescoring can't land on it. Rescored tops reach 125, past
+// anything the game gives, so 105+ gets a tier of its own: 💎.
+export const RESCORED_TIERS: { min: number; emoji: string }[] = [
+	{ min: 0, emoji: '🫧' },
+	{ min: 20, emoji: '🐟' },
+	{ min: 45, emoji: '🦑' },
+	{ min: 72.5, emoji: '🏮' },
+	{ min: 90, emoji: '🌟' },
+	{ min: 105, emoji: '💎' }
+];
+
+export function gameEmoji(points: number | null, miss: boolean): string {
+	if (miss || !points) return MISS_EMOJI;
+	let best = GAME_TIERS[0];
+	for (const t of GAME_TIERS) {
+		if (Math.abs(t.points - points) < Math.abs(best.points - points)) best = t;
+	}
+	return best.emoji;
+}
+
+export function rescoredEmoji(points: number, miss: boolean): string {
+	if (miss || points <= 0) return MISS_EMOJI;
+	let emoji = RESCORED_TIERS[0].emoji;
+	for (const t of RESCORED_TIERS) if (points >= t.min) emoji = t.emoji;
+	return emoji;
+}
+
+// ➕ rescored higher than the game gave, ➖ lower, 🟰 the same (to the tenth).
+export function changeEmoji(gamePoints: number | null, points: number): string {
+	const diff = Math.round((points - (gamePoints ?? 0)) * 10);
+	return diff > 0 ? '➕' : diff < 0 ? '➖' : '🟰';
+}
+
+export function rescoreShareText(
+	dayNumber: number,
+	gameScore: number | null,
+	updatedScore: number,
+	rounds: { gamePoints: number | null; points: number; miss: boolean }[]
+): string {
+	const row = (f: (r: (typeof rounds)[number]) => string) => rounds.map(f).join('');
+	return [
+		`Krillion #${dayNumber} 🦐 rescored`,
+		`${gameScore ?? '—'} ➡️ ${updatedScore.toFixed(1)}`,
+		'',
+		row((r) => gameEmoji(r.gamePoints, r.miss)),
+		row(() => '⬇️'),
+		row((r) => rescoredEmoji(r.points, r.miss)),
+		row((r) => changeEmoji(r.gamePoints, r.points))
+	].join('\n');
+}

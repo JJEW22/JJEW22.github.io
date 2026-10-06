@@ -14,6 +14,7 @@
 -->
 <script>
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { scoreMatch } from '$lib/pizzaScoring';
 
 	const API = '/pizzaBracket/api/admin';
@@ -263,7 +264,7 @@
 
 <main>
 	<nav class="breadcrumb">
-		<a href="/pizzaBracket">← Back to the bracket</a>
+		<a href={resolve('/pizzaBracket')}>← Back to the bracket</a>
 	</nav>
 
 	{#if status === 'loading'}
@@ -272,7 +273,7 @@
 		<div class="card">
 			<h1>Pizza Bracket Admin</h1>
 			<p>You don't have access to this page.</p>
-			<p><a href="/account?redirect=/pizzaBracket/admin">Sign in</a> with a pizza:admin account.</p>
+			<p><a href="{resolve('/account')}?redirect=/pizzaBracket/admin">Sign in</a> with a pizza:admin account.</p>
 			{#if msg}<p class="msg error">{msg}</p>{/if}
 		</div>
 	{:else if status === 'empty'}
@@ -304,7 +305,7 @@
 		{#if msg}<p class="msg" class:error={invalidCount > 0}>{msg}</p>{/if}
 
 		<nav class="tabs">
-			{#each rounds as r, i}
+			{#each rounds as r, i (i)}
 				<button class="tab" class:active={i === activeRound} on:click={() => (activeRound = i)}>
 					{r.name}
 				</button>
@@ -318,7 +319,7 @@
 						<thead>
 							<tr>
 								<th class="voter-head" rowspan="2">Voter</th>
-								{#each readyMatches as match}
+								{#each readyMatches as match (match.id)}
 									<th class="match-head" colspan={match.slots.length}>
 										{match.divisionName ?? match.roundName}
 										<span class="match-key">{match.matchKey}</span>
@@ -326,7 +327,7 @@
 								{/each}
 							</tr>
 							<tr>
-								{#each columns as col}
+								{#each columns as col, ci (ci)}
 									<th class="team-head" class:group-start={col.first}>
 										{#if col.slot.seed}<span class="seed">({col.slot.seed})</span>{/if}
 										{teamName(col.slot.teamId)}
@@ -335,10 +336,10 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each state.voters as voter}
+							{#each state.voters as voter (voter.id)}
 								<tr>
 									<th class="voter">{voter.name}</th>
-									{#each columns as col}
+									{#each columns as col, ci (ci)}
 										{@const value = cellValue(col.match, col.slot.teamId, voter.id)}
 										<td class:group-start={col.first}>
 											<input
@@ -360,14 +361,14 @@
 						<tfoot>
 							<tr>
 								<th class="voter">Votes</th>
-								{#each columns as col}
+								{#each columns as col, ci (ci)}
 									{@const r = previewFor(col.match, col.slot.teamId)}
 									<td class="summary" class:group-start={col.first}>{r?.votes ?? '—'}</td>
 								{/each}
 							</tr>
 							<tr>
 								<th class="voter">Average</th>
-								{#each columns as col}
+								{#each columns as col, ci (ci)}
 									{@const r = previewFor(col.match, col.slot.teamId)}
 									<td
 										class="summary avg"
@@ -387,7 +388,7 @@
 			{/if}
 
 			<section class="results">
-				{#each readyMatches as match}
+				{#each readyMatches as match (match.id)}
 					{@const preview = previews[match.id]}
 					{@const winner = effectiveWinner(match)}
 					<div class="result-card" class:overridden={match.overridden}>
@@ -433,7 +434,7 @@
 									disabled={busy}
 								>
 									<option value="">From the ratings</option>
-									{#each match.slots as slot}
+									{#each match.slots as slot, si (si)}
 										<option value={String(slot.teamId)}>{teamName(slot.teamId)}</option>
 									{/each}
 								</select>
@@ -451,7 +452,7 @@
 					</div>
 				{/each}
 
-				{#each waitingMatches as match}
+				{#each waitingMatches as match (match.id)}
 					<div class="result-card waiting">
 						<div class="result-head">
 							<strong>{match.divisionName ?? match.roundName}</strong>
@@ -477,7 +478,7 @@
 					<button class="mini" on:click={addVoter} disabled={busy || !newVoter.trim()}>Add</button>
 				</div>
 				<ul class="list">
-					{#each state.voters as voter}
+					{#each state.voters as voter (voter.id)}
 						<li>
 							<input
 								value={voter.name}
@@ -499,7 +500,7 @@
 			<div class="panel-body">
 				<p class="note small">Renaming is safe — ratings follow the team, not its name.</p>
 				<ul class="list">
-					{#each state.teams as team}
+					{#each state.teams as team (team.id)}
 						<li>
 							<input
 								value={team.name}

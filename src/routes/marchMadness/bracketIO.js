@@ -371,7 +371,9 @@ export async function loadBracketFromPath(basePath, teams = null, teamsList = nu
             if (response.ok) {
                 return await loadBracketFromJSON(jsonPath, teams);
             }
-        } catch (e) {}
+        } catch {
+            // No JSON variant here; try the Excel file next
+        }
         
         // Fall back to Excel
         try {
@@ -381,7 +383,9 @@ export async function loadBracketFromPath(basePath, teams = null, teamsList = nu
                 const arrayBuffer = await response.arrayBuffer();
                 return await loadBracketFromExcel(arrayBuffer, teams, teamsList);
             }
-        } catch (e) {}
+        } catch {
+            // No Excel file for this variant either; try the next one
+        }
     }
     
     throw new Error(`Bracket not found at ${basePath} (tried .json and .xlsx with variants: ${allVariants.join(', ')})`);

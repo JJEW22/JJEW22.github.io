@@ -113,7 +113,7 @@
             }
             // If GF-1 and losers side won, populate reset match
             if (editingMatch.matchIndex === 0 && match.winner) {
-                propagateGrandFinal(match);
+                propagateGrandFinal();
             }
         }
         
@@ -190,35 +190,6 @@
     // Check if this is a double elimination tournament
     $: isDoubleElimination = tournament?.bracket?.bracketType === 'doubleElimination' || 
                               tournament?.format?.bracketType === 'doubleElimination';
-    
-    // Find a match by ID across all bracket sections
-    function findMatchById(matchId) {
-        if (!tournament?.bracket) return null;
-        
-        // Search winners bracket
-        if (tournament.bracket.winnersBracket) {
-            for (const round of tournament.bracket.winnersBracket.rounds) {
-                for (const match of round.matches) {
-                    if (match.id === matchId) return match;
-                }
-            }
-        }
-        // Search losers bracket
-        if (tournament.bracket.losersBracket) {
-            for (const round of tournament.bracket.losersBracket.rounds) {
-                for (const match of round.matches) {
-                    if (match.id === matchId) return match;
-                }
-            }
-        }
-        // Search grand final
-        if (tournament.bracket.grandFinal) {
-            for (const match of tournament.bracket.grandFinal.matches) {
-                if (match.id === matchId) return match;
-            }
-        }
-        return null;
-    }
     
     // Find a losers bracket round by ID
     function findLBRound(roundId) {
@@ -298,7 +269,7 @@
     }
     
     // Handle grand final propagation (GF-1 result -> potentially populate reset)
-    function propagateGrandFinal(match) {
+    function propagateGrandFinal() {
         if (!tournament.bracket.grandFinal || tournament.bracket.grandFinal.matches.length < 2) return;
         
         const gf1 = tournament.bracket.grandFinal.matches[0];
@@ -699,6 +670,7 @@
     // Get unique board names from schedule (Home first, then others alphabetically)
     function getBoards() {
         if (!tournament.schedule) return [];
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set, not reactive state
         const boards = new Set();
         tournament.schedule.forEach(slot => {
             slot.matches.forEach(match => {
@@ -792,29 +764,6 @@
         return scheduleMatch && !scheduleMatch.matchId;
     }
 
-    // Find schedule info for a group match
-    function getGroupMatchSchedule(team1, team2, groupName) {
-        if (!tournament.schedule) return null;
-        
-        for (const timeSlot of tournament.schedule) {
-            for (const match of timeSlot.matches) {
-                // Check both orderings of teams
-                const matchesTeams = (match.team1 === team1 && match.team2 === team2) ||
-                                    (match.team1 === team2 && match.team2 === team1);
-                const matchesGroup = !match.group || match.group === groupName;
-                
-                if (matchesTeams && matchesGroup) {
-                    return {
-                        time: timeSlot.time,
-                        board: match.board,
-                        slotIndex: tournament.schedule.indexOf(timeSlot)
-                    };
-                }
-            }
-        }
-        return null;
-    }
-    
     // Find schedule info for a bracket match by matchId
     function getBracketMatchSchedule(matchId) {
         if (!tournament.schedule || !matchId) return null;
@@ -991,7 +940,7 @@
                                 <!-- Left: Standings Table -->
                                 <div class="standings-section">
                                     <h2>{tournament.groups.length > 1 ? 'Group Standings' : 'Standings'}</h2>
-                                    {#each tournament.groups as group, groupIndex}
+                                    {#each tournament.groups as group, groupIndex (groupIndex)}
                                         {@const standings = calculateStandings(group)}
                                         <div class="group-card">
                                             {#if tournament.groups.length > 1}
@@ -1013,7 +962,7 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {#each standings as team, i}
+                                                    {#each standings as team, i (i)}
                                                         {@const teamInfo = getTeamInfo(team.name)}
                                                         {@const highlight = getStandingsHighlight(i)}
                                                         {@const isLastInZone = highlight && (!getStandingsHighlight(i + 1) || getStandingsHighlight(i + 1)?.label !== highlight.label)}
@@ -1048,13 +997,13 @@
                                         <thead>
                                             <tr>
                                                 <th class="time-col">Time</th>
-                                                {#each getBoards() as board}
+                                                {#each getBoards() as board (board)}
                                                     <th class="board-col">{board} Board</th>
                                                 {/each}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {#each tournament.schedule as timeSlot, slotIndex}
+                                            {#each tournament.schedule as timeSlot, slotIndex (slotIndex)}
                                                 <tr class="schedule-row" class:knockout-row={timeSlot.stage !== 'Group Stage' && !timeSlot.stage.includes('Float')}>
                                                     <td class="time-cell">
                                                         <span class="time-value">{timeSlot.time}</span>
@@ -1062,7 +1011,7 @@
                                                             <span class="stage-label">{timeSlot.stage}</span>
                                                         {/if}
                                                     </td>
-                                                    {#each getBoards() as board}
+                                                    {#each getBoards() as board (board)}
                                                         {@const scheduleMatch = getScheduleMatch(slotIndex, board)}
                                                         <td class="match-cell">
                                                             {#if scheduleMatch}
@@ -1211,11 +1160,11 @@
                                     <div class="de-section winners-section">
                                         <h3 class="de-section-title winners-title">🏆 Winners Bracket</h3>
                                         <div class="bracket-container">
-                                            {#each tournament.bracket.winnersBracket.rounds as round, roundIndex}
+                                            {#each tournament.bracket.winnersBracket.rounds as round, roundIndex (roundIndex)}
                                                 <div class="bracket-round">
                                                     <h4 class="round-title">{round.name}</h4>
                                                     <div class="round-matches">
-                                                        {#each round.matches as match, matchIndex}
+                                                        {#each round.matches as match, matchIndex (matchIndex)}
                                                             {@const scheduleInfo = getBracketMatchSchedule(match.id)}
                                                             <div class={getMatchClass(match)}>
                                                                 {#if scheduleInfo}
@@ -1277,11 +1226,11 @@
                                     <div class="de-section losers-section">
                                         <h3 class="de-section-title losers-title">💀 Losers Bracket</h3>
                                         <div class="bracket-container">
-                                            {#each tournament.bracket.losersBracket.rounds as round, roundIndex}
+                                            {#each tournament.bracket.losersBracket.rounds as round, roundIndex (roundIndex)}
                                                 <div class="bracket-round">
                                                     <h4 class="round-title">{round.name}</h4>
                                                     <div class="round-matches">
-                                                        {#each round.matches as match, matchIndex}
+                                                        {#each round.matches as match, matchIndex (matchIndex)}
                                                             {@const scheduleInfo = getBracketMatchSchedule(match.id)}
                                                             <div class={getMatchClass(match)}>
                                                                 {#if scheduleInfo}
@@ -1343,7 +1292,7 @@
                                     <div class="de-section grand-final-section">
                                         <h3 class="de-section-title gf-title">👑 Grand Final</h3>
                                         <div class="grand-final-matches">
-                                            {#each tournament.bracket.grandFinal.matches as match, matchIndex}
+                                            {#each tournament.bracket.grandFinal.matches as match, matchIndex (matchIndex)}
                                                 {#if !match.conditional || isResetNeeded()}
                                                     <div class="gf-match-wrapper">
                                                         <h4 class="gf-match-label">
@@ -1416,11 +1365,11 @@
                         <!-- Single Elimination Bracket (original) -->
                         
                         <div class="bracket-container">
-                            {#each tournament.bracket.rounds as round, roundIndex}
+                            {#each tournament.bracket.rounds as round, roundIndex (roundIndex)}
                                 <div class="bracket-round">
                                     <h3 class="round-title">{round.name}</h3>
                                     <div class="round-matches">
-                                        {#each round.matches as match, matchIndex}
+                                        {#each round.matches as match, matchIndex (matchIndex)}
                                             {@const scheduleInfo = getBracketMatchSchedule(match.id)}
                                             <div class={getMatchClass(match)}>
                                                 {#if scheduleInfo}

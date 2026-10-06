@@ -287,15 +287,13 @@
         const isTeam2Slot = game.team2 && game.team2.name === team.name;
         
         // Get what the scenario says should be in this slot
-        let scenarioTeamName, scenarioTeamSeed, isEitherTeam, eitherTeams;
+        let scenarioTeamName, scenarioTeamSeed;
         if (isTeam1Slot) {
             scenarioTeamName = scenarioGame.team1;
             scenarioTeamSeed = scenarioGame.team1Seed;
-            isEitherTeam = scenarioGame.team1IsEither;
         } else if (isTeam2Slot) {
             scenarioTeamName = scenarioGame.team2;
             scenarioTeamSeed = scenarioGame.team2Seed;
-            isEitherTeam = scenarioGame.team2IsEither;
         } else {
             // Fallback - shouldn't happen
             return { name: team.name, seed: team.seed, userPick: null, score };
@@ -366,7 +364,7 @@
                 
                 <!-- Round 1 - Games 0-7 -->
                 <div class="bracket-column">
-                    {#each bracket.round1.slice(0, 8) as game, i}
+                    {#each bracket.round1.slice(0, 8) as game, i (i)}
                         {#if i === 0}
                             <div 
                                 class="game" 
@@ -461,7 +459,7 @@
                 
                 <!-- Round 2 - Games 0-3 -->
                 <div class="bracket-column">
-                    {#each bracket.round2.slice(0, 4) as game, i}
+                    {#each bracket.round2.slice(0, 4) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(2, i))}
@@ -509,7 +507,7 @@
                 
                 <!-- Sweet 16 - Games 0-1 -->
                 <div class="bracket-column">
-                    {#each bracket.round3.slice(0, 2) as game, i}
+                    {#each bracket.round3.slice(0, 2) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(3, i))}
@@ -654,7 +652,7 @@
                 
                 <!-- Sweet 16 - Games 4-5 -->
                 <div class="bracket-column">
-                    {#each bracket.round3.slice(4, 6) as game, i}
+                    {#each bracket.round3.slice(4, 6) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(3, i + 4))}
@@ -702,7 +700,7 @@
                 
                 <!-- Round 2 - Games 8-11 -->
                 <div class="bracket-column">
-                    {#each bracket.round2.slice(8, 12) as game, i}
+                    {#each bracket.round2.slice(8, 12) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(2, i + 8))}
@@ -750,7 +748,7 @@
                 
                 <!-- Round 1 - Games 16-23 -->
                 <div class="bracket-column">
-                    {#each bracket.round1.slice(16, 24) as game, i}
+                    {#each bracket.round1.slice(16, 24) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(1, i + 16))}
@@ -967,7 +965,7 @@
                 
                 <!-- Round 1 - Games 8-15 -->
                 <div class="bracket-column">
-                    {#each bracket.round1.slice(8, 16) as game, i}
+                    {#each bracket.round1.slice(8, 16) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(1, i + 8))}
@@ -1015,7 +1013,7 @@
                 
                 <!-- Round 2 - Games 4-7 -->
                 <div class="bracket-column">
-                    {#each bracket.round2.slice(4, 8) as game, i}
+                    {#each bracket.round2.slice(4, 8) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(2, i + 4))}
@@ -1063,7 +1061,7 @@
                 
                 <!-- Sweet 16 - Games 2-3 -->
                 <div class="bracket-column">
-                    {#each bracket.round3.slice(2, 4) as game, i}
+                    {#each bracket.round3.slice(2, 4) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(3, i + 2))}
@@ -1208,7 +1206,7 @@
                 
                 <!-- Sweet 16 - Games 6-7 -->
                 <div class="bracket-column">
-                    {#each bracket.round3.slice(6, 8) as game, i}
+                    {#each bracket.round3.slice(6, 8) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(3, i + 6))}
@@ -1256,7 +1254,7 @@
                 
                 <!-- Round 2 - Games 12-15 -->
                 <div class="bracket-column">
-                    {#each bracket.round2.slice(12, 16) as game, i}
+                    {#each bracket.round2.slice(12, 16) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(2, i + 12))}
@@ -1304,7 +1302,7 @@
                 
                 <!-- Round 1 - Games 24-31 -->
                 <div class="bracket-column">
-                    {#each bracket.round1.slice(24, 32) as game, i}
+                    {#each bracket.round1.slice(24, 32) as game, i (i)}
                         <div 
                                 class="game" 
                                 class:next-game={isNextGame(getResultsGame(1, i + 24))}
@@ -1370,7 +1368,7 @@
             <div class="tooltip-content">
                 <div class="tooltip-column">
                     <div class="tooltip-column-header">{hoveredGame.resultsGame?.team1?.name || 'Team 1'}</div>
-                    {#each stakes.team1Supporters.slice(0, 5) as supporter}
+                    {#each stakes.team1Supporters.slice(0, 5) as supporter, i (i)}
                         <div class="tooltip-row">
                             <span class="supporter-name">{supporter.name}</span>
                             <span class="supporter-points">+{supporter.points}</span>
@@ -1385,7 +1383,7 @@
                 </div>
                 <div class="tooltip-column">
                     <div class="tooltip-column-header">{hoveredGame.resultsGame?.team2?.name || 'Team 2'}</div>
-                    {#each stakes.team2Supporters.slice(0, 5) as supporter}
+                    {#each stakes.team2Supporters.slice(0, 5) as supporter, i (i)}
                         <div class="tooltip-row">
                             <span class="supporter-name">{supporter.name}</span>
                             <span class="supporter-points">+{supporter.points}</span>

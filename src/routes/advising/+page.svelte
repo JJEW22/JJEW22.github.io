@@ -1,8 +1,8 @@
 <script>
+    import { resolve } from '$app/paths';
     import '../../app.css';
     import { onMount, onDestroy } from 'svelte';
     
-    let showCalendly = false;
     
     // Replace with your actual Calendly URL
     const CALENDLY_URL = 'https://calendly.com/jwilkins-risenorthcapital/30min?hide_landing_page_details=1&hide_gdpr_banner=1';
@@ -32,7 +32,7 @@
 
 <div class="page">
     <nav class="nav-bar">
-        <a href="/" class="nav-back">← Home</a>
+        <a href={resolve('/')} class="nav-back">← Home</a>
     </nav>
     
     <!-- Hero -->

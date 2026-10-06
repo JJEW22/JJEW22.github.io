@@ -41,11 +41,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
             if (claimed.length === 0) throw new Error('INVALID_INVITE');
             return Number(u.id);
         });
-    } catch (e: any) {
-        if (e?.message === 'INVALID_INVITE') {
+    } catch (e) {
+        const err = e as { message?: string; code?: string } | null;
+        if (err?.message === 'INVALID_INVITE') {
             return json({ ok: false, error: 'This invite link is invalid or already used.' }, { status: 409 });
         }
-        if (e?.code === '23505') {
+        if (err?.code === '23505') {
             return json({ ok: false, error: 'That username is taken — pick another.' }, { status: 409 });
         }
         throw e;

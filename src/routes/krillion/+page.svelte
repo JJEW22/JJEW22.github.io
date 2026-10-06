@@ -8,12 +8,14 @@
 	server, which is what actually scores it.
 -->
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import '../../app.css';
 	import { onMount } from 'svelte';
 	import {
 		MIN_DIVES_FOR_AVERAGE,
 		etDate,
 		parsePaste,
+		rescoreShareText,
 		TOP_MAX,
 		TOP_MIN,
 		type PastedRound
@@ -103,6 +105,31 @@
 	let busy = false;
 	let error = '';
 	let result: Result | null = null;
+
+	// The rescored share block, once the dive has counts.
+	$: shareText =
+		result?.status === 'scored' && result.updatedScore !== null
+			? rescoreShareText(result.dayNumber, result.gameScore, result.updatedScore, result.rounds)
+			: '';
+	let copied = false;
+
+	async function copyShare() {
+		try {
+			await navigator.clipboard.writeText(shareText);
+		} catch {
+			// No clipboard API (older browser or insecure context): fall back to
+			// selecting a hidden textarea.
+			const t = document.createElement('textarea');
+			t.value = shareText;
+			t.style.cssText = 'position:fixed;opacity:0';
+			document.body.appendChild(t);
+			t.select();
+			document.execCommand('copy');
+			t.remove();
+		}
+		copied = true;
+		setTimeout(() => (copied = false), 2000);
+	}
 
 	// Leaderboard: signed-in dives, totals only.
 	interface LeaderRow {
@@ -317,10 +344,10 @@
 
 <div class="container">
 	<nav class="breadcrumb">
-		<a href="/me">← Back to Me</a>
+		<a href={resolve('/me')}>← Back to Me</a>
 		<span class="nav-right">
-			{#if isAdmin}<a class="pill" href="/krillion/admin">Admin</a>{/if}
-			{#if !me}<a class="pill" href="/account?redirect=/krillion">Sign in</a>{/if}
+			{#if isAdmin}<a class="pill" href={resolve('/krillion/admin')}>Admin</a>{/if}
+			{#if !me}<a class="pill" href="{resolve('/account')}?redirect=/krillion">Sign in</a>{/if}
 		</span>
 	</nav>
 
@@ -452,7 +479,8 @@
 							<p class="sub">Used for this one email, then deleted.</p>
 						{/if}
 						<p class="sub">
-							<a href="/account?redirect=/krillion">Sign in</a> to keep your scores on your account.
+							<a href="{resolve('/account')}?redirect=/krillion">Sign in</a> to keep your scores on your
+							account.
 						</p>
 					{/if}
 				</div>
@@ -528,6 +556,14 @@
 							{/each}
 						</tbody>
 					</table>
+					{#if shareText}
+						<div class="share">
+							<pre>{shareText}</pre>
+							<button type="button" on:click={copyShare}
+								>{copied ? 'Copied!' : 'Copy to share'}</button
+							>
+						</div>
+					{/if}
 					<p class="notice">
 						Based on counts as of {time(result.countsAsOf)} ET. Your rescored total can change during
 						the day; it's final after midnight ET.
@@ -583,7 +619,7 @@
 				Everyone who submits while signed in, by rescored total. All time ranks average rescored
 				total, once you have {MIN_DIVES_FOR_AVERAGE} dives. Totals only — no answers, so it never spoils
 				the dive.{#if !me}
-					<a href="/account?redirect=/krillion">Sign in</a> to be on it.{/if}
+					<a href="{resolve('/account')}?redirect=/krillion">Sign in</a> to be on it.{/if}
 			</p>
 
 			{#if boardView === 'day'}
@@ -854,6 +890,37 @@
 	button.small:hover {
 		border-color: #0066cc;
 		color: #0066cc;
+	}
+
+	.share {
+		display: flex;
+		align-items: flex-end;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin-top: 1rem;
+	}
+
+	.share pre {
+		margin: 0;
+		padding: 0.75rem 1rem;
+		background: #f6f8fa;
+		border: 1px solid #e3e7ec;
+		border-radius: 8px;
+		font-family: inherit;
+		font-size: 1rem;
+		line-height: 1.5;
+		white-space: pre;
+	}
+
+	.share button {
+		padding: 0.45rem 1rem;
+		background: #0066cc;
+		border: 1px solid #0066cc;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.9rem;
+		color: #fff;
+		cursor: pointer;
 	}
 
 	.saved-flag {

@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { resolve } from '$app/paths';
     import PizzaBracket from './PizzaBracket.svelte';
 
     let isAdmin = false;
@@ -19,9 +20,9 @@
 
 <main>
     <nav class="breadcrumb">
-        <a href="/">← Back to Home</a>
+        <a href={resolve('/')}>← Back to Home</a>
         {#if isAdmin}
-            <a class="admin-link" href="/pizzaBracket/admin">Edit results →</a>
+            <a class="admin-link" href={resolve('/pizzaBracket/admin')}>Edit results →</a>
         {/if}
     </nav>
     <PizzaBracket />

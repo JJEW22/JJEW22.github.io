@@ -44,7 +44,7 @@
         </div>
         
         <div class="tournament-selector">
-            {#each tournaments as tourney}
+            {#each tournaments as tourney (tourney.id)}
                 <button 
                     class="tournament-tab"
                     class:active={selectedTournamentId === tourney.id}

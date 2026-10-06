@@ -1,5 +1,6 @@
 <!-- src/routes/featureRequests/+page.svelte -->
 <script>
+    import { resolve } from '$app/paths';
     import { onMount } from 'svelte';
 
     const API = '/premierLeaguePickem/api';
@@ -7,7 +8,6 @@
     let loaded = false;
     let signedIn = false;
     let joined = false;
-    let cycle = 0;
     let maxLen = 280;
     let nextReset = '';
     let mine = null;
@@ -25,13 +25,12 @@
             const d = await r.json();
             signedIn = !!d.signedIn;
             joined = !!d.joined;
-            cycle = d.cycle;
             maxLen = d.maxLen;
             nextReset = d.nextReset || '';
             mine = d.mine ?? null;
             submissions = d.submissions ?? null;
             if (mine) body = mine;
-        } catch (_) {
+        } catch {
             status = 'Could not load.';
         }
         loaded = true;
@@ -54,7 +53,7 @@
             } else {
                 status = d.error || 'Could not submit.';
             }
-        } catch (_) {
+        } catch {
             status = 'Network error.';
         }
         saving = false;
@@ -68,7 +67,7 @@
 
 <div class="page-background">
     <div class="container">
-        <nav class="breadcrumb"><a href="/premierLeaguePickem">&larr; Back to Pickem</a></nav>
+        <nav class="breadcrumb"><a href={resolve('/premierLeaguePickem')}>&larr; Back to Pickem</a></nav>
         <main>
             <h1>Feature Requests</h1>
             <p class="lede">
@@ -81,9 +80,9 @@
             {#if !loaded}
                 <p class="muted">Loading…</p>
             {:else if !signedIn}
-                <div class="gate"><p>Please <a href="/account?redirect=/featureRequests">sign in</a> to submit a request.</p></div>
+                <div class="gate"><p>Please <a href="{resolve('/account')}?redirect=/featureRequests">sign in</a> to submit a request.</p></div>
             {:else if !joined}
-                <div class="gate"><p>Join the competition on the <a href="/premierLeaguePickem">Pickem page</a> first, then you can send requests.</p></div>
+                <div class="gate"><p>Join the competition on the <a href={resolve('/premierLeaguePickem')}>Pickem page</a> first, then you can send requests.</p></div>
             {:else}
                 <section class="card">
                     <h2>Your request for this cycle</h2>
@@ -108,7 +107,7 @@
                             <p class="muted">Nothing yet.</p>
                         {:else}
                             <ul class="sub-list">
-                                {#each submissions as s}
+                                {#each submissions as s, i (i)}
                                     <li><b>{s.name}:</b> {s.body}</li>
                                 {/each}
                             </ul>

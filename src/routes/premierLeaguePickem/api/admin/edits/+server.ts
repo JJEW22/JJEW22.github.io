@@ -12,8 +12,8 @@ interface Row {
     kind: string;
     fixture_id: string | null;
     matchweek: number | null;
-    before: any;
-    after: any;
+    before: unknown; // jsonb snapshot, passed straight through
+    after: unknown;
     note: string | null;
     created_at: Date;
     admin_name: string;

@@ -82,8 +82,6 @@
 		variant === 'custom' && showBorder
 			? `border: ${borderWidth} ${borderStyle} ${borderColor}; border-radius: ${headerBorderRadius}`
 			: '';
-
-	$: headerHoverStyles = headerBgHover ? `background: ${headerBgHover} !important` : '';
 </script>
 
 <div {id} class="collapsible {variant}" class:open class:transparent style={containerStyles}>

@@ -16,6 +16,7 @@
 	coordinate is invisible in a text field and obvious as a dot in the wrong sea.
 -->
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import '../../../app.css';
 	import { onMount } from 'svelte';
 	import WorldMap from '../WorldMap.svelte';
@@ -447,7 +448,7 @@
 
 <div class="container">
 	<nav class="breadcrumb">
-		<a href="/meSoup">
+		<a href={resolve('/meSoup')}>
 			← Back to {username ? 'my' : 'the'} map
 		</a>
 		{#if username}
@@ -464,7 +465,7 @@
 		{:else if status === 'denied'}
 			<h1>Sign in first</h1>
 			<p class="note">
-				Taking you to <a href={SIGN_IN_URL}>sign in</a> — your spots are tied to your account.
+				Taking you to <a href="{resolve('/account')}?redirect=/meSoup/admin">sign in</a> — your spots are tied to your account.
 			</p>
 		{:else}
 			<h1>My spots</h1>

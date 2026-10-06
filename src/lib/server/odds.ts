@@ -40,12 +40,22 @@ export interface OddsMultipliers {
     multAway: number;
 }
 
+// The slice of the-odds-api's /odds response this reads.
+interface OddsEvent {
+    home_team: string;
+    away_team: string;
+    commence_time: string;
+    bookmakers?: {
+        markets?: { key: string; outcomes?: { name: string; price: number }[] }[];
+    }[];
+}
+
 export async function fetchOddsMultipliers(): Promise<OddsMultipliers[]> {
     if (!env.ODDS_API_KEY) throw new Error('ODDS_API_KEY is not set');
     const url = `${ODDS_BASE}/sports/${SPORT}/odds?regions=uk&markets=h2h&oddsFormat=decimal&apiKey=${env.ODDS_API_KEY}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`odds api ${res.status}: ${await res.text()}`);
-    const events: any[] = await res.json();
+    const events: OddsEvent[] = await res.json();
 
     const out: OddsMultipliers[] = [];
     for (const ev of events) {
@@ -58,13 +68,13 @@ export async function fetchOddsMultipliers(): Promise<OddsMultipliers[]> {
             sumA = 0,
             books = 0;
         for (const bk of ev.bookmakers ?? []) {
-            const market = (bk.markets ?? []).find((m: any) => m.key === 'h2h');
+            const market = (bk.markets ?? []).find((m) => m.key === 'h2h');
             if (!market) continue;
             const oc = market.outcomes ?? [];
-            const priceOf = (teamName: string) => oc.find((x: any) => x.name === teamName)?.price;
+            const priceOf = (teamName: string) => oc.find((x) => x.name === teamName)?.price;
             const dh = priceOf(ev.home_team);
             const da = priceOf(ev.away_team);
-            const dd = oc.find((x: any) => x.name === 'Draw')?.price;
+            const dd = oc.find((x) => x.name === 'Draw')?.price;
             if (!dh || !da || !dd) continue;
             sumH += 1 / dh;
             sumD += 1 / dd;

@@ -28,13 +28,6 @@
             console.error('Error loading scoring config:', err);
         }
     }
-    
-    // Compute total possible points (all correct picks, no upsets)
-    $: maxBasePoints = config ? config.scoreForRound.reduce((sum, pts, i) => {
-        if (i === 0) return sum;
-        const gamesInRound = Math.pow(2, 6 - i);  // 32, 16, 8, 4, 2, 1
-        return sum + (pts * gamesInRound);
-    }, 0) : 0;
 </script>
 
 {#if loading}
@@ -92,11 +85,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {#each config.roundNames as roundName, i}
+                    {#each config.roundNames as roundName, i (i)}
                         {#if i > 0}
                             {@const factor = config.seedFactor[i]}        
                             {@const gamesInRound = Math.pow(2, 6 - i)}
-                            {@const maxForRound = config.scoreForRound[i] * gamesInRound}
                             <tr>
                                 <td class="round-name">{roundName}</td>
                                 <td class="games">{gamesInRound}</td>
@@ -126,7 +118,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {#each config.starBonus as starAmount, i}
+                    {#each config.starBonus as starAmount, i (i)}
                         <tr>
                             {#if i + 1 === config.starBonus.length}
                                 <td>{i + 1}+</td>
@@ -167,7 +159,7 @@
                     <h3>Starting Bonuses</h3>
                     <p class="rules-description">Some participants have starting bonus points:</p>
                     <ul class="bonus-list">
-                        {#each Object.entries(config.startBonus) as [name, bonus]}
+                        {#each Object.entries(config.startBonus) as [name, bonus] (name)}
                             <li><strong>{name}:</strong> +{bonus} points</li>
                         {/each}
                     </ul>

@@ -473,7 +473,7 @@
 
   <!-- Step nav -->
   <nav class="step-nav">
-    {#each sections as s}
+    {#each sections as s (s.id)}
       <button class="step-btn {activeSection === s.id ? 'active' : ''}" on:click={() => goTo(s.id)}>
         <span class="icon">{s.icon}</span> {s.label}
       </button>
@@ -654,7 +654,7 @@
             </div>
           </div>
 
-          {#each children as child, i}
+          {#each children as child, i (i)}
             <div class="child-row" style="margin-top: .8rem">
               <span class="child-row-label">Child {i + 1}</span>
               <div class="field">

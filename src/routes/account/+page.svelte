@@ -1,5 +1,6 @@
 <!-- src/routes/account/+page.svelte -->
 <script>
+    import { resolve } from '$app/paths';
     import { onMount } from 'svelte';
 
     // Resend usually delivers in seconds, but greylisting and spam filtering on the
@@ -175,7 +176,7 @@
 
 <div class="page-background">
     <div class="container">
-        <nav class="breadcrumb"><a href="/">&larr; Back to Home</a></nav>
+        <nav class="breadcrumb"><a href={resolve('/')}>&larr; Back to Home</a></nav>
         <main>
             <h1>Account</h1>
 
