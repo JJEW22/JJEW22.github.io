@@ -54,6 +54,13 @@
             image: 'none',
             display: true
         },
+        {
+            title: "Ultra tracker",
+            description: "Follow me live during an ultra marathon — my phone posts its GPS here as I run.",
+            link: "/ultra",
+            image: 'none',
+            display: true
+        },
     ];
 
 // Filter to only show projects where display is true
