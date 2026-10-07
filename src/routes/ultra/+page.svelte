@@ -1,11 +1,12 @@
 <!-- src/routes/ultra/+page.svelte -->
 <!--
-	Live ultra tracking. My phone runs the Overland app, which posts GPS points
-	to /ultra/api/ingest; this page polls /ultra/api/track and draws them.
+	Live ultra tracking. Phones run the Overland app, which posts GPS points to
+	/ultra/api/ingest; this page polls /ultra/api/track and draws them.
 
-	Only points inside the race window (RACE in $lib/ultra) are ever public.
-	Before the start it's a countdown; a site admin can flip on a 24-hour
-	preview to check the phone is reporting.
+	Whose points appear, and when, is set in /ultra/admin: each phone is
+	switched on or off there (new ones start hidden), and the display mode is
+	off, the race window (RACE in $lib/ultra), or live from when it was
+	switched on. An admin can flip on a 24-hour preview to check a phone.
 
 	The map is Leaflet over OpenStreetMap tiles, unlike meSoup's tile-free world
 	map: following a runner needs streets and trails. Leaflet touches `window`,
@@ -19,8 +20,20 @@
 	import { formatDuration, formatPace } from '$lib/ultra';
 	import type { Map as LeafletMap, Polyline, CircleMarker } from 'leaflet';
 
+	interface Runner {
+		id: string;
+		name: string;
+		color: string;
+		path: [number, number][];
+		latest: { t: string; lat: number; lon: number; battery: number | null } | null;
+		distanceMiles: number;
+		elapsedMs: number | null;
+		paceMsPerMile: number | null;
+	}
 	interface Track {
-		status: 'unscheduled' | 'upcoming' | 'live' | 'finished' | 'preview';
+		status: 'unscheduled' | 'upcoming' | 'live' | 'finished' | 'preview' | 'off';
+		mode: 'off' | 'race' | 'live';
+		liveSince: string | null;
 		isAdmin: boolean;
 		race: {
 			name: string;
@@ -32,11 +45,7 @@
 			courseGpx: string | null;
 			aidStations: { name: string; mile: number }[];
 		};
-		path: [number, number][];
-		latest: { t: string; lat: number; lon: number; battery: number | null } | null;
-		distanceMiles: number;
-		elapsedMs: number | null;
-		paceMsPerMile: number | null;
+		runners: Runner[];
 		serverTime: string;
 	}
 
@@ -53,11 +62,13 @@
 	let mapEl: HTMLDivElement;
 	let map: LeafletMap | null = null;
 	let L: typeof import('leaflet') | null = null;
-	let trackLine: Polyline | null = null;
 	let courseLine: Polyline | null = null;
-	let here: CircleMarker | null = null;
-	let fitted = false;
 	let courseLoaded = false;
+	// One line + marker per runner, kept across polls so the map doesn't flicker.
+	// Leaflet objects, not page state: nothing in the markup reads this.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const layers = new Map<string, { line: Polyline; marker: CircleMarker }>();
+	let fitted = false;
 
 	let pollTimer: ReturnType<typeof setInterval>;
 	let clockTimer: ReturnType<typeof setInterval>;
@@ -128,46 +139,80 @@
 			courseLine = L.polyline(pts, { color: '#8a94a6', weight: 4, opacity: 0.6, dashArray: '6 8' })
 				.addTo(map)
 				.bringToBack();
-			if (!track.path.length) map.fitBounds(courseLine.getBounds(), { padding: [20, 20] });
+			if (!fitted) map.fitBounds(courseLine.getBounds(), { padding: [20, 20] });
 		} catch {
-			// No course drawn; the live track still works.
+			// No course drawn; the live tracks still work.
 		}
 	}
 
 	function draw() {
 		if (!L || !map || !track) return;
 		loadCourse();
-		const path = track.path;
-		if (!path.length) {
-			trackLine?.remove();
-			here?.remove();
-			trackLine = here = null;
-			return;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set
+		const live = new Set<string>();
+		for (const r of track.runners) {
+			if (!r.path.length) continue;
+			live.add(r.id);
+			const last = r.path[r.path.length - 1];
+			const existing = layers.get(r.id);
+			if (existing) {
+				existing.line.setLatLngs(r.path).setStyle({ color: r.color });
+				existing.marker.setLatLng(last).setStyle({ fillColor: r.color });
+				existing.marker.setTooltipContent(r.name);
+			} else {
+				const line = L.polyline(r.path, { color: r.color, weight: 4 }).addTo(map);
+				const marker = L.circleMarker(last, {
+					radius: 9,
+					color: '#fff',
+					weight: 3,
+					fillColor: r.color,
+					fillOpacity: 1
+				})
+					.bindTooltip(r.name, { direction: 'top', offset: [0, -8] })
+					.addTo(map);
+				layers.set(r.id, { line, marker });
+			}
 		}
-		if (trackLine) trackLine.setLatLngs(path);
-		else trackLine = L.polyline(path, { color: '#e4572e', weight: 4 }).addTo(map);
-		const last = path[path.length - 1];
-		if (here) here.setLatLng(last);
-		else
-			here = L.circleMarker(last, {
-				radius: 9,
-				color: '#fff',
-				weight: 3,
-				fillColor: '#e4572e',
-				fillOpacity: 1
-			}).addTo(map);
+		// Runners switched off in the admin come off the map.
+		for (const [id, l] of layers) {
+			if (!live.has(id)) {
+				l.line.remove();
+				l.marker.remove();
+				layers.delete(id);
+			}
+		}
+		// Name labels stay up when there's more than one dot to tell apart.
+		for (const l of layers.values()) {
+			if (layers.size > 1) l.marker.openTooltip();
+			else l.marker.closeTooltip();
+		}
+		if (!layers.size) return;
+		const lines = [...layers.values()].map((l) => l.line);
+		const bounds = lines.reduce((b, l) => b.extend(l.getBounds()), lines[0].getBounds());
 		if (!fitted) {
-			map.fitBounds(trackLine.getBounds(), { padding: [30, 30], maxZoom: 15 });
+			map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
 			fitted = true;
 		} else if (follow) {
-			map.panTo(last);
+			if (layers.size === 1) map.panTo([...layers.values()][0].marker.getLatLng());
+			else map.fitBounds(markerBounds(), { padding: [40, 40], maxZoom: 15 });
 		}
+	}
+
+	// Where everyone is right now, for following several runners at once.
+	function markerBounds() {
+		const pts = [...layers.values()].map((l) => l.marker.getLatLng());
+		return L!.latLngBounds(pts);
 	}
 
 	function recenter() {
 		follow = true;
-		const last = track?.path[track.path.length - 1];
-		if (map && last) map.setView(last, Math.max(map.getZoom(), 14));
+		if (!map || !layers.size) return;
+		if (layers.size === 1) {
+			const m = [...layers.values()][0].marker;
+			map.setView(m.getLatLng(), Math.max(map.getZoom(), 14));
+		} else {
+			map.fitBounds(markerBounds(), { padding: [40, 40], maxZoom: 15 });
+		}
 	}
 
 	function ago(iso: string): string {
@@ -185,25 +230,37 @@
 		});
 	}
 
-	// Aid-station ETAs from the average pace so far, counted from the last fix.
-	function eta(mile: number): string {
-		if (!track?.latest || !track.paceMsPerMile) return '—';
-		const left = mile - track.distanceMiles;
+	// Aid-station ETAs from a runner's average pace so far, counted from their last fix.
+	function eta(r: Runner, mile: number): string {
+		if (!r.latest || !r.paceMsPerMile) return '—';
+		const left = mile - r.distanceMiles;
 		if (left <= 0) return 'passed';
-		return clock(Date.parse(track.latest.t) + left * track.paceMsPerMile);
+		return clock(Date.parse(r.latest.t) + left * r.paceMsPerMile);
+	}
+
+	// Elapsed ticks every second while live, from the race start or from when
+	// live was switched on.
+	function elapsed(r: Runner): number | null {
+		if (status === 'live' && clockStartMs !== null) return now - clockStartMs;
+		return r.elapsedMs;
+	}
+
+	function isStale(r: Runner): boolean {
+		return (
+			(status === 'live' || status === 'preview') &&
+			!!r.latest &&
+			now - Date.parse(r.latest.t) > STALE_MS
+		);
 	}
 
 	$: status = track?.status ?? null;
 	$: startMs = track?.race.start ? Date.parse(track.race.start) : null;
-	$: elapsed = status === 'live' && startMs !== null ? now - startMs : (track?.elapsedMs ?? null);
-	$: stale =
-		(status === 'live' || status === 'preview') &&
-		!!track?.latest &&
-		now - Date.parse(track.latest.t) > STALE_MS;
-	$: toGo =
-		track?.race.distanceMiles != null
-			? Math.max(0, track.race.distanceMiles - (track?.distanceMiles ?? 0))
-			: null;
+	$: clockStartMs =
+		track?.mode === 'live' && track.liveSince ? Date.parse(track.liveSince) : startMs;
+	$: runners = track?.runners ?? [];
+	$: anyTrack = runners.some((r) => r.path.length);
+	$: stale = runners.filter(isStale);
+	$: showStats = status === 'live' || status === 'finished' || status === 'preview';
 </script>
 
 <svelte:head>
@@ -218,7 +275,7 @@
 		<header class="head">
 			<div>
 				<h1>{track?.race.name ?? 'Ultra marathon'}</h1>
-				{#if track?.race.location || track?.race.start}
+				{#if track?.mode === 'race' && (track.race.location || track.race.start)}
 					<p class="sub">
 						{track.race.location}{#if track.race.location && track.race.start}
 							·
@@ -239,6 +296,8 @@
 
 		{#if loadFailed && !track}
 			<p class="banner warn">Couldn't reach the tracker. It will keep retrying.</p>
+		{:else if status === 'off'}
+			<p class="banner">Live tracking is switched off right now. Check back on race day.</p>
 		{:else if status === 'unscheduled'}
 			<p class="banner">Race details coming soon. Live tracking will appear here on race day.</p>
 		{:else if status === 'upcoming' && startMs !== null}
@@ -247,78 +306,97 @@
 			</p>
 		{:else if status === 'preview'}
 			<p class="banner warn">
-				Admin preview: the last 24 hours of points, whatever the race window. Not visible to anyone
+				Admin preview: the last 24 hours of points, whatever the display mode. Not visible to anyone
 				else.
 			</p>
+		{:else if status === 'live' && track?.mode === 'live' && !anyTrack}
+			<p class="banner">Live — waiting for the first location update.</p>
 		{/if}
 
-		{#if stale && track?.latest}
-			<p class="banner warn">
-				No update since {ago(track.latest.t)} — probably no signal out on the course. The track fills
-				in when the phone reconnects.
-			</p>
-		{/if}
+		{#each stale as r (r.id)}
+			{#if r.latest}
+				<p class="banner warn">
+					No update from {runners.length > 1 ? r.name : 'my phone'} since {ago(r.latest.t)} — probably
+					no signal. The track fills in when the phone reconnects.
+				</p>
+			{/if}
+		{/each}
 
-		{#if status === 'live' || status === 'finished' || status === 'preview'}
-			<div class="stats">
-				<div>
-					<span class="n">{track?.distanceMiles.toFixed(1) ?? '0.0'}</span><span class="l"
-						>miles{#if toGo !== null}&nbsp;· {toGo.toFixed(1)} to go{/if}</span
-					>
+		{#if showStats}
+			{#each runners as r (r.id)}
+				{#if runners.length > 1}
+					<h3 class="runner"><span class="dot" style="background:{r.color}"></span>{r.name}</h3>
+				{/if}
+				<div class="stats">
+					<div>
+						<span class="n">{r.distanceMiles.toFixed(1)}</span><span class="l"
+							>miles{#if track?.mode === 'race' && track.race.distanceMiles != null}&nbsp;· {Math.max(
+									0,
+									track.race.distanceMiles - r.distanceMiles
+								).toFixed(1)} to go{/if}</span
+						>
+					</div>
+					<div>
+						<span class="n">{elapsed(r) !== null ? formatDuration(elapsed(r) ?? 0) : '—'}</span
+						><span class="l">elapsed</span>
+					</div>
+					<div>
+						<span class="n">{formatPace(r.paceMsPerMile)}</span><span class="l">average pace</span>
+					</div>
+					<div>
+						<span class="n">{r.latest ? ago(r.latest.t) : '—'}</span><span class="l"
+							>last update{#if r.latest?.battery != null}&nbsp;· phone {Math.round(
+									r.latest.battery * 100
+								)}%{/if}</span
+						>
+					</div>
 				</div>
-				<div>
-					<span class="n">{elapsed !== null ? formatDuration(elapsed) : '—'}</span><span class="l"
-						>elapsed</span
-					>
-				</div>
-				<div>
-					<span class="n">{formatPace(track?.paceMsPerMile ?? null)}</span><span class="l"
-						>average pace</span
-					>
-				</div>
-				<div>
-					<span class="n">{track?.latest ? ago(track.latest.t) : '—'}</span><span class="l"
-						>last update{#if track?.latest?.battery != null}&nbsp;· phone {Math.round(
-								track.latest.battery * 100
-							)}%{/if}</span
-					>
-				</div>
-			</div>
+			{/each}
 		{/if}
 
 		<div class="map-wrap">
 			<div class="map" bind:this={mapEl}></div>
-			{#if track?.path.length && !follow}
-				<button type="button" class="recenter" on:click={recenter}>Follow me</button>
+			{#if anyTrack && !follow}
+				<button type="button" class="recenter" on:click={recenter}>
+					{runners.length > 1 ? 'Follow everyone' : 'Follow me'}
+				</button>
 			{/if}
 		</div>
 
-		{#if track?.race.aidStations.length}
+		{#if track?.mode === 'race' && track.race.aidStations.length && runners.length}
 			<h2>Aid stations</h2>
 			<table>
 				<thead>
-					<tr><th>Station</th><th class="num">Mile</th><th class="num">ETA</th></tr>
+					<tr>
+						<th>Station</th>
+						<th class="num">Mile</th>
+						{#each runners as r (r.id)}
+							<th class="num">{runners.length > 1 ? r.name : 'ETA'}</th>
+						{/each}
+					</tr>
 				</thead>
 				<tbody>
 					{#each track.race.aidStations as s (s.name + s.mile)}
-						<tr class:passed={track.distanceMiles >= s.mile}>
+						<tr>
 							<td>{s.name}</td>
 							<td class="num">{s.mile}</td>
-							<td class="num">{eta(s.mile)}</td>
+							{#each runners as r (r.id)}
+								<td class="num" class:passed={r.distanceMiles >= s.mile}>{eta(r, s.mile)}</td>
+							{/each}
 						</tr>
 					{/each}
 				</tbody>
 			</table>
-			<p class="sub">ETAs use my average pace so far, so they drift later as the miles add up.</p>
+			<p class="sub">ETAs use average pace so far, so they drift later as the miles add up.</p>
 		{/if}
 
 		{#if track?.isAdmin}
 			<p class="admin">
+				<a href={resolve('/ultra/admin')}>Tracker admin</a> ·
 				{#if preview}
 					<a href={resolve('/ultra')}>Leave preview</a>
 				{:else}
-					<a href="{resolve('/ultra')}?preview=1">Preview the last 24 hours</a> (admin only — to check
-					the phone is reporting)
+					<a href="{resolve('/ultra')}?preview=1">Preview the last 24 hours</a>
 				{/if}
 			</p>
 		{/if}
@@ -366,6 +444,22 @@
 		font-size: 1.15rem;
 		margin: 1.75rem 0 0.4rem 0;
 		color: #333;
+	}
+
+	h3.runner {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 1.1rem 0 -0.5rem 0;
+		font-size: 1rem;
+		color: #333;
+	}
+
+	.dot {
+		width: 0.8rem;
+		height: 0.8rem;
+		border-radius: 50%;
+		display: inline-block;
 	}
 
 	.sub {
@@ -496,7 +590,7 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	tr.passed td {
+	td.passed {
 		color: #9aa5b1;
 	}
 

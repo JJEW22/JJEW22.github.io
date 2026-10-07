@@ -70,6 +70,7 @@ export interface TrackPoint {
 	lat: number;
 	lon: number;
 	accuracy: number | null;
+	battery?: number | null;
 }
 
 // Fixes worse than this are skipped: a phone under tree cover can report a
@@ -77,25 +78,78 @@ export interface TrackPoint {
 export const MAX_ACCURACY_M = 50;
 // A segment faster than this is a GPS jump, not running (it's ~11.2 mph).
 export const MAX_SPEED_MPS = 5;
-// Moves shorter than this are jitter while standing at an aid station.
+// Moves shorter than this are jitter while standing at an aid station. The
+// real threshold is the larger of this and the fix's own reported accuracy:
+// a fix good to 20m wobbles 5-15m between readings standing still.
 export const MIN_STEP_M = 4;
+
+// (0, 0) -- "Null Island", in the Atlantic -- is what a phone can report
+// before it has a fix. Nobody is running there.
+export function isNullIsland(lat: number, lon: number): boolean {
+	return Math.abs(lat) < 0.01 && Math.abs(lon) < 0.01;
+}
+
+// Could a runner get from a to b in the time between them?
+function plausible(a: TrackPoint, b: TrackPoint): boolean {
+	const d = haversine(a.lat, a.lon, b.lat, b.lon);
+	const secs = (Date.parse(b.t) - Date.parse(a.t)) / 1000;
+	return secs > 0 ? d / secs <= MAX_SPEED_MPS : d <= MAX_ACCURACY_M;
+}
+
+// The points worth drawing and measuring: no Null Island, no poor fixes, no
+// jumps, no standing-still jitter.
+//
+// A jump is judged against the last kept point -- but that point can be the
+// bad one (a first fix miles off, say), and then every real point after it
+// would look like a jump. So a rejected point is held as a suspect: if the
+// next point agrees with the suspect rather than with the kept point, the
+// two of them outvote it and the kept point is dropped instead.
+export function cleanTrack(points: TrackPoint[]): TrackPoint[] {
+	const kept: TrackPoint[] = [];
+	let suspect: TrackPoint | null = null;
+	for (const p of points) {
+		if (isNullIsland(p.lat, p.lon)) continue;
+		if (p.accuracy !== null && p.accuracy > MAX_ACCURACY_M) continue;
+		const prev = kept[kept.length - 1];
+		if (!prev) {
+			kept.push(p);
+			continue;
+		}
+		if (!plausible(prev, p)) {
+			if (suspect && plausible(suspect, p)) {
+				kept.pop();
+				kept.push(suspect, p);
+				suspect = null;
+			} else {
+				suspect = p;
+			}
+			continue;
+		}
+		suspect = null;
+		// Keep `prev` through jitter, so wobbles can't add up to distance. Slow
+		// real movement isn't lost: `prev` holds until the move is big enough,
+		// then the whole stretch counts.
+		const step = Math.max(MIN_STEP_M, p.accuracy ?? 0);
+		if (haversine(prev.lat, prev.lon, p.lat, p.lon) < step) continue;
+		kept.push(p);
+	}
+	return kept;
+}
+
+// Metres along a cleaned track.
+export function pathLength(points: TrackPoint[]): number {
+	let total = 0;
+	for (let i = 1; i < points.length; i++) {
+		const a = points[i - 1];
+		const b = points[i];
+		total += haversine(a.lat, a.lon, b.lat, b.lon);
+	}
+	return total;
+}
 
 // Distance along the track, ignoring poor fixes, jumps and jitter.
 export function trackDistance(points: TrackPoint[]): number {
-	let total = 0;
-	let prev: TrackPoint | null = null;
-	for (const p of points) {
-		if (p.accuracy !== null && p.accuracy > MAX_ACCURACY_M) continue;
-		if (prev) {
-			const d = haversine(prev.lat, prev.lon, p.lat, p.lon);
-			const secs = (Date.parse(p.t) - Date.parse(prev.t)) / 1000;
-			if (d < MIN_STEP_M) continue; // keep `prev` so jitter can't add up
-			if (secs > 0 && d / secs > MAX_SPEED_MPS) continue;
-			total += d;
-		}
-		prev = p;
-	}
-	return total;
+	return pathLength(cleanTrack(points));
 }
 
 // "1:05:09" from milliseconds.

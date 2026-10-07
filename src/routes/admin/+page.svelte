@@ -3,7 +3,7 @@
     import { resolve } from '$app/paths';
     import { onMount } from 'svelte';
 
-    const KNOWN_ROLES = ['site:admin', 'pickem:admin', 'pizza:admin', 'krillion:admin'];
+    const KNOWN_ROLES = ['site:admin', 'pickem:admin', 'pizza:admin', 'krillion:admin', 'ultra:admin'];
 
     let status = 'loading'; // loading | denied | ready
     let emailsText = '';
