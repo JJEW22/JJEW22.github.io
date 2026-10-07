@@ -475,8 +475,8 @@ export const GAME_TIERS: { points: number; emoji: string; name: string }[] = [
 ];
 
 // Rescored points are continuous, so they're banded into tiers: roughly the
-// midpoints between the game's tier points, with Deep Cut topping out at 90
-// and One in a Krillion running 90-105. Too Clever is
+// midpoints between the game's tier points, with Deep Cut topping out at 95
+// and One in a Krillion running 95-105, so it stays rare. Too Clever is
 // left out -- it's krillion.io's hand-picked "famously obscure" label, not a
 // rarity level, so rescoring can't land on it. Rescored tops reach 125, past
 // anything the game gives, so 105+ gets a tier of its own: 💎.
@@ -485,7 +485,7 @@ export const RESCORED_TIERS: { min: number; emoji: string }[] = [
 	{ min: 20, emoji: '🐟' },
 	{ min: 45, emoji: '🦑' },
 	{ min: 72.5, emoji: '🏮' },
-	{ min: 90, emoji: '🌟' },
+	{ min: 95, emoji: '🌟' },
 	{ min: 105, emoji: '💎' }
 ];
 

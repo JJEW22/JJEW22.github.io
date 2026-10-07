@@ -4,8 +4,11 @@
     import { onMount, onDestroy } from 'svelte';
     
     
-    // Replace with your actual Calendly URL
-    const CALENDLY_URL = 'https://calendly.com/jwilkins-risenorthcapital/30min?hide_landing_page_details=1&hide_gdpr_banner=1';
+    // Booking is paused while Innume Financial's RIA registration goes through.
+    // To turn it back on: set the new Calendly URL here, uncomment it and the
+    // widget script in <svelte:head>, and swap the notice in #schedule back for
+    // the calendly-inline-widget block.
+    // const CALENDLY_URL = 'https://calendly.com/<new-link>/30min?hide_landing_page_details=1&hide_gdpr_banner=1';
     
     function handleCalendlyEvent(e) {
         if (e.data.event === 'calendly.event_scheduled') {
@@ -27,7 +30,7 @@
 <svelte:head>
     <title>John Wilkins - Financial Advisor</title>
     <meta name="description" content="Personalized financial planning, investment management, and insurance solutions.">
-    <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+    <!-- <script src="https://assets.calendly.com/assets/external/widget.js" async></script> -->
 </svelte:head>
 
 <div class="page">
@@ -38,7 +41,7 @@
     <!-- Hero -->
     <header class="hero">
         <div class="hero-content">
-            <p class="hero-eyebrow">Financial Representative · Rise North Capital</p>
+            <p class="hero-eyebrow">Co-Founder, Advisor · Innume Financial</p>
             <h1>John (Jack) Wilkins</h1>
             <p class="hero-tagline">Helping you build a financial plan that works for your life — not the other way around.</p>
             <div class="hero-actions">
@@ -54,7 +57,7 @@
             <h2>About Me</h2>
             <div class="about-content">
                 <p>
-                    I'm a financial representative at Rise North Capital based in Braintree, MA. I work with 
+                    I'm a co-founder and advisor at Innume Financial based in Braintree, MA. I work with 
                     individuals and families to develop personalized strategies for growing and protecting 
                     their wealth. Whether you're just starting to invest, planning for retirement, or 
                     looking to protect your family with the right insurance coverage, I'm here to help 
@@ -187,6 +190,7 @@
         <!-- Schedule -->
         <section id="schedule" class="section schedule-section">
             <h2>Schedule a Consultation</h2>
+            <!--
             <p class="schedule-intro">
                 Ready to get started? Book a free introductory call and we'll talk through your goals. Don't see a time that works for you? You can find my email at the bottom of this page, reach out and I would be happy to find a time that works for you
             </p>
@@ -197,6 +201,17 @@
                      style="min-width:320px;height:700px;">
                 </div>
             </div>
+            -->
+            <div class="calendly-placeholder">
+                <div class="placeholder-content">
+                    <div class="placeholder-icon">📋</div>
+                    <h3>Not taking meetings just yet</h3>
+                    <p>
+                        We're currently in the process of registering our RIA, so we aren't taking meetings
+                        right now. Check back soon to schedule a meeting.
+                    </p>
+                </div>
+            </div>
         </section>
         
         <!-- Contact -->
@@ -204,7 +219,7 @@
             <h2>Get in Touch</h2>
             <p>Have questions before booking? Feel free to reach out directly.</p>
             <div class="contact-methods">
-                <a href="mailto:jack@risenorthcapital.com" class="contact-item">
+                <a href="mailto:john@innumefinancial.com" class="contact-item">
                     <span class="contact-icon">✉️</span>
                     <span>Email me</span>
                 </a>
@@ -213,7 +228,7 @@
     </main>
     
     <footer class="page-footer">
-        <p>Jack Wilkins · Financial Representative · Rise North Capital</p>
+        <p>Jack Wilkins · Co-Founder, Advisor · Innume Financial</p>
     </footer>
 </div>
 

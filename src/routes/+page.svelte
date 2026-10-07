@@ -2,7 +2,7 @@
     import { resolve } from '$app/paths';
     // Update these with your actual information
     let name = "John Wilkins";
-    let roles = ["Financial Representative at Rise North Capital", "PhD Student at Northeastern University"];
+    let roles = ["Co-Founder, Advisor at Innume Financial", "PhD Student at Northeastern University"];
     let tagline = "CS Theory and Finance";
     
     // Social links - update with your actual links
@@ -35,10 +35,10 @@
                     <h3>About <a href={resolve('/me')}>Me</a> (<a href={resolve('/cv')}>CV</a>)</h3>
                     <div class="bio-text">
                             <p>
-                            I am a third-year Computer Science PhD Student at Northeastern University, where I am advised by <a href="https://www.ccs.neu.edu/home/koods/"> Ravi Sundaram </a>. My research interests are in algorithmic fairness theory and its applications to personal finance outcomes.
+                            I am a fourth-year Computer Science PhD Student at Northeastern University, where I am advised by <a href="https://www.ccs.neu.edu/home/koods/"> Ravi Sundaram </a>. My research interests are in algorithmic fairness theory and its applications to personal finance outcomes.
                             </p>
                             <p>
-                            In addition to conducting research I put it into practice as a Financial Representative at <a href="https://www.risenorthcapital.com/">Rise North Capital</a>.
+                            In addition to conducting research I put it into practice as a co-founder and advisor at <a href="https://innumefinancial.com/">Innume Financial</a>.
                             </p>
                     </div>
                 </div>

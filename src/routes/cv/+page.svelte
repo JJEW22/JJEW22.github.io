@@ -41,15 +41,25 @@
     // Experience data
     const experience = [
         {
+            company: "Innume Financial",
+            title: "Co-Founder, Advisor",
+            location: "Braintree, MA",
+            startDate: "October 2026",
+            endDate: "Present",
+            accomplishments: [
+                "Co-founded an independent financial advisory firm, currently registering as a Registered Investment Adviser (RIA)"
+            ]
+        },
+        {
             company: "Rise North Capital",
             title: "Financial Representative",
             location: "Boston, MA",
             startDate: "Spring 2025",
-            endDate: "Present",
+            endDate: "June 2026",
             accomplishments: [
-                "Provide holistic financial planning services to clients including investment management, retirement planning, and insurance solutions",
-                "Develop personalized financial strategies aligned with client goals, risk tolerance, and life stage",
-                "Conduct portfolio reviews and recommend adjustments to optimize long-term outcomes"
+                "Provided holistic financial planning services to clients including investment management, retirement planning, and insurance solutions",
+                "Developed personalized financial strategies aligned with client goals, risk tolerance, and life stage",
+                "Conducted portfolio reviews and recommended adjustments to optimize long-term outcomes"
             ]
         },
         {
