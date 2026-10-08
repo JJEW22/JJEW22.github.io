@@ -378,8 +378,13 @@
 		return { r, start, rows: stopSchedule(rows, start, pace, live, at) };
 	}
 
+	// 24-hour, "06:52": no AM/PM, so the windows stay narrow on a phone.
 	function hm(ms: number): string {
-		return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+		return new Date(ms).toLocaleTimeString(undefined, {
+			hour: '2-digit',
+			minute: '2-digit',
+			hourCycle: 'h23'
+		});
 	}
 
 	// "Sun " in front of a time that falls on a different day from the start.
@@ -395,19 +400,14 @@
 		return `+${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 	}
 
-	// "6:52 – 7:09 AM", "11:40 AM – 12:12 PM", "✓ 6:58 AM", "+0:52 – +1:10".
+	// "06:52–07:09", "Sun 00:26–00:37", "✓ 06:58", "+0:52–+1:10".
 	function windowText(row: ScheduleRow, start: number | null): string {
 		if (row.kind === 'start') return start === null ? 'Start' : hm(row.at ?? start);
 		if (row.kind === 'arrived') return `✓ ${hm(row.at ?? 0)}`;
 		const low = row.low ?? 0;
 		const high = row.high ?? 0;
-		if (start === null) return `${relTime(low)} – ${relTime(high)}`;
-		let a = hm(low);
-		const b = hm(high);
-		// Browsers often put a narrow no-break space (U+202F) before AM/PM.
-		const suffix = /[\s\u202f]?[AaPp]\.?[Mm]\.?$/;
-		if (a.match(suffix)?.[0] === b.match(suffix)?.[0]) a = a.replace(suffix, '');
-		return `${dayPrefix(low, start)}${a} – ${b}`;
+		if (start === null) return `${relTime(low)}–${relTime(high)}`;
+		return `${dayPrefix(low, start)}${hm(low)}–${hm(high)}`;
 	}
 
 	function windowTitle(row: ScheduleRow): string | undefined {
@@ -630,48 +630,50 @@
 
 		{#if ci && tableStops.length}
 			<h2>Aid stations</h2>
-			<table>
-				<thead>
-					<tr>
-						<th class="num stop-no" title="Stop number">#</th>
-						<th>Stop</th>
-						<th class="num">Mile</th>
-						<th class="num">Leg</th>
-						{#each schedules as sc, j (sc.r?.id ?? j)}
-							<th class="num">{schedules.length > 1 && sc.r ? sc.r.name : 'Estimated arrival'}</th>
-						{/each}
-						<th class="num">Directions</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each tableStops as st, i (st.name + st.mile)}
-						<tr class:finish-row={isFinishStop(st, ci)}>
-							<td class="num stop-no">{i}</td>
-							<td>{st.name}</td>
-							<td class="num">{st.mile.toFixed(1)}</td>
-							<td class="num leg"
-								>{i === 0 ? '—' : (st.mile - tableStops[i - 1].mile).toFixed(1)}</td
-							>
+			<!-- Scrolls sideways on a narrow phone rather than spilling off the page. -->
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th class="num stop-no" title="Stop number">#</th>
+							<th>Stop</th>
+							<th class="num">Mile</th>
+							<th class="num">Leg</th>
 							{#each schedules as sc, j (sc.r?.id ?? j)}
-								{@const row = sc.rows[i]}
-								<td
-									class="num window"
-									class:arrived={row?.kind === 'arrived'}
-									class:late={row?.late}
-									title={row ? windowTitle(row) : undefined}
-									>{row ? windowText(row, sc.start) : '—'}</td
-								>
+								<th class="num">{schedules.length > 1 && sc.r ? sc.r.name : 'Est. Arrival'}</th>
 							{/each}
-							<td class="num">
-								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
-								<a href={directionsUrl(st.lat, st.lon)} target="_blank" rel="noopener"
-									>Google Maps ↗</a
-								>
-							</td>
+							<th class="num" title="Directions in Google Maps">Map</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{#each tableStops as st, i (st.name + st.mile)}
+							<tr class:finish-row={isFinishStop(st, ci)}>
+								<td class="num stop-no">{i}</td>
+								<!-- Names like "Roche Bros/McDonald's/Dunkin'" may break after a slash on a phone. -->
+								<td class="stop-name">{st.name.replace(/\//g, '/\u200b')}</td>
+								<td class="num">{st.mile.toFixed(1)}</td>
+								<td class="num leg"
+									>{i === 0 ? '—' : (st.mile - tableStops[i - 1].mile).toFixed(1)}</td
+								>
+								{#each schedules as sc, j (sc.r?.id ?? j)}
+									{@const row = sc.rows[i]}
+									<td
+										class="num window"
+										class:arrived={row?.kind === 'arrived'}
+										class:late={row?.late}
+										title={row ? windowTitle(row) : undefined}
+										>{row ? windowText(row, sc.start) : '—'}</td
+									>
+								{/each}
+								<td class="num">
+									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
+									<a href={directionsUrl(st.lat, st.lon)} target="_blank" rel="noopener">Google</a>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
 			<p class="sub">
 				Arrival windows: the previous stop's late time plus this leg at {track?.race
 					.paceRangeMinPerMile[0] ?? 9}:00/mi (early) to {track?.race.paceRangeMinPerMile[1] ??
@@ -950,6 +952,11 @@
 		color: #b9770e;
 	}
 
+	.table-wrap {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
 	.stop-no {
 		width: 2rem;
 		color: #888;
@@ -1045,11 +1052,11 @@
 
 	@media (max-width: 768px) {
 		.container {
-			padding: 1rem;
+			padding: 0.6rem;
 		}
 
 		main {
-			padding: 1.25rem;
+			padding: 1rem 0.85rem;
 		}
 
 		.stats {
@@ -1058,6 +1065,24 @@
 
 		.map {
 			height: 420px;
+		}
+
+		th,
+		td {
+			padding: 0.4rem 0.35rem;
+		}
+
+		table {
+			font-size: 0.82rem;
+		}
+
+		th {
+			font-size: 0.68rem;
+			letter-spacing: 0.02em;
+		}
+
+		.stop-no {
+			width: 1.4rem;
 		}
 	}
 </style>
