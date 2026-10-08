@@ -1,16 +1,21 @@
 // src/routes/ultra/api/admin/+server.ts
-// The ultra tracker's admin: the public display mode, and every phone that has
-// sent points -- name, colour, and whether it's shown. ultra:admin (or
-// site:admin) only.
+// The ultra tracker's admin: the public display mode, the race clock, the
+// battery setting, and every phone that has sent points -- name, colour, and
+// whether it's shown. ultra:admin (or site:admin) only.
 import { json } from '@sveltejs/kit';
-import { RACE, raceWindow } from '$lib/ultra';
+import { RACE } from '$lib/ultra';
 import { hasRole } from '$lib/server/roles';
 import {
 	ULTRA_ADMIN_ROLE,
 	UltraError,
+	endRaceNow,
 	getSettings,
 	listDevices,
+	raceWindowFrom,
 	setMode,
+	setRaceTimes,
+	setShowBattery,
+	startRaceNow,
 	updateDevice,
 	type DisplayMode
 } from '$lib/server/ultra';
@@ -29,16 +34,21 @@ function gate(locals: App.Locals): Response | null {
 }
 
 async function state() {
-	const w = raceWindow();
+	const settings = await getSettings();
+	const w = raceWindowFrom(settings);
 	return {
 		ok: true,
-		settings: await getSettings(),
+		settings,
 		devices: await listDevices(),
 		race: {
 			name: RACE.name,
 			start: w?.start.toISOString() ?? null,
-			end: w?.end.toISOString() ?? null
-		}
+			end: w?.end.toISOString() ?? null,
+			ended: w?.ended ?? false,
+			startSource: w?.source ?? null,
+			cutoffHours: RACE.cutoffHours
+		},
+		now: new Date().toISOString()
 	};
 }
 
@@ -49,6 +59,9 @@ export const GET: RequestHandler = async ({ locals }) => {
 };
 
 // Body: { mode: 'off' | 'race' | 'live' }
+//    or { showBattery: boolean }
+//    or { startRace: true } / { endRace: true }           -- the clock, set to now
+//    or { raceStart?: ISO | null, raceEnd?: ISO | null }  -- the clock, set by hand
 //    or { deviceId, name?, color?, shown? }
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const denied = gate(locals);
@@ -61,6 +74,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				return json({ ok: false, error: 'Unknown mode.' }, { status: 400 });
 			}
 			await setMode(body.mode as DisplayMode);
+		} else if (typeof body.showBattery === 'boolean') {
+			await setShowBattery(body.showBattery);
+		} else if (body.startRace === true) {
+			await startRaceNow();
+		} else if (body.endRace === true) {
+			await endRaceNow();
+		} else if (body.raceStart !== undefined || body.raceEnd !== undefined) {
+			await setRaceTimes(body);
 		} else if (typeof body.deviceId === 'string') {
 			await updateDevice(body.deviceId, body);
 		} else {

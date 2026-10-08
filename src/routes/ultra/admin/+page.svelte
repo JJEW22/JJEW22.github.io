@@ -29,6 +29,21 @@
 	interface Row extends Device {
 		nameDraft: string;
 	}
+	interface Race {
+		name: string;
+		start: string | null;
+		end: string | null;
+		ended: boolean;
+		startSource: 'admin' | 'config' | null;
+		cutoffHours: number;
+	}
+	interface Settings {
+		mode: Mode;
+		liveSince: string | null;
+		showBattery: boolean;
+		raceStart: string | null;
+		raceEnd: string | null;
+	}
 
 	let status: 'loading' | 'denied' | 'ready' = 'loading';
 	let error = '';
@@ -36,7 +51,13 @@
 	let busy = false;
 	let mode: Mode = 'race';
 	let liveSince: string | null = null;
-	let race: { name: string; start: string | null; end: string | null } | null = null;
+	let race: Race | null = null;
+	let showBattery = true;
+	// The clock fields, as <input type="datetime-local"> values in the admin's
+	// own time zone. Refreshes leave them alone while they're being edited.
+	let startDraft = '';
+	let endDraft = '';
+	let editingClock = false;
 	let devices: Row[] = [];
 	let now = Date.now();
 
@@ -46,21 +67,22 @@
 		const poll = setInterval(() => {
 			if (document.visibilityState === 'visible' && !busy) load(true);
 		}, 20_000);
-		const tick = setInterval(() => (now = Date.now()), 15_000);
+		const tick = setInterval(() => (now = Date.now()), 1000);
 		return () => {
 			clearInterval(poll);
 			clearInterval(tick);
 		};
 	});
 
-	function apply(data: {
-		settings: { mode: Mode; liveSince: string | null };
-		devices: Device[];
-		race: { name: string; start: string | null; end: string | null };
-	}) {
+	function apply(data: { settings: Settings; devices: Device[]; race: Race }) {
 		mode = data.settings.mode;
 		liveSince = data.settings.liveSince;
+		showBattery = data.settings.showBattery;
 		race = data.race;
+		if (!editingClock) {
+			startDraft = toLocalInput(data.race.start);
+			endDraft = data.race.ended ? toLocalInput(data.race.end) : '';
+		}
 		// Keep a half-typed name across background refreshes.
 		const drafts = new Map(devices.map((d) => [d.deviceId, d.nameDraft]));
 		devices = data.devices.map((d) => ({
@@ -119,6 +141,57 @@
 		);
 	}
 
+	// ISO <-> the "YYYY-MM-DDTHH:mm" a datetime-local input wants, in local time.
+	function toLocalInput(iso: string | null): string {
+		if (!iso) return '';
+		const d = new Date(iso);
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	}
+
+	function fromLocalInput(v: string): string | null {
+		if (!v) return null;
+		const d = new Date(v); // parsed as local time
+		return Number.isNaN(d.getTime()) ? null : d.toISOString();
+	}
+
+	async function clockPost(body: Record<string, unknown>, done: string) {
+		await post(body, done);
+		editingClock = false;
+		startDraft = toLocalInput(race?.start ?? null);
+		endDraft = race?.ended ? toLocalInput(race.end) : '';
+	}
+
+	function startNow() {
+		const again = race?.start && race.startSource === 'admin';
+		if (
+			!confirm(
+				again
+					? 'Restart the race clock from now? The current start time is replaced.'
+					: 'Start the race now? The public page switches to the race window.'
+			)
+		)
+			return;
+		clockPost({ startRace: true }, 'Race started — the clock is running.');
+	}
+
+	function endNow() {
+		if (!confirm('End the race now? Elapsed time stops at this moment.')) return;
+		clockPost({ endRace: true }, 'Race ended.');
+	}
+
+	function saveStart() {
+		const iso = fromLocalInput(startDraft);
+		if (!iso) return;
+		clockPost({ raceStart: iso }, 'Start time saved.');
+	}
+
+	function saveEnd() {
+		const iso = fromLocalInput(endDraft);
+		if (!iso) return;
+		clockPost({ raceEnd: iso }, 'End time saved.');
+	}
+
 	function label(d: Device): string {
 		return d.name || d.deviceId || '(no Device ID)';
 	}
@@ -143,6 +216,20 @@
 	}
 
 	$: shownCount = devices.filter((d) => d.shown).length;
+	$: clockState = !race?.start
+		? 'unset'
+		: now < Date.parse(race.start)
+			? 'upcoming'
+			: race.end && now > Date.parse(race.end)
+				? 'finished'
+				: 'running';
+
+	function hms(ms: number): string {
+		const t = Math.max(0, Math.floor(ms / 1000));
+		const h = Math.floor(t / 3600);
+		const m = Math.floor((t % 3600) / 60);
+		return `${h}:${String(m).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+	}
 </script>
 
 <svelte:head>
@@ -219,6 +306,119 @@
 						should appear.
 					</p>
 				{/if}
+			</section>
+
+			<section>
+				<h2>Race clock</h2>
+				<p class="clock-state {clockState}">
+					{#if clockState === 'unset'}
+						Not started — no start time set.
+					{:else if clockState === 'upcoming' && race?.start}
+						Starts {clock(race.start)} (in {hms(Date.parse(race.start) - now)}){race.startSource ===
+						'config'
+							? ' — from RACE in the code'
+							: ''}.
+					{:else if clockState === 'running' && race?.start}
+						<b>Running · {hms(now - Date.parse(race.start))}</b> since {clock(race.start)}.
+						{#if race.end && !race.ended}Window closes {clock(race.end)} (start + {race.cutoffHours}h).{/if}
+					{:else if race?.start && race.end}
+						<b>Finished · {hms(Date.parse(race.end) - Date.parse(race.start))}</b> ({clock(
+							race.start
+						)}
+						→ {clock(race.end)}).
+					{/if}
+				</p>
+				<div class="clock-actions">
+					<button type="button" class="go" disabled={busy} on:click={startNow}
+						>{race?.start && race.startSource === 'admin'
+							? 'Restart from now'
+							: 'Start the race now'}</button
+					>
+					<button
+						type="button"
+						class="stop"
+						disabled={busy || clockState !== 'running'}
+						on:click={endNow}>End the race now</button
+					>
+				</div>
+				<div class="clock-fields">
+					<label>
+						<span>Start</span>
+						<input
+							type="datetime-local"
+							bind:value={startDraft}
+							on:input={() => (editingClock = true)}
+							disabled={busy}
+						/>
+						<button
+							type="button"
+							class="mini"
+							disabled={busy || !startDraft || startDraft === toLocalInput(race?.start ?? null)}
+							on:click={saveStart}>Save</button
+						>
+						{#if race?.startSource === 'admin'}
+							<button
+								type="button"
+								class="mini"
+								disabled={busy}
+								on:click={() =>
+									clockPost({ raceStart: null, raceEnd: null }, 'Race clock cleared.')}
+								>Clear</button
+							>
+						{/if}
+					</label>
+					<label>
+						<span>End</span>
+						<input
+							type="datetime-local"
+							bind:value={endDraft}
+							on:input={() => (editingClock = true)}
+							disabled={busy || !race?.start}
+						/>
+						<button
+							type="button"
+							class="mini"
+							disabled={busy || !endDraft || (race?.ended && endDraft === toLocalInput(race.end))}
+							on:click={saveEnd}>Save</button
+						>
+						{#if race?.ended}
+							<button
+								type="button"
+								class="mini"
+								disabled={busy}
+								on:click={() =>
+									clockPost({ raceEnd: null }, 'End cleared — the race is running again.')}
+								>Clear</button
+							>
+						{/if}
+					</label>
+				</div>
+				<p class="sub">
+					Times are in your time zone. Starting the race also switches the public display to
+					<b>Race window</b>. With no end set, the window closes {race?.cutoffHours ?? 30} hours after
+					the start.
+				</p>
+			</section>
+
+			<section>
+				<h2>Shown to followers</h2>
+				<label class="toggle">
+					<input
+						type="checkbox"
+						checked={showBattery}
+						disabled={busy}
+						on:change={(e) =>
+							post(
+								{ showBattery: e.currentTarget.checked },
+								e.currentTarget.checked ? 'Battery % shown.' : 'Battery % hidden.'
+							)}
+					/>
+					<span>Phone battery % on the public page</span>
+				</label>
+				<p class="sub">
+					When off, the battery isn't sent to the public page at all. You still see it here and in
+					the preview.
+				</p>
 			</section>
 
 			<section>
@@ -393,6 +593,93 @@
 	.modes button:disabled {
 		cursor: default;
 		opacity: 0.7;
+	}
+
+	.clock-state {
+		margin: 0 0 0.75rem 0;
+		padding: 0.65rem 0.9rem;
+		border-radius: 8px;
+		background: #f3f4f6;
+		color: #444;
+	}
+
+	.clock-state.running {
+		background: #fdeeee;
+		color: #8c2a1c;
+	}
+
+	.clock-state.finished {
+		background: #eaf7ee;
+		color: #1e6b36;
+	}
+
+	.clock-state.upcoming {
+		background: #eef4fb;
+		color: #1d4f7a;
+	}
+
+	.clock-actions {
+		display: flex;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		margin-bottom: 0.9rem;
+	}
+
+	.clock-actions button {
+		padding: 0.55rem 1.1rem;
+		border: 0;
+		border-radius: 8px;
+		font: inherit;
+		font-weight: 600;
+		color: #fff;
+		cursor: pointer;
+	}
+
+	.clock-actions .go {
+		background: #27ae60;
+	}
+
+	.clock-actions .stop {
+		background: #c0392b;
+	}
+
+	.clock-actions button:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+
+	.clock-fields {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.clock-fields label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	.clock-fields label span {
+		width: 3rem;
+		font-size: 0.9rem;
+		color: #555;
+	}
+
+	.clock-fields input {
+		padding: 0.35rem 0.5rem;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.9rem;
+	}
+
+	.toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		cursor: pointer;
 	}
 
 	.banner.warn {

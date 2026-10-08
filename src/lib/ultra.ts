@@ -5,6 +5,10 @@
 export interface AidStation {
 	name: string;
 	mile: number; // race distance at the station
+	// Exact spot, if you have it. Without one, the station is placed on the
+	// course GPX at `mile`.
+	lat?: number;
+	lon?: number;
 }
 
 export interface RaceConfig {
@@ -18,6 +22,10 @@ export interface RaceConfig {
 	// A GPX of the course in static/, drawn under the live track. Optional.
 	courseGpx: string | null;
 	aidStations: AidStation[];
+	// A shared Google My Maps link of the course (import the GPX at
+	// mymaps.google.com, share "anyone with the link"). Shows an "Open in
+	// Google Maps" button; null hides it.
+	googleMapsUrl: string | null;
 	// Free-text note shown under the title (race website, bib number, ...).
 	note: string;
 }
@@ -28,12 +36,15 @@ export const RACE: RaceConfig = {
 	name: 'The entire Charles River',
 	start: null, // set the start time to open the race window
 	cutoffHours: 30,
-	distanceMiles: 78.9,
+	distanceMiles: 78.2,
 	location: 'Hopkinton to Boston, MA',
-	// Strava route "entire Charles river (kinda)": Echo Lake to the Charles
-	// River Dam, 78.9 mi, ~880 m of climbing.
+	// Strava route "entire Charles river (kinda)", shortened past Volunteer
+	// stop #1: Echo Lake to Night Shift Brewing, 78.2 mi. Its 15 waypoints
+	// (start, 13 stops, finish) are the aid stations; the page measures their
+	// miles from the track itself.
 	courseGpx: '/ultra/charles-river.gpx',
 	aidStations: [],
+	googleMapsUrl: null,
 	note: ''
 };
 
@@ -138,6 +149,25 @@ export function cleanTrack(points: TrackPoint[]): TrackPoint[] {
 	return kept;
 }
 
+// Where the phone is now, and when it last reported: the newest fix that's
+// usable (not Null Island, decent accuracy) and plausible from the last kept
+// point. Standing still, the cleaned track stops growing -- wobble isn't
+// distance -- but the phone is still reporting, and followers should see that
+// rather than "no update for an hour". Falls back to the last kept point.
+export function latestFix(points: TrackPoint[], clean: TrackPoint[]): TrackPoint | null {
+	const anchor = clean[clean.length - 1];
+	if (!anchor) return null;
+	const since = Date.parse(anchor.t);
+	for (let i = points.length - 1; i >= 0; i--) {
+		const p = points[i];
+		if (Date.parse(p.t) <= since) break;
+		if (isNullIsland(p.lat, p.lon)) continue;
+		if (p.accuracy !== null && p.accuracy > MAX_ACCURACY_M) continue;
+		if (plausible(anchor, p)) return p;
+	}
+	return anchor;
+}
+
 // Metres along a cleaned track.
 export function pathLength(points: TrackPoint[]): number {
 	let total = 0;
@@ -167,4 +197,203 @@ export function formatPace(msPerMile: number | null): string {
 	if (!msPerMile || !Number.isFinite(msPerMile)) return '—';
 	const s = Math.round(msPerMile / 1000);
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} /mi`;
+}
+
+// ---- the course ----
+
+export interface CourseWaypoint {
+	name: string;
+	lat: number;
+	lon: number;
+}
+
+// The track (trkpt / rtept, in order) and any named waypoints (wpt) in a GPX.
+export function parseGpx(text: string): { track: [number, number][]; waypoints: CourseWaypoint[] } {
+	const doc = new DOMParser().parseFromString(text, 'application/xml');
+	const pt = (el: Element): [number, number] => [
+		Number(el.getAttribute('lat')),
+		Number(el.getAttribute('lon'))
+	];
+	const ok = ([a, b]: [number, number]) => Number.isFinite(a) && Number.isFinite(b);
+	const track = [...doc.querySelectorAll('trkpt, rtept')].map(pt).filter(ok);
+	const waypoints = [...doc.querySelectorAll('wpt')]
+		.map((el) => {
+			const [lat, lon] = pt(el);
+			return { name: el.querySelector('name')?.textContent?.trim() || 'Waypoint', lat, lon };
+		})
+		.filter((w) => ok([w.lat, w.lon]));
+	return { track, waypoints };
+}
+
+// Cumulative miles at each track point.
+export function courseMiles(track: [number, number][]): number[] {
+	const out = [0];
+	for (let i = 1; i < track.length; i++) {
+		const [a, b] = [track[i - 1], track[i]];
+		out.push(out[i - 1] + haversine(a[0], a[1], b[0], b[1]) / METERS_PER_MILE);
+	}
+	return out;
+}
+
+// The point `mile` miles along the course, interpolated between track points.
+// Clamped to the start and finish.
+export function pointAtMile(
+	track: [number, number][],
+	miles: number[],
+	mile: number
+): [number, number] | null {
+	if (!track.length) return null;
+	if (mile <= 0) return track[0];
+	const total = miles[miles.length - 1];
+	if (mile >= total) return track[track.length - 1];
+	let i = 1;
+	while (miles[i] < mile) i++;
+	const f = (mile - miles[i - 1]) / (miles[i] - miles[i - 1] || 1);
+	const [a, b] = [track[i - 1], track[i]];
+	return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+}
+
+export interface PlacedStation extends AidStation {
+	lat: number;
+	lon: number;
+}
+
+// Every aid station with a position: its own lat/lon, or its mile on the course.
+export function placeStations(stations: AidStation[], track: [number, number][]): PlacedStation[] {
+	const miles = courseMiles(track);
+	const out: PlacedStation[] = [];
+	for (const s of stations) {
+		if (s.lat !== undefined && s.lon !== undefined) {
+			out.push({ ...s, lat: s.lat, lon: s.lon });
+			continue;
+		}
+		const at = pointAtMile(track, miles, s.mile);
+		if (at) out.push({ ...s, lat: at[0], lon: at[1] });
+	}
+	return out;
+}
+
+const xmlEscape = (t: string) =>
+	t.replace(
+		/[<>&'"]/g,
+		(c) => `&${{ '<': 'lt', '>': 'gt', '&': 'amp', "'": 'apos', '"': 'quot' }[c]};`
+	);
+
+// A GPX of the course with the aid stations as waypoints -- what Google My
+// Maps, Gaia, Strava and the rest import.
+export function buildGpx(
+	name: string,
+	track: [number, number][],
+	stations: { name: string; lat: number; lon: number; mile?: number }[]
+): string {
+	const wpts = stations
+		.map(
+			(s) =>
+				`  <wpt lat="${s.lat.toFixed(6)}" lon="${s.lon.toFixed(6)}"><name>${xmlEscape(s.name)}</name>` +
+				(s.mile !== undefined ? `<desc>Mile ${s.mile}</desc>` : '') +
+				'</wpt>'
+		)
+		.join('\n');
+	const pts = track
+		.map(([lat, lon]) => `      <trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}"></trkpt>`)
+		.join('\n');
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="johnjackwilkins.com/ultra" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><name>${xmlEscape(name)}</name></metadata>
+${wpts}
+  <trk>
+    <name>${xmlEscape(name)}</name>
+    <trkseg>
+${pts}
+    </trkseg>
+  </trk>
+</gpx>
+`;
+}
+
+// ---- progress along the course ----
+
+// Further than this from the route and a fix doesn't count as on the course
+// (a detour, a car to the start, testing at home).
+export const ON_COURSE_M = 250;
+
+export interface CourseIndex {
+	track: [number, number][];
+	miles: number[]; // cumulative, per track point
+	total: number;
+}
+
+export function indexCourse(track: [number, number][]): CourseIndex {
+	const miles = courseMiles(track);
+	return { track, miles, total: miles[miles.length - 1] ?? 0 };
+}
+
+// The nearest point on the course to (lat, lon), searching only the segments
+// that start between `fromMile` and `toMile`. Returns its course mile and how
+// far off the route the point is. Flat-earth maths per segment: exact enough
+// over the few hundred metres that matter.
+export function projectOnCourse(
+	ci: CourseIndex,
+	lat: number,
+	lon: number,
+	fromMile = 0,
+	toMile = Infinity
+): { mile: number; offMeters: number } {
+	const R = 6_371_000;
+	const rad = Math.PI / 180;
+	const kx = Math.cos(lat * rad) * R * rad; // metres per degree of longitude here
+	const ky = R * rad;
+	let best = { mile: 0, offMeters: Infinity };
+	const { track, miles } = ci;
+	for (let i = 1; i < track.length; i++) {
+		if (miles[i] < fromMile) continue;
+		if (miles[i - 1] > toMile) break;
+		const [a, b] = [track[i - 1], track[i]];
+		const ax = (a[1] - lon) * kx;
+		const ay = (a[0] - lat) * ky;
+		const bx = (b[1] - lon) * kx;
+		const by = (b[0] - lat) * ky;
+		const dx = bx - ax;
+		const dy = by - ay;
+		const len2 = dx * dx + dy * dy;
+		const t = len2 > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+		const off = Math.hypot(ax + t * dx, ay + t * dy);
+		if (off < best.offMeters) {
+			best = { mile: miles[i - 1] + t * (miles[i] - miles[i - 1]), offMeters: off };
+		}
+	}
+	return best;
+}
+
+// How far along the course a runner has got, from their track in order.
+//
+// Progress only moves forward and only looks a little ahead of where it was,
+// so a route that passes near itself (or a GPS wobble) can't jump them miles
+// on. A fix off the route keeps the last on-course mile; if the narrow look
+// ahead finds nothing (a signal gap), the rest of the course is searched.
+export function courseProgress(
+	ci: CourseIndex,
+	path: [number, number][]
+): { mile: number; offMeters: number; onCourse: boolean } {
+	let mile = 0;
+	let found = false;
+	let lastOff = Infinity;
+	for (const [lat, lon] of path) {
+		let r = projectOnCourse(ci, lat, lon, found ? mile - 0.25 : 0, found ? mile + 2 : Infinity);
+		if (r.offMeters > ON_COURSE_M && found) {
+			const wide = projectOnCourse(ci, lat, lon, mile - 0.25, Infinity);
+			if (wide.offMeters <= ON_COURSE_M) r = wide;
+		}
+		if (r.offMeters <= ON_COURSE_M) {
+			mile = found ? Math.max(mile, r.mile) : r.mile;
+			found = true;
+		}
+		lastOff = r.offMeters;
+	}
+	return { mile, offMeters: lastOff, onCourse: found };
+}
+
+// Google Maps directions from wherever the viewer is to a point.
+export function directionsUrl(lat: number, lon: number): string {
+	return `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(6)},${lon.toFixed(6)}`;
 }

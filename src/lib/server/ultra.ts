@@ -7,13 +7,15 @@ import { sql } from '$lib/server/db';
 import {
 	METERS_PER_MILE,
 	RACE,
-	raceStatus,
-	raceWindow,
 	cleanTrack,
 	isNullIsland,
+	latestFix,
 	pathLength,
+	type AidStation,
 	type RaceStatus
 } from '$lib/ultra';
+
+export class UltraError extends Error {}
 
 export const ULTRA_ADMIN_ROLE = 'ultra:admin';
 
@@ -98,13 +100,133 @@ export type DisplayMode = 'off' | 'race' | 'live';
 export interface UltraSettings {
 	mode: DisplayMode;
 	liveSince: string | null;
+	showBattery: boolean; // phone battery % on the public page
+	// The race clock set on the admin page. Null start falls back to RACE.start;
+	// null end means start + RACE.cutoffHours.
+	raceStart: string | null;
+	raceEnd: string | null;
 }
 
 export async function getSettings(): Promise<UltraSettings> {
-	const [row] = await sql<{ mode: DisplayMode; live_since: Date | null }[]>`
-		select mode, live_since from ultra_settings where id = 1
+	const [row] = await sql<
+		{
+			mode: DisplayMode;
+			live_since: Date | null;
+			show_battery: boolean;
+			race_start: Date | null;
+			race_end: Date | null;
+		}[]
+	>`
+		select mode, live_since, show_battery, race_start, race_end from ultra_settings where id = 1
 	`;
-	return { mode: row?.mode ?? 'race', liveSince: row?.live_since?.toISOString() ?? null };
+	return {
+		mode: row?.mode ?? 'race',
+		liveSince: row?.live_since?.toISOString() ?? null,
+		showBattery: row?.show_battery ?? true,
+		raceStart: row?.race_start?.toISOString() ?? null,
+		raceEnd: row?.race_end?.toISOString() ?? null
+	};
+}
+
+// ---- the race clock ----
+
+export interface RaceWindow {
+	start: Date;
+	end: Date;
+	ended: boolean; // an end time was set (the race is over at `end`)
+	source: 'admin' | 'config'; // where the start came from
+}
+
+// The race window: the admin's start (or RACE.start), to the admin's end (or
+// start + cutoff).
+export function raceWindowFrom(settings: UltraSettings): RaceWindow | null {
+	const startIso = settings.raceStart ?? RACE.start;
+	if (!startIso) return null;
+	const start = new Date(startIso);
+	if (Number.isNaN(start.getTime())) return null;
+	const end = settings.raceEnd
+		? new Date(settings.raceEnd)
+		: new Date(start.getTime() + RACE.cutoffHours * 3_600_000);
+	return { start, end, ended: !!settings.raceEnd, source: settings.raceStart ? 'admin' : 'config' };
+}
+
+export function windowStatus(w: RaceWindow | null, now: Date): RaceStatus {
+	if (!w) return 'unscheduled';
+	if (now < w.start) return 'upcoming';
+	if (now > w.end) return 'finished';
+	return 'live';
+}
+
+const toDate = (v: unknown): Date | null => {
+	if (v === null) return null;
+	if (typeof v !== 'string') throw new UltraError('Expected an ISO time.');
+	const d = new Date(v);
+	if (Number.isNaN(d.getTime())) throw new UltraError("That isn't a valid time.");
+	return d;
+};
+
+// "Start the race now" (by the app's clock, like the status checks): the clock starts, any old end is cleared, and the
+// public page switches to the race window so followers see it straight away.
+export async function startRaceNow(): Promise<UltraSettings> {
+	await sql`
+		insert into ultra_settings (id, mode, race_start, race_end, updated_at)
+		values (1, 'race', ${new Date()}, null, now())
+		on conflict (id) do update set
+			mode = 'race', race_start = excluded.race_start, race_end = null, updated_at = now()
+	`;
+	return getSettings();
+}
+
+export async function endRaceNow(): Promise<UltraSettings> {
+	const s = await getSettings();
+	const w = raceWindowFrom(s);
+	if (!w) throw new UltraError('The race has no start time yet.');
+	if (new Date() <= w.start) throw new UltraError("The race hasn't started yet.");
+	// The app's clock, not the database's: the two can disagree by a few
+	// seconds, and the race has to read as over the moment it's ended.
+	await sql`update ultra_settings set race_end = ${new Date()}, updated_at = now() where id = 1`;
+	return getSettings();
+}
+
+// Set either end of the clock to any time (null clears it). The end has to
+// come after the start.
+export async function setRaceTimes(patch: {
+	raceStart?: unknown;
+	raceEnd?: unknown;
+}): Promise<UltraSettings> {
+	const cur = await getSettings();
+	const start =
+		patch.raceStart !== undefined
+			? toDate(patch.raceStart)
+			: cur.raceStart
+				? new Date(cur.raceStart)
+				: null;
+	const end =
+		patch.raceEnd !== undefined
+			? toDate(patch.raceEnd)
+			: cur.raceEnd
+				? new Date(cur.raceEnd)
+				: null;
+	const effectiveStart = start ?? (RACE.start ? new Date(RACE.start) : null);
+	if (end && !effectiveStart) throw new UltraError('Set a start time before an end time.');
+	if (end && effectiveStart && end <= effectiveStart) {
+		throw new UltraError('The end has to be after the start.');
+	}
+	await sql`
+		insert into ultra_settings (id, race_start, race_end, updated_at)
+		values (1, ${start}, ${end}, now())
+		on conflict (id) do update set
+			race_start = excluded.race_start, race_end = excluded.race_end, updated_at = now()
+	`;
+	return getSettings();
+}
+
+export async function setShowBattery(show: boolean): Promise<UltraSettings> {
+	await sql`
+		insert into ultra_settings (id, show_battery, updated_at) values (1, ${show}, now())
+		on conflict (id) do update set show_battery = excluded.show_battery, updated_at = now()
+	`;
+	return getSettings();
 }
 
 // Switching to live starts the clock: only points from now on are shown.
@@ -188,8 +310,6 @@ export async function listDevices(): Promise<AdminDevice[]> {
 	}));
 }
 
-export class UltraError extends Error {}
-
 export async function updateDevice(
 	deviceId: string,
 	patch: { name?: unknown; color?: unknown; shown?: unknown }
@@ -231,12 +351,17 @@ export interface Runner {
 	distanceMiles: number;
 	elapsedMs: number | null;
 	paceMsPerMile: number | null;
+	// When this runner's clock started: the race start, when live was switched
+	// on, or (in the preview) their first fix. The page measures course pace
+	// from it.
+	startedAt: string | null;
 }
 
 export interface TrackResponse {
 	status: TrackStatus;
 	mode: DisplayMode;
 	liveSince: string | null;
+	showBattery: boolean;
 	race: {
 		name: string;
 		start: string | null;
@@ -245,7 +370,8 @@ export interface TrackResponse {
 		location: string;
 		note: string;
 		courseGpx: string | null;
-		aidStations: { name: string; mile: number }[];
+		aidStations: AidStation[];
+		googleMapsUrl: string | null;
 	};
 	runners: Runner[];
 	serverTime: string;
@@ -267,7 +393,7 @@ function displayName(d: { device_id: string; name: string | null }): string {
 export async function loadTrack(preview = false): Promise<TrackResponse> {
 	const now = new Date();
 	const settings = await getSettings();
-	const w = raceWindow();
+	const w = raceWindowFrom(settings);
 	const race = {
 		name: RACE.name,
 		start: w?.start.toISOString() ?? null,
@@ -276,7 +402,8 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 		location: RACE.location,
 		note: RACE.note,
 		courseGpx: RACE.courseGpx,
-		aidStations: RACE.aidStations
+		aidStations: RACE.aidStations,
+		googleMapsUrl: RACE.googleMapsUrl
 	};
 
 	let status: TrackStatus;
@@ -291,7 +418,7 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 		status = 'live';
 		from = settings.liveSince ? new Date(settings.liveSince) : now;
 	} else {
-		status = raceStatus(RACE, now);
+		status = windowStatus(w, now);
 		if (w && (status === 'live' || status === 'finished')) {
 			from = w.start;
 			to = status === 'live' ? now : w.end;
@@ -302,6 +429,7 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 		status,
 		mode: settings.mode,
 		liveSince: settings.liveSince,
+		showBattery: settings.showBattery,
 		race,
 		runners: [],
 		serverTime: now.toISOString()
@@ -334,19 +462,19 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 	const clockStart = preview ? null : from.getTime();
 
 	for (const d of devices) {
-		// The map line, the distance and "where are they" all come from the same
-		// cleaned points, so a bad fix can't draw a spike or add miles.
-		const clean = cleanTrack(
-			rows
-				.filter((r) => r.device_id === d.deviceId)
-				.map((r) => ({
-					t: r.t.toISOString(),
-					lat: r.lat,
-					lon: r.lon,
-					accuracy: r.accuracy,
-					battery: r.battery
-				}))
-		);
+		// The map line and the distance come from the cleaned points, so a bad fix
+		// can't draw a spike or add miles. "Where are they now" is the newest
+		// usable fix, which keeps updating while they stand still.
+		const raw = rows
+			.filter((r) => r.device_id === d.deviceId)
+			.map((r) => ({
+				t: r.t.toISOString(),
+				lat: r.lat,
+				lon: r.lon,
+				accuracy: r.accuracy,
+				battery: r.battery
+			}));
+		const clean = cleanTrack(raw);
 		const runner: Runner = {
 			id: d.deviceId,
 			name: displayName({ device_id: d.deviceId, name: d.name }),
@@ -355,18 +483,32 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 			latest: null,
 			distanceMiles: 0,
 			elapsedMs: status === 'live' && clockStart !== null ? now.getTime() - clockStart : null,
+			startedAt: clockStart !== null ? new Date(clockStart).toISOString() : null,
 			paceMsPerMile: null
 		};
 		if (clean.length) {
-			const last = clean[clean.length - 1];
+			const last = latestFix(raw, clean) ?? clean[clean.length - 1];
 			const startMs = clockStart ?? Date.parse(clean[0].t);
-			// Elapsed runs to now while live; otherwise to the last fix.
-			const endMs = status === 'live' ? now.getTime() : Date.parse(last.t);
+			// Elapsed runs to now while live. Once the race is ended by the admin,
+			// it's the official time, end minus start; otherwise, the last fix.
+			const endMs =
+				status === 'live'
+					? now.getTime()
+					: status === 'finished' && w?.ended
+						? w.end.getTime()
+						: Date.parse(last.t);
 			const miles = pathLength(clean) / METERS_PER_MILE;
 			const step = Math.ceil(clean.length / MAX_PATH_POINTS);
 			for (let i = 0; i < clean.length; i += step) runner.path.push([clean[i].lat, clean[i].lon]);
-			if ((clean.length - 1) % step !== 0) runner.path.push([last.lat, last.lon]);
-			runner.latest = { t: last.t, lat: last.lat, lon: last.lon, battery: last.battery ?? null };
+			const lastKept = clean[clean.length - 1];
+			if ((clean.length - 1) % step !== 0) runner.path.push([lastKept.lat, lastKept.lon]);
+			// The line ends where the phone is now, so the marker sits on it.
+			if (last !== lastKept) runner.path.push([last.lat, last.lon]);
+			// The battery stays off the public payload when the admin has hidden
+			// it -- not just off the page. The admin's own preview still sees it.
+			const battery = settings.showBattery || preview ? (last.battery ?? null) : null;
+			runner.latest = { t: last.t, lat: last.lat, lon: last.lon, battery };
+			runner.startedAt = new Date(startMs).toISOString();
 			runner.distanceMiles = miles;
 			runner.elapsedMs = endMs - startMs;
 			runner.paceMsPerMile = miles > 0.1 ? runner.elapsedMs / miles : null;

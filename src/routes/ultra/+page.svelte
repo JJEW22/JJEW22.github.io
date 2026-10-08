@@ -17,7 +17,21 @@
 	import 'leaflet/dist/leaflet.css';
 	import { onDestroy, onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { formatDuration, formatPace } from '$lib/ultra';
+	import {
+		ON_COURSE_M,
+		METERS_PER_MILE,
+		buildGpx,
+		courseProgress,
+		directionsUrl,
+		formatDuration,
+		formatPace,
+		indexCourse,
+		parseGpx,
+		placeStations,
+		projectOnCourse,
+		type AidStation,
+		type CourseIndex
+	} from '$lib/ultra';
 	import type { Map as LeafletMap, Polyline, CircleMarker } from 'leaflet';
 
 	interface Runner {
@@ -29,11 +43,21 @@
 		distanceMiles: number;
 		elapsedMs: number | null;
 		paceMsPerMile: number | null;
+		startedAt: string | null;
+	}
+	// A stop on the course: a GPX waypoint (or a configured aid station), with
+	// its course mile so arrival times can be estimated.
+	interface Stop {
+		name: string;
+		lat: number;
+		lon: number;
+		mile: number;
 	}
 	interface Track {
 		status: 'unscheduled' | 'upcoming' | 'live' | 'finished' | 'preview' | 'off';
 		mode: 'off' | 'race' | 'live';
 		liveSince: string | null;
+		showBattery: boolean;
 		isAdmin: boolean;
 		race: {
 			name: string;
@@ -43,7 +67,8 @@
 			location: string;
 			note: string;
 			courseGpx: string | null;
-			aidStations: { name: string; mile: number }[];
+			aidStations: AidStation[];
+			googleMapsUrl: string | null;
 		};
 		runners: Runner[];
 		serverTime: string;
@@ -64,6 +89,10 @@
 	let L: typeof import('leaflet') | null = null;
 	let courseLine: Polyline | null = null;
 	let courseLoaded = false;
+	// The course, once its GPX has loaded, and its stops in course order.
+	let ci: CourseIndex | null = null;
+	let stops: Stop[] = [];
+	let downloadHref = '';
 	// One line + marker per runner, kept across polls so the map doesn't flicker.
 	// Leaflet objects, not page state: nothing in the markup reads this.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -90,6 +119,7 @@
 		if (typeof document !== 'undefined')
 			document.removeEventListener('visibilitychange', onVisible);
 		map?.remove();
+		if (downloadHref) URL.revokeObjectURL(downloadHref);
 	});
 
 	function onVisible() {
@@ -131,11 +161,22 @@
 		courseLoaded = true;
 		try {
 			const text = await fetch(track.race.courseGpx).then((r) => (r.ok ? r.text() : ''));
-			const doc = new DOMParser().parseFromString(text, 'application/xml');
-			const pts: [number, number][] = [...doc.querySelectorAll('trkpt, rtept')]
-				.map((p) => [Number(p.getAttribute('lat')), Number(p.getAttribute('lon'))])
-				.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b)) as [number, number][];
+			const parsed = parseGpx(text);
+			const pts = parsed.track;
 			if (!pts.length) return;
+			const index = indexCourse(pts);
+			// The GPX's own waypoints are the stops, each snapped to the route for
+			// its mile. Any aid stations configured in RACE join them, unless one is
+			// already there as a waypoint.
+			const fromGpx: Stop[] = parsed.waypoints.map((w) => ({
+				...w,
+				mile: projectOnCourse(index, w.lat, w.lon).mile
+			}));
+			const fromConfig = placeStations(track.race.aidStations, pts).filter(
+				(c) => !fromGpx.some((w) => Math.abs(c.lat - w.lat) + Math.abs(c.lon - w.lon) < 0.0005)
+			);
+			stops = [...fromGpx, ...fromConfig].sort((a, b) => a.mile - b.mile);
+			ci = index;
 			// Dark enough to read at a whole-course zoom, dashed so the live track
 			// (solid, in the runner's colour) still stands out on top of it.
 			courseLine = L.polyline(pts, { color: '#3d4a5c', weight: 4, opacity: 0.75, dashArray: '8 6' })
@@ -152,8 +193,34 @@
 					})
 					.bindTooltip(label, { direction: 'top', offset: [0, -6] })
 					.addTo(map!);
-			end(pts[0], 'Start', '#27ae60');
-			end(pts[pts.length - 1], 'Finish', '#1a1a1a');
+			// A waypoint at either end of the course is the start or finish itself:
+			// it names the end marker instead of getting a pin of its own.
+			const startStop = stops.find((st) => isStartStop(st));
+			const finishStop = stops.find((st) => isFinishStop(st, index));
+			end(pts[0], startStop?.name ?? 'Start', '#27ae60');
+			end(pts[pts.length - 1], finishStop?.name ?? 'Finish', '#1a1a1a');
+			for (const st of stops) {
+				if (st === startStop || st === finishStop) continue;
+				L.marker([st.lat, st.lon], { icon: stopIcon('aid'), keyboard: false })
+					.bindTooltip(`${st.name} · mile ${st.mile.toFixed(1)}`, {
+						direction: 'top',
+						offset: [0, -10]
+					})
+					.addTo(map);
+			}
+			// The download: the course with every stop as a waypoint, ready to
+			// import into Google My Maps, Gaia, Strava...
+			const blob = new Blob(
+				[
+					buildGpx(
+						track.race.name,
+						pts,
+						stops.map((st) => ({ ...st, mile: Math.round(st.mile * 10) / 10 }))
+					)
+				],
+				{ type: 'application/gpx+xml' }
+			);
+			downloadHref = URL.createObjectURL(blob);
 			if (!fitted) map.fitBounds(courseLine.getBounds(), { padding: [20, 20] });
 		} catch {
 			// No course drawn; the live tracks still work.
@@ -219,6 +286,25 @@
 		return L!.latLngBounds(pts);
 	}
 
+	// Stops at the very ends of the course: the start, and the finish.
+	function isStartStop(st: Stop): boolean {
+		return st.mile < 0.1;
+	}
+
+	function isFinishStop(st: Stop, index: CourseIndex): boolean {
+		return st.mile > index.total - 0.25;
+	}
+
+	// A small square pin for a stop on the course; aid stations get a cross.
+	function stopIcon(kind: 'aid' | 'wpt') {
+		return L!.divIcon({
+			className: 'stop-icon',
+			html: `<span class="stop ${kind}">${kind === 'aid' ? '+' : ''}</span>`,
+			iconSize: [18, 18],
+			iconAnchor: [9, 9]
+		});
+	}
+
 	function recenter() {
 		follow = true;
 		if (!map || !layers.size) return;
@@ -245,12 +331,33 @@
 		});
 	}
 
-	// Aid-station ETAs from a runner's average pace so far, counted from their last fix.
+	// Average pace along the course so far: time from the clock start to the
+	// last fix, over course miles covered. Measured to the last fix rather than
+	// to now, so a stretch with no signal doesn't make it look like a crawl.
+	function coursePace(r: Runner): number | null {
+		const p = progressById[r.id];
+		if (!p?.onCourse || p.mile < 0.1 || !r.latest || !r.startedAt) return null;
+		return (Date.parse(r.latest.t) - Date.parse(r.startedAt)) / p.mile;
+	}
+
+	// When a runner should reach a course mile at their average pace so far.
+	function etaMs(r: Runner, mile: number): number | null {
+		const p = progressById[r.id];
+		const pace = coursePace(r);
+		if (!p || pace === null || !r.latest) return null;
+		return Date.parse(r.latest.t) + Math.max(0, mile - p.mile) * pace;
+	}
+
 	function eta(r: Runner, mile: number): string {
-		if (!r.latest || !r.paceMsPerMile) return '—';
-		const left = mile - r.distanceMiles;
-		if (left <= 0) return 'passed';
-		return clock(Date.parse(r.latest.t) + left * r.paceMsPerMile);
+		const p = progressById[r.id];
+		if (p?.onCourse && p.mile >= mile) return 'passed';
+		const at = etaMs(r, mile);
+		return at === null ? '—' : clock(at);
+	}
+
+	function passed(r: Runner, mile: number): boolean {
+		const p = progressById[r.id];
+		return !!p?.onCourse && p.mile >= mile;
 	}
 
 	// Elapsed ticks every second while live, from the race start or from when
@@ -275,6 +382,27 @@
 	$: runners = track?.runners ?? [];
 	$: anyTrack = runners.some((r) => r.path.length);
 	$: stale = runners.filter(isStale);
+	// Where each runner is along the course (null without a course or a track).
+	$: progressById = Object.fromEntries(
+		runners.map((r) => [r.id, ci && r.path.length ? courseProgress(ci, r.path) : null])
+	) as Record<string, ReturnType<typeof courseProgress> | null>;
+	$: showEtas = runners.some((r) => coursePace(r) !== null);
+	$: courseTotal = ci?.total ?? track?.race.distanceMiles ?? null;
+	// Progress-bar ticks: the stops between the ends.
+	$: barStops = ci ? stops.filter((st) => !isStartStop(st) && !isFinishStop(st, ci!)) : [];
+	// The stops table: every waypoint, plus a Finish row if the GPX has none.
+	$: tableStops =
+		ci && !stops.some((st) => isFinishStop(st, ci!))
+			? [
+					...stops,
+					{
+						name: 'Finish',
+						lat: ci.track[ci.track.length - 1][0],
+						lon: ci.track[ci.track.length - 1][1],
+						mile: ci.total
+					}
+				]
+			: stops;
 	$: showStats = status === 'live' || status === 'finished' || status === 'preview';
 </script>
 
@@ -295,7 +423,7 @@
 						{track.race.location}{#if track.race.location && track.race.start}
 							·
 						{/if}{#if track.race.start}starts {clock(track.race.start)}{/if}
-						{#if track.race.distanceMiles}· {track.race.distanceMiles} mi{/if}
+						{#if courseTotal}· {courseTotal.toFixed(1)} mi{/if}
 					</p>
 				{/if}
 				{#if track?.race.note}<p class="note">{track.race.note}</p>{/if}
@@ -342,21 +470,26 @@
 				{#if runners.length > 1}
 					<h3 class="runner"><span class="dot" style="background:{r.color}"></span>{r.name}</h3>
 				{/if}
+				{@const p = progressById[r.id]}
+				{@const onCourse = !!ci && !!p?.onCourse}
 				<div class="stats">
 					<div>
-						<span class="n">{r.distanceMiles.toFixed(1)}</span><span class="l"
-							>miles{#if track?.mode === 'race' && track.race.distanceMiles != null}&nbsp;· {Math.max(
-									0,
-									track.race.distanceMiles - r.distanceMiles
-								).toFixed(1)} to go{/if}</span
-						>
+						{#if onCourse && ci && p}
+							<span class="n">{p.mile.toFixed(1)} mi</span><span class="l"
+								>of {ci.total.toFixed(1)} · {Math.max(0, ci.total - p.mile).toFixed(1)} to go</span
+							>
+						{:else}
+							<span class="n">{r.distanceMiles.toFixed(1)}</span><span class="l">miles</span>
+						{/if}
 					</div>
 					<div>
 						<span class="n">{elapsed(r) !== null ? formatDuration(elapsed(r) ?? 0) : '—'}</span
 						><span class="l">elapsed</span>
 					</div>
 					<div>
-						<span class="n">{formatPace(r.paceMsPerMile)}</span><span class="l">average pace</span>
+						<span class="n">{formatPace(onCourse ? coursePace(r) : r.paceMsPerMile)}</span><span
+							class="l">average pace</span
+						>
 					</div>
 					<div>
 						<span class="n">{r.latest ? ago(r.latest.t) : '—'}</span><span class="l"
@@ -366,6 +499,46 @@
 						>
 					</div>
 				</div>
+				{#if onCourse && ci && p}
+					{@const pct = Math.min(100, (100 * p.mile) / ci.total)}
+					{@const finish = etaMs(r, ci.total)}
+					<div class="progress">
+						<div
+							class="bar"
+							role="progressbar"
+							aria-valuenow={Math.round(pct)}
+							aria-valuemin={0}
+							aria-valuemax={100}
+							aria-label="Course progress"
+						>
+							<div class="fill" style="width:{pct}%; background:{r.color}"></div>
+							{#each barStops as st (st.name + st.mile)}
+								<span
+									class="tick"
+									class:done={p.mile >= st.mile}
+									style="left:{(100 * st.mile) / ci.total}%"
+									title="{st.name} · mile {st.mile.toFixed(1)}"
+								></span>
+							{/each}
+						</div>
+						<div class="progress-labels">
+							<span><b>{pct.toFixed(1)}%</b> of the course</span>
+							{#if finish !== null && p.mile < ci.total}
+								<span>Projected finish <b>{clock(finish)}</b></span>
+							{/if}
+						</div>
+						{#if p.offMeters > ON_COURSE_M}
+							<p class="sub">
+								Off the route right now ({(p.offMeters / METERS_PER_MILE).toFixed(1)} mi away) — progress
+								holds at the last point on the course.
+							</p>
+						{/if}
+					</div>
+				{:else if ci && r.latest && p && !p.onCourse}
+					<p class="sub">
+						Not on the course yet — {(p.offMeters / METERS_PER_MILE).toFixed(1)} mi from the route.
+					</p>
+				{/if}
 			{/each}
 		{/if}
 
@@ -378,31 +551,82 @@
 			{/if}
 		</div>
 
-		{#if track?.mode === 'race' && track.race.aidStations.length && runners.length}
+		{#if ci}
+			<div class="course-links">
+				{#if track?.race.googleMapsUrl}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
+					<a class="btn primary" href={track.race.googleMapsUrl} target="_blank" rel="noopener"
+						>Open the course in Google Maps</a
+					>
+				{/if}
+				{#if downloadHref}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- a blob: download, not a route -->
+					<a class="btn" href={downloadHref} download="{track?.race.name ?? 'course'}.gpx"
+						>Download course (GPX)</a
+					>
+				{/if}
+				<span class="sub"
+					>{track?.race.googleMapsUrl
+						? 'Google Maps shows the course and your own location; it doesn’t share it with anyone.'
+						: 'The GPX includes the aid stations; it opens in Google My Maps, Gaia, Strava and most running apps.'}</span
+				>
+			</div>
+		{/if}
+
+		{#if ci && (stops.length || showEtas)}
+			{@const solo = runners.length <= 1 ? runners[0] : null}
 			<h2>Aid stations</h2>
 			<table>
 				<thead>
 					<tr>
-						<th>Station</th>
+						<th>Stop</th>
 						<th class="num">Mile</th>
-						{#each runners as r (r.id)}
-							<th class="num">{runners.length > 1 ? r.name : 'ETA'}</th>
-						{/each}
+						{#if showEtas}
+							{#if solo}
+								<th class="num">To go</th>
+								<th class="num">ETA</th>
+							{:else}
+								{#each runners as r (r.id)}
+									<th class="num">{r.name}</th>
+								{/each}
+							{/if}
+						{/if}
+						<th class="num">Directions</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each track.race.aidStations as s (s.name + s.mile)}
-						<tr>
-							<td>{s.name}</td>
-							<td class="num">{s.mile}</td>
-							{#each runners as r (r.id)}
-								<td class="num" class:passed={r.distanceMiles >= s.mile}>{eta(r, s.mile)}</td>
-							{/each}
+					{#each tableStops as st (st.name + st.mile)}
+						<tr class:finish-row={isFinishStop(st, ci)}>
+							<td>{st.name}</td>
+							<td class="num">{st.mile.toFixed(1)}</td>
+							{#if showEtas}
+								{#if solo}
+									{@const sp = progressById[solo.id]}
+									<td class="num" class:passed={passed(solo, st.mile)}
+										>{sp?.onCourse ? `${Math.max(0, st.mile - sp.mile).toFixed(1)} mi` : '—'}</td
+									>
+									<td class="num" class:passed={passed(solo, st.mile)}>{eta(solo, st.mile)}</td>
+								{:else}
+									{#each runners as r (r.id)}
+										<td class="num" class:passed={passed(r, st.mile)}>{eta(r, st.mile)}</td>
+									{/each}
+								{/if}
+							{/if}
+							<td class="num">
+								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
+								<a href={directionsUrl(st.lat, st.lon)} target="_blank" rel="noopener"
+									>Google Maps ↗</a
+								>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
-			<p class="sub">ETAs use average pace so far, so they drift later as the miles add up.</p>
+			<p class="sub">
+				{#if showEtas}ETAs use average pace along the course so far, so they drift later as the
+					miles add up.{/if}
+				Directions open Google Maps from wherever you are, which is handy for crew.
+			</p>
 		{/if}
 
 		{#if track?.isAdmin}
@@ -603,6 +827,106 @@
 	.num {
 		text-align: right;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.progress {
+		margin: -0.4rem 0 1.25rem 0;
+	}
+
+	.bar {
+		position: relative;
+		height: 14px;
+		background: #edf0f4;
+		border-radius: 7px;
+		overflow: visible;
+	}
+
+	.fill {
+		height: 100%;
+		border-radius: 7px;
+		min-width: 4px;
+		transition: width 0.6s ease;
+	}
+
+	.tick {
+		position: absolute;
+		top: -3px;
+		width: 4px;
+		height: 20px;
+		margin-left: -2px;
+		background: #d35400;
+		border-radius: 2px;
+		box-shadow: 0 0 0 1px #fff;
+	}
+
+	.tick.done {
+		background: #9aa5b1;
+	}
+
+	.progress-labels {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+		margin-top: 0.4rem;
+		font-size: 0.85rem;
+		color: #555;
+	}
+
+	tr.finish-row td {
+		font-weight: 600;
+	}
+
+	.course-links {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		margin-top: 0.9rem;
+	}
+
+	.btn {
+		padding: 0.45rem 0.9rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font-size: 0.9rem;
+		color: #333;
+		text-decoration: none;
+	}
+
+	.btn.primary {
+		background: #0066cc;
+		border-color: #0066cc;
+		color: #fff;
+	}
+
+	/* Leaflet adds these outside the component's markup, hence :global. */
+	:global(.stop-icon) {
+		background: none;
+		border: 0;
+	}
+
+	:global(.stop) {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		border: 2px solid #fff;
+		border-radius: 4px;
+		box-sizing: border-box;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+		font: 700 14px/1 sans-serif;
+		color: #fff;
+	}
+
+	:global(.stop.aid) {
+		background: #d35400;
+	}
+
+	:global(.stop.wpt) {
+		background: #5d6d7e;
 	}
 
 	td.passed {
