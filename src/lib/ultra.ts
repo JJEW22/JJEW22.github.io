@@ -26,6 +26,10 @@ export interface RaceConfig {
 	// mymaps.google.com, share "anyone with the link"). Shows an "Open in
 	// Google Maps" button; null hides it.
 	googleMapsUrl: string | null;
+	// The arrival windows in the stops table, in minutes per mile: each stop's
+	// window is the previous stop's late time plus the leg at the fast pace
+	// (early end) and at the slow pace (late end, which the next stop builds on).
+	paceRangeMinPerMile: [number, number];
 	// Free-text note shown under the title (race website, bib number, ...).
 	note: string;
 }
@@ -44,7 +48,9 @@ export const RACE: RaceConfig = {
 	// miles from the track itself.
 	courseGpx: '/ultra/charles-river.gpx',
 	aidStations: [],
-	googleMapsUrl: null,
+	// The course on Google My Maps (view-only link; editing stays with the owner).
+	googleMapsUrl: 'https://www.google.com/maps/d/viewer?mid=1M0ZxjYQmL5LDcqTH9S_LRSnjzh-PznU',
+	paceRangeMinPerMile: [9, 12],
 	note: ''
 };
 
@@ -374,10 +380,13 @@ export function projectOnCourse(
 export function courseProgress(
 	ci: CourseIndex,
 	path: [number, number][]
-): { mile: number; offMeters: number; onCourse: boolean } {
+): { mile: number; offMeters: number; onCourse: boolean; pointMiles: number[] } {
 	let mile = 0;
 	let found = false;
 	let lastOff = Infinity;
+	// The course mile reached by each point (-1 until the runner is on course),
+	// for reading off when they passed a given mile.
+	const pointMiles: number[] = [];
 	for (const [lat, lon] of path) {
 		let r = projectOnCourse(ci, lat, lon, found ? mile - 0.25 : 0, found ? mile + 2 : Infinity);
 		if (r.offMeters > ON_COURSE_M && found) {
@@ -389,8 +398,83 @@ export function courseProgress(
 			found = true;
 		}
 		lastOff = r.offMeters;
+		pointMiles.push(found ? mile : -1);
 	}
-	return { mile, offMeters: lastOff, onCourse: found };
+	return { mile, offMeters: lastOff, onCourse: found, pointMiles };
+}
+
+// When a runner reached course mile `mile`: interpolated between the two
+// points either side of it. Null if they haven't got there.
+export function timeAtMile(pointMiles: number[], times: number[], mile: number): number | null {
+	for (let k = 0; k < pointMiles.length; k++) {
+		if (pointMiles[k] < mile) continue;
+		const j = k - 1;
+		if (j < 0 || pointMiles[j] < 0 || pointMiles[k] === pointMiles[j]) return times[k] ?? null;
+		const f = (mile - pointMiles[j]) / (pointMiles[k] - pointMiles[j]);
+		return times[j] + f * (times[k] - times[j]);
+	}
+	return null;
+}
+
+// ---- arrival windows ----
+
+export interface ScheduleRow {
+	kind: 'start' | 'arrived' | 'estimate';
+	at?: number; // 'start' / 'arrived': when (ms, or ms after the start if relative)
+	low?: number; // 'estimate': the early end of the window
+	high?: number; // 'estimate': the late end
+	late?: boolean; // the late end has passed and they haven't arrived
+}
+
+// The arrival window at every stop.
+//
+// Each stop's window is built on the previous stop's late time: early = that
+// + leg miles × the fast pace, late = that + leg miles × the slow pace, and
+// the late time carries on to the next stop. With a runner on course, a stop
+// they've reached shows when they actually got there (and the chain restarts
+// from it), and the next stop is measured from where they are now.
+//
+// `start` null means no start time yet: times come back as ms after the start.
+export function stopSchedule(
+	stops: { mile: number }[],
+	start: number | null,
+	paceMinPerMile: [number, number],
+	runner: {
+		arrivals: (number | null)[]; // per stop
+		progressMile: number | null; // where they are on the course
+		fixMs: number | null; // when that was
+	} | null = null,
+	now: number = Date.now()
+): ScheduleRow[] {
+	const [fast, slow] = paceMinPerMile.map((m) => m * 60_000);
+	let base = { mile: 0, t: start ?? 0 };
+	let measuredFromRunner = false;
+	return stops.map((st, i) => {
+		if (st.mile < 0.1) {
+			return { kind: 'start', at: runner?.arrivals[i] ?? start ?? 0 };
+		}
+		const arrived = runner?.arrivals[i] ?? null;
+		if (arrived !== null) {
+			base = { mile: st.mile, t: arrived };
+			return { kind: 'arrived', at: arrived };
+		}
+		// The first stop they haven't reached: measure from where they are.
+		if (
+			!measuredFromRunner &&
+			runner?.progressMile != null &&
+			runner.fixMs != null &&
+			start !== null &&
+			runner.progressMile > base.mile
+		) {
+			base = { mile: runner.progressMile, t: runner.fixMs };
+		}
+		measuredFromRunner = true;
+		const leg = Math.max(0, st.mile - base.mile);
+		const low = base.t + leg * fast;
+		const high = base.t + leg * slow;
+		base = { mile: st.mile, t: high };
+		return { kind: 'estimate', low, high, late: start !== null && high < now };
+	});
 }
 
 // Google Maps directions from wherever the viewer is to a point.

@@ -347,6 +347,7 @@ export interface Runner {
 	name: string;
 	color: string;
 	path: [number, number][]; // [lat, lon], thinned for drawing
+	pathTimes: number[]; // when each path point was recorded (ms), same order
 	latest: { t: string; lat: number; lon: number; battery: number | null } | null;
 	distanceMiles: number;
 	elapsedMs: number | null;
@@ -372,6 +373,7 @@ export interface TrackResponse {
 		courseGpx: string | null;
 		aidStations: AidStation[];
 		googleMapsUrl: string | null;
+		paceRangeMinPerMile: [number, number];
 	};
 	runners: Runner[];
 	serverTime: string;
@@ -403,7 +405,8 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 		note: RACE.note,
 		courseGpx: RACE.courseGpx,
 		aidStations: RACE.aidStations,
-		googleMapsUrl: RACE.googleMapsUrl
+		googleMapsUrl: RACE.googleMapsUrl,
+		paceRangeMinPerMile: RACE.paceRangeMinPerMile
 	};
 
 	let status: TrackStatus;
@@ -480,6 +483,7 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 			name: displayName({ device_id: d.deviceId, name: d.name }),
 			color: d.color,
 			path: [],
+			pathTimes: [],
 			latest: null,
 			distanceMiles: 0,
 			elapsedMs: status === 'live' && clockStart !== null ? now.getTime() - clockStart : null,
@@ -499,11 +503,15 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 						: Date.parse(last.t);
 			const miles = pathLength(clean) / METERS_PER_MILE;
 			const step = Math.ceil(clean.length / MAX_PATH_POINTS);
-			for (let i = 0; i < clean.length; i += step) runner.path.push([clean[i].lat, clean[i].lon]);
+			const add = (p: { lat: number; lon: number; t: string }) => {
+				runner.path.push([p.lat, p.lon]);
+				runner.pathTimes.push(Date.parse(p.t));
+			};
+			for (let i = 0; i < clean.length; i += step) add(clean[i]);
 			const lastKept = clean[clean.length - 1];
-			if ((clean.length - 1) % step !== 0) runner.path.push([lastKept.lat, lastKept.lon]);
+			if ((clean.length - 1) % step !== 0) add(lastKept);
 			// The line ends where the phone is now, so the marker sits on it.
-			if (last !== lastKept) runner.path.push([last.lat, last.lon]);
+			if (last !== lastKept) add(last);
 			// The battery stays off the public payload when the admin has hidden
 			// it -- not just off the page. The admin's own preview still sees it.
 			const battery = settings.showBattery || preview ? (last.battery ?? null) : null;

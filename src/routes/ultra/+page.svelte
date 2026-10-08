@@ -29,8 +29,11 @@
 		parseGpx,
 		placeStations,
 		projectOnCourse,
+		stopSchedule,
+		timeAtMile,
 		type AidStation,
-		type CourseIndex
+		type CourseIndex,
+		type ScheduleRow
 	} from '$lib/ultra';
 	import type { Map as LeafletMap, Polyline, CircleMarker } from 'leaflet';
 
@@ -39,6 +42,7 @@
 		name: string;
 		color: string;
 		path: [number, number][];
+		pathTimes: number[];
 		latest: { t: string; lat: number; lon: number; battery: number | null } | null;
 		distanceMiles: number;
 		elapsedMs: number | null;
@@ -69,6 +73,7 @@
 			courseGpx: string | null;
 			aidStations: AidStation[];
 			googleMapsUrl: string | null;
+			paceRangeMinPerMile: [number, number];
 		};
 		runners: Runner[];
 		serverTime: string;
@@ -340,24 +345,75 @@
 		return (Date.parse(r.latest.t) - Date.parse(r.startedAt)) / p.mile;
 	}
 
-	// When a runner should reach a course mile at their average pace so far.
-	function etaMs(r: Runner, mile: number): number | null {
-		const p = progressById[r.id];
-		const pace = coursePace(r);
-		if (!p || pace === null || !r.latest) return null;
-		return Date.parse(r.latest.t) + Math.max(0, mile - p.mile) * pace;
+	interface Schedule {
+		r: Runner | null;
+		start: number | null; // null: no start time yet, times are "+h:mm" after it
+		rows: ScheduleRow[]; // one per table stop
 	}
 
-	function eta(r: Runner, mile: number): string {
-		const p = progressById[r.id];
-		if (p?.onCourse && p.mile >= mile) return 'passed';
-		const at = etaMs(r, mile);
-		return at === null ? '—' : clock(at);
+	// The arrival windows for one runner -- or, with nobody shown yet, from the
+	// race start alone. Stops they've reached take their actual arrival time
+	// (read off their track); the next one is measured from their latest fix.
+	function scheduleFor(
+		r: Runner | null,
+		rows: Stop[],
+		t: Track | null,
+		progress: typeof progressById,
+		at: number
+	): Schedule {
+		const startIso = r?.startedAt ?? t?.race.start ?? null;
+		const start = startIso ? Date.parse(startIso) : null;
+		const p = r ? progress[r.id] : null;
+		const live =
+			r && p?.onCourse && r.latest && start !== null
+				? {
+						arrivals: rows.map((st) =>
+							st.mile < 0.1 ? start : timeAtMile(p.pointMiles, r.pathTimes, st.mile)
+						),
+						progressMile: p.mile,
+						fixMs: Date.parse(r.latest.t)
+					}
+				: null;
+		const pace = t?.race.paceRangeMinPerMile ?? [9, 12];
+		return { r, start, rows: stopSchedule(rows, start, pace, live, at) };
 	}
 
-	function passed(r: Runner, mile: number): boolean {
-		const p = progressById[r.id];
-		return !!p?.onCourse && p.mile >= mile;
+	function hm(ms: number): string {
+		return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+	}
+
+	// "Sun " in front of a time that falls on a different day from the start.
+	function dayPrefix(ms: number, ref: number): string {
+		const a = new Date(ms);
+		return a.toDateString() === new Date(ref).toDateString()
+			? ''
+			: `${a.toLocaleDateString(undefined, { weekday: 'short' })} `;
+	}
+
+	function relTime(ms: number): string {
+		const m = Math.round(ms / 60_000);
+		return `+${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+	}
+
+	// "6:52 – 7:09 AM", "11:40 AM – 12:12 PM", "✓ 6:58 AM", "+0:52 – +1:10".
+	function windowText(row: ScheduleRow, start: number | null): string {
+		if (row.kind === 'start') return start === null ? 'Start' : hm(row.at ?? start);
+		if (row.kind === 'arrived') return `✓ ${hm(row.at ?? 0)}`;
+		const low = row.low ?? 0;
+		const high = row.high ?? 0;
+		if (start === null) return `${relTime(low)} – ${relTime(high)}`;
+		let a = hm(low);
+		const b = hm(high);
+		// Browsers often put a narrow no-break space (U+202F) before AM/PM.
+		const suffix = /[\s\u202f]?[AaPp]\.?[Mm]\.?$/;
+		if (a.match(suffix)?.[0] === b.match(suffix)?.[0]) a = a.replace(suffix, '');
+		return `${dayPrefix(low, start)}${a} – ${b}`;
+	}
+
+	function windowTitle(row: ScheduleRow): string | undefined {
+		if (row.kind === 'arrived') return 'Arrived';
+		if (row.late) return 'Running behind this window';
+		return undefined;
 	}
 
 	// Elapsed ticks every second while live, from the race start or from when
@@ -386,8 +442,13 @@
 	$: progressById = Object.fromEntries(
 		runners.map((r) => [r.id, ci && r.path.length ? courseProgress(ci, r.path) : null])
 	) as Record<string, ReturnType<typeof courseProgress> | null>;
-	$: showEtas = runners.some((r) => coursePace(r) !== null);
 	$: courseTotal = ci?.total ?? track?.race.distanceMiles ?? null;
+	// Arrival windows: one per runner shown, or one from the start alone.
+	$: schedules = (runners.length ? runners : [null]).map((r) =>
+		scheduleFor(r, tableStops, track, progressById, now)
+	);
+	$: livePositions = schedules.some((sc) => sc.rows.some((row) => row.kind === 'arrived'));
+
 	// Progress-bar ticks: the stops between the ends.
 	$: barStops = ci ? stops.filter((st) => !isStartStop(st) && !isFinishStop(st, ci!)) : [];
 	// The stops table: every waypoint, plus a Finish row if the GPX has none.
@@ -436,6 +497,19 @@
 				<span class="badge preview">Preview</span>
 			{/if}
 		</header>
+
+		{#if track?.race.googleMapsUrl}
+			<div class="gmaps">
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
+				<a class="btn primary" href={track.race.googleMapsUrl} target="_blank" rel="noopener"
+					>Open the course in Google Maps ↗</a
+				>
+				<span class="sub"
+					>The course and every stop, with your own location on it. It stays on your phone; nothing
+					is shared with anyone.</span
+				>
+			</div>
+		{/if}
 
 		{#if loadFailed && !track}
 			<p class="banner warn">Couldn't reach the tracker. It will keep retrying.</p>
@@ -501,7 +575,8 @@
 				</div>
 				{#if onCourse && ci && p}
 					{@const pct = Math.min(100, (100 * p.mile) / ci.total)}
-					{@const finish = etaMs(r, ci.total)}
+					{@const finishRow = schedules.find((sc) => sc.r?.id === r.id)?.rows.at(-1)}
+					{@const finishStart = schedules.find((sc) => sc.r?.id === r.id)?.start ?? null}
 					<div class="progress">
 						<div
 							class="bar"
@@ -523,8 +598,10 @@
 						</div>
 						<div class="progress-labels">
 							<span><b>{pct.toFixed(1)}%</b> of the course</span>
-							{#if finish !== null && p.mile < ci.total}
-								<span>Projected finish <b>{clock(finish)}</b></span>
+							{#if finishRow && finishRow.kind === 'estimate'}
+								<span>Finish window <b>{windowText(finishRow, finishStart)}</b></span>
+							{:else if finishRow && finishRow.kind === 'arrived'}
+								<span>Finished <b>{windowText(finishRow, finishStart)}</b></span>
 							{/if}
 						</div>
 						{#if p.offMeters > ON_COURSE_M}
@@ -551,67 +628,40 @@
 			{/if}
 		</div>
 
-		{#if ci}
-			<div class="course-links">
-				{#if track?.race.googleMapsUrl}
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
-					<a class="btn primary" href={track.race.googleMapsUrl} target="_blank" rel="noopener"
-						>Open the course in Google Maps</a
-					>
-				{/if}
-				{#if downloadHref}
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- a blob: download, not a route -->
-					<a class="btn" href={downloadHref} download="{track?.race.name ?? 'course'}.gpx"
-						>Download course (GPX)</a
-					>
-				{/if}
-				<span class="sub"
-					>{track?.race.googleMapsUrl
-						? 'Google Maps shows the course and your own location; it doesn’t share it with anyone.'
-						: 'The GPX includes the aid stations; it opens in Google My Maps, Gaia, Strava and most running apps.'}</span
-				>
-			</div>
-		{/if}
-
-		{#if ci && (stops.length || showEtas)}
-			{@const solo = runners.length <= 1 ? runners[0] : null}
+		{#if ci && tableStops.length}
 			<h2>Aid stations</h2>
 			<table>
 				<thead>
 					<tr>
+						<th class="num stop-no" title="Stop number">#</th>
 						<th>Stop</th>
 						<th class="num">Mile</th>
-						{#if showEtas}
-							{#if solo}
-								<th class="num">To go</th>
-								<th class="num">ETA</th>
-							{:else}
-								{#each runners as r (r.id)}
-									<th class="num">{r.name}</th>
-								{/each}
-							{/if}
-						{/if}
+						<th class="num">Leg</th>
+						{#each schedules as sc, j (sc.r?.id ?? j)}
+							<th class="num">{schedules.length > 1 && sc.r ? sc.r.name : 'Estimated arrival'}</th>
+						{/each}
 						<th class="num">Directions</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each tableStops as st (st.name + st.mile)}
+					{#each tableStops as st, i (st.name + st.mile)}
 						<tr class:finish-row={isFinishStop(st, ci)}>
+							<td class="num stop-no">{i}</td>
 							<td>{st.name}</td>
 							<td class="num">{st.mile.toFixed(1)}</td>
-							{#if showEtas}
-								{#if solo}
-									{@const sp = progressById[solo.id]}
-									<td class="num" class:passed={passed(solo, st.mile)}
-										>{sp?.onCourse ? `${Math.max(0, st.mile - sp.mile).toFixed(1)} mi` : '—'}</td
-									>
-									<td class="num" class:passed={passed(solo, st.mile)}>{eta(solo, st.mile)}</td>
-								{:else}
-									{#each runners as r (r.id)}
-										<td class="num" class:passed={passed(r, st.mile)}>{eta(r, st.mile)}</td>
-									{/each}
-								{/if}
-							{/if}
+							<td class="num leg"
+								>{i === 0 ? '—' : (st.mile - tableStops[i - 1].mile).toFixed(1)}</td
+							>
+							{#each schedules as sc, j (sc.r?.id ?? j)}
+								{@const row = sc.rows[i]}
+								<td
+									class="num window"
+									class:arrived={row?.kind === 'arrived'}
+									class:late={row?.late}
+									title={row ? windowTitle(row) : undefined}
+									>{row ? windowText(row, sc.start) : '—'}</td
+								>
+							{/each}
 							<td class="num">
 								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
 								<a href={directionsUrl(st.lat, st.lon)} target="_blank" rel="noopener"
@@ -623,9 +673,23 @@
 				</tbody>
 			</table>
 			<p class="sub">
-				{#if showEtas}ETAs use average pace along the course so far, so they drift later as the
-					miles add up.{/if}
-				Directions open Google Maps from wherever you are, which is handy for crew.
+				Arrival windows: the previous stop's late time plus this leg at {track?.race
+					.paceRangeMinPerMile[0] ?? 9}:00/mi (early) to {track?.race.paceRangeMinPerMile[1] ??
+					12}:00/mi (late).
+				{#if livePositions}Stops already reached show when they were reached, and the next one is
+					measured from the latest position.{/if}
+				{#if schedules[0]?.start === null}Times are after the start until the start time is set.{:else}Times
+					are in your time zone.{/if}
+				Directions open Google Maps from wherever you are.
+			</p>
+		{/if}
+
+		{#if downloadHref}
+			<p class="download">
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- a blob: download, not a route -->
+				<a href={downloadHref} download="{track?.race.name ?? 'course'}.gpx"
+					>Download the course GPX</a
+				> (with the aid stations) for Gaia, Strava or a watch.
 			</p>
 		{/if}
 
@@ -873,16 +937,60 @@
 		color: #555;
 	}
 
+	td.window {
+		white-space: nowrap;
+	}
+
+	td.window.arrived {
+		color: #1e6b36;
+		font-weight: 600;
+	}
+
+	td.window.late {
+		color: #b9770e;
+	}
+
+	.stop-no {
+		width: 2rem;
+		color: #888;
+		font-weight: 600;
+	}
+
+	td.leg {
+		color: #888;
+	}
+
 	tr.finish-row td {
 		font-weight: 600;
 	}
 
-	.course-links {
+	.gmaps {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.75rem;
 		flex-wrap: wrap;
-		margin-top: 0.9rem;
+		margin: 0.9rem 0 0.25rem 0;
+	}
+
+	.gmaps .btn {
+		padding: 0.6rem 1.1rem;
+		font-size: 1rem;
+		font-weight: 600;
+	}
+
+	.gmaps .sub {
+		flex: 1;
+		min-width: 14rem;
+	}
+
+	.download {
+		margin-top: 1.75rem;
+		font-size: 0.8rem;
+		color: #888;
+	}
+
+	.download a {
+		color: #666;
 	}
 
 	.btn {
@@ -927,10 +1035,6 @@
 
 	:global(.stop.wpt) {
 		background: #5d6d7e;
-	}
-
-	td.passed {
-		color: #9aa5b1;
 	}
 
 	.admin {
