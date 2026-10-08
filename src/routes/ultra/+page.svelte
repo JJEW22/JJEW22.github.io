@@ -136,9 +136,24 @@
 				.map((p) => [Number(p.getAttribute('lat')), Number(p.getAttribute('lon'))])
 				.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b)) as [number, number][];
 			if (!pts.length) return;
-			courseLine = L.polyline(pts, { color: '#8a94a6', weight: 4, opacity: 0.6, dashArray: '6 8' })
+			// Dark enough to read at a whole-course zoom, dashed so the live track
+			// (solid, in the runner's colour) still stands out on top of it.
+			courseLine = L.polyline(pts, { color: '#3d4a5c', weight: 4, opacity: 0.75, dashArray: '8 6' })
 				.addTo(map)
 				.bringToBack();
+			const end = (at: [number, number], label: string, fill: string) =>
+				L!
+					.circleMarker(at, {
+						radius: 6,
+						color: '#fff',
+						weight: 2,
+						fillColor: fill,
+						fillOpacity: 1
+					})
+					.bindTooltip(label, { direction: 'top', offset: [0, -6] })
+					.addTo(map!);
+			end(pts[0], 'Start', '#27ae60');
+			end(pts[pts.length - 1], 'Finish', '#1a1a1a');
 			if (!fitted) map.fitBounds(courseLine.getBounds(), { padding: [20, 20] });
 		} catch {
 			// No course drawn; the live tracks still work.

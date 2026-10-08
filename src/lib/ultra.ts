@@ -25,12 +25,14 @@ export interface RaceConfig {
 // Edit this for the race. Points the phone sends are only shown publicly
 // between `start` and `start + cutoffHours`.
 export const RACE: RaceConfig = {
-	name: 'Ultra marathon',
-	start: null,
+	name: 'The entire Charles River',
+	start: null, // set the start time to open the race window
 	cutoffHours: 30,
-	distanceMiles: null,
-	location: '',
-	courseGpx: null,
+	distanceMiles: 78.9,
+	location: 'Hopkinton to Boston, MA',
+	// Strava route "entire Charles river (kinda)": Echo Lake to the Charles
+	// River Dam, 78.9 mi, ~880 m of climbing.
+	courseGpx: '/ultra/charles-river.gpx',
 	aidStations: [],
 	note: ''
 };
