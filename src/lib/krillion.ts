@@ -464,6 +464,26 @@ export function matchAnswer<T extends { answer: string; count: number }>(
 
 export const MISS_EMOJI = '⬛';
 
+// Rarity percentile: the share of the day's players whose answer to the
+// prompt was more common than yours, 0-100. The most-given answer is the 0th;
+// an answer nobody else gave is just under the 100th.
+export function rarityPercentile(
+	count: number,
+	counts: number[],
+	total = counts.reduce((s, c) => s + c, 0)
+): number | null {
+	if (total <= 0) return null;
+	let more = 0;
+	for (const c of counts) if (c > count) more += c;
+	return (100 * more) / total;
+}
+
+// "89.4%". Rounded down, so an answer nobody else gave reads 99.9%, never
+// 100.0% -- that would claim it was rarer than itself.
+export function formatPercentile(p: number): string {
+	return `${(Math.floor(p * 10) / 10).toFixed(1)}%`;
+}
+
 // krillion.io's tiers: game points → emoji.
 export const GAME_TIERS: { points: number; emoji: string; name: string }[] = [
 	{ points: 10, emoji: '🫧', name: 'Plankton' },

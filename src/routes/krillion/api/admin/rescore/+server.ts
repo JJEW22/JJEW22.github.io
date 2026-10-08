@@ -4,6 +4,9 @@
 // changes. krillion:admin, or the cron's x-sync-key.
 //   POST { "day": 81 }    one day, against the stored all-time breadth range
 //   POST { "all": true }  rebuild the range from every stored day, then rescore all
+//   POST { "dives": true } leave the model and answer points alone; just re-run
+//                          every stored dive against them (to fill in fields a
+//                          newer scoreRounds adds, like the rarity percentile)
 import { json } from '@sveltejs/kit';
 import { dateForDay } from '$lib/krillion';
 import { sql } from '$lib/server/db';
@@ -12,6 +15,7 @@ import {
 	KRILLION_ADMIN_ROLE,
 	KrillionError,
 	rebuildBreadthRange,
+	rescoreDate,
 	rescoreStoredDay
 } from '$lib/server/krillion';
 import type { RequestHandler } from './$types';
@@ -22,6 +26,14 @@ export const POST: RequestHandler = async ({ url, request, locals }) => {
 	requireAdmin(locals.user, url, KRILLION_ADMIN_ROLE, request.headers);
 	const body = await request.json().catch(() => null);
 	try {
+		if (body?.dives === true) {
+			const days = await sql<{ date: string }[]>`
+				select to_char(date, 'YYYY-MM-DD') as date from krillion_days order by date
+			`;
+			const done = [];
+			for (const d of days) done.push({ date: d.date, dives: await rescoreDate(d.date) });
+			return json({ ok: true, days: done });
+		}
 		if (body?.all === true) {
 			const range = await rebuildBreadthRange();
 			const days = await sql<{ date: string }[]>`

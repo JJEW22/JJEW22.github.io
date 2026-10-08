@@ -14,6 +14,7 @@
 	import {
 		MIN_DIVES_FOR_AVERAGE,
 		etDate,
+		formatPercentile,
 		parsePaste,
 		rescoreShareText,
 		TOP_MAX,
@@ -40,6 +41,7 @@
 		gamePoints: number | null;
 		points: number;
 		count: number | null;
+		rarity?: number | null;
 	}
 	interface Result {
 		dayNumber: number;
@@ -107,6 +109,11 @@
 	let result: Result | null = null;
 
 	// The rescored share block, once the dive has counts.
+	// Rescored minus the game's score, for the totals row.
+	$: adjustment =
+		result?.status === 'scored' && result.updatedScore !== null && result.gameScore !== null
+			? result.updatedScore - result.gameScore
+			: null;
 	$: shareText =
 		result?.status === 'scored' && result.updatedScore !== null
 			? rescoreShareText(result.dayNumber, result.gameScore, result.updatedScore, result.rounds)
@@ -529,13 +536,22 @@
 							<span class="n">{result.updatedScore?.toFixed(1)}</span><span class="l">rescored</span
 							>
 						</div>
+						{#if adjustment !== null}
+							<div>
+								<span class="n adj" class:up={adjustment > 0} class:down={adjustment < 0}
+									>{adjustment > 0 ? '+' : ''}{adjustment.toFixed(1)}</span
+								><span class="l">total adjustment</span>
+							</div>
+						{/if}
 					</div>
 					<table>
 						<thead>
 							<tr
-								><th>#</th><th>Answer</th><th class="num">Players</th><th class="num">Game</th><th
-									class="num">Rescored</th
-								></tr
+								><th>#</th><th>Answer</th><th class="num">Players</th><th
+									class="num"
+									title="Percentile of rarity: the share of players whose answer was more common than yours"
+									>Rarity</th
+								><th class="num">Game</th><th class="num">Rescored</th></tr
 							>
 						</thead>
 						<tbody>
@@ -550,6 +566,12 @@
 										<div class="sub">{r.prompt}</div>
 									</td>
 									<td class="num">{r.count?.toLocaleString() ?? '—'}</td>
+									<td
+										class="num"
+										title={r.rarity != null
+											? `Rarer than ${formatPercentile(r.rarity)} of players' answers`
+											: undefined}>{r.rarity != null ? formatPercentile(r.rarity) : '—'}</td
+									>
 									<td class="num">{r.gamePoints ?? '—'}</td>
 									<td class="num"><b>{r.points.toFixed(1)}</b></td>
 								</tr>
@@ -727,7 +749,8 @@
 					mostly Krillion's tiers re-dealt in order of how common each answer really was.
 				</li>
 				<li>
-					Counts are taken once a day at 11:00 ET from krillion.io. Misses score 0, as in the game.
+					Counts are taken from krillion.io twice a day, at 11:00 and 23:00 ET; your score updates
+					with each. Misses score 0, as in the game.
 				</li>
 			</ul>
 		</section>
@@ -1079,6 +1102,14 @@
 		font-weight: 600;
 		color: #0b62a4;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.totals .n.adj.up {
+		color: #1e6b36;
+	}
+
+	.totals .n.adj.down {
+		color: #9a2c2c;
 	}
 
 	.totals .l {

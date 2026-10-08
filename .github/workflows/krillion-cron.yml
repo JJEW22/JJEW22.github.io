@@ -1,7 +1,7 @@
 # .github/workflows/krillion-cron.yml
 # Drives Krillion, rescored (/krillion). Runs hourly; the endpoint self-gates:
-#   - fetches from krillion.io only ONCE a day, on the first tick at/after 11:00 ET
-#     (until Krillion's developer agrees to more)
+#   - fetches from krillion.io TWICE a day: the first tick at/after 11:00 ET and
+#     the first at/after 23:00 ET (until Krillion's developer agrees to more)
 #   - sends final-score emails on the first tick after midnight ET
 # Hourly rather than two fixed times so daylight-saving shifts need no edits.
 #

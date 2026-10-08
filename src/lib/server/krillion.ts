@@ -2,11 +2,12 @@
 // Krillion, rescored: the daily snapshot, scoring, submissions and emails.
 //
 // We haven't asked Krillion's developer for permission yet, so this contacts
-// krillion.io ONCE a day: the first cron tick after 11am ET fetches today's
+// krillion.io TWICE a day: the first cron tick after 11am ET fetches today's
 // prompts, answer sheet and answer counts (three GETs, the same public ones the
-// game itself uses). Everything a player submits is scored against that one
-// snapshot. When permission arrives, loosen fetchIfDue() -- the tables and the
-// rescoring already handle several snapshots a day.
+// game itself uses), and the first tick after 11pm ET refreshes them so the
+// final scores use near-end-of-day counts. Every dive is rescored against the
+// latest snapshot. To fetch more often, add slots to fetchIfDue() -- the tables
+// and the rescoring already handle it.
 //
 // Not here on purpose: cheater removal, miss rates and "better than X%"
 // standings. They need the score histogram, which only comes from the game's
@@ -22,6 +23,7 @@ import {
 	MIN_DIVES_FOR_AVERAGE,
 	breadth,
 	matchAnswer,
+	rarityPercentile,
 	scoreDay,
 	type PastedRound,
 	type PromptFit
@@ -29,6 +31,8 @@ import {
 
 const BASE = 'https://krillion.io';
 const FETCH_HOUR_ET = 11;
+// The second scheduled fetch: the day's counts refreshed before it ends.
+const LATE_FETCH_HOUR_ET = 23;
 const SITE = 'https://johnjackwilkins.com';
 // Identify ourselves; a contact makes it easy for the developer to reach us.
 const UA = `johnjackwilkins.com krillion-rescore (once daily; contact ${SITE})`;
@@ -355,6 +359,9 @@ export interface ScoredRound {
 	gamePoints: number | null;
 	points: number;
 	count: number | null;
+	// Percentile of rarity: % of players whose answer was more common. Null
+	// for a miss, and on dives scored before it existed.
+	rarity?: number | null;
 }
 
 function scoreRounds(
@@ -376,7 +383,8 @@ function scoreRounds(
 			(r.prompt ? prompts.find((x) => norm(x.text) === norm(r.prompt)) : undefined) ??
 			prompts[r.round - 1] ??
 			prompts[i];
-		const hit = !r.miss && r.answer && p ? matchAnswer(byPrompt.get(p.id) ?? [], r.answer) : null;
+		const list = p ? (byPrompt.get(p.id) ?? []) : [];
+		const hit = !r.miss && r.answer && p ? matchAnswer(list, r.answer) : null;
 		return {
 			round: r.round,
 			promptId: p?.id ?? null,
@@ -388,7 +396,13 @@ function scoreRounds(
 			// answer can't leave the pasted points behind. A miss scores 0.
 			gamePoints: hit ? (hit.game_score ?? r.gamePoints ?? null) : r.miss || !r.answer ? 0 : null,
 			points: hit ? hit.points : 0,
-			count: hit ? hit.count : null
+			count: hit ? hit.count : null,
+			rarity: hit
+				? rarityPercentile(
+						hit.count,
+						list.map((a) => a.count)
+					)
+				: null
 		};
 	});
 	return { scored, total: scored.reduce((s, r) => s + r.points, 0) };
@@ -566,18 +580,31 @@ export async function mySubmissions(userId: number) {
 
 // ---------------- the cron ----------------
 
-// Fetch once a day: the first tick at or after 11am ET with no snapshot yet.
+// Fetch twice a day: the first tick at or after 11am ET, and the first at or
+// after 11pm ET. Each is gated on its own scheduled run, not on any snapshot
+// existing: an admin's "Fetch now" must not cancel either one.
 export async function fetchIfDue(now = new Date()) {
 	const date = etDate(now);
-	if (etHour(now) < FETCH_HOUR_ET)
-		return { fetched: false, reason: `before ${FETCH_HOUR_ET}:00 ET` };
-	// Gate on the scheduled fetch having run, not on any snapshot existing: an
-	// admin's "Fetch now" earlier in the day must not cancel the 11am one.
-	const [have] = await sql`
-		select 1 from krillion_days where date = ${date} and cron_fetched_at is not null
+	const hour = etHour(now);
+	if (hour < FETCH_HOUR_ET) return { fetched: false, reason: `before ${FETCH_HOUR_ET}:00 ET` };
+	const [row] = await sql<{ cron_fetched_at: Date | null; late_fetched_at: Date | null }[]>`
+		select cron_fetched_at, late_fetched_at from krillion_days where date = ${date}
 	`;
-	if (have) return { fetched: false, reason: `already fetched ${date} on schedule` };
-	return { fetched: true, ...(await fetchAndScore(date, true)) };
+	if (!row?.cron_fetched_at) {
+		return { fetched: true, slot: `${FETCH_HOUR_ET}:00`, ...(await fetchAndScore(date, true)) };
+	}
+	if (hour >= LATE_FETCH_HOUR_ET && !row.late_fetched_at) {
+		const result = await fetchAndScore(date, false);
+		await sql`update krillion_days set late_fetched_at = now() where date = ${date}`;
+		return { fetched: true, slot: `${LATE_FETCH_HOUR_ET}:00`, ...result };
+	}
+	return {
+		fetched: false,
+		reason:
+			hour >= LATE_FETCH_HOUR_ET
+				? `already fetched ${date} at ${FETCH_HOUR_ET}:00 and ${LATE_FETCH_HOUR_ET}:00`
+				: `already fetched ${date} at ${FETCH_HOUR_ET}:00; next at ${LATE_FETCH_HOUR_ET}:00 ET`
+	};
 }
 
 // An admin's "Fetch now": today's counts and sheet, right away, whatever the
