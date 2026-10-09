@@ -406,11 +406,22 @@ export interface ScoredRound {
 	// Percentile of rarity: % of players whose answer was more common. Null
 	// for a miss, for an accepted word, and on dives scored before it existed.
 	rarity?: number | null;
-	// An answer that isn't on the day's list (and so scores as a miss).
+	// The answer isn't on the day's list (and so scores as a miss).
 	unknown?: boolean;
-	// Where the answer stands in review: an accepted word, or one not on the
-	// list that's waiting for (or was refused by) an admin.
-	review?: ReviewStatus | null;
+	// The answer is a word an admin accepted after review.
+	acceptedWord?: boolean;
+	// The answer's own rescored points. `points` is what the round scores:
+	// these, or an accepted override's.
+	originalPoints?: number;
+	// Another word sent for review. Until it's accepted the round scores the
+	// answer; once it is, the override's points. `listedAs`: the override is
+	// already on the day's list, so it isn't one to review.
+	override?: {
+		word: string;
+		status: ReviewStatus | null;
+		points: number | null;
+		listedAs: string | null;
+	} | null;
 }
 
 function scoreRounds(
@@ -436,6 +447,27 @@ function scoreRounds(
 		const list = p ? (byPrompt.get(p.id) ?? []) : [];
 		const hit = !r.miss && r.answer && p ? matchAnswer(list, r.answer) : null;
 		const unknown = !r.miss && !!r.answer && !!p && !hit;
+		const original = hit ? hit.points : 0;
+		// The override, if any: scored only once an admin accepts it.
+		const word = r.override?.trim() || null;
+		let override: ScoredRound['override'] = null;
+		if (word && p) {
+			const status = reviews.get(reviewKey(p.id, word)) ?? null;
+			const listed = matchAnswer(
+				list.filter((a) => !a.accepted),
+				word
+			);
+			const accepted =
+				status === 'accepted'
+					? list.find((a) => a.answer.toLowerCase() === word.toLowerCase())
+					: undefined;
+			override = {
+				word,
+				status: listed ? null : status,
+				points: !listed && accepted ? accepted.points : null,
+				listedAs: listed?.answer ?? null
+			};
+		}
 		return {
 			round: r.round,
 			promptId: p?.id ?? null,
@@ -444,9 +476,13 @@ function scoreRounds(
 			match: hit?.answer ?? null,
 			miss: r.miss || !hit,
 			// The sheet's points for whatever answer was matched, so editing an
-			// answer can't leave the pasted points behind. A miss scores 0.
-			gamePoints: hit ? (hit.game_score ?? r.gamePoints ?? null) : r.miss || !r.answer ? 0 : null,
-			points: hit ? hit.points : 0,
+			// answer can't leave the pasted points behind. A miss scores 0 -- and
+			// so does a word that isn't on krillion.io's list (sent for review, or
+			// accepted since): the game counted it as a miss, and the game's total
+			// should still add up rather than go blank.
+			gamePoints: hit ? (hit.accepted ? 0 : (hit.game_score ?? r.gamePoints ?? null)) : 0,
+			points: override?.points ?? original,
+			originalPoints: original,
 			count: hit ? hit.count : null,
 			rarity:
 				hit && !hit.accepted
@@ -456,11 +492,8 @@ function scoreRounds(
 						)
 					: null,
 			unknown,
-			review: hit?.accepted
-				? 'accepted'
-				: unknown && p && r.answer
-					? (reviews.get(reviewKey(p.id, r.answer)) ?? null)
-					: null
+			acceptedWord: Boolean(hit?.accepted),
+			override
 		};
 	});
 	return { scored, total: scored.reduce((s, r) => s + r.points, 0) };
@@ -472,20 +505,18 @@ function gameTotal(rounds: { gamePoints: number | null }[]): number | null {
 	return rounds.reduce((s, r) => s + (r.gamePoints as number), 0);
 }
 
-// File the words a dive asked to have reviewed: answers not on the day's
-// list, with "submit for review" ticked, and not reviewed already. Returns
-// whether anything new was filed.
+// File a dive's overrides for review: words not on the day's list and not
+// reviewed already. Returns whether anything new was filed.
 async function fileReviews(
 	date: string,
 	sub: { id: number | string; user_id: number | string | null },
-	rounds: PastedRound[],
 	scored: ScoredRound[],
 	reviews: Map<string, ReviewStatus>
 ): Promise<boolean> {
 	let filed = false;
-	for (const [i, r] of scored.entries()) {
-		const answer = r.submitted?.trim();
-		if (!r.unknown || !rounds[i]?.review || !r.promptId || !answer) continue;
+	for (const r of scored) {
+		const answer = r.override?.word;
+		if (!answer || r.override?.listedAs || !r.promptId) continue;
 		if (reviews.has(reviewKey(r.promptId, answer))) continue;
 		await sql`
 			insert into krillion_word_reviews (date, prompt_id, answer, user_id, submission_id)
@@ -506,10 +537,10 @@ export async function rescoreDate(date: string): Promise<number> {
 		select id, user_id, rounds from krillion_submissions where date = ${date}
 	`;
 	// Dives submitted before the counts arrived couldn't be checked then: their
-	// words for review are filed now.
+	// overrides are filed now.
 	for (const s of subs) {
 		const { scored } = scoreRounds(s.rounds, day.prompts, answers, reviews);
-		await fileReviews(date, s, s.rounds, scored, reviews);
+		await fileReviews(date, s, scored, reviews);
 	}
 	for (const s of subs) {
 		const { scored, total } = scoreRounds(s.rounds, day.prompts, answers, reviews);
@@ -585,18 +616,17 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		othersChose: Number.isFinite(r.othersChose) ? r.othersChose : null,
 		gamePoints: !r.answer || !String(r.answer).trim() ? 0 : okPoints(r.gamePoints),
 		found: Boolean(r.found),
-		review: Boolean(r.review)
+		override: r.override ? String(r.override).trim().slice(0, 200) || null : null
 	}));
 
-	// With the day's list in, every answer has to be on it -- or be sent for
-	// review. Anything else is refused, naming the rounds, so the page can flag
-	// them and tick their review boxes.
+	// With the day's list in, every answer has to be on it: a word that isn't
+	// is refused, naming the rounds, so the page can move it to an override
+	// for review. So is an override that's already on the list -- that's just
+	// an answer.
 	const scoring = day.scored ? await loadScoring(date) : null;
 	if (scoring) {
 		const { scored } = scoreRounds(rounds, day.prompts, scoring.answers, scoring.reviews);
-		const unknownRounds = scored
-			.filter((r, i) => r.unknown && !rounds[i].review)
-			.map((r) => r.round);
+		const unknownRounds = scored.filter((r) => r.unknown).map((r) => r.round);
 		if (unknownRounds.length) {
 			throw new KrillionError(
 				unknownRounds.length === 1
@@ -604,6 +634,19 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 					: `Rounds ${unknownRounds.join(', ')} have answers that aren't in the database.`,
 				422,
 				{ unknownRounds }
+			);
+		}
+		const listed = scored.filter((r) => r.override?.listedAs);
+		if (listed.length) {
+			throw new KrillionError(
+				listed
+					.map(
+						(r) =>
+							`Round ${r.round}: “${r.override!.word}” is already in the database (as “${r.override!.listedAs}”), so it doesn't need an override.`
+					)
+					.join(' '),
+				422,
+				{ listedOverrides: listed.map((r) => r.round) }
 			);
 		}
 	}
@@ -636,7 +679,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 	if (scoring) {
 		const { answers, reviews } = scoring;
 		const first = scoreRounds(rounds, day.prompts, answers, reviews);
-		await fileReviews(date, { id, user_id: userId }, rounds, first.scored, reviews);
+		await fileReviews(date, { id, user_id: userId }, first.scored, reviews);
 		const { scored, total } = scoreRounds(rounds, day.prompts, answers, reviews);
 		await sql`
 			update krillion_submissions set scored = ${sql.json(scored as never)}, updated_score = ${total},

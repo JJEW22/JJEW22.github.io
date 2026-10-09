@@ -43,7 +43,14 @@
 		count: number | null;
 		rarity?: number | null;
 		unknown?: boolean; // not on the day's list
-		review?: 'pending' | 'accepted' | 'rejected' | null;
+		acceptedWord?: boolean; // a word an admin accepted after review
+		originalPoints?: number; // the answer's own points (`points` may be an override's)
+		override?: {
+			word: string;
+			status: 'pending' | 'accepted' | 'rejected' | null;
+			points: number | null;
+			listedAs: string | null;
+		} | null;
 	}
 	interface Result {
 		dayNumber: number;
@@ -86,8 +93,11 @@
 		othersChose: number | null;
 		prompt: string;
 		found: boolean;
-		review: boolean; // "submit for review": the answer may not be on the day's list
-		flagged: boolean; // the server said it isn't on the list
+		// An override: another word, not on the day's list, sent for review. The
+		// answer above keeps scoring until an admin accepts it.
+		overrideOn: boolean;
+		override: string;
+		flagged: boolean; // the server said the override word isn't on the list
 	}
 	const blankRow = (): Row => ({
 		answer: '',
@@ -97,7 +107,8 @@
 		othersChose: null,
 		prompt: '',
 		found: false,
-		review: false,
+		overrideOn: false,
+		override: '',
 		flagged: false
 	});
 	let paste = '';
@@ -245,14 +256,15 @@
 		formOpen = false;
 		notify = mine.notify;
 		rows = scoredRounds.map((r, i) => {
-			// A word sent for review is put back as typed, still ticked for review.
-			const text = r.unknown ? (r.submitted ?? '') : r.miss ? '' : (r.match ?? r.submitted ?? '');
+			const text = r.miss ? '' : (r.match ?? r.submitted ?? '');
+			const override = mine.rounds[i]?.override ?? '';
 			return {
 				...blankRow(),
 				answer: text,
 				original: text,
 				prompt: r.prompt ?? '',
-				review: Boolean(mine.rounds[i]?.review)
+				overrideOn: Boolean(override),
+				override
 			};
 		});
 	}
@@ -271,7 +283,8 @@
 			othersChose: r.othersChose,
 			prompt: r.prompt,
 			found: r.found,
-			review: false,
+			overrideOn: false,
+			override: '',
 			flagged: false
 		}));
 		pasted = { dayNumber: d.dayNumber, score: d.score, betterThan: d.betterThan, found: d.found };
@@ -293,6 +306,14 @@
 	// Set when a submission was refused for answers that aren't on the day's list.
 	let reviewNote = false;
 
+	// Ticking "Override" opens a line for the other word -- a miss's typed
+	// text to start with, if the paste had one.
+	function toggleOverride(r: Row) {
+		if (r.overrideOn && !r.override.trim() && r.typed) r.override = r.typed;
+		if (!r.overrideOn) r.flagged = false;
+		rows = rows;
+	}
+
 	async function submit() {
 		busy = true;
 		error = '';
@@ -313,7 +334,7 @@
 						othersChose: same ? r.othersChose : null,
 						prompt: r.prompt,
 						found: r.found && same,
-						review: r.review && Boolean(r.answer.trim())
+						override: r.overrideOn ? r.override.trim() || null : null
 					};
 				}),
 				notify,
@@ -326,12 +347,22 @@
 			});
 			const data = await r.json().catch(() => null);
 			if (Array.isArray(data?.unknownRounds) && data.unknownRounds.length) {
-				// Answers that aren't on the day's list: flag them and tick them for
-				// review, so submitting again sends them in.
+				// Answers that aren't on the day's list: each moves to its round's
+				// override, ticked and flagged, and the answer goes back to what was
+				// first submitted (the paste's, else a miss) -- so submitting again
+				// keeps that score and sends the word in for review.
 				const bad = new Set<number>(data.unknownRounds);
-				rows = rows.map((row, i) =>
-					bad.has(i + 1) ? { ...row, flagged: true, review: true } : row
-				);
+				rows = rows.map((row, i) => {
+					if (!bad.has(i + 1)) return row;
+					const word = row.answer.trim();
+					return {
+						...row,
+						answer: row.original && row.original !== word ? row.original : '',
+						overrideOn: true,
+						override: word,
+						flagged: true
+					};
+				});
 				reviewNote = true;
 				return;
 			}
@@ -492,12 +523,33 @@
 								</span>
 								<label
 									class="review"
-									title="Not in the database? Tick to send this answer to an admin for review."
+									title="Submit another word for this round, for an admin to review. Your answer keeps scoring until it's accepted."
 								>
-									<input type="checkbox" bind:checked={r.review} disabled={!r.answer.trim()} />
-									<span>Submit for review</span>
+									<input
+										type="checkbox"
+										bind:checked={r.overrideOn}
+										on:change={() => toggleOverride(r)}
+									/>
+									<span>Override</span>
 								</label>
 							</span>
+							{#if r.overrideOn}
+								<span class="row-input override-line">
+									<span class="override-arrow" aria-hidden="true">↳</span>
+									<input
+										id="k-override-{i}"
+										aria-label="Override word for round {i + 1}"
+										bind:value={r.override}
+										on:input={() => (r.flagged = false)}
+										autocomplete="off"
+										placeholder="word to submit for review"
+									/>
+									<span class="row-tag override-tag"
+										>for review — {r.answer.trim() ? 'your answer above' : 'a miss'} counts until it's
+										accepted</span
+									>
+								</span>
+							{/if}
 						</div>
 						{#if day?.answers && day.prompts[i]}
 							<datalist id="k-answers-{i}">
@@ -542,8 +594,9 @@
 				{#if reviewNote}
 					<p class="warn review-note">
 						The words highlighted in red are not in the database. They have now been checked to be
-						submitted for review — press <b>Rescore my dive</b> again to send them in, or fix them. Until
-						an admin accepts a word it scores as a miss.
+						submitted for review, as overrides — press <b>Rescore my dive</b> again to send them in,
+						or fix them. Each round keeps its original answer's score (a miss, if it was one) until an
+						admin accepts the override.
 					</p>
 				{/if}
 				{#if error}<p class="warn">{error}</p>{/if}
@@ -572,7 +625,11 @@
 							{#each result.rounds as r (r.round)}
 								<tr class:miss={r.miss}>
 									<td>{r.round}</td>
-									<td>{r.miss ? 'miss' : r.submitted}</td>
+									<td
+										>{r.miss ? 'miss' : r.submitted}{#if r.override}<div class="sub">
+												↳ override “{r.override}” — sent for review
+											</div>{/if}</td
+									>
 									<td class="num">{r.gamePoints ?? '—'}</td>
 								</tr>
 							{/each}
@@ -607,37 +664,56 @@
 						</thead>
 						<tbody>
 							{#each result.rounds as r (r.round)}
-								<tr class:miss={r.miss}>
+								{@const overridden = r.override?.points != null}
+								<tr class:miss={r.miss && !overridden}>
 									<td>{r.round}</td>
 									<td>
-										{r.unknown ? r.submitted : r.miss ? 'miss' : r.match}
+										<span class:replaced={overridden}>{r.miss ? 'miss' : r.match}</span>
 										{#if !r.miss && r.submitted && r.match && r.match.toLowerCase() !== r.submitted.toLowerCase()}
 											<span class="sub">(you typed “{r.submitted}”)</span>
 										{/if}
-										{#if r.review === 'accepted'}
+										{#if r.acceptedWord}
 											<span class="rv accepted" title="Accepted by an admin after review"
 												>accepted word</span
 											>
-										{:else if r.review === 'pending'}
-											<span class="rv pending" title="Scores as a miss unless an admin accepts it"
-												>in review</span
-											>
-										{:else if r.review === 'rejected'}
-											<span class="rv rejected">not accepted</span>
-										{:else if r.unknown}
-											<span class="rv rejected">not in the database</span>
+										{/if}
+										{#if r.override}
+											<div class="override-result">
+												↳ override <b>{r.override.word}</b>
+												{#if r.override.status === 'accepted'}
+													<span class="rv accepted"
+														>accepted — scores {r.override.points?.toFixed(1)}</span
+													>
+												{:else if r.override.status === 'rejected'}
+													<span class="rv rejected">not accepted</span>
+												{:else if r.override.listedAs}
+													<span class="rv rejected">already in the database</span>
+												{:else}
+													<span
+														class="rv pending"
+														title="The answer above scores until an admin accepts this"
+														>in review</span
+													>
+												{/if}
+											</div>
 										{/if}
 										<div class="sub">{r.prompt}</div>
 									</td>
-									<td class="num">{r.count?.toLocaleString() ?? '—'}</td>
+									<td class="num">{overridden ? '—' : (r.count?.toLocaleString() ?? '—')}</td>
 									<td
 										class="num"
-										title={r.rarity != null
+										title={r.rarity != null && !overridden
 											? `Rarer than ${formatPercentile(r.rarity)} of players' answers`
-											: undefined}>{r.rarity != null ? formatPercentile(r.rarity) : '—'}</td
+											: undefined}
+										>{r.rarity != null && !overridden ? formatPercentile(r.rarity) : '—'}</td
 									>
 									<td class="num">{r.gamePoints ?? '—'}</td>
-									<td class="num"><b>{r.points.toFixed(1)}</b></td>
+									<td
+										class="num"
+										title={overridden
+											? `Your answer scored ${(r.originalPoints ?? 0).toFixed(1)}; the accepted override replaces it`
+											: undefined}><b>{r.points.toFixed(1)}</b></td
+									>
 								</tr>
 							{/each}
 						</tbody>
@@ -817,9 +893,9 @@
 					with each. Misses score 0, as in the game.
 				</li>
 				<li>
-					An answer that isn't in the day's list can be <b>submitted for review</b>. Until an admin
-					accepts it, it scores as a miss; once accepted it scores the prompt's average plus one
-					standard deviation, for everyone who gave it that day.
+					A word that isn't in the day's list can be sent as an <b>override</b> for review. Your original
+					answer keeps scoring until an admin accepts it; once accepted, the word scores the prompt's
+					average plus one standard deviation, for everyone who sent it that day.
 				</li>
 			</ul>
 		</section>
@@ -1072,13 +1148,43 @@
 		background: #f4fbf6;
 	}
 
-	.row.flagged input:not([type='checkbox']) {
-		border-color: #d64545;
+	.override-line {
+		padding-left: 0.4rem;
+	}
+
+	.override-arrow {
+		flex: none;
+		color: #999;
+	}
+
+	.override-line input {
+		border-style: dashed;
+	}
+
+	.row-tag.override-tag {
+		min-width: 0;
+		max-width: 14rem;
+		line-height: 1.3;
+	}
+
+	.row.flagged .override-line input {
+		border: 1px solid #d64545;
 		background: #fdeeee;
 	}
 
 	.row.flagged .row-label {
 		color: #9a2c2c;
+	}
+
+	.override-result {
+		margin-top: 0.15rem;
+		font-size: 0.85rem;
+		color: #555;
+	}
+
+	.replaced {
+		text-decoration: line-through;
+		color: #999;
 	}
 
 	.review {

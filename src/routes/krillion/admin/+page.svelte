@@ -15,6 +15,7 @@
 	import { resolve } from '$app/paths';
 	import '../../../app.css';
 	import { onMount } from 'svelte';
+	import { formatPercentile } from '$lib/krillion';
 
 	interface Fit {
 		a: number;
@@ -52,6 +53,9 @@
 		gamePoints: number | null;
 		points: number;
 		count: number | null;
+		rarity?: number | null; // % of players whose answer was more common
+		acceptedWord?: boolean; // the answer is an Accepted Word, from review
+		override?: { word: string; status: string | null; points: number | null } | null;
 	}
 	interface Submission {
 		id: number;
@@ -63,7 +67,7 @@
 		submittedAt: string;
 		rounds: Round[];
 	}
-	type SubSortKey = 'updatedScore' | 'gameScore' | 'gain' | 'name';
+	type SubSortKey = 'updatedScore' | 'gameScore' | 'gain' | 'rarity' | 'name';
 
 	let status: 'loading' | 'denied' | 'gated' | 'missing' | 'ready' = 'loading';
 	let error = '';
@@ -258,13 +262,27 @@
 	$: shown = rows.slice(0, limit);
 	$: if (search !== undefined) limit = 200;
 
-	function arrow(key: SortKey): string {
-		return sortKey === key ? (sortDesc ? ' ▼' : ' ▲') : '';
+	// The sort state is passed in rather than read here: the markup only re-runs
+	// a call when something written in the call itself changes.
+	function arrow(key: SortKey, by: SortKey, desc: boolean): string {
+		return by === key ? (desc ? ' ▼' : ' ▲') : '';
 	}
 
 	// ---- submissions ----
 	function gain(s: Submission): number | null {
 		return s.updatedScore === null || s.gameScore === null ? null : s.updatedScore - s.gameScore;
+	}
+
+	// A round's rarity percentile -- not once an accepted override replaces
+	// the answer it describes.
+	function roundRarity(r: Round): number | null {
+		return r.override?.points != null ? null : (r.rarity ?? null);
+	}
+
+	// A dive's average rarity over the rounds with an answer.
+	function avgRarity(s: Submission): number | null {
+		const v = s.rounds.map(roundRarity).filter((x): x is number => x !== null);
+		return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 	}
 
 	function subSortBy(key: SubSortKey) {
@@ -275,8 +293,8 @@
 		}
 	}
 
-	function subArrow(key: SubSortKey): string {
-		return subSort === key ? (subDesc ? ' ▼' : ' ▲') : '';
+	function subArrow(key: SubSortKey, by: SubSortKey, desc: boolean): string {
+		return by === key ? (desc ? ' ▼' : ' ▲') : '';
 	}
 
 	function toggle(id: number) {
@@ -292,27 +310,22 @@
 	$: sq = subSearch.trim().toLowerCase();
 	$: subRows = submissions
 		.filter(
-			(s) =>
-				!sq ||
-				s.name.toLowerCase().includes(sq) ||
-				s.rounds.some(
-					(r) =>
-						!r.miss &&
-						((r.submitted ?? '').toLowerCase().includes(sq) ||
-							(r.match ?? '').toLowerCase().includes(sq))
-				)
+			(s) => !sq || s.name.toLowerCase().includes(sq) || s.rounds.some((r) => answerHit(r, sq))
 		)
 		.sort((x, y) => {
 			const dir = subDesc ? -1 : 1;
 			if (subSort === 'name') return dir * x.name.localeCompare(y.name);
-			const xv = (subSort === 'gain' ? gain(x) : x[subSort]) ?? -Infinity;
-			const yv = (subSort === 'gain' ? gain(y) : y[subSort]) ?? -Infinity;
+			const val = (v: Submission) =>
+				subSort === 'gain' ? gain(v) : subSort === 'rarity' ? avgRarity(v) : v[subSort];
+			const xv = val(x) ?? -Infinity;
+			const yv = val(y) ?? -Infinity;
 			return xv === yv ? x.name.localeCompare(y.name) : dir * (xv > yv ? 1 : -1);
 		});
-	// Searching for an answer opens the dives that used it.
+	// Searching for an answer (or an override word) opens the dives that used it.
 	function answerHit(r: Round, q: string): boolean {
+		if (!q) return false;
+		if ((r.override?.word ?? '').toLowerCase().includes(q)) return true;
 		return (
-			!!q &&
 			!r.miss &&
 			((r.submitted ?? '').toLowerCase().includes(q) || (r.match ?? '').toLowerCase().includes(q))
 		);
@@ -490,21 +503,27 @@
 					<tr>
 						<th
 							><button type="button" on:click={() => subSortBy('name')}
-								>Player{subArrow('name')}</button
+								>Player{subArrow('name', subSort, subDesc)}</button
 							></th
 						>
 						<th class="num"
 							><button type="button" on:click={() => subSortBy('gameScore')}
-								>Game{subArrow('gameScore')}</button
+								>Game{subArrow('gameScore', subSort, subDesc)}</button
 							></th
 						>
 						<th class="num"
 							><button type="button" on:click={() => subSortBy('updatedScore')}
-								>Rescored{subArrow('updatedScore')}</button
+								>Rescored{subArrow('updatedScore', subSort, subDesc)}</button
 							></th
 						>
 						<th class="num"
-							><button type="button" on:click={() => subSortBy('gain')}>Δ{subArrow('gain')}</button
+							><button type="button" on:click={() => subSortBy('gain')}
+								>Δ{subArrow('gain', subSort, subDesc)}</button
+							></th
+						>
+						<th class="num" title="Average rarity percentile of the dive's answers"
+							><button type="button" on:click={() => subSortBy('rarity')}
+								>Avg rarity{subArrow('rarity', subSort, subDesc)}</button
 							></th
 						>
 					</tr>
@@ -532,10 +551,13 @@
 							<td class="num" class:up={g !== null && g > 0} class:down={g !== null && g < 0}
 								>{g === null ? '—' : `${g > 0 ? '+' : ''}${g.toFixed(1)}`}</td
 							>
+							<td class="num"
+								>{avgRarity(s) === null ? '—' : formatPercentile(avgRarity(s) ?? 0)}</td
+							>
 						</tr>
 						{#if openIds.includes(s.id) || (sq && s.rounds.some((r) => answerHit(r, sq)))}
 							<tr class="detail">
-								<td colspan="4">
+								<td colspan="5">
 									<table>
 										<thead>
 											<tr>
@@ -543,6 +565,11 @@
 												<th>Prompt</th>
 												<th>Answer</th>
 												<th class="num">Players</th>
+												<th
+													class="num"
+													title="Percentile of rarity: the share of players whose answer was more common"
+													>Rarity</th
+												>
 												<th class="num">Game</th>
 												<th class="num">Rescored</th>
 											</tr>
@@ -559,9 +586,21 @@
 																class="sub"
 															>
 																→ {r.match}</span
-															>{/if}
+															>{/if}{#if r.acceptedWord}<span class="tag accepted-tag"
+																>Accepted Word</span
+															>{/if}{#if r.override}<div class="sub">
+																↳ override “{r.override.word}” · {r.override.status ??
+																	'not filed'}{r.override.points != null
+																	? ` · scores ${r.override.points.toFixed(1)}`
+																	: ''}
+															</div>{/if}
 													</td>
 													<td class="num">{r.count?.toLocaleString() ?? '—'}</td>
+													<td class="num"
+														>{roundRarity(r) === null
+															? '—'
+															: formatPercentile(roundRarity(r) ?? 0)}</td
+													>
 													<td class="num">{r.gamePoints ?? '—'}</td>
 													<td class="num"
 														><b>{s.updatedScore === null ? '—' : r.points.toFixed(1)}</b></td
@@ -575,7 +614,7 @@
 							</tr>
 						{/if}
 					{:else}
-						<tr><td colspan="4" class="sub">No dives{sq ? ' match' : ' yet'}.</td></tr>
+						<tr><td colspan="5" class="sub">No dives{sq ? ' match' : ' yet'}.</td></tr>
 					{/each}
 				</tbody>
 			</table>
@@ -640,23 +679,23 @@
 						<tr>
 							<th
 								><button type="button" on:click={() => sortBy('answer')}
-									>Answer{arrow('answer')}</button
+									>Answer{arrow('answer', sortKey, sortDesc)}</button
 								></th
 							>
 							<th class="num"
 								><button type="button" on:click={() => sortBy('count')}
-									>Players{arrow('count')}</button
+									>Players{arrow('count', sortKey, sortDesc)}</button
 								></th
 							>
 							<th class="num">Share</th>
 							<th class="num"
 								><button type="button" on:click={() => sortBy('gameScore')}
-									>Game{arrow('gameScore')}</button
+									>Game{arrow('gameScore', sortKey, sortDesc)}</button
 								></th
 							>
 							<th class="num"
 								><button type="button" on:click={() => sortBy('points')}
-									>Rescored{arrow('points')}</button
+									>Rescored{arrow('points', sortKey, sortDesc)}</button
 								></th
 							>
 						</tr>

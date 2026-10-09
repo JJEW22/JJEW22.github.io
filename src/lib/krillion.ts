@@ -74,9 +74,10 @@ export interface PastedRound {
 	othersChose: number | null;
 	gamePoints: number | null;
 	found: boolean; // false = this round wasn't in the paste; the player fills it in
-	// The player asked for this answer to be reviewed if it isn't on the day's
-	// list (krillion_word_reviews). Ignored for an answer that is.
-	review?: boolean;
+	// An override: another word for this round, not on the day's list, sent to
+	// an admin for review (krillion_word_reviews). The round keeps scoring the
+	// answer above until the override is accepted.
+	override?: string | null;
 }
 
 export interface PastedDive {
@@ -555,7 +556,9 @@ export function rescoreShareText(
 		'',
 		row((r) => gameEmoji(r.gamePoints, r.miss)),
 		row(() => '⬇️'),
-		row((r) => rescoredEmoji(r.points, r.miss)),
+		// Rescored by its points alone: an accepted override can score a round
+		// the game counted as a miss.
+		row((r) => rescoredEmoji(r.points, false)),
 		row((r) => changeEmoji(r.gamePoints, r.points))
 	].join('\n');
 }

@@ -5,8 +5,9 @@
 // come from the day's answer sheet, so nothing pasted is trusted for scoring.
 //
 // Once the day's list is in, an answer that isn't on it is refused (422, with
-// `unknownRounds`) unless the player ticked "submit for review" for it; then
-// it's filed for a krillion admin and scores as a miss until accepted.
+// `unknownRounds`): the page moves it to an override. An override is another
+// word for the round, filed for a krillion admin; the round keeps scoring its
+// answer until the override is accepted.
 import { json } from '@sveltejs/kit';
 import { dayForDate, etDate, type PastedRound } from '$lib/krillion';
 import { KrillionError, submitDive } from '$lib/server/krillion';
@@ -37,8 +38,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			othersChose: num(r?.othersChose),
 			gamePoints: num(r?.gamePoints),
 			found: Boolean(r?.found),
-			// "Submit for review": an answer that isn't on the day's list.
-			review: Boolean(r?.review) && Boolean(answer)
+			// An override: another word, not on the day's list, for review.
+			override: text(r?.override, 200) || null
 		};
 	});
 	if (rounds.every((r) => r.miss)) {
