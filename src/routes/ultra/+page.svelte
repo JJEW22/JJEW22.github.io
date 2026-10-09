@@ -19,20 +19,20 @@
 	import { resolve } from '$app/paths';
 	import {
 		ON_COURSE_M,
-		RACE,
 		METERS_PER_MILE,
 		buildGpx,
 		courseProgress,
-		directionsUrl,
 		formatDuration,
 		formatPace,
 		indexCourse,
 		parseGpx,
+		placeUrl,
 		placeStations,
 		projectOnCourse,
 		stopSchedule,
 		timeAtMile,
 		type AidStation,
+		type RaceAbout,
 		type CourseIndex,
 		type ScheduleRow
 	} from '$lib/ultra';
@@ -65,6 +65,8 @@
 		showBattery: boolean;
 		isAdmin: boolean;
 		race: {
+			id: 'main' | 'test';
+			test: boolean;
 			name: string;
 			start: string | null;
 			end: string | null;
@@ -75,6 +77,8 @@
 			aidStations: AidStation[];
 			googleMapsUrl: string | null;
 			paceRangeMinPerMile: [number, number];
+			legPaceMinPerMile: Record<string, [number, number]>;
+			about: RaceAbout | null;
 		};
 		runners: Runner[];
 		serverTime: string;
@@ -375,7 +379,9 @@
 						fixMs: Date.parse(r.latest.t)
 					}
 				: null;
-		const pace = t?.race.paceRangeMinPerMile ?? [9, 12];
+		const base: [number, number] = t?.race.paceRangeMinPerMile ?? [9, 12];
+		// Per leg: a stop with its own range (a train ride) uses it.
+		const pace = rows.map((st) => t?.race.legPaceMinPerMile?.[st.name] ?? base);
 		return { r, start, rows: stopSchedule(rows, start, pace, live, at) };
 	}
 
@@ -458,6 +464,8 @@
 		.filter((st) => /looking for volunteer/i.test(st.name));
 	// The summary leads before the race; once it's under way the live data does.
 	$: raceUnderway = status === 'live' || status === 'finished';
+	// The active race's summary (the real race's, or the test race's).
+	$: about = track?.race.about ?? null;
 
 	function startText(iso: string): string {
 		const d = new Date(iso);
@@ -495,7 +503,11 @@
 	<main>
 		<header class="head">
 			<div>
-				<h1>{track?.race.name ?? 'Ultra marathon'}</h1>
+				<h1>
+					{track?.race.name ?? 'Ultra marathon'}{#if track?.race.test}<span class="test-badge"
+							>TEST</span
+						>{/if}
+				</h1>
 				{#if track?.mode === 'race' && (track.race.location || track.race.start)}
 					<p class="sub">
 						{track.race.location}{#if track.race.location && track.race.start}
@@ -529,10 +541,10 @@
 		{/if}
 
 		{#snippet raceAbout()}
-			{#if RACE.about}
+			{#if about}
 				<section class="about" aria-label="About the race">
-					<p class="hook">🍃 {RACE.about.hook}</p>
-					<p class="intro">{RACE.about.intro}</p>
+					<p class="hook">🍃 {about.hook}</p>
+					<p class="intro">{about.intro}</p>
 					<dl class="facts">
 						<div>
 							<dt>Start</dt>
@@ -540,7 +552,7 @@
 						</div>
 						<div class="route">
 							<dt>Route</dt>
-							<dd>{RACE.about.route}</dd>
+							<dd>{about.route}</dd>
 						</div>
 						{#if courseTotal}
 							<div>
@@ -562,31 +574,33 @@
 							From the start, our live location shows on the map below.
 						{/if}
 					</p>
-					<h3>How you can help</h3>
-					<ul class="help">
-						{#each RACE.about.help as h (h.title)}
-							<li>
-								<span class="help-icon" aria-hidden="true">{h.icon}</span>
-								<div>
-									<b>{h.title}</b>
-									<p>{h.text}</p>
-									{#if h.openVolunteerStops}
-										{#if openStops.length}
-											<p class="open">
-												Still needed:
-												{#each openStops as st, i (st.no)}{i ? ', ' : ''}<a href="#stop-{st.no}"
-														>{shortStopName(st.name)} (stop {st.no}, mile {st.mile.toFixed(1)})</a
-													>{/each}.
-											</p>
-										{:else if ci}
-											<p class="open filled">Every volunteer stop is covered. Thank you!</p>
+					{#if about.help.length}
+						<h3>How you can help</h3>
+						<ul class="help">
+							{#each about.help as h (h.title)}
+								<li>
+									<span class="help-icon" aria-hidden="true">{h.icon}</span>
+									<div>
+										<b>{h.title}</b>
+										<p>{h.text}</p>
+										{#if h.openVolunteerStops}
+											{#if openStops.length}
+												<p class="open">
+													Still needed:
+													{#each openStops as st, i (st.no)}{i ? ', ' : ''}<a href="#stop-{st.no}"
+															>{shortStopName(st.name)} (stop {st.no}, mile {st.mile.toFixed(1)})</a
+														>{/each}.
+												</p>
+											{:else if ci}
+												<p class="open filled">Every volunteer stop is covered. Thank you!</p>
+											{/if}
 										{/if}
-									{/if}
-								</div>
-							</li>
-						{/each}
-					</ul>
-					<p class="contact">{RACE.about.contact}</p>
+									</div>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					{#if about.contact}<p class="contact">{about.contact}</p>{/if}
 				</section>
 			{/if}
 		{/snippet}
@@ -724,7 +738,7 @@
 							{#each schedules as sc, j (sc.r?.id ?? j)}
 								<th class="num">{schedules.length > 1 && sc.r ? sc.r.name : 'Est. Arrival'}</th>
 							{/each}
-							<th class="num" title="Directions in Google Maps">Map</th>
+							<th class="num" title="Open the spot in Google Maps">Map</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -749,7 +763,7 @@
 								{/each}
 								<td class="num">
 									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
-									<a href={directionsUrl(st.lat, st.lon)} target="_blank" rel="noopener">Google</a>
+									<a href={placeUrl(st.lat, st.lon)} target="_blank" rel="noopener">Google</a>
 								</td>
 							</tr>
 						{/each}
@@ -764,7 +778,7 @@
 					measured from the latest position.{/if}
 				{#if schedules[0]?.start === null}Times are after the start until the start time is set.{:else}Times
 					are in your time zone.{/if}
-				Directions open Google Maps from wherever you are.
+				“Google” opens the spot in Google Maps; tap Directions there to get to it.
 			</p>
 		{/if}
 
@@ -860,6 +874,19 @@
 	.note {
 		color: #555;
 		margin: 0.5rem 0 0 0;
+	}
+
+	.test-badge {
+		display: inline-block;
+		margin-left: 0.6rem;
+		padding: 0.15rem 0.5rem;
+		background: #b9770e;
+		border-radius: 6px;
+		font-size: 0.9rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		color: #fff;
+		vertical-align: middle;
 	}
 
 	.badge {

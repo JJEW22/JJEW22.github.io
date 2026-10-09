@@ -6,12 +6,15 @@ import { env } from '$env/dynamic/private';
 import { sql } from '$lib/server/db';
 import {
 	METERS_PER_MILE,
-	RACE,
+	RACES,
+	isRaceId,
 	cleanTrack,
 	isNullIsland,
 	latestFix,
 	pathLength,
 	type AidStation,
+	type RaceAbout,
+	type RaceId,
 	type RaceStatus
 } from '$lib/ultra';
 
@@ -101,11 +104,19 @@ export interface UltraSettings {
 	mode: DisplayMode;
 	liveSince: string | null;
 	showBattery: boolean; // phone battery % on the public page
-	// The race clock set on the admin page. Null start falls back to RACE.start;
-	// null end means start + RACE.cutoffHours.
+	// Which race the public page shows: the real one or the practice course.
+	activeRace: RaceId;
+	// The active race's clock, set on the admin page. Null start falls back to
+	// its config's start; null end means start + its cutoffHours.
 	raceStart: string | null;
 	raceEnd: string | null;
 }
+
+// Each race's clock columns. The main race keeps the original ones.
+const CLOCK_COLUMNS: Record<RaceId, { start: string; end: string }> = {
+	main: { start: 'race_start', end: 'race_end' },
+	test: { start: 'test_race_start', end: 'test_race_end' }
+};
 
 export async function getSettings(): Promise<UltraSettings> {
 	const [row] = await sql<
@@ -113,19 +124,50 @@ export async function getSettings(): Promise<UltraSettings> {
 			mode: DisplayMode;
 			live_since: Date | null;
 			show_battery: boolean;
+			active_race: string;
 			race_start: Date | null;
 			race_end: Date | null;
+			test_race_start: Date | null;
+			test_race_end: Date | null;
 		}[]
 	>`
-		select mode, live_since, show_battery, race_start, race_end from ultra_settings where id = 1
+		select mode, live_since, show_battery, active_race, race_start, race_end,
+			test_race_start, test_race_end
+		from ultra_settings where id = 1
 	`;
+	const activeRace: RaceId = isRaceId(row?.active_race) ? row.active_race : 'main';
+	const test = activeRace === 'test';
 	return {
 		mode: row?.mode ?? 'race',
 		liveSince: row?.live_since?.toISOString() ?? null,
 		showBattery: row?.show_battery ?? true,
-		raceStart: row?.race_start?.toISOString() ?? null,
-		raceEnd: row?.race_end?.toISOString() ?? null
+		activeRace,
+		raceStart: (test ? row?.test_race_start : row?.race_start)?.toISOString() ?? null,
+		raceEnd: (test ? row?.test_race_end : row?.race_end)?.toISOString() ?? null
 	};
+}
+
+// Write the active race's clock. Only the fields passed are changed.
+async function writeClock(
+	race: RaceId,
+	patch: { start?: Date | null; end?: Date | null },
+	switchToRaceMode = false
+): Promise<void> {
+	const cols = CLOCK_COLUMNS[race];
+	const set: Record<string, Date | null | string> = {};
+	if (patch.start !== undefined) set[cols.start] = patch.start;
+	if (patch.end !== undefined) set[cols.end] = patch.end;
+	if (switchToRaceMode) set.mode = 'race';
+	await sql`insert into ultra_settings (id) values (1) on conflict (id) do nothing`;
+	await sql`update ultra_settings set ${sql(set)}, updated_at = now() where id = 1`;
+}
+
+// Switch the public page to another race. Each keeps its own clock, so
+// trying out the test race leaves the real race's start alone.
+export async function setActiveRace(race: RaceId): Promise<UltraSettings> {
+	await sql`insert into ultra_settings (id) values (1) on conflict (id) do nothing`;
+	await sql`update ultra_settings set active_race = ${race}, updated_at = now() where id = 1`;
+	return getSettings();
 }
 
 // ---- the race clock ----
@@ -137,16 +179,17 @@ export interface RaceWindow {
 	source: 'admin' | 'config'; // where the start came from
 }
 
-// The race window: the admin's start (or RACE.start), to the admin's end (or
-// start + cutoff).
+// The active race's window: the admin's start (or its config's), to the
+// admin's end (or start + cutoff).
 export function raceWindowFrom(settings: UltraSettings): RaceWindow | null {
-	const startIso = settings.raceStart ?? RACE.start;
+	const race = RACES[settings.activeRace];
+	const startIso = settings.raceStart ?? race.start;
 	if (!startIso) return null;
 	const start = new Date(startIso);
 	if (Number.isNaN(start.getTime())) return null;
 	const end = settings.raceEnd
 		? new Date(settings.raceEnd)
-		: new Date(start.getTime() + RACE.cutoffHours * 3_600_000);
+		: new Date(start.getTime() + race.cutoffHours * 3_600_000);
 	return { start, end, ended: !!settings.raceEnd, source: settings.raceStart ? 'admin' : 'config' };
 }
 
@@ -165,15 +208,12 @@ const toDate = (v: unknown): Date | null => {
 	return d;
 };
 
-// "Start the race now" (by the app's clock, like the status checks): the clock starts, any old end is cleared, and the
-// public page switches to the race window so followers see it straight away.
+// "Start the race now", by the app's clock like the status checks: the active
+// race's clock starts, any old end is cleared, and the public page switches
+// to the race window so followers see it straight away.
 export async function startRaceNow(): Promise<UltraSettings> {
-	await sql`
-		insert into ultra_settings (id, mode, race_start, race_end, updated_at)
-		values (1, 'race', ${new Date()}, null, now())
-		on conflict (id) do update set
-			mode = 'race', race_start = excluded.race_start, race_end = null, updated_at = now()
-	`;
+	const { activeRace } = await getSettings();
+	await writeClock(activeRace, { start: new Date(), end: null }, true);
 	return getSettings();
 }
 
@@ -184,12 +224,12 @@ export async function endRaceNow(): Promise<UltraSettings> {
 	if (new Date() <= w.start) throw new UltraError("The race hasn't started yet.");
 	// The app's clock, not the database's: the two can disagree by a few
 	// seconds, and the race has to read as over the moment it's ended.
-	await sql`update ultra_settings set race_end = ${new Date()}, updated_at = now() where id = 1`;
+	await writeClock(s.activeRace, { end: new Date() });
 	return getSettings();
 }
 
-// Set either end of the clock to any time (null clears it). The end has to
-// come after the start.
+// Set either end of the active race's clock to any time (null clears it).
+// The end has to come after the start.
 export async function setRaceTimes(patch: {
 	raceStart?: unknown;
 	raceEnd?: unknown;
@@ -207,17 +247,13 @@ export async function setRaceTimes(patch: {
 			: cur.raceEnd
 				? new Date(cur.raceEnd)
 				: null;
-	const effectiveStart = start ?? (RACE.start ? new Date(RACE.start) : null);
+	const configStart = RACES[cur.activeRace].start;
+	const effectiveStart = start ?? (configStart ? new Date(configStart) : null);
 	if (end && !effectiveStart) throw new UltraError('Set a start time before an end time.');
 	if (end && effectiveStart && end <= effectiveStart) {
 		throw new UltraError('The end has to be after the start.');
 	}
-	await sql`
-		insert into ultra_settings (id, race_start, race_end, updated_at)
-		values (1, ${start}, ${end}, now())
-		on conflict (id) do update set
-			race_start = excluded.race_start, race_end = excluded.race_end, updated_at = now()
-	`;
+	await writeClock(cur.activeRace, { start, end });
 	return getSettings();
 }
 
@@ -364,6 +400,8 @@ export interface TrackResponse {
 	liveSince: string | null;
 	showBattery: boolean;
 	race: {
+		id: RaceId;
+		test: boolean;
 		name: string;
 		start: string | null;
 		end: string | null;
@@ -374,6 +412,8 @@ export interface TrackResponse {
 		aidStations: AidStation[];
 		googleMapsUrl: string | null;
 		paceRangeMinPerMile: [number, number];
+		legPaceMinPerMile: Record<string, [number, number]>;
+		about: RaceAbout | null;
 	};
 	runners: Runner[];
 	serverTime: string;
@@ -396,17 +436,22 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 	const now = new Date();
 	const settings = await getSettings();
 	const w = raceWindowFrom(settings);
+	const cfg = RACES[settings.activeRace];
 	const race = {
-		name: RACE.name,
+		id: settings.activeRace,
+		test: cfg.test,
+		name: cfg.name,
 		start: w?.start.toISOString() ?? null,
 		end: w?.end.toISOString() ?? null,
-		distanceMiles: RACE.distanceMiles,
-		location: RACE.location,
-		note: RACE.note,
-		courseGpx: RACE.courseGpx,
-		aidStations: RACE.aidStations,
-		googleMapsUrl: RACE.googleMapsUrl,
-		paceRangeMinPerMile: RACE.paceRangeMinPerMile
+		distanceMiles: cfg.distanceMiles,
+		location: cfg.location,
+		note: cfg.note,
+		courseGpx: cfg.courseGpx,
+		aidStations: cfg.aidStations,
+		googleMapsUrl: cfg.googleMapsUrl,
+		paceRangeMinPerMile: cfg.paceRangeMinPerMile,
+		legPaceMinPerMile: cfg.legPaceMinPerMile ?? {},
+		about: cfg.about
 	};
 
 	let status: TrackStatus;

@@ -29,7 +29,15 @@
 	interface Row extends Device {
 		nameDraft: string;
 	}
+	type RaceId = 'main' | 'test';
+	interface RaceOption {
+		id: RaceId;
+		label: string;
+		test: boolean;
+	}
 	interface Race {
+		id: RaceId;
+		test: boolean;
 		name: string;
 		start: string | null;
 		end: string | null;
@@ -52,6 +60,7 @@
 	let mode: Mode = 'race';
 	let liveSince: string | null = null;
 	let race: Race | null = null;
+	let races: RaceOption[] = [];
 	let showBattery = true;
 	// The clock fields, as <input type="datetime-local"> values in the admin's
 	// own time zone. Refreshes leave them alone while they're being edited.
@@ -74,11 +83,15 @@
 		};
 	});
 
-	function apply(data: { settings: Settings; devices: Device[]; race: Race }) {
+	function apply(data: { settings: Settings; devices: Device[]; race: Race; races: RaceOption[] }) {
+		const switched = race !== null && race.id !== data.race.id;
+		races = data.races;
 		mode = data.settings.mode;
 		liveSince = data.settings.liveSince;
 		showBattery = data.settings.showBattery;
 		race = data.race;
+		// A different race has a different clock: drop any half-typed times.
+		if (switched) editingClock = false;
 		if (!editingClock) {
 			startDraft = toLocalInput(data.race.start);
 			endDraft = data.race.ended ? toLocalInput(data.race.end) : '';
@@ -124,6 +137,16 @@
 		} finally {
 			busy = false;
 		}
+	}
+
+	function switchRace(r: RaceOption) {
+		if (r.id === race?.id) return;
+		const note =
+			mode === 'off'
+				? ''
+				: "\n\nThe public page will show this race straight away (the display isn't Off).";
+		if (!confirm(`Switch to "${r.label}"?${note}\n\nEach race keeps its own clock.`)) return;
+		post({ activeRace: r.id }, `Now showing: ${r.label}.`);
 	}
 
 	function setMode(m: Mode) {
@@ -253,6 +276,32 @@
 			</p>
 		{:else}
 			<section>
+				<h2>Race</h2>
+				<div class="races" role="radiogroup" aria-label="Race">
+					{#each races as r (r.id)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={race?.id === r.id}
+							class:on={race?.id === r.id}
+							class:test={r.test}
+							disabled={busy}
+							on:click={() => switchRace(r)}
+						>
+							{#if r.test}<span class="test-tag">TEST</span>{/if}
+							<b>{r.label}</b>
+						</button>
+					{/each}
+				</div>
+				{#if race?.test}
+					<p class="banner warn">
+						The <b>test race</b> is active: the public page shows its course, with a TEST label. Switch
+						back to the real race when you're done. Its clock is kept separately and isn't affected.
+					</p>
+				{/if}
+			</section>
+
+			<section>
 				<h2>Public display</h2>
 				<div class="modes" role="radiogroup" aria-label="Public display">
 					<button
@@ -278,7 +327,7 @@
 							{#if race?.start && race.end}
 								{clock(race.start)} → {clock(race.end)}
 							{:else}
-								No race set yet (RACE in <code>src/lib/ultra.ts</code>)
+								No start time set yet
 							{/if}
 						</span>
 					</button>
@@ -309,14 +358,16 @@
 			</section>
 
 			<section>
-				<h2>Race clock</h2>
+				<h2>
+					Race clock{#if race}<span class="clock-for">&nbsp;· {race.name}</span>{/if}
+				</h2>
 				<p class="clock-state {clockState}">
 					{#if clockState === 'unset'}
 						Not started — no start time set.
 					{:else if clockState === 'upcoming' && race?.start}
 						Starts {clock(race.start)} (in {hms(Date.parse(race.start) - now)}){race.startSource ===
 						'config'
-							? ' — from RACE in the code'
+							? ' — from the race config in the code'
 							: ''}.
 					{:else if clockState === 'running' && race?.start}
 						<b>Running · {hms(now - Date.parse(race.start))}</b> since {clock(race.start)}.
@@ -593,6 +644,55 @@
 	.modes button:disabled {
 		cursor: default;
 		opacity: 0.7;
+	}
+
+	.clock-for {
+		font-weight: 400;
+		color: #888;
+		font-size: 0.95rem;
+	}
+
+	.races {
+		display: flex;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.races button {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.7rem 1rem;
+		background: #fff;
+		border: 2px solid #e3e7ec;
+		border-radius: 10px;
+		font: inherit;
+		cursor: pointer;
+	}
+
+	.races button.on {
+		border-color: #e4572e;
+		background: #fff5f2;
+	}
+
+	.races button.test.on {
+		border-color: #b9770e;
+		background: #fff8e8;
+	}
+
+	.races button:disabled {
+		opacity: 0.7;
+		cursor: default;
+	}
+
+	.test-tag {
+		padding: 0.05rem 0.4rem;
+		background: #b9770e;
+		border-radius: 4px;
+		font-size: 0.7rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		color: #fff;
 	}
 
 	.clock-state {

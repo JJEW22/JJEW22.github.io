@@ -21,12 +21,16 @@ export interface RaceAbout {
 		text: string;
 		// List the stops still "looking for volunteer" under this item.
 		openVolunteerStops?: boolean;
-	}[];
-	contact: string;
+	}[]; // empty: no "How you can help" section
+	contact: string; // empty: no closing line
 }
 
 export interface RaceConfig {
 	name: string;
+	// What the admin page's race switch calls it.
+	label: string;
+	// A practice race: the public page says so, loudly.
+	test: boolean;
 	// ISO start time with its UTC offset, or null while the race isn't set.
 	// No start = nothing is shown publicly.
 	start: string | null;
@@ -44,6 +48,9 @@ export interface RaceConfig {
 	// window is the previous stop's late time plus the leg at the fast pace
 	// (early end) and at the slow pace (late end, which the next stop builds on).
 	paceRangeMinPerMile: [number, number];
+	// A different pace range for the leg into a particular stop, keyed by the
+	// stop's name -- a leg ridden on a train, say.
+	legPaceMinPerMile?: Record<string, [number, number]>;
 	// The race summary at the top of the page (moves under the stops table
 	// once the race is live). The start time and the open volunteer stops are
 	// filled in by the page from the race clock and the stop names.
@@ -52,10 +59,21 @@ export interface RaceConfig {
 	note: string;
 }
 
-// Edit this for the race. Points the phone sends are only shown publicly
-// between `start` and `start + cutoffHours`.
+// The races the tracker knows. The admin page switches the public page
+// between them; each keeps its own race clock. Points the phones send are only
+// shown publicly between a race's start and `start + cutoffHours`.
+export type RaceId = 'main' | 'test';
+export const RACE_IDS: RaceId[] = ['main', 'test'];
+
+export function isRaceId(v: unknown): v is RaceId {
+	return typeof v === 'string' && (RACE_IDS as string[]).includes(v);
+}
+
+// The real race.
 export const RACE: RaceConfig = {
 	name: 'The entire Charles River',
+	label: 'The entire Charles River',
+	test: false,
 	start: null, // set the start time to open the race window
 	cutoffHours: 30,
 	distanceMiles: 78.2,
@@ -96,6 +114,38 @@ export const RACE: RaceConfig = {
 	},
 	note: ''
 };
+
+// A short practice course for trying the tracker end to end before race day:
+// walk from 7 Bynner St to Jackson Square, the Orange Line to Back Bay, then
+// walk via Copley Square to the Tracksmith Trackhouse on Newbury St. Walking
+// legs from OpenStreetMap's router; the train is drawn station to station.
+export const TEST_RACE: RaceConfig = {
+	name: 'Test race: Bynner St to Tracksmith',
+	label: 'Test: Bynner St → Tracksmith (Orange Line)',
+	test: true,
+	start: null,
+	cutoffHours: 3,
+	distanceMiles: 3.4,
+	location: 'Jamaica Plain to Back Bay, Boston',
+	courseGpx: '/ultra/test-bynner-tracksmith.gpx',
+	aidStations: [],
+	googleMapsUrl: null,
+	paceRangeMinPerMile: [9, 12],
+	// The Orange Line, Jackson Square to Back Bay: ~2.1 mi in ~8-10 minutes,
+	// plus some waiting on the platform.
+	legPaceMinPerMile: { 'Back Bay T (off the Orange Line)': [3, 6] },
+	about: {
+		hook: 'This is a test run of the tracker.',
+		intro:
+			'A short practice trip from 7 Bynner St to the Tracksmith Trackhouse, walking to Jackson Square, riding the Orange Line to Back Bay and walking via Copley Square, to check everything works before race day. The real race is the entire Charles River.',
+		route: '7 Bynner St → Orange Line → Tracksmith Trackhouse',
+		help: [],
+		contact: ''
+	},
+	note: ''
+};
+
+export const RACES: Record<RaceId, RaceConfig> = { main: RACE, test: TEST_RACE };
 
 export const METERS_PER_MILE = 1609.344;
 
@@ -481,7 +531,8 @@ export interface ScheduleRow {
 export function stopSchedule(
 	stops: { mile: number }[],
 	start: number | null,
-	paceMinPerMile: [number, number],
+	// One range for every leg, or one per stop (the leg ending at that stop).
+	paceMinPerMile: [number, number] | [number, number][],
 	runner: {
 		arrivals: (number | null)[]; // per stop
 		progressMile: number | null; // where they are on the course
@@ -489,7 +540,9 @@ export function stopSchedule(
 	} | null = null,
 	now: number = Date.now()
 ): ScheduleRow[] {
-	const [fast, slow] = paceMinPerMile.map((m) => m * 60_000);
+	const perStop = Array.isArray(paceMinPerMile[0]);
+	const paceAt = (i: number): [number, number] =>
+		perStop ? (paceMinPerMile as [number, number][])[i] : (paceMinPerMile as [number, number]);
 	let base = { mile: 0, t: start ?? 0 };
 	let measuredFromRunner = false;
 	return stops.map((st, i) => {
@@ -513,6 +566,7 @@ export function stopSchedule(
 		}
 		measuredFromRunner = true;
 		const leg = Math.max(0, st.mile - base.mile);
+		const [fast, slow] = paceAt(i).map((m) => m * 60_000);
 		const low = base.t + leg * fast;
 		const high = base.t + leg * slow;
 		base = { mile: st.mile, t: high };
@@ -520,7 +574,8 @@ export function stopSchedule(
 	});
 }
 
-// Google Maps directions from wherever the viewer is to a point.
-export function directionsUrl(lat: number, lon: number): string {
-	return `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(6)},${lon.toFixed(6)}`;
+// A point opened in Google Maps as a pin. Directions are one tap away in the
+// Maps UI, and people can pick how they're getting there (car, bike, foot).
+export function placeUrl(lat: number, lon: number): string {
+	return `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lon.toFixed(6)}`;
 }

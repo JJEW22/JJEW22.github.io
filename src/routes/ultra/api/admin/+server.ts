@@ -3,7 +3,7 @@
 // battery setting, and every phone that has sent points -- name, colour, and
 // whether it's shown. ultra:admin (or site:admin) only.
 import { json } from '@sveltejs/kit';
-import { RACE } from '$lib/ultra';
+import { RACES, RACE_IDS, isRaceId } from '$lib/ultra';
 import { hasRole } from '$lib/server/roles';
 import {
 	ULTRA_ADMIN_ROLE,
@@ -12,6 +12,7 @@ import {
 	getSettings,
 	listDevices,
 	raceWindowFrom,
+	setActiveRace,
 	setMode,
 	setRaceTimes,
 	setShowBattery,
@@ -36,17 +37,21 @@ function gate(locals: App.Locals): Response | null {
 async function state() {
 	const settings = await getSettings();
 	const w = raceWindowFrom(settings);
+	const cfg = RACES[settings.activeRace];
 	return {
 		ok: true,
 		settings,
 		devices: await listDevices(),
+		races: RACE_IDS.map((id) => ({ id, label: RACES[id].label, test: RACES[id].test })),
 		race: {
-			name: RACE.name,
+			id: settings.activeRace,
+			test: cfg.test,
+			name: cfg.name,
 			start: w?.start.toISOString() ?? null,
 			end: w?.end.toISOString() ?? null,
 			ended: w?.ended ?? false,
 			startSource: w?.source ?? null,
-			cutoffHours: RACE.cutoffHours
+			cutoffHours: cfg.cutoffHours
 		},
 		now: new Date().toISOString()
 	};
@@ -60,6 +65,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 // Body: { mode: 'off' | 'race' | 'live' }
 //    or { showBattery: boolean }
+//    or { activeRace: 'main' | 'test' }  -- which race the public page shows
 //    or { startRace: true } / { endRace: true }           -- the clock, set to now
 //    or { raceStart?: ISO | null, raceEnd?: ISO | null }  -- the clock, set by hand
 //    or { deviceId, name?, color?, shown? }
@@ -74,6 +80,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				return json({ ok: false, error: 'Unknown mode.' }, { status: 400 });
 			}
 			await setMode(body.mode as DisplayMode);
+		} else if (body.activeRace !== undefined) {
+			if (!isRaceId(body.activeRace)) {
+				return json({ ok: false, error: 'Unknown race.' }, { status: 400 });
+			}
+			await setActiveRace(body.activeRace);
 		} else if (typeof body.showBattery === 'boolean') {
 			await setShowBattery(body.showBattery);
 		} else if (body.startRace === true) {
