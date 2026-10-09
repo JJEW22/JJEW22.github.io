@@ -416,6 +416,7 @@ export interface TrackResponse {
 		aidStations: AidStation[];
 		googleMapsUrl: string | null;
 		paceRangeMinPerMile: [number, number];
+		latePaceMinPerMile: number;
 		legPaceMinPerMile: Record<string, [number, number]>;
 		about: RaceAbout | null;
 	};
@@ -467,6 +468,7 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 		aidStations: cfg.aidStations,
 		googleMapsUrl: cfg.googleMapsUrl,
 		paceRangeMinPerMile: cfg.paceRangeMinPerMile,
+		latePaceMinPerMile: cfg.latePaceMinPerMile,
 		legPaceMinPerMile: cfg.legPaceMinPerMile ?? {},
 		about: cfg.about
 	};

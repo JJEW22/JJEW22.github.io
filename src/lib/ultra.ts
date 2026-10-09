@@ -44,10 +44,12 @@ export interface RaceConfig {
 	// mymaps.google.com, share "anyone with the link"). Shows an "Open in
 	// Google Maps" button; null hides it.
 	googleMapsUrl: string | null;
-	// The arrival windows in the stops table, in minutes per mile: each stop's
-	// window is the previous stop's late time plus the leg at the fast pace
-	// (early end) and at the slow pace (late end, which the next stop builds on).
+	// The arrival windows in the stops table, in minutes per mile. The early
+	// end: the previous stop reached at the slow pace (chained from the start),
+	// plus this leg at the fast pace. The late end: the whole way from the
+	// start at latePaceMinPerMile.
 	paceRangeMinPerMile: [number, number];
+	latePaceMinPerMile: number;
 	// A different pace range for the leg into a particular stop, keyed by the
 	// stop's name -- a leg ridden on a train, say.
 	legPaceMinPerMile?: Record<string, [number, number]>;
@@ -87,6 +89,7 @@ export const RACE: RaceConfig = {
 	// The course on Google My Maps (view-only link; editing stays with the owner).
 	googleMapsUrl: 'https://www.google.com/maps/d/viewer?mid=1M0ZxjYQmL5LDcqTH9S_LRSnjzh-PznU',
 	paceRangeMinPerMile: [9, 12],
+	latePaceMinPerMile: 12.5,
 	about: {
 		hook: 'Have you ever wanted to cosplay as a leaf going downstream?',
 		intro:
@@ -131,6 +134,7 @@ export const TEST_RACE: RaceConfig = {
 	aidStations: [],
 	googleMapsUrl: null,
 	paceRangeMinPerMile: [9, 12],
+	latePaceMinPerMile: 12.5,
 	// The Orange Line, Jackson Square to Back Bay: ~2.1 mi in ~8-10 minutes,
 	// plus some waiting on the platform.
 	legPaceMinPerMile: { 'Back Bay T (off the Orange Line)': [3, 6] },
@@ -564,11 +568,12 @@ export interface ScheduleRow {
 
 // The arrival window at every stop.
 //
-// Each stop's window is built on the previous stop's late time: early = that
-// + leg miles × the fast pace, late = that + leg miles × the slow pace, and
-// the late time carries on to the next stop. With a runner on course, a stop
-// they've reached shows when they actually got there (and the chain restarts
-// from it), and the next stop is measured from where they are now.
+// Early end: the previous stop reached at the slow pace -- each stop chained
+// on the one before, from the start -- plus this leg at the fast pace. Late
+// end: the whole way from the start at the late pace (`latePaceMinPerMile`,
+// one for every leg or one per stop). With a runner on course, a stop they've
+// reached shows when they actually got there and both ends restart from it;
+// the next stop is measured from where they are now.
 //
 // `start` null means no start time yet: times come back as ms after the start.
 export function stopSchedule(
@@ -581,12 +586,22 @@ export function stopSchedule(
 		progressMile: number | null; // where they are on the course
 		fixMs: number | null; // when that was
 	} | null = null,
-	now: number = Date.now()
+	now: number = Date.now(),
+	// Defaults to the slow end of each leg's range.
+	latePaceMinPerMile: number | number[] | null = null
 ): ScheduleRow[] {
 	const perStop = Array.isArray(paceMinPerMile[0]);
 	const paceAt = (i: number): [number, number] =>
 		perStop ? (paceMinPerMile as [number, number][])[i] : (paceMinPerMile as [number, number]);
+	const lateAt = (i: number): number =>
+		Array.isArray(latePaceMinPerMile)
+			? latePaceMinPerMile[i]
+			: (latePaceMinPerMile ?? paceAt(i)[1]);
+	// `base` chains the early ends: each stop at the slow pace from the last.
+	// `late` runs at the late pace from the last real position (the start, an
+	// arrival, or the runner's latest fix).
 	let base = { mile: 0, t: start ?? 0 };
+	let late = { mile: 0, t: start ?? 0 };
 	let measuredFromRunner = false;
 	return stops.map((st, i) => {
 		if (st.mile < 0.1) {
@@ -594,7 +609,7 @@ export function stopSchedule(
 		}
 		const arrived = runner?.arrivals[i] ?? null;
 		if (arrived !== null) {
-			base = { mile: st.mile, t: arrived };
+			base = late = { mile: st.mile, t: arrived };
 			return { kind: 'arrived', at: arrived };
 		}
 		// The first stop they haven't reached: measure from where they are.
@@ -605,14 +620,17 @@ export function stopSchedule(
 			start !== null &&
 			runner.progressMile > base.mile
 		) {
-			base = { mile: runner.progressMile, t: runner.fixMs };
+			base = late = { mile: runner.progressMile, t: runner.fixMs };
 		}
 		measuredFromRunner = true;
-		const leg = Math.max(0, st.mile - base.mile);
 		const [fast, slow] = paceAt(i).map((m) => m * 60_000);
-		const low = base.t + leg * fast;
-		const high = base.t + leg * slow;
-		base = { mile: st.mile, t: high };
+		const low = base.t + Math.max(0, st.mile - base.mile) * fast;
+		base = { mile: st.mile, t: base.t + Math.max(0, st.mile - base.mile) * slow };
+		late = {
+			mile: st.mile,
+			t: late.t + Math.max(0, st.mile - late.mile) * lateAt(i) * 60_000
+		};
+		const high = Math.max(low, late.t);
 		return { kind: 'estimate', low, high, late: start !== null && high < now };
 	});
 }

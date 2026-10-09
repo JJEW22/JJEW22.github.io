@@ -80,6 +80,7 @@
 			aidStations: AidStation[];
 			googleMapsUrl: string | null;
 			paceRangeMinPerMile: [number, number];
+			latePaceMinPerMile: number;
 			legPaceMinPerMile: Record<string, [number, number]>;
 			about: RaceAbout | null;
 		};
@@ -445,9 +446,18 @@
 					}
 				: null;
 		const base: [number, number] = t?.race.paceRangeMinPerMile ?? [9, 12];
-		// Per leg: a stop with its own range (a train ride) uses it.
-		const pace = rows.map((st) => t?.race.legPaceMinPerMile?.[st.name] ?? base);
-		return { r, start, rows: stopSchedule(rows, start, pace, live, at) };
+		// Per leg: a stop with its own range (a train ride) uses it, its slow end
+		// standing in for the late pace too.
+		const leg = (st: Stop) => t?.race.legPaceMinPerMile?.[st.name];
+		const pace = rows.map((st) => leg(st) ?? base);
+		const latePace = rows.map((st) => leg(st)?.[1] ?? t?.race.latePaceMinPerMile ?? 12.5);
+		return { r, start, rows: stopSchedule(rows, start, pace, live, at, latePace) };
+	}
+
+	// 12.5 -> "12:30".
+	function paceText(minPerMile: number): string {
+		const s = Math.round(minPerMile * 60);
+		return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 	}
 
 	// 24-hour, "06:52": no AM/PM, so the windows stay narrow on a phone.
@@ -847,9 +857,12 @@
 				</table>
 			</div>
 			<p class="sub">
-				Arrival windows: the previous stop's late time plus this leg at {track?.race
-					.paceRangeMinPerMile[0] ?? 9}:00/mi (early) to {track?.race.paceRangeMinPerMile[1] ??
-					12}:00/mi (late).
+				Arrival windows: early is the previous stop at {paceText(
+					track?.race.paceRangeMinPerMile[1] ?? 12
+				)}/mi from the start, plus this leg at {paceText(
+					track?.race.paceRangeMinPerMile[0] ?? 9
+				)}/mi; late is {paceText(track?.race.latePaceMinPerMile ?? 12.5)}/mi the whole way from the
+				start.
 				{#if livePositions}Stops already reached show when they were reached, and the next one is
 					measured from the latest position.{/if}
 				{#if schedules[0]?.start === null}Times are after the start until the start time is set.{:else}Times
