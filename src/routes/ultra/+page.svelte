@@ -19,6 +19,7 @@
 	import { resolve } from '$app/paths';
 	import {
 		ON_COURSE_M,
+		RACE,
 		METERS_PER_MILE,
 		buildGpx,
 		courseProgress,
@@ -451,6 +452,22 @@
 
 	// Progress-bar ticks: the stops between the ends.
 	$: barStops = ci ? stops.filter((st) => !isStartStop(st) && !isFinishStop(st, ci!)) : [];
+	// Volunteer stops nobody has taken yet, for the race summary.
+	$: openStops = tableStops
+		.map((st, i) => ({ ...st, no: i }))
+		.filter((st) => /looking for volunteer/i.test(st.name));
+	// The summary leads before the race; once it's under way the live data does.
+	$: raceUnderway = status === 'live' || status === 'finished';
+
+	function startText(iso: string): string {
+		const d = new Date(iso);
+		return `${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${hm(d.getTime())}`;
+	}
+
+	// "Volunteer stop #1 - looking for volunteer <3" -> "Volunteer stop #1".
+	function shortStopName(name: string): string {
+		return name.replace(/\s*-\s*looking for volunteer.*$/i, '');
+	}
 	// The stops table: every waypoint, plus a Finish row if the GPX has none.
 	$: tableStops =
 		ci && !stops.some((st) => isFinishStop(st, ci!))
@@ -510,6 +527,71 @@
 				>
 			</div>
 		{/if}
+
+		{#snippet raceAbout()}
+			{#if RACE.about}
+				<section class="about" aria-label="About the race">
+					<p class="hook">🍃 {RACE.about.hook}</p>
+					<p class="intro">{RACE.about.intro}</p>
+					<dl class="facts">
+						<div>
+							<dt>Start</dt>
+							<dd>{track?.race.start ? startText(track.race.start) : 'Time coming soon'}</dd>
+						</div>
+						<div class="route">
+							<dt>Route</dt>
+							<dd>{RACE.about.route}</dd>
+						</div>
+						{#if courseTotal}
+							<div>
+								<dt>Distance</dt>
+								<dd>{courseTotal.toFixed(1)} mi</dd>
+							</div>
+						{/if}
+						{#if barStops.length}
+							<div>
+								<dt>Stops</dt>
+								<dd>{barStops.length} along the way</dd>
+							</div>
+						{/if}
+					</dl>
+					<p class="follow">
+						{#if raceUnderway}
+							We're out on the course: the map and stops above update as we go.
+						{:else}
+							From the start, our live location shows on the map below.
+						{/if}
+					</p>
+					<h3>How you can help</h3>
+					<ul class="help">
+						{#each RACE.about.help as h (h.title)}
+							<li>
+								<span class="help-icon" aria-hidden="true">{h.icon}</span>
+								<div>
+									<b>{h.title}</b>
+									<p>{h.text}</p>
+									{#if h.openVolunteerStops}
+										{#if openStops.length}
+											<p class="open">
+												Still needed:
+												{#each openStops as st, i (st.no)}{i ? ', ' : ''}<a href="#stop-{st.no}"
+														>{shortStopName(st.name)} (stop {st.no}, mile {st.mile.toFixed(1)})</a
+													>{/each}.
+											</p>
+										{:else if ci}
+											<p class="open filled">Every volunteer stop is covered. Thank you!</p>
+										{/if}
+									{/if}
+								</div>
+							</li>
+						{/each}
+					</ul>
+					<p class="contact">{RACE.about.contact}</p>
+				</section>
+			{/if}
+		{/snippet}
+
+		{#if !raceUnderway}{@render raceAbout()}{/if}
 
 		{#if loadFailed && !track}
 			<p class="banner warn">Couldn't reach the tracker. It will keep retrying.</p>
@@ -647,7 +729,7 @@
 					</thead>
 					<tbody>
 						{#each tableStops as st, i (st.name + st.mile)}
-							<tr class:finish-row={isFinishStop(st, ci)}>
+							<tr id="stop-{i}" class:finish-row={isFinishStop(st, ci)}>
 								<td class="num stop-no">{i}</td>
 								<!-- Names like "Roche Bros/McDonald's/Dunkin'" may break after a slash on a phone. -->
 								<td class="stop-name">{st.name.replace(/\//g, '/\u200b')}</td>
@@ -685,6 +767,8 @@
 				Directions open Google Maps from wherever you are.
 			</p>
 		{/if}
+
+		{#if raceUnderway}{@render raceAbout()}{/if}
 
 		{#if downloadHref}
 			<p class="download">
@@ -957,6 +1041,112 @@
 		-webkit-overflow-scrolling: touch;
 	}
 
+	.about {
+		margin: 1.25rem 0 0.5rem 0;
+		padding: 1.25rem 1.4rem;
+		background: linear-gradient(135deg, #f1f8f3 0%, #eef4fb 100%);
+		border: 1px solid #dbe8e0;
+		border-radius: 12px;
+	}
+
+	.about .hook {
+		margin: 0;
+		font-size: 1.25rem;
+		font-style: italic;
+		color: #1e6b36;
+	}
+
+	.about .intro {
+		margin: 0.4rem 0 1rem 0;
+		color: #333;
+		line-height: 1.5;
+	}
+
+	.facts {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+		gap: 0.6rem;
+		margin: 0 0 0.9rem 0;
+	}
+
+	.facts div {
+		padding: 0.55rem 0.75rem;
+		background: rgba(255, 255, 255, 0.75);
+		border-radius: 8px;
+	}
+
+	.facts dt {
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #888;
+	}
+
+	.facts dd {
+		margin: 0.15rem 0 0 0;
+		font-weight: 600;
+		color: #1a1a1a;
+	}
+
+	.about .follow {
+		margin: 0 0 1rem 0;
+		color: #1d4f7a;
+	}
+
+	.about h3 {
+		margin: 0 0 0.5rem 0;
+		font-size: 1rem;
+		color: #333;
+	}
+
+	.help {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+		gap: 0.6rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.help li {
+		display: flex;
+		gap: 0.6rem;
+		padding: 0.75rem 0.85rem;
+		background: #fff;
+		border-radius: 10px;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+	}
+
+	.help-icon {
+		font-size: 1.4rem;
+		line-height: 1.2;
+	}
+
+	.help p {
+		margin: 0.2rem 0 0 0;
+		font-size: 0.9rem;
+		color: #555;
+		line-height: 1.45;
+	}
+
+	.help .open {
+		color: #b9770e;
+	}
+
+	.help .open.filled {
+		color: #1e6b36;
+	}
+
+	.about .contact {
+		margin: 0.9rem 0 0 0;
+		font-weight: 600;
+		color: #8c2a5a;
+	}
+
+	tr:target td {
+		background: #fff8db;
+	}
+
 	.stop-no {
 		width: 2rem;
 		color: #888;
@@ -1083,6 +1273,18 @@
 
 		.stop-no {
 			width: 1.4rem;
+		}
+
+		.facts {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.facts .route {
+			grid-column: 1 / -1;
+		}
+
+		.about {
+			padding: 1rem;
 		}
 	}
 </style>

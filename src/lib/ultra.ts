@@ -11,6 +11,20 @@ export interface AidStation {
 	lon?: number;
 }
 
+export interface RaceAbout {
+	hook: string; // the opening line
+	intro: string;
+	route: string; // "start → finish", for the facts strip
+	help: {
+		icon: string;
+		title: string;
+		text: string;
+		// List the stops still "looking for volunteer" under this item.
+		openVolunteerStops?: boolean;
+	}[];
+	contact: string;
+}
+
 export interface RaceConfig {
 	name: string;
 	// ISO start time with its UTC offset, or null while the race isn't set.
@@ -30,6 +44,10 @@ export interface RaceConfig {
 	// window is the previous stop's late time plus the leg at the fast pace
 	// (early end) and at the slow pace (late end, which the next stop builds on).
 	paceRangeMinPerMile: [number, number];
+	// The race summary at the top of the page (moves under the stops table
+	// once the race is live). The start time and the open volunteer stops are
+	// filled in by the page from the race clock and the stop names.
+	about: RaceAbout | null;
 	// Free-text note shown under the title (race website, bib number, ...).
 	note: string;
 }
@@ -51,6 +69,31 @@ export const RACE: RaceConfig = {
 	// The course on Google My Maps (view-only link; editing stays with the owner).
 	googleMapsUrl: 'https://www.google.com/maps/d/viewer?mid=1M0ZxjYQmL5LDcqTH9S_LRSnjzh-PznU',
 	paceRangeMinPerMile: [9, 12],
+	about: {
+		hook: 'Have you ever wanted to cosplay as a leaf going downstream?',
+		intro:
+			"Well, we're running the inaugural Run the Entire Charles River (kinda), and this page is your way to track us as we do!",
+		route: 'Echo Lake, Hopkinton → Night Shift Brewing, Boston',
+		help: [
+			{
+				icon: '🥤',
+				title: 'Staff an aid station',
+				text: 'Bring water, snacks and supplies to us at a set spot on the course.',
+				openVolunteerStops: true
+			},
+			{
+				icon: '🚴',
+				title: 'Run or bike with us',
+				text: "Can't do an aid station? It's never too late to jump in anywhere along the course and run or bike a stretch with us."
+			},
+			{
+				icon: '🍝',
+				title: 'Make us food',
+				text: "We'll need a lot of fuel and don't want just GUs, so anyone is welcome to make something for us. Think carbs, electrolytes and the like."
+			}
+		],
+		contact: 'Want to help? Reach out to Arianna or Jack <3'
+	},
 	note: ''
 };
 
