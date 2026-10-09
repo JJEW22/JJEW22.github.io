@@ -15,7 +15,7 @@
 	import { resolve } from '$app/paths';
 	import '../../../app.css';
 	import { onMount } from 'svelte';
-	import { formatPercentile } from '$lib/krillion';
+	import { acceptedPoints, formatPercentile } from '$lib/krillion';
 
 	interface Fit {
 		a: number;
@@ -36,6 +36,10 @@
 		gameScore: number | null;
 		points: number;
 		accepted?: boolean; // an Accepted Word, from review
+		rarity?: number | null; // % of players whose answer was more common
+		// Not an answer: the "Accepted Answers" row, where an accepted word would
+		// rank, on a prompt that has none yet.
+		placeholder?: boolean;
 	}
 	interface Prompt {
 		id: string;
@@ -43,7 +47,7 @@
 		fit: Fit | null;
 		answers: Answer[];
 	}
-	type SortKey = 'points' | 'count' | 'gameScore' | 'answer';
+	type SortKey = 'points' | 'count' | 'rarity' | 'gameScore' | 'answer';
 	interface Round {
 		round: number;
 		prompt: string;
@@ -248,15 +252,56 @@
 		limit = 200;
 	}
 
+	// Each answer's rarity percentile (the share of players whose answer was
+	// more common), and -- on a prompt with no accepted words yet -- an
+	// "Accepted Answers" row at the score one would get, to show where it
+	// would rank.
+	function annotate(p: Prompt | null): Answer[] {
+		if (!p) return [];
+		const real = p.answers.filter((a) => !a.accepted);
+		const total = real.reduce((s, a) => s + a.count, 0);
+		const counts = real.map((a) => a.count).sort((x, y) => y - x);
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch map
+		const above = new Map<number, number>();
+		let run = 0;
+		for (const c of counts) {
+			if (!above.has(c)) above.set(c, run);
+			run += c;
+		}
+		const out: Answer[] = p.answers.map((a) => ({
+			...a,
+			rarity: a.accepted || total <= 0 ? null : (100 * (above.get(a.count) ?? 0)) / total
+		}));
+		if (p.fit && !p.answers.some((a) => a.accepted)) {
+			out.push({
+				answer: 'Accepted Answers',
+				count: 0,
+				share: 0,
+				gameScore: null,
+				points: acceptedPoints(p.fit),
+				accepted: true,
+				rarity: null,
+				placeholder: true
+			});
+		}
+		return out;
+	}
+
 	$: prompt = prompts.find((p) => p.id === promptId) ?? null;
 	$: q = search.trim().toLowerCase();
-	$: rows = (prompt?.answers ?? [])
-		.filter((a) => !q || a.answer.toLowerCase().includes(q))
+	$: annotated = annotate(prompt);
+	$: answerCount = annotated.filter((a) => !a.placeholder).length;
+	$: rows = annotated
+		.filter((a) => (a.placeholder ? !q : !q || a.answer.toLowerCase().includes(q)))
 		.sort((x, y) => {
 			const dir = sortDesc ? -1 : 1;
 			if (sortKey === 'answer') return dir * x.answer.localeCompare(y.answer);
-			const xv = x[sortKey] ?? -1;
-			const yv = y[sortKey] ?? -1;
+			// No value (no game points, no rarity) sorts last either way.
+			const xv = x[sortKey] ?? null;
+			const yv = y[sortKey] ?? null;
+			if (xv === null || yv === null) {
+				return xv === yv ? x.answer.localeCompare(y.answer) : xv === null ? 1 : -1;
+			}
 			return dir * (xv - yv) || x.answer.localeCompare(y.answer);
 		});
 	$: shown = rows.slice(0, limit);
@@ -664,13 +709,18 @@
 
 				<input class="search" bind:value={search} placeholder="Search answers…" />
 				<p class="sub">
-					{rows.length.toLocaleString()}
-					{rows.length === 1 ? 'answer' : 'answers'}{q ? ` matching "${search.trim()}"` : ''}
+					{(q ? rows.length : answerCount).toLocaleString()}
+					{(q ? rows.length : answerCount) === 1 ? 'answer' : 'answers'}{q
+						? ` matching "${search.trim()}"`
+						: ''}
 				</p>
-				{#if prompt.answers.some((a) => a.accepted)}
+				{#if annotated.some((a) => a.accepted)}
 					<p class="sub legend">
-						<span class="swatch"></span><b>Accepted Words</b> — accepted after review; not in krillion.io's
-						list, scored at the target mean + 1 SD.
+						<span class="swatch"></span><span
+							><b>Accepted Words</b> — accepted after review; not in krillion.io's list, scored at
+							the target mean + 1 SD.{#if annotated.some((a) => a.placeholder)}&nbsp; None yet on
+								this prompt: the <i>Accepted Answers</i> row shows where one would rank.{/if}</span
+						>
 					</p>
 				{/if}
 
@@ -688,6 +738,13 @@
 								></th
 							>
 							<th class="num">Share</th>
+							<th
+								class="num"
+								title="Percentile of rarity: the share of players whose answer was more common"
+								><button type="button" on:click={() => sortBy('rarity')}
+									>Rarity{arrow('rarity', sortKey, sortDesc)}</button
+								></th
+							>
 							<th class="num"
 								><button type="button" on:click={() => sortBy('gameScore')}
 									>Game{arrow('gameScore', sortKey, sortDesc)}</button
@@ -701,14 +758,22 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each shown as a (a.answer)}
-							<tr class:unused={a.count === 0 && !a.accepted} class:accepted={a.accepted}>
+						{#each shown as a (a.placeholder ? '#placeholder' : 'a:' + a.answer)}
+							<tr
+								class:unused={a.count === 0 && !a.accepted}
+								class:accepted={a.accepted}
+								class:placeholder={a.placeholder}
+							>
 								<td
-									>{a.answer}{#if a.accepted}<span class="tag accepted-tag">Accepted Word</span
-										>{/if}</td
+									>{#if a.placeholder}<i>Accepted Answers</i><span class="sub"
+											>&nbsp;— where an accepted word would rank</span
+										>{:else}{a.answer}{#if a.accepted}<span class="tag accepted-tag"
+												>Accepted Word</span
+											>{/if}{/if}</td
 								>
-								<td class="num">{a.count.toLocaleString()}</td>
-								<td class="num">{(a.share * 100).toFixed(2)}%</td>
+								<td class="num">{a.placeholder ? '—' : a.count.toLocaleString()}</td>
+								<td class="num">{a.placeholder ? '—' : `${(a.share * 100).toFixed(2)}%`}</td>
+								<td class="num">{a.rarity == null ? '—' : formatPercentile(a.rarity)}</td>
 								<td class="num">{a.gameScore ?? '—'}</td>
 								<td class="num"><b>{a.points.toFixed(1)}</b></td>
 							</tr>
@@ -1003,6 +1068,12 @@
 
 	tr.accepted td {
 		background: #f3f8fe;
+	}
+
+	tr.placeholder td {
+		color: #0b4f8a;
+		border-top: 1px dashed #cfe0f5;
+		border-bottom: 1px dashed #cfe0f5;
 	}
 
 	.tag.accepted-tag {

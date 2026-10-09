@@ -446,7 +446,11 @@ export function scoreDay(
 // day's sheet or in its counts -- scores the prompt's target mean plus one
 // target SD: better than an average answer, as a real but unlisted one should
 // be. Never more than the prompt's top.
-export function acceptedPoints(fit: Pick<PromptFit, 'targetMean' | 'targetSd' | 'top'>): number {
+export function acceptedPoints(fit: {
+	targetMean: number;
+	targetSd: number;
+	top?: number;
+}): number {
 	return Math.min(fit.top ?? TOP_MAX, fit.targetMean + fit.targetSd);
 }
 
