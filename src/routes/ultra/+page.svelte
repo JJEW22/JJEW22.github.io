@@ -22,12 +22,14 @@
 		METERS_PER_MILE,
 		buildGpx,
 		courseProgress,
+		estimateMile,
 		formatDuration,
 		formatPace,
 		indexCourse,
 		parseGpx,
 		placeUrl,
 		placeStations,
+		pointAtMile,
 		projectOnCourse,
 		stopSchedule,
 		timeAtMile,
@@ -49,6 +51,7 @@
 		elapsedMs: number | null;
 		paceMsPerMile: number | null;
 		startedAt: string | null;
+		syncs: number[]; // the newest fix of each recent upload (ms), oldest first
 	}
 	// A stop on the course: a GPX waypoint (or a configured aid station), with
 	// its course mile so arrival times can be estimated.
@@ -92,6 +95,9 @@
 	let loadFailed = false;
 	let preview = false;
 	let now = Date.now();
+	// The server's clock minus this one, from each poll: the elapsed time ticks
+	// here every second and lines back up with the server whenever data lands.
+	let skew = 0;
 	let follow = true;
 
 	let mapEl: HTMLDivElement;
@@ -103,10 +109,11 @@
 	let ci: CourseIndex | null = null;
 	let stops: Stop[] = [];
 	let downloadHref = '';
-	// One line + marker per runner, kept across polls so the map doesn't flicker.
-	// Leaflet objects, not page state: nothing in the markup reads this.
+	// One line + marker per runner, kept across polls so the map doesn't flicker,
+	// with the runner's last real fix (the marker moves on from it between
+	// uploads). Leaflet objects, not page state: nothing in the markup reads this.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	const layers = new Map<string, { line: Polyline; marker: CircleMarker }>();
+	const layers = new Map<string, { line: Polyline; marker: CircleMarker; fix: [number, number] }>();
 	let fitted = false;
 
 	let pollTimer: ReturnType<typeof setInterval>;
@@ -156,9 +163,14 @@
 
 	async function load() {
 		try {
+			const sent = Date.now();
 			const r = await fetch(`/ultra/api/track${preview ? '?preview=1' : ''}`);
 			if (!r.ok) throw new Error(String(r.status));
-			track = await r.json();
+			const data: Track = await r.json();
+			// The server's time was read about halfway through the round trip.
+			skew = Date.parse(data.serverTime) - (sent + Date.now()) / 2;
+			now = Date.now();
+			track = data;
 			loadFailed = false;
 			draw();
 		} catch {
@@ -251,6 +263,7 @@
 				existing.line.setLatLngs(r.path).setStyle({ color: r.color });
 				existing.marker.setLatLng(last).setStyle({ fillColor: r.color });
 				existing.marker.setTooltipContent(r.name);
+				existing.fix = last;
 			} else {
 				const line = L.polyline(r.path, { color: r.color, weight: 4 }).addTo(map);
 				const marker = L.circleMarker(last, {
@@ -262,7 +275,7 @@
 				})
 					.bindTooltip(r.name, { direction: 'top', offset: [0, -8] })
 					.addTo(map);
-				layers.set(r.id, { line, marker });
+				layers.set(r.id, { line, marker, fix: last });
 			}
 		}
 		// Runners switched off in the admin come off the map.
@@ -326,8 +339,15 @@
 		}
 	}
 
-	function ago(iso: string): string {
-		const mins = Math.floor((now - Date.parse(iso)) / 60_000);
+	// Each between-uploads position on the map, or back to the last real fix.
+	function placeMarkers(v: Record<string, RunnerView>) {
+		for (const [id, l] of layers) l.marker.setLatLng(v[id]?.at ?? l.fix);
+	}
+
+	// `at` is passed in rather than read from `now` in here: the markup only
+	// re-runs a call when something written in the call itself changes.
+	function ago(iso: string, at: number): string {
+		const mins = Math.floor((at - Date.parse(iso)) / 60_000);
 		if (mins < 1) return 'just now';
 		if (mins < 60) return `${mins} min ago`;
 		return `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
@@ -341,13 +361,58 @@
 		});
 	}
 
-	// Average pace along the course so far: time from the clock start to the
-	// last fix, over course miles covered. Measured to the last fix rather than
-	// to now, so a stretch with no signal doesn't make it look like a crawl.
-	function coursePace(r: Runner): number | null {
-		const p = progressById[r.id];
-		if (!p?.onCourse || p.mile < 0.1 || !r.latest || !r.startedAt) return null;
-		return (Date.parse(r.latest.t) - Date.parse(r.startedAt)) / p.mile;
+	// What the stats and the map show for a runner at `at` (server time).
+	interface RunnerView {
+		mile: number | null; // course miles, carried on between uploads
+		estimated: boolean; // `mile` is ahead of the last real fix
+		at: [number, number] | null; // where the dot goes, when it's moved on
+		elapsedMs: number | null;
+		paceMsPerMile: number | null; // along the course
+	}
+
+	function viewFor(
+		r: Runner,
+		p: ReturnType<typeof courseProgress> | null,
+		course: CourseIndex | null,
+		st: Track['status'] | null,
+		clockStart: number | null,
+		at: number
+	): RunnerView {
+		// Elapsed ticks every second while live, from the race start or from
+		// when live was switched on.
+		const elapsedMs = st === 'live' && clockStart !== null ? at - clockStart : r.elapsedMs;
+		if (!course || !p?.onCourse || !r.latest) {
+			return { mile: null, estimated: false, at: null, elapsedMs, paceMsPerMile: null };
+		}
+		const fixMs = Date.parse(r.latest.t);
+		// Between uploads the runner carries on at their average speed over the
+		// last few -- not while they're off the route.
+		const est =
+			(st === 'live' || st === 'preview') && p.offMeters <= ON_COURSE_M
+				? estimateMile(p.pointMiles, r.pathTimes, r.syncs, at, course.total)
+				: null;
+		const moved = !!est && est.mile > p.mile + 0.001;
+		const mile = moved && est ? est.mile : p.mile;
+		let dot: [number, number] | null = null;
+		if (moved) {
+			// Shifted by as much as the course moves, so the dot slides on from
+			// where the phone really was rather than snapping onto the line.
+			const a = pointAtMile(course.track, course.miles, p.mile);
+			const b = pointAtMile(course.track, course.miles, mile);
+			if (a && b) dot = [r.latest.lat + b[0] - a[0], r.latest.lon + b[1] - a[1]];
+		}
+		// Average pace: the clock start to the position's time, over course
+		// miles. To the last fix (or the estimate), not to now, so a stretch with
+		// no signal doesn't make it look like a crawl.
+		const startMs = r.startedAt ? Date.parse(r.startedAt) : null;
+		const asOf = moved && est ? est.at : fixMs;
+		return {
+			mile,
+			estimated: moved,
+			at: dot,
+			elapsedMs,
+			paceMsPerMile: startMs !== null && mile >= 0.1 ? (asOf - startMs) / mile : null
+		};
 	}
 
 	interface Schedule {
@@ -423,18 +488,9 @@
 		return undefined;
 	}
 
-	// Elapsed ticks every second while live, from the race start or from when
-	// live was switched on.
-	function elapsed(r: Runner): number | null {
-		if (status === 'live' && clockStartMs !== null) return now - clockStartMs;
-		return r.elapsedMs;
-	}
-
-	function isStale(r: Runner): boolean {
+	function isStale(r: Runner, st: Track['status'] | null, at: number): boolean {
 		return (
-			(status === 'live' || status === 'preview') &&
-			!!r.latest &&
-			now - Date.parse(r.latest.t) > STALE_MS
+			(st === 'live' || st === 'preview') && !!r.latest && at - Date.parse(r.latest.t) > STALE_MS
 		);
 	}
 
@@ -444,7 +500,9 @@
 		track?.mode === 'live' && track.liveSince ? Date.parse(track.liveSince) : startMs;
 	$: runners = track?.runners ?? [];
 	$: anyTrack = runners.some((r) => r.path.length);
-	$: stale = runners.filter(isStale);
+	// Now by the server's clock, ticking every second.
+	$: serverNow = now + skew;
+	$: stale = runners.filter((r) => isStale(r, status, serverNow));
 	// Where each runner is along the course (null without a course or a track).
 	$: progressById = Object.fromEntries(
 		runners.map((r) => [r.id, ci && r.path.length ? courseProgress(ci, r.path) : null])
@@ -452,8 +510,14 @@
 	$: courseTotal = ci?.total ?? track?.race.distanceMiles ?? null;
 	// Arrival windows: one per runner shown, or one from the start alone.
 	$: schedules = (runners.length ? runners : [null]).map((r) =>
-		scheduleFor(r, tableStops, track, progressById, now)
+		scheduleFor(r, tableStops, track, progressById, serverNow)
 	);
+	// The stats and the dots, every second.
+	$: views = Object.fromEntries(
+		runners.map((r) => [r.id, viewFor(r, progressById[r.id], ci, status, clockStartMs, serverNow)])
+	) as Record<string, RunnerView>;
+	$: if (map) placeMarkers(views);
+	$: anyEstimated = Object.values(views).some((v) => v.estimated);
 	$: livePositions = schedules.some((sc) => sc.rows.some((row) => row.kind === 'arrived'));
 
 	// Progress-bar ticks: the stops between the ends.
@@ -615,7 +679,7 @@
 			<p class="banner">Race details coming soon. Live tracking will appear here on race day.</p>
 		{:else if status === 'upcoming' && startMs !== null}
 			<p class="banner">
-				Tracking starts in <b>{formatDuration(startMs - now)}</b> ({clock(startMs)}).
+				Tracking starts in <b>{formatDuration(startMs - serverNow)}</b> ({clock(startMs)}).
 			</p>
 		{:else if status === 'preview'}
 			<p class="banner warn">
@@ -629,8 +693,10 @@
 		{#each stale as r (r.id)}
 			{#if r.latest}
 				<p class="banner warn">
-					No update from {runners.length > 1 ? r.name : 'my phone'} since {ago(r.latest.t)} — probably
-					no signal. The track fills in when the phone reconnects.
+					No update from {runners.length > 1 ? r.name : 'my phone'} since {ago(
+						r.latest.t,
+						serverNow
+					)} — probably no signal. The track fills in when the phone reconnects.
 				</p>
 			{/if}
 		{/each}
@@ -642,27 +708,30 @@
 				{/if}
 				{@const p = progressById[r.id]}
 				{@const onCourse = !!ci && !!p?.onCourse}
+				{@const v = views[r.id]}
+				{@const mile = v?.mile ?? p?.mile ?? 0}
 				<div class="stats">
 					<div>
 						{#if onCourse && ci && p}
-							<span class="n">{p.mile.toFixed(1)} mi</span><span class="l"
-								>of {ci.total.toFixed(1)} · {Math.max(0, ci.total - p.mile).toFixed(1)} to go</span
+							<span class="n">{mile.toFixed(1)} mi</span><span class="l"
+								>of {ci.total.toFixed(1)} · {Math.max(0, ci.total - mile).toFixed(1)} to go</span
 							>
 						{:else}
 							<span class="n">{r.distanceMiles.toFixed(1)}</span><span class="l">miles</span>
 						{/if}
 					</div>
 					<div>
-						<span class="n">{elapsed(r) !== null ? formatDuration(elapsed(r) ?? 0) : '—'}</span
-						><span class="l">elapsed</span>
-					</div>
-					<div>
-						<span class="n">{formatPace(onCourse ? coursePace(r) : r.paceMsPerMile)}</span><span
-							class="l">average pace</span
+						<span class="n">{v?.elapsedMs != null ? formatDuration(v.elapsedMs) : '—'}</span><span
+							class="l">elapsed</span
 						>
 					</div>
 					<div>
-						<span class="n">{r.latest ? ago(r.latest.t) : '—'}</span><span class="l"
+						<span class="n"
+							>{formatPace(onCourse ? (v?.paceMsPerMile ?? null) : r.paceMsPerMile)}</span
+						><span class="l">average pace</span>
+					</div>
+					<div>
+						<span class="n">{r.latest ? ago(r.latest.t, serverNow) : '—'}</span><span class="l"
 							>last update{#if r.latest?.battery != null}&nbsp;· phone {Math.round(
 									r.latest.battery * 100
 								)}%{/if}</span
@@ -670,7 +739,7 @@
 					</div>
 				</div>
 				{#if onCourse && ci && p}
-					{@const pct = Math.min(100, (100 * p.mile) / ci.total)}
+					{@const pct = Math.min(100, (100 * mile) / ci.total)}
 					{@const finishRow = schedules.find((sc) => sc.r?.id === r.id)?.rows.at(-1)}
 					{@const finishStart = schedules.find((sc) => sc.r?.id === r.id)?.start ?? null}
 					<div class="progress">
@@ -686,7 +755,7 @@
 							{#each barStops as st (st.name + st.mile)}
 								<span
 									class="tick"
-									class:done={p.mile >= st.mile}
+									class:done={mile >= st.mile}
 									style="left:{(100 * st.mile) / ci.total}%"
 									title="{st.name} · mile {st.mile.toFixed(1)}"
 								></span>
@@ -713,6 +782,13 @@
 					</p>
 				{/if}
 			{/each}
+			{#if anyEstimated}
+				<p class="sub">
+					Between phone updates (every couple of minutes) the distance and the dot carry on at the
+					average speed over the last 3 updates, then catch up with the real position when the next
+					one arrives.
+				</p>
+			{/if}
 		{/if}
 
 		<div class="map-wrap">

@@ -392,6 +392,10 @@ export interface Runner {
 	// on, or (in the preview) their first fix. The page measures course pace
 	// from it.
 	startedAt: string | null;
+	// When the newest fix of each of the phone's last few uploads was taken (ms),
+	// oldest first: the page carries the dot on between uploads at the average
+	// speed across them.
+	syncs: number[];
 }
 
 export interface TrackResponse {
@@ -421,6 +425,19 @@ export interface TrackResponse {
 
 // Enough to draw a smooth line; a 24-hour race at 1 fix per 10s is ~8,600.
 const MAX_PATH_POINTS = 3000;
+// The last 3 upload-to-upload stretches set the speed between uploads.
+const SPEED_SYNCS = 4;
+
+// The newest fix in each upload. One upload is one insert, so its points share
+// a received_at exactly.
+function syncTimes(rows: { t: Date; received_at: Date }[], count: number): number[] {
+	const newest = new Map<number, number>();
+	for (const r of rows) {
+		const k = r.received_at.getTime();
+		newest.set(k, Math.max(newest.get(k) ?? 0, r.t.getTime()));
+	}
+	return [...newest.values()].sort((a, b) => a - b).slice(-count);
+}
 
 function displayName(d: { device_id: string; name: string | null }): string {
 	return d.name || d.device_id || 'Unnamed phone';
@@ -497,9 +514,11 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 			lon: number;
 			accuracy: number | null;
 			battery: number | null;
+			received_at: Date;
 		}[]
 	>`
-		select device_id, recorded_at as t, lat, lon, accuracy, battery from ultra_points
+		select device_id, recorded_at as t, lat, lon, accuracy, battery, received_at
+		from ultra_points
 		where recorded_at between ${from} and ${to}
 			and device_id in ${sql(devices.map((d) => d.deviceId))}
 		order by recorded_at
@@ -513,15 +532,14 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 		// The map line and the distance come from the cleaned points, so a bad fix
 		// can't draw a spike or add miles. "Where are they now" is the newest
 		// usable fix, which keeps updating while they stand still.
-		const raw = rows
-			.filter((r) => r.device_id === d.deviceId)
-			.map((r) => ({
-				t: r.t.toISOString(),
-				lat: r.lat,
-				lon: r.lon,
-				accuracy: r.accuracy,
-				battery: r.battery
-			}));
+		const mine = rows.filter((r) => r.device_id === d.deviceId);
+		const raw = mine.map((r) => ({
+			t: r.t.toISOString(),
+			lat: r.lat,
+			lon: r.lon,
+			accuracy: r.accuracy,
+			battery: r.battery
+		}));
 		const clean = cleanTrack(raw);
 		const runner: Runner = {
 			id: d.deviceId,
@@ -533,7 +551,8 @@ export async function loadTrack(preview = false): Promise<TrackResponse> {
 			distanceMiles: 0,
 			elapsedMs: status === 'live' && clockStart !== null ? now.getTime() - clockStart : null,
 			startedAt: clockStart !== null ? new Date(clockStart).toISOString() : null,
-			paceMsPerMile: null
+			paceMsPerMile: null,
+			syncs: syncTimes(mine, SPEED_SYNCS)
 		};
 		if (clean.length) {
 			const last = latestFix(raw, clean) ?? clean[clean.length - 1];

@@ -509,6 +509,49 @@ export function timeAtMile(pointMiles: number[], times: number[], mile: number):
 	return null;
 }
 
+// The course mile a runner had reached at time `t`, read off their track.
+// Null before they were on the course.
+export function mileAtTime(pointMiles: number[], times: number[], t: number): number | null {
+	let k = -1;
+	while (k + 1 < times.length && times[k + 1] <= t) k++;
+	if (k < 0 || pointMiles[k] < 0) return null;
+	const n = k + 1;
+	if (n >= times.length || times[n] === times[k]) return pointMiles[k];
+	return pointMiles[k] + ((t - times[k]) / (times[n] - times[k])) * (pointMiles[n] - pointMiles[k]);
+}
+
+// Faster than this between uploads is a bad estimate, not a runner (even on
+// a train): 60 mph, in miles per ms.
+const MAX_ESTIMATE_MI_PER_MS = 1 / 60_000;
+
+// Where a runner probably is at `at`, between the phone's uploads (every
+// couple of minutes): their course mile at the last fix, carried on at their
+// average speed from the oldest of `syncs` to that fix. Standing still, it
+// stays put. It stops guessing a while after the next upload was due, so a
+// phone that's lost signal doesn't run its dot off down the course.
+export function estimateMile(
+	pointMiles: number[],
+	times: number[],
+	syncs: number[], // the newest fix of each recent upload (ms), oldest first
+	at: number,
+	total: number
+): { mile: number; at: number } | null {
+	const lastT = times[times.length - 1];
+	const lastMile = pointMiles[pointMiles.length - 1];
+	if (syncs.length < 2 || lastT === undefined || lastMile < 0) return null;
+	const fromMile = mileAtTime(pointMiles, times, syncs[0]);
+	if (fromMile === null || lastT - syncs[0] < 30_000) return null;
+	const speed = Math.min(
+		MAX_ESTIMATE_MI_PER_MS,
+		Math.max(0, (lastMile - fromMile) / (lastT - syncs[0]))
+	);
+	const interval = (syncs[syncs.length - 1] - syncs[0]) / (syncs.length - 1);
+	const ahead = Math.min(10 * 60_000, Math.max(2 * 60_000, 2 * interval));
+	const t = Math.min(at, lastT + ahead);
+	if (t <= lastT) return { mile: lastMile, at: lastT };
+	return { mile: Math.min(total, lastMile + speed * (t - lastT)), at: t };
+}
+
 // ---- arrival windows ----
 
 export interface ScheduleRow {
