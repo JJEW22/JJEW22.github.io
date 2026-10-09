@@ -72,7 +72,7 @@ export const RACE: RaceConfig = {
 	about: {
 		hook: 'Have you ever wanted to cosplay as a leaf going downstream?',
 		intro:
-			"Well, we're running the inaugural Run the Entire Charles River (kinda), and this page is your way to track us as we do!",
+			'Well, we did too! So we are running the inaugural Run the Entire Charles River (kinda), and this page is your way to track us as we do!',
 		route: 'Echo Lake, Hopkinton → Night Shift Brewing, Boston',
 		help: [
 			{
