@@ -3,6 +3,10 @@
 // from their pasted end screen where the paste covered a round, typed where it
 // didn't. A blank answer is a miss. Game points for a matched answer always
 // come from the day's answer sheet, so nothing pasted is trusted for scoring.
+//
+// Once the day's list is in, an answer that isn't on it is refused (422, with
+// `unknownRounds`) unless the player ticked "submit for review" for it; then
+// it's filed for a krillion admin and scores as a miss until accepted.
 import { json } from '@sveltejs/kit';
 import { dayForDate, etDate, type PastedRound } from '$lib/krillion';
 import { KrillionError, submitDive } from '$lib/server/krillion';
@@ -32,7 +36,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			miss: !answer,
 			othersChose: num(r?.othersChose),
 			gamePoints: num(r?.gamePoints),
-			found: Boolean(r?.found)
+			found: Boolean(r?.found),
+			// "Submit for review": an answer that isn't on the day's list.
+			review: Boolean(r?.review) && Boolean(answer)
 		};
 	});
 	if (rounds.every((r) => r.miss)) {
@@ -55,7 +61,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
 	} catch (err) {
 		if (err instanceof KrillionError) {
-			return json({ ok: false, error: err.message }, { status: err.status });
+			return json({ ok: false, error: err.message, ...err.details }, { status: err.status });
 		}
 		throw err;
 	}

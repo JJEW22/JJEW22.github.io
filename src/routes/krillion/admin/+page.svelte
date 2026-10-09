@@ -3,7 +3,9 @@
 	Krillion admin: every answer's count, game points and rescored points for a
 	day, one prompt at a time, searchable and sortable -- and every dive
 	submitted that day, searchable by player or answer, each opening to show how
-	its rounds were converted.
+	its rounds were converted. Above them, the words players sent for review
+	(answers not on the day's list), to accept or reject; accepted ones join
+	the day's answers as Accepted Words.
 
 	Prerendered like every page here, so it renders for anyone and asks the API;
 	/krillion/api/admin/answers is what enforces the krillion:admin role and the
@@ -32,6 +34,7 @@
 		share: number;
 		gameScore: number | null;
 		points: number;
+		accepted?: boolean; // an Accepted Word, from review
 	}
 	interface Prompt {
 		id: string;
@@ -91,7 +94,78 @@
 	let sortDesc = true;
 	let limit = 200;
 
-	onMount(() => load(null));
+	// ---- words sent for review ----
+	interface ReviewItem {
+		id: number;
+		date: string;
+		dayNumber: number;
+		prompt: string;
+		answer: string;
+		status: 'pending' | 'accepted' | 'rejected';
+		askedBy: string;
+		askedAt: string;
+		decidedAt: string | null;
+		decidedBy: string | null;
+		acceptedPoints: number | null;
+	}
+	let pending: ReviewItem[] = [];
+	let decided: ReviewItem[] = [];
+	let hiddenToday = 0;
+	let reviewsLoaded = false;
+	let reviewBusy: number | null = null;
+	let reviewMsg = '';
+	let reviewBad = false;
+	let showDecided = false;
+
+	function applyReviews(data: {
+		pending?: ReviewItem[];
+		decided?: ReviewItem[];
+		hiddenToday?: number;
+	}) {
+		pending = data.pending ?? [];
+		decided = data.decided ?? [];
+		hiddenToday = data.hiddenToday ?? 0;
+		reviewsLoaded = true;
+	}
+
+	async function loadReviews() {
+		const r = await fetch('/krillion/api/admin/reviews');
+		const data = await r.json().catch(() => null);
+		if (r.ok && data?.ok) applyReviews(data);
+	}
+
+	// Accept, reject, or (undo) put back to pending. That day's dives are
+	// rescored on the server; the answers below reload to match.
+	async function decide(item: ReviewItem, status: ReviewItem['status']) {
+		reviewBusy = item.id;
+		reviewMsg = '';
+		reviewBad = false;
+		try {
+			const r = await fetch('/krillion/api/admin/reviews', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ id: item.id, status })
+			});
+			const data = await r.json().catch(() => null);
+			if (!r.ok || !data?.ok) {
+				reviewBad = true;
+				reviewMsg = data?.error ?? `Couldn't save (${r.status}).`;
+				return;
+			}
+			applyReviews(data);
+			const what =
+				status === 'accepted' ? 'accepted' : status === 'rejected' ? 'rejected' : 'back in review';
+			reviewMsg = `“${item.answer}” ${what}; ${data.rescored} ${data.rescored === 1 ? 'dive' : 'dives'} on #${item.dayNumber} rescored.`;
+			if (status !== 'rejected' || item.status === 'accepted') await load(picked);
+		} finally {
+			reviewBusy = null;
+		}
+	}
+
+	onMount(() => {
+		load(null);
+		loadReviews();
+	});
 
 	async function load(n: number | null) {
 		picked = n;
@@ -281,6 +355,96 @@
 			{#if fetchMsg}<p class="fetch-msg" class:bad={fetchBad}>{fetchMsg}</p>{/if}
 		{/if}
 
+		{#if status !== 'denied' && status !== 'loading' && reviewsLoaded}
+			<section class="reviews" class:none={!pending.length}>
+				<h2>
+					Words to review{#if pending.length}<span class="count">{pending.length}</span>{/if}
+				</h2>
+				{#if pending.length}
+					<p class="sub">
+						Answers players sent for review because they aren't on the day's list. Accepting one
+						scores it at that prompt's target mean + 1 SD for everyone who gave it that day.
+					</p>
+					<table class="rv-table">
+						<thead>
+							<tr>
+								<th>Dive</th>
+								<th>Prompt</th>
+								<th>Word</th>
+								<th>Asked by</th>
+								<th class="num" title="The prompt's target mean + 1 SD">Would score</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each pending as w (w.id)}
+								<tr>
+									<td>#{w.dayNumber}</td>
+									<td class="prompt">{w.prompt}</td>
+									<td><b>{w.answer}</b></td>
+									<td class="sub">{w.askedBy}</td>
+									<td class="num">{w.acceptedPoints?.toFixed(1) ?? '—'}</td>
+									<td class="actions">
+										<button
+											type="button"
+											class="accept"
+											disabled={reviewBusy !== null}
+											on:click={() => decide(w, 'accepted')}>Accept</button
+										>
+										<button
+											type="button"
+											class="reject"
+											disabled={reviewBusy !== null}
+											on:click={() => decide(w, 'rejected')}>Reject</button
+										>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{:else}
+					<p class="sub">No words waiting for review.</p>
+				{/if}
+				{#if hiddenToday}
+					<p class="sub">
+						{hiddenToday} more for today, hidden until you've submitted today's dive.
+					</p>
+				{/if}
+				{#if reviewMsg}<p class="fetch-msg" class:bad={reviewBad}>{reviewMsg}</p>{/if}
+				{#if decided.length}
+					<button type="button" class="link" on:click={() => (showDecided = !showDecided)}>
+						{showDecided ? 'Hide' : 'Show'} recent decisions ({decided.length})
+					</button>
+					{#if showDecided}
+						<table class="rv-table">
+							<tbody>
+								{#each decided as w (w.id)}
+									<tr>
+										<td>#{w.dayNumber}</td>
+										<td class="prompt">{w.prompt}</td>
+										<td><b>{w.answer}</b></td>
+										<td>
+											<span class="state {w.status}"
+												>{w.status === 'accepted' ? 'Accepted' : 'Rejected'}</span
+											>
+											{#if w.decidedBy}<span class="sub"> by {w.decidedBy}</span>{/if}
+										</td>
+										<td class="actions">
+											<button
+												type="button"
+												disabled={reviewBusy !== null}
+												on:click={() => decide(w, 'pending')}>Undo</button
+											>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					{/if}
+				{/if}
+			</section>
+		{/if}
+
 		{#if status === 'ready' || (status === 'missing' && submissions.length)}
 			<div class="views" role="tablist">
 				<button
@@ -464,6 +628,12 @@
 					{rows.length.toLocaleString()}
 					{rows.length === 1 ? 'answer' : 'answers'}{q ? ` matching "${search.trim()}"` : ''}
 				</p>
+				{#if prompt.answers.some((a) => a.accepted)}
+					<p class="sub legend">
+						<span class="swatch"></span><b>Accepted Words</b> — accepted after review; not in krillion.io's
+						list, scored at the target mean + 1 SD.
+					</p>
+				{/if}
 
 				<table>
 					<thead>
@@ -493,8 +663,11 @@
 					</thead>
 					<tbody>
 						{#each shown as a (a.answer)}
-							<tr class:unused={a.count === 0}>
-								<td>{a.answer}</td>
+							<tr class:unused={a.count === 0 && !a.accepted} class:accepted={a.accepted}>
+								<td
+									>{a.answer}{#if a.accepted}<span class="tag accepted-tag">Accepted Word</span
+										>{/if}</td
+								>
 								<td class="num">{a.count.toLocaleString()}</td>
 								<td class="num">{(a.share * 100).toFixed(2)}%</td>
 								<td class="num">{a.gameScore ?? '—'}</td>
@@ -787,6 +960,124 @@
 
 	tr.hit td {
 		background: #fff8db;
+	}
+
+	tr.accepted td {
+		background: #f3f8fe;
+	}
+
+	.tag.accepted-tag {
+		background: #e3eefb;
+		color: #0b4f8a;
+	}
+
+	.legend {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.swatch {
+		display: inline-block;
+		width: 0.9rem;
+		height: 0.9rem;
+		background: #f3f8fe;
+		border: 1px solid #cfe0f5;
+		border-radius: 3px;
+	}
+
+	.reviews {
+		margin: 0 0 1.25rem 0;
+		padding: 1rem 1.1rem;
+		background: #fffaf0;
+		border: 1px solid #f1e2bf;
+		border-radius: 10px;
+	}
+
+	.reviews.none {
+		background: #fafbfc;
+		border-color: #e9ecef;
+	}
+
+	.reviews h2 {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0 0 0.3rem 0;
+	}
+
+	.count {
+		padding: 0.05rem 0.5rem;
+		background: #b9770e;
+		border-radius: 10px;
+		font-size: 0.8rem;
+		color: #fff;
+	}
+
+	.rv-table td {
+		vertical-align: middle;
+	}
+
+	.rv-table .prompt {
+		color: #666;
+	}
+
+	.actions {
+		white-space: nowrap;
+		text-align: right;
+	}
+
+	.actions button {
+		margin-left: 0.3rem;
+		padding: 0.3rem 0.7rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.85rem;
+		cursor: pointer;
+	}
+
+	.actions button.accept {
+		background: #1e6b36;
+		border-color: #1e6b36;
+		color: #fff;
+	}
+
+	.actions button.reject {
+		color: #9a2c2c;
+	}
+
+	.actions button:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+
+	.state {
+		padding: 0.05rem 0.45rem;
+		border-radius: 8px;
+		font-size: 0.78rem;
+	}
+
+	.state.accepted {
+		background: #eaf7ee;
+		color: #1e6b36;
+	}
+
+	.state.rejected {
+		background: #f3f4f6;
+		color: #777;
+	}
+
+	button.link {
+		margin-top: 0.5rem;
+		padding: 0;
+		background: none;
+		border: 0;
+		font: inherit;
+		font-size: 0.85rem;
+		color: #0066cc;
+		cursor: pointer;
 	}
 
 	.more {

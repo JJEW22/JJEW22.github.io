@@ -74,6 +74,9 @@ export interface PastedRound {
 	othersChose: number | null;
 	gamePoints: number | null;
 	found: boolean; // false = this round wasn't in the paste; the player fills it in
+	// The player asked for this answer to be reviewed if it isn't on the day's
+	// list (krillion_word_reviews). Ignored for an answer that is.
+	review?: boolean;
 }
 
 export interface PastedDive {
@@ -436,6 +439,14 @@ export function scoreDay(
 ): { points: number[]; fit: PromptFit }[] {
 	const tops = topScores(prompts, range);
 	return prompts.map((answers, i) => scorePrompt(answers, tops[i]));
+}
+
+// An answer a krillion admin accepted after review -- one that isn't on the
+// day's sheet or in its counts -- scores the prompt's target mean plus one
+// target SD: better than an average answer, as a real but unlisted one should
+// be. Never more than the prompt's top.
+export function acceptedPoints(fit: Pick<PromptFit, 'targetMean' | 'targetSd' | 'top'>): number {
+	return Math.min(fit.top ?? TOP_MAX, fit.targetMean + fit.targetSd);
 }
 
 // ---------------- matching a typed answer to the sheet ----------------

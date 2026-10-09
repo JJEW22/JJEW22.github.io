@@ -16,6 +16,7 @@
 import { sql } from '$lib/server/db';
 import { sendEmail } from '$lib/server/email';
 import {
+	acceptedPoints,
 	dateForDay,
 	dayForDate,
 	etDate,
@@ -40,7 +41,9 @@ const UA = `johnjackwilkins.com krillion-rescore (once daily; contact ${SITE})`;
 export class KrillionError extends Error {
 	constructor(
 		message: string,
-		public status = 400
+		public status = 400,
+		// Extra fields for the JSON error response.
+		public details: Record<string, unknown> = {}
 	) {
 		super(message);
 	}
@@ -347,6 +350,47 @@ interface AnswerRow {
 	count: number;
 	game_score: number | null;
 	points: number;
+	accepted?: boolean; // an admin-accepted word, not one of krillion.io's
+}
+
+export type ReviewStatus = 'pending' | 'accepted' | 'rejected';
+
+const reviewKey = (promptId: string, answer: string) =>
+	`${promptId}\u0000${answer.trim().toLowerCase()}`;
+
+// What a day's dives are scored against: krillion.io's answers plus any words
+// an admin accepted (scored from the prompt's fit), and every reviewed word's
+// status. An accepted word that krillion.io has since listed itself scores as
+// krillion.io's.
+async function loadScoring(
+	date: string
+): Promise<{ answers: AnswerRow[]; reviews: Map<string, ReviewStatus> }> {
+	const answers = await sql<AnswerRow[]>`
+		select prompt_id, answer, count, game_score, points from krillion_answers where date = ${date}
+	`;
+	const [day] = await sql<{ model: Record<string, PromptFit> }[]>`
+		select model from krillion_days where date = ${date}
+	`;
+	const words = await sql<{ prompt_id: string; answer: string; status: ReviewStatus }[]>`
+		select prompt_id, answer, status from krillion_word_reviews where date = ${date}
+	`;
+	const listed = new Set(answers.map((a) => reviewKey(a.prompt_id, a.answer)));
+	const reviews = new Map<string, ReviewStatus>();
+	for (const w of words) {
+		const key = reviewKey(w.prompt_id, w.answer);
+		reviews.set(key, w.status);
+		const fit = day?.model?.[w.prompt_id];
+		if (w.status !== 'accepted' || !fit || listed.has(key)) continue;
+		answers.push({
+			prompt_id: w.prompt_id,
+			answer: w.answer,
+			count: 0,
+			game_score: null,
+			points: acceptedPoints(fit),
+			accepted: true
+		});
+	}
+	return { answers, reviews };
 }
 
 export interface ScoredRound {
@@ -360,14 +404,20 @@ export interface ScoredRound {
 	points: number;
 	count: number | null;
 	// Percentile of rarity: % of players whose answer was more common. Null
-	// for a miss, and on dives scored before it existed.
+	// for a miss, for an accepted word, and on dives scored before it existed.
 	rarity?: number | null;
+	// An answer that isn't on the day's list (and so scores as a miss).
+	unknown?: boolean;
+	// Where the answer stands in review: an accepted word, or one not on the
+	// list that's waiting for (or was refused by) an admin.
+	review?: ReviewStatus | null;
 }
 
 function scoreRounds(
 	rounds: PastedRound[],
 	prompts: { id: string; text: string }[],
-	answers: AnswerRow[]
+	answers: AnswerRow[],
+	reviews: Map<string, ReviewStatus> = new Map()
 ): { scored: ScoredRound[]; total: number } {
 	const byPrompt = new Map<string, AnswerRow[]>();
 	for (const a of answers) {
@@ -385,6 +435,7 @@ function scoreRounds(
 			prompts[i];
 		const list = p ? (byPrompt.get(p.id) ?? []) : [];
 		const hit = !r.miss && r.answer && p ? matchAnswer(list, r.answer) : null;
+		const unknown = !r.miss && !!r.answer && !!p && !hit;
 		return {
 			round: r.round,
 			promptId: p?.id ?? null,
@@ -397,12 +448,19 @@ function scoreRounds(
 			gamePoints: hit ? (hit.game_score ?? r.gamePoints ?? null) : r.miss || !r.answer ? 0 : null,
 			points: hit ? hit.points : 0,
 			count: hit ? hit.count : null,
-			rarity: hit
-				? rarityPercentile(
-						hit.count,
-						list.map((a) => a.count)
-					)
-				: null
+			rarity:
+				hit && !hit.accepted
+					? rarityPercentile(
+							hit.count,
+							list.map((a) => a.count)
+						)
+					: null,
+			unknown,
+			review: hit?.accepted
+				? 'accepted'
+				: unknown && p && r.answer
+					? (reviews.get(reviewKey(p.id, r.answer)) ?? null)
+					: null
 		};
 	});
 	return { scored, total: scored.reduce((s, r) => s + r.points, 0) };
@@ -414,17 +472,47 @@ function gameTotal(rounds: { gamePoints: number | null }[]): number | null {
 	return rounds.reduce((s, r) => s + (r.gamePoints as number), 0);
 }
 
+// File the words a dive asked to have reviewed: answers not on the day's
+// list, with "submit for review" ticked, and not reviewed already. Returns
+// whether anything new was filed.
+async function fileReviews(
+	date: string,
+	sub: { id: number | string; user_id: number | string | null },
+	rounds: PastedRound[],
+	scored: ScoredRound[],
+	reviews: Map<string, ReviewStatus>
+): Promise<boolean> {
+	let filed = false;
+	for (const [i, r] of scored.entries()) {
+		const answer = r.submitted?.trim();
+		if (!r.unknown || !rounds[i]?.review || !r.promptId || !answer) continue;
+		if (reviews.has(reviewKey(r.promptId, answer))) continue;
+		await sql`
+			insert into krillion_word_reviews (date, prompt_id, answer, user_id, submission_id)
+			values (${date}, ${r.promptId}, ${answer.slice(0, 200)}, ${sub.user_id}, ${sub.id})
+			on conflict do nothing
+		`;
+		reviews.set(reviewKey(r.promptId, answer), 'pending');
+		filed = true;
+	}
+	return filed;
+}
+
 export async function rescoreDate(date: string): Promise<number> {
 	const day = await loadDay(date);
 	if (!day.scored) return 0;
-	const answers = await sql<AnswerRow[]>`
-		select prompt_id, answer, count, game_score, points from krillion_answers where date = ${date}
+	const { answers, reviews } = await loadScoring(date);
+	const subs = await sql<{ id: string; user_id: string | null; rounds: PastedRound[] }[]>`
+		select id, user_id, rounds from krillion_submissions where date = ${date}
 	`;
-	const subs = await sql<{ id: string; rounds: PastedRound[] }[]>`
-		select id, rounds from krillion_submissions where date = ${date}
-	`;
+	// Dives submitted before the counts arrived couldn't be checked then: their
+	// words for review are filed now.
 	for (const s of subs) {
-		const { scored, total } = scoreRounds(s.rounds, day.prompts, answers);
+		const { scored } = scoreRounds(s.rounds, day.prompts, answers, reviews);
+		await fileReviews(date, s, s.rounds, scored, reviews);
+	}
+	for (const s of subs) {
+		const { scored, total } = scoreRounds(s.rounds, day.prompts, answers, reviews);
 		await sql`
 			update krillion_submissions
 			set scored = ${sql.json(scored as never)}, updated_score = ${total}, scored_at = now(),
@@ -496,8 +584,29 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		miss: Boolean(r.miss) || !r.answer || !String(r.answer).trim(),
 		othersChose: Number.isFinite(r.othersChose) ? r.othersChose : null,
 		gamePoints: !r.answer || !String(r.answer).trim() ? 0 : okPoints(r.gamePoints),
-		found: Boolean(r.found)
+		found: Boolean(r.found),
+		review: Boolean(r.review)
 	}));
+
+	// With the day's list in, every answer has to be on it -- or be sent for
+	// review. Anything else is refused, naming the rounds, so the page can flag
+	// them and tick their review boxes.
+	const scoring = day.scored ? await loadScoring(date) : null;
+	if (scoring) {
+		const { scored } = scoreRounds(rounds, day.prompts, scoring.answers, scoring.reviews);
+		const unknownRounds = scored
+			.filter((r, i) => r.unknown && !rounds[i].review)
+			.map((r) => r.round);
+		if (unknownRounds.length) {
+			throw new KrillionError(
+				unknownRounds.length === 1
+					? `Round ${unknownRounds[0]}'s answer isn't in the database.`
+					: `Rounds ${unknownRounds.join(', ')} have answers that aren't in the database.`,
+				422,
+				{ unknownRounds }
+			);
+		}
+	}
 	// The game's total: the paste's own figure if it had one, else the rounds' sum.
 	const gameScore = okTotal(input.gameScore) ?? gameTotal(rounds);
 
@@ -524,11 +633,11 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		id = Number(row.id);
 	}
 
-	if (day.scored) {
-		const answers = await sql<AnswerRow[]>`
-			select prompt_id, answer, count, game_score, points from krillion_answers where date = ${date}
-		`;
-		const { scored, total } = scoreRounds(rounds, day.prompts, answers);
+	if (scoring) {
+		const { answers, reviews } = scoring;
+		const first = scoreRounds(rounds, day.prompts, answers, reviews);
+		await fileReviews(date, { id, user_id: userId }, rounds, first.scored, reviews);
+		const { scored, total } = scoreRounds(rounds, day.prompts, answers, reviews);
 		await sql`
 			update krillion_submissions set scored = ${sql.json(scored as never)}, updated_score = ${total},
 				scored_at = now(), game_score = coalesce(game_score, ${gameTotal(scored)})
@@ -814,6 +923,7 @@ export interface AdminAnswer {
 	share: number;
 	gameScore: number | null;
 	points: number;
+	accepted: boolean; // an Accepted Word, from review
 }
 
 export interface AdminDay {
@@ -906,10 +1016,7 @@ export async function adminAnswers(userId: number, date: string): Promise<AdminD
 		select day_number, prompts, model from krillion_days where date = ${date}
 	`;
 	if (!day) throw new KrillionError(`No counts for ${date} yet.`, 404);
-	const rows = await sql<AnswerRow[]>`
-		select prompt_id, answer, count, game_score, points from krillion_answers where date = ${date}
-		order by prompt_id, points desc
-	`;
+	const { answers: rows } = await loadScoring(date);
 	const totals = new Map<string, number>();
 	for (const r of rows) totals.set(r.prompt_id, (totals.get(r.prompt_id) ?? 0) + r.count);
 	return {
@@ -928,9 +1035,126 @@ export async function adminAnswers(userId: number, date: string): Promise<AdminD
 						count: r.count,
 						share: total > 0 ? r.count / total : 0,
 						gameScore: r.game_score,
-						points: r.points
+						points: r.points,
+						accepted: Boolean(r.accepted)
 					}))
 			};
 		})
 	};
+}
+
+// ---------------- admin: words sent for review ----------------
+
+export interface ReviewItem {
+	id: number;
+	date: string;
+	dayNumber: number;
+	promptId: string;
+	prompt: string;
+	answer: string;
+	status: ReviewStatus;
+	askedBy: string; // account name, or "Guest"
+	askedAt: string;
+	decidedAt: string | null;
+	decidedBy: string | null;
+	// What it scores (or would) once accepted: the prompt's target mean + 1 SD.
+	acceptedPoints: number | null;
+}
+
+// Every word waiting for review, plus the most recent decisions. Today's
+// words are held back until the admin has submitted today's dive, like
+// today's answer scores.
+export async function listReviews(
+	userId: number
+): Promise<{ pending: ReviewItem[]; decided: ReviewItem[]; hiddenToday: number }> {
+	const today = etDate();
+	let seeToday = true;
+	try {
+		await assertAdminCanSee(userId, today);
+	} catch {
+		seeToday = false;
+	}
+	const rows = await sql<
+		{
+			id: number;
+			date: string;
+			day_number: number | null;
+			prompt_id: string;
+			prompts: { id: string; text: string }[] | null;
+			model: Record<string, PromptFit> | null;
+			answer: string;
+			status: ReviewStatus;
+			asked_by: string | null;
+			created_at: Date;
+			decided_at: Date | null;
+			decided_by: string | null;
+		}[]
+	>`
+		(select r.id::int as id, to_char(r.date, 'YYYY-MM-DD') as date, d.day_number, r.prompt_id,
+			d.prompts, d.model, r.answer, r.status, coalesce(u.real_name, u.username) as asked_by,
+			r.created_at, r.decided_at, coalesce(a.real_name, a.username) as decided_by
+		from krillion_word_reviews r
+		left join krillion_days d on d.date = r.date
+		left join users u on u.id = r.user_id
+		left join users a on a.id = r.decided_by
+		where r.status = 'pending'
+		order by r.date desc, r.created_at)
+		union all
+		(select r.id::int, to_char(r.date, 'YYYY-MM-DD'), d.day_number, r.prompt_id, d.prompts, d.model,
+			r.answer, r.status, coalesce(u.real_name, u.username), r.created_at, r.decided_at,
+			coalesce(a.real_name, a.username)
+		from krillion_word_reviews r
+		left join krillion_days d on d.date = r.date
+		left join users u on u.id = r.user_id
+		left join users a on a.id = r.decided_by
+		where r.status <> 'pending'
+		order by r.decided_at desc nulls last
+		limit 50)
+	`;
+	const items = rows.map(
+		(r): ReviewItem => ({
+			id: r.id,
+			date: r.date,
+			dayNumber: r.day_number ?? dayForDate(r.date),
+			promptId: r.prompt_id,
+			prompt: r.prompts?.find((p) => p.id === r.prompt_id)?.text ?? r.prompt_id,
+			answer: r.answer,
+			status: r.status,
+			askedBy: r.asked_by ?? 'Guest',
+			askedAt: r.created_at.toISOString(),
+			decidedAt: r.decided_at?.toISOString() ?? null,
+			decidedBy: r.decided_by,
+			acceptedPoints: r.model?.[r.prompt_id] ? acceptedPoints(r.model[r.prompt_id]) : null
+		})
+	);
+	const visible = items.filter((r) => seeToday || r.date !== today);
+	return {
+		pending: visible.filter((r) => r.status === 'pending'),
+		decided: visible.filter((r) => r.status !== 'pending'),
+		hiddenToday:
+			items.filter((r) => r.status === 'pending').length -
+			visible.filter((r) => r.status === 'pending').length
+	};
+}
+
+// Accept or reject a word (or put it back to pending), then rescore that
+// day's dives so everyone who gave it gets the new score.
+export async function decideReview(
+	userId: number,
+	id: number,
+	status: ReviewStatus
+): Promise<{ date: string; rescored: number }> {
+	const [row] = await sql<{ date: string }[]>`
+		select to_char(date, 'YYYY-MM-DD') as date from krillion_word_reviews where id = ${id}
+	`;
+	if (!row) throw new KrillionError('No such word.', 404);
+	await assertAdminCanSee(userId, row.date);
+	await sql`
+		update krillion_word_reviews
+		set status = ${status},
+			decided_at = ${status === 'pending' ? null : new Date()},
+			decided_by = ${status === 'pending' ? null : userId}
+		where id = ${id}
+	`;
+	return { date: row.date, rescored: await rescoreDate(row.date) };
 }

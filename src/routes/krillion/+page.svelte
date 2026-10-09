@@ -42,6 +42,8 @@
 		points: number;
 		count: number | null;
 		rarity?: number | null;
+		unknown?: boolean; // not on the day's list
+		review?: 'pending' | 'accepted' | 'rejected' | null;
 	}
 	interface Result {
 		dayNumber: number;
@@ -84,6 +86,8 @@
 		othersChose: number | null;
 		prompt: string;
 		found: boolean;
+		review: boolean; // "submit for review": the answer may not be on the day's list
+		flagged: boolean; // the server said it isn't on the list
 	}
 	const blankRow = (): Row => ({
 		answer: '',
@@ -92,7 +96,9 @@
 		gamePoints: null,
 		othersChose: null,
 		prompt: '',
-		found: false
+		found: false,
+		review: false,
+		flagged: false
 	});
 	let paste = '';
 	let rows: Row[] = [0, 1, 2, 3, 4, 5, 6].map(blankRow);
@@ -238,9 +244,16 @@
 		restored = true;
 		formOpen = false;
 		notify = mine.notify;
-		rows = scoredRounds.map((r) => {
-			const text = r.miss ? '' : (r.match ?? r.submitted ?? '');
-			return { ...blankRow(), answer: text, original: text, prompt: r.prompt ?? '' };
+		rows = scoredRounds.map((r, i) => {
+			// A word sent for review is put back as typed, still ticked for review.
+			const text = r.unknown ? (r.submitted ?? '') : r.miss ? '' : (r.match ?? r.submitted ?? '');
+			return {
+				...blankRow(),
+				answer: text,
+				original: text,
+				prompt: r.prompt ?? '',
+				review: Boolean(mine.rounds[i]?.review)
+			};
 		});
 	}
 
@@ -257,7 +270,9 @@
 			gamePoints: r.gamePoints,
 			othersChose: r.othersChose,
 			prompt: r.prompt,
-			found: r.found
+			found: r.found,
+			review: false,
+			flagged: false
 		}));
 		pasted = { dayNumber: d.dayNumber, score: d.score, betterThan: d.betterThan, found: d.found };
 	}
@@ -275,9 +290,13 @@
 		answered > 0 &&
 		(!notify || Boolean(me) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
 
+	// Set when a submission was refused for answers that aren't on the day's list.
+	let reviewNote = false;
+
 	async function submit() {
 		busy = true;
 		error = '';
+		reviewNote = false;
 		result = null;
 		try {
 			const body = {
@@ -293,7 +312,8 @@
 						gamePoints: same ? r.gamePoints : null,
 						othersChose: same ? r.othersChose : null,
 						prompt: r.prompt,
-						found: r.found && same
+						found: r.found && same,
+						review: r.review && Boolean(r.answer.trim())
 					};
 				}),
 				notify,
@@ -305,6 +325,16 @@
 				body: JSON.stringify(body)
 			});
 			const data = await r.json().catch(() => null);
+			if (Array.isArray(data?.unknownRounds) && data.unknownRounds.length) {
+				// Answers that aren't on the day's list: flag them and tick them for
+				// review, so submitting again sends them in.
+				const bad = new Set<number>(data.unknownRounds);
+				rows = rows.map((row, i) =>
+					bad.has(i + 1) ? { ...row, flagged: true, review: true } : row
+				);
+				reviewNote = true;
+				return;
+			}
 			if (!r.ok || !data?.ok) {
 				error = data?.error || `Something went wrong (${r.status}).`;
 				return;
@@ -324,10 +354,12 @@
 		}
 	}
 
-	function promptLabel(i: number): string {
-		if (day?.scored && day.prompts[i]) return day.prompts[i].text;
+	// `d` and `rs` are passed in rather than read here: the markup only re-runs a
+	// call when something written in the call itself changes.
+	function promptLabel(i: number, d: Day | null, rs: Row[]): string {
+		if (d?.scored && d.prompts[i]) return d.prompts[i].text;
 		// Before the day's counts arrive, the paste's own prompt text is the best label.
-		const p = rows[i]?.prompt;
+		const p = rs[i]?.prompt;
 		return p ? p.charAt(0) + p.slice(1).toLowerCase() : `Round ${i + 1}`;
 	}
 
@@ -430,14 +462,19 @@
 
 				<div class="rows">
 					{#each rows as r, i (i)}
-						<label
+						<div
 							class="row"
 							class:from-paste={r.found && r.answer.trim() === r.original && r.answer}
+							class:flagged={r.flagged}
 						>
-							<span class="row-label"><b>{i + 1}.</b> {promptLabel(i)}</span>
+							<label class="row-label" for="k-answer-{i}"
+								><b>{i + 1}.</b> {promptLabel(i, day, rows)}</label
+							>
 							<span class="row-input">
 								<input
+									id="k-answer-{i}"
 									bind:value={r.answer}
+									on:input={() => (r.flagged = false)}
 									list="k-answers-{i}"
 									autocomplete="off"
 									placeholder={r.typed
@@ -453,8 +490,15 @@
 										miss
 									{/if}
 								</span>
+								<label
+									class="review"
+									title="Not in the database? Tick to send this answer to an admin for review."
+								>
+									<input type="checkbox" bind:checked={r.review} disabled={!r.answer.trim()} />
+									<span>Submit for review</span>
+								</label>
 							</span>
-						</label>
+						</div>
 						{#if day?.answers && day.prompts[i]}
 							<datalist id="k-answers-{i}">
 								{#each day.answers[day.prompts[i].id] ?? [] as a (a)}<option value={a}
@@ -495,6 +539,13 @@
 				<button type="button" class="primary" disabled={!canSubmit} on:click={submit}>
 					{busy ? 'Scoring…' : 'Rescore my dive'}
 				</button>
+				{#if reviewNote}
+					<p class="warn review-note">
+						The words highlighted in red are not in the database. They have now been checked to be
+						submitted for review — press <b>Rescore my dive</b> again to send them in, or fix them. Until
+						an admin accepts a word it scores as a miss.
+					</p>
+				{/if}
 				{#if error}<p class="warn">{error}</p>{/if}
 			</section>
 		{/if}
@@ -559,9 +610,22 @@
 								<tr class:miss={r.miss}>
 									<td>{r.round}</td>
 									<td>
-										{r.miss ? 'miss' : r.match}
+										{r.unknown ? r.submitted : r.miss ? 'miss' : r.match}
 										{#if !r.miss && r.submitted && r.match && r.match.toLowerCase() !== r.submitted.toLowerCase()}
 											<span class="sub">(you typed “{r.submitted}”)</span>
+										{/if}
+										{#if r.review === 'accepted'}
+											<span class="rv accepted" title="Accepted by an admin after review"
+												>accepted word</span
+											>
+										{:else if r.review === 'pending'}
+											<span class="rv pending" title="Scores as a miss unless an admin accepts it"
+												>in review</span
+											>
+										{:else if r.review === 'rejected'}
+											<span class="rv rejected">not accepted</span>
+										{:else if r.unknown}
+											<span class="rv rejected">not in the database</span>
 										{/if}
 										<div class="sub">{r.prompt}</div>
 									</td>
@@ -751,6 +815,11 @@
 				<li>
 					Counts are taken from krillion.io twice a day, at 11:00 and 23:00 ET; your score updates
 					with each. Misses score 0, as in the game.
+				</li>
+				<li>
+					An answer that isn't in the day's list can be <b>submitted for review</b>. Until an admin
+					accepts it, it scores as a miss; once accepted it scores the prompt's average plus one
+					standard deviation, for everyone who gave it that day.
 				</li>
 			</ul>
 		</section>
@@ -1003,6 +1072,60 @@
 		background: #f4fbf6;
 	}
 
+	.row.flagged input:not([type='checkbox']) {
+		border-color: #d64545;
+		background: #fdeeee;
+	}
+
+	.row.flagged .row-label {
+		color: #9a2c2c;
+	}
+
+	.review {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.75rem;
+		color: #666;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+
+	.row.flagged .review {
+		color: #9a2c2c;
+		font-weight: 600;
+	}
+
+	.review-note {
+		padding: 0.6rem 0.8rem;
+		background: #fdeeee;
+		border-radius: 8px;
+	}
+
+	.rv {
+		margin-left: 0.35rem;
+		padding: 0.05rem 0.45rem;
+		border-radius: 10px;
+		font-size: 0.72rem;
+		white-space: nowrap;
+	}
+
+	.rv.accepted {
+		background: #eaf2fd;
+		color: #0b4f8a;
+	}
+
+	.rv.pending {
+		background: #fff6e5;
+		color: #7a5200;
+	}
+
+	.rv.rejected {
+		background: #f3f4f6;
+		color: #777;
+	}
+
 	button.link {
 		margin-top: 0.5rem;
 		padding: 0;
@@ -1200,6 +1323,14 @@
 		table {
 			display: block;
 			overflow-x: auto;
+		}
+
+		.row-input {
+			flex-wrap: wrap;
+		}
+
+		.row-input input:not([type='checkbox']) {
+			flex: 1 1 100%;
 		}
 	}
 </style>
