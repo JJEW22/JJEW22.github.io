@@ -15,7 +15,7 @@
 	import { resolve } from '$app/paths';
 	import '../../../app.css';
 	import { onMount } from 'svelte';
-	import { acceptedPoints, formatPercentile } from '$lib/krillion';
+	import { acceptedPoints, dayForDate, formatPercentile } from '$lib/krillion';
 
 	interface Fit {
 		a: number;
@@ -69,7 +69,10 @@
 		betterThan: number | null;
 		updatedScore: number | null;
 		submittedAt: string;
+		editedBy: string | null; // the admin who last changed it for the player
+		editedAt: string | null;
 		rounds: Round[];
+		answers: { answer: string | null; override: string | null }[];
 	}
 	type SubSortKey = 'updatedScore' | 'gameScore' | 'gain' | 'rarity' | 'name';
 
@@ -174,6 +177,113 @@
 		load(null);
 		loadReviews();
 	});
+
+	// ---- entering or fixing a dive on a player's behalf ----
+	interface EditRow {
+		answer: string;
+		override: string;
+		flagged: boolean; // not in the database: moved to the override
+	}
+	let editing: {
+		id: number | null; // null: a new dive for `player`
+		player: string;
+		gameScore: string;
+		was: number | null; // the dive's game score, kept unless one is typed
+		rows: EditRow[];
+	} | null = null;
+	let editBusy = false;
+	let editMsg = '';
+	let editBad = false;
+	let players: { username: string; name: string }[] = [];
+	const blankEditRow = (): EditRow => ({ answer: '', override: '', flagged: false });
+
+	function startEdit(s: Submission) {
+		editMsg = '';
+		editing = {
+			id: s.id,
+			player: s.name,
+			gameScore: '',
+			was: s.gameScore,
+			rows: s.answers.map((a) => ({
+				answer: a.answer ?? '',
+				override: a.override ?? '',
+				flagged: false
+			}))
+		};
+	}
+
+	async function startNew() {
+		editMsg = '';
+		editing = {
+			id: null,
+			player: '',
+			gameScore: '',
+			was: null,
+			rows: [0, 1, 2, 3, 4, 5, 6].map(blankEditRow)
+		};
+		if (!players.length) {
+			const r = await fetch('/krillion/api/admin/dive')
+				.then((x) => x.json())
+				.catch(() => null);
+			players = r?.players ?? [];
+		}
+	}
+
+	async function saveEdit() {
+		if (!editing || !diveNumber) return;
+		editBusy = true;
+		editMsg = '';
+		editBad = false;
+		try {
+			const game = editing.gameScore.trim();
+			const r = await fetch('/krillion/api/admin/dive', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					dayNumber: diveNumber,
+					submissionId: editing.id,
+					player: editing.id ? null : editing.player,
+					gameScore: game ? Number(game) : null,
+					answers: editing.rows.map((x) => ({
+						answer: x.answer.trim() || null,
+						override: x.override.trim() || null
+					}))
+				})
+			});
+			const data = await r.json().catch(() => null);
+			if (Array.isArray(data?.unknownRounds) && data.unknownRounds.length && editing) {
+				// Words not in the database go to their round's override, as on the
+				// player's page: save again to send them for review, then accept them
+				// in "Words to review".
+				const bad = new Set<number>(data.unknownRounds);
+				editing.rows = editing.rows.map((x, i) =>
+					bad.has(i + 1) ? { answer: '', override: x.answer.trim(), flagged: true } : x
+				);
+				editBad = true;
+				editMsg =
+					'The words in red are not in the database: they have been moved to overrides. Save again to send them for review, then accept them above.';
+				return;
+			}
+			if (!r.ok || !data?.ok) {
+				editBad = true;
+				editMsg = data?.error ?? `Couldn't save (${r.status}).`;
+				return;
+			}
+			const who = editing.id ? editing.player : editing.player.trim();
+			editing = null;
+			await load(picked);
+			await loadReviews();
+			view = 'submissions';
+			editMsg = `Saved ${who}'s dive #${diveNumber}; it's been rescored.`;
+			openIds = [data.id];
+		} finally {
+			editBusy = false;
+		}
+	}
+
+	// The dive on show, for saving: from its date, so it's right on a day
+	// whose counts aren't in yet too.
+	$: diveNumber = date ? dayForDate(date) : null;
 
 	async function load(n: number | null) {
 		picked = n;
@@ -534,10 +644,83 @@
 				{error} <a href={resolve('/krillion')}>Submit today's dive →</a>
 			</p>
 		{:else if view === 'submissions'}
+			{#snippet editor(s: Submission | null)}
+				{#if editing}
+					<div class="editor">
+						{#if editing.id === null}
+							<label class="ed-player">
+								<span>Player</span>
+								<input
+									bind:value={editing.player}
+									list="k-players"
+									autocomplete="off"
+									placeholder="username or account name"
+								/>
+								<datalist id="k-players">
+									{#each players as pl (pl.username)}<option value={pl.username}>{pl.name}</option
+										>{/each}
+								</datalist>
+							</label>
+							<p class="sub">Replaces any dive they already have for #{diveNumber}.</p>
+						{/if}
+						{#each editing.rows as row, i (i)}
+							<div class="ed-row" class:flagged={row.flagged}>
+								<label for="ed-answer-{i}"
+									><b>{i + 1}.</b>
+									{prompts[i]?.text ?? s?.rounds[i]?.prompt ?? `Round ${i + 1}`}</label
+								>
+								<input
+									id="ed-answer-{i}"
+									bind:value={row.answer}
+									autocomplete="off"
+									placeholder="answer (blank = miss)"
+								/>
+								<input
+									class="ed-override"
+									aria-label="Override for round {i + 1}"
+									bind:value={row.override}
+									on:input={() => (row.flagged = false)}
+									autocomplete="off"
+									placeholder="override for review (optional)"
+								/>
+							</div>
+						{/each}
+						<label class="ed-game">
+							<span>Game score</span>
+							<input
+								type="number"
+								min="0"
+								max="770"
+								bind:value={editing.gameScore}
+								placeholder={editing.was !== null ? `keep ${editing.was}` : 'from the sheet'}
+							/>
+						</label>
+						<div class="ed-actions">
+							<button type="button" class="accept" disabled={editBusy} on:click={saveEdit}
+								>{editBusy ? 'Saving…' : 'Save and rescore'}</button
+							>
+							<button type="button" disabled={editBusy} on:click={() => (editing = null)}
+								>Cancel</button
+							>
+						</div>
+						{#if editMsg}<p class="fetch-msg" class:bad={editBad}>{editMsg}</p>{/if}
+					</div>
+				{/if}
+			{/snippet}
+
 			{#if status === 'missing'}
 				<p class="note">{error} Dives below show the game's points only until the counts arrive.</p>
 			{/if}
-			<input class="search" bind:value={subSearch} placeholder="Search players or answers…" />
+			<div class="sub-tools">
+				<input class="search" bind:value={subSearch} placeholder="Search players or answers…" />
+				{#if editing?.id !== null}
+					<button type="button" class="add-dive" on:click={startNew}
+						>+ Add a dive for a player</button
+					>
+				{/if}
+			</div>
+			{#if editing && editing.id === null}{@render editor(null)}{/if}
+			{#if editMsg && !editing}<p class="fetch-msg">{editMsg}</p>{/if}
 			<p class="sub">
 				{subRows.length}
 				{subRows.length === 1 ? 'dive' : 'dives'}{sq ? ` matching "${subSearch.trim()}"` : ''} · click
@@ -583,7 +766,10 @@
 										? '▾'
 										: '▸'}</span
 								>
-								{s.name}{#if s.guest}<span class="tag">guest</span>{/if}
+								{s.name}{#if s.guest}<span class="tag">guest</span>{/if}{#if s.editedBy}<span
+										class="tag"
+										title="Changed by {s.editedBy} on the player's behalf">edited</span
+									>{/if}
 							</td>
 							<td class="num"
 								>{s.gameScore ?? '—'}{#if s.betterThan !== null}<span class="sub">
@@ -603,58 +789,70 @@
 						{#if openIds.includes(s.id) || (sq && s.rounds.some((r) => answerHit(r, sq)))}
 							<tr class="detail">
 								<td colspan="5">
-									<table>
-										<thead>
-											<tr>
-												<th>#</th>
-												<th>Prompt</th>
-												<th>Answer</th>
-												<th class="num">Players</th>
-												<th
-													class="num"
-													title="Percentile of rarity: the share of players whose answer was more common"
-													>Rarity</th
-												>
-												<th class="num">Game</th>
-												<th class="num">Rescored</th>
-											</tr>
-										</thead>
-										<tbody>
-											{#each s.rounds as r (r.round)}
-												<tr class:miss={r.miss} class:hit={answerHit(r, sq)}>
-													<td>{r.round}</td>
-													<td class="prompt">{r.prompt}</td>
-													<td>
-														{answerText(
-															r
-														)}{#if !r.miss && r.match && r.match.toLowerCase() !== (r.submitted ?? '').toLowerCase()}<span
-																class="sub"
-															>
-																→ {r.match}</span
-															>{/if}{#if r.acceptedWord}<span class="tag accepted-tag"
-																>Accepted Word</span
-															>{/if}{#if r.override}<div class="sub">
-																↳ override “{r.override.word}” · {r.override.status ??
-																	'not filed'}{r.override.points != null
-																	? ` · scores ${r.override.points.toFixed(1)}`
-																	: ''}
-															</div>{/if}
-													</td>
-													<td class="num">{r.count?.toLocaleString() ?? '—'}</td>
-													<td class="num"
-														>{roundRarity(r) === null
-															? '—'
-															: formatPercentile(roundRarity(r) ?? 0)}</td
+									{#if editing?.id === s.id}
+										{@render editor(s)}
+									{:else}
+										<table>
+											<thead>
+												<tr>
+													<th>#</th>
+													<th>Prompt</th>
+													<th>Answer</th>
+													<th class="num">Players</th>
+													<th
+														class="num"
+														title="Percentile of rarity: the share of players whose answer was more common"
+														>Rarity</th
 													>
-													<td class="num">{r.gamePoints ?? '—'}</td>
-													<td class="num"
-														><b>{s.updatedScore === null ? '—' : r.points.toFixed(1)}</b></td
-													>
+													<th class="num">Game</th>
+													<th class="num">Rescored</th>
 												</tr>
-											{/each}
-										</tbody>
-									</table>
-									<p class="sub">Submitted {new Date(s.submittedAt).toLocaleString()}</p>
+											</thead>
+											<tbody>
+												{#each s.rounds as r (r.round)}
+													<tr class:miss={r.miss} class:hit={answerHit(r, sq)}>
+														<td>{r.round}</td>
+														<td class="prompt">{r.prompt}</td>
+														<td>
+															{answerText(
+																r
+															)}{#if !r.miss && r.match && r.match.toLowerCase() !== (r.submitted ?? '').toLowerCase()}<span
+																	class="sub"
+																>
+																	→ {r.match}</span
+																>{/if}{#if r.acceptedWord}<span class="tag accepted-tag"
+																	>Accepted Word</span
+																>{/if}{#if r.override}<div class="sub">
+																	↳ override “{r.override.word}” · {r.override.status ??
+																		'not filed'}{r.override.points != null
+																		? ` · scores ${r.override.points.toFixed(1)}`
+																		: ''}
+																</div>{/if}
+														</td>
+														<td class="num">{r.count?.toLocaleString() ?? '—'}</td>
+														<td class="num"
+															>{roundRarity(r) === null
+																? '—'
+																: formatPercentile(roundRarity(r) ?? 0)}</td
+														>
+														<td class="num">{r.gamePoints ?? '—'}</td>
+														<td class="num"
+															><b>{s.updatedScore === null ? '—' : r.points.toFixed(1)}</b></td
+														>
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+										<p class="sub">
+											Submitted {new Date(
+												s.submittedAt
+											).toLocaleString()}{#if s.editedBy && s.editedAt}&nbsp;· edited by {s.editedBy},
+												{new Date(s.editedAt).toLocaleString()}{/if}
+											<button type="button" class="link edit-link" on:click={() => startEdit(s)}
+												>Edit answers</button
+											>
+										</p>
+									{/if}
 								</td>
 							</tr>
 						{/if}
@@ -1188,6 +1386,105 @@
 		font-size: 0.85rem;
 		color: #0066cc;
 		cursor: pointer;
+	}
+
+	.sub-tools {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.add-dive {
+		margin-top: 0.5rem;
+		padding: 0.4rem 0.9rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.9rem;
+		cursor: pointer;
+	}
+
+	.editor {
+		margin: 0.6rem 0;
+		padding: 0.9rem 1rem;
+		background: #f7f9fb;
+		border: 1px solid #e3e7ec;
+		border-radius: 8px;
+	}
+
+	.ed-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 0.25rem 0.5rem;
+		margin-bottom: 0.55rem;
+	}
+
+	.ed-row label {
+		grid-column: 1 / -1;
+		font-size: 0.85rem;
+		color: #555;
+	}
+
+	.editor input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 0.4rem 0.55rem;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.9rem;
+	}
+
+	.editor input.ed-override {
+		border-style: dashed;
+	}
+
+	.ed-row.flagged label {
+		color: #9a2c2c;
+	}
+
+	.ed-row.flagged input.ed-override {
+		border: 1px solid #d64545;
+		background: #fdeeee;
+	}
+
+	.ed-player,
+	.ed-game {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		max-width: 22rem;
+		margin-bottom: 0.4rem;
+		font-size: 0.9rem;
+		color: #555;
+	}
+
+	.ed-actions {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.6rem;
+	}
+
+	.ed-actions button {
+		padding: 0.4rem 0.9rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.9rem;
+		cursor: pointer;
+	}
+
+	.ed-actions button.accept {
+		background: #1e6b36;
+		border-color: #1e6b36;
+		color: #fff;
+	}
+
+	.edit-link {
+		margin: 0 0 0 0.6rem;
 	}
 
 	.more {

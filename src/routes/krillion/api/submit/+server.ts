@@ -9,7 +9,7 @@
 // word for the round, filed for a krillion admin; the round keeps scoring its
 // answer until the override is accepted.
 import { json } from '@sveltejs/kit';
-import { dayForDate, etDate, type PastedRound } from '$lib/krillion';
+import { dayForDate, openDiveDate, type PastedRound } from '$lib/krillion';
 import { KrillionError, submitDive } from '$lib/server/krillion';
 import type { RequestHandler } from './$types';
 
@@ -46,9 +46,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ ok: false, error: 'Enter at least one answer.' }, { status: 400 });
 	}
 
-	// No "Dive #N complete" in a partial paste, and none when typed: today's dive.
+	// No "Dive #N complete" in a partial paste, and none when typed: the dive
+	// still open -- today's, or yesterday's until 12:15am ET.
 	const n = num(body.dayNumber);
-	const dayNumber = n !== null && Number.isInteger(n) && n > 0 ? n : dayForDate(etDate());
+	const dayNumber = n !== null && Number.isInteger(n) && n > 0 ? n : dayForDate(openDiveDate());
 
 	try {
 		const result = await submitDive(locals.user?.id ?? null, {

@@ -24,7 +24,9 @@ import {
 	MIN_DIVES_FOR_AVERAGE,
 	breadth,
 	matchAnswer,
+	openDiveDate,
 	rarityPercentile,
+	SUBMIT_DEADLINE_TEXT,
 	scoreDay,
 	type PastedRound,
 	type PromptFit
@@ -583,31 +585,34 @@ function okTotal(v: unknown): number | null {
 	return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 770 ? v : null;
 }
 
-export async function submitDive(userId: number | null, input: SubmitInput): Promise<SubmitResult> {
-	const date = dateForDay(input.dayNumber);
+// The day a dive is for, checked: it has happened, and an old one needs its
+// counts. Players also have to be inside the submission window (today's dive,
+// or yesterday's until 12:15am ET); an admin entering a dive for a player
+// doesn't.
+async function diveDay(dayNumber: number, admin = false): Promise<{ date: string; day: DayView }> {
+	const date = dateForDay(dayNumber);
 	const today = etDate();
-	// Only today's dive can still be scored from fresh data; an older one only if
-	// we happen to have its snapshot.
-	if (date > today) throw new KrillionError(`Dive #${input.dayNumber} hasn't happened yet.`);
+	if (date > today) throw new KrillionError(`Dive #${dayNumber} hasn't happened yet.`);
+	if (!admin && date < openDiveDate()) {
+		throw new KrillionError(
+			`Submissions for dive #${dayNumber} closed at ${SUBMIT_DEADLINE_TEXT}, 15 minutes after the dive ended.`
+		);
+	}
 	const day = await loadDay(date);
 	if (date < today && !day.scored) {
 		throw new KrillionError(
-			`We don't have the counts for dive #${input.dayNumber} (${date}), so it can't be rescored.`
+			`We don't have the counts for dive #${dayNumber} (${date}), so it can't be rescored.`
 		);
 	}
-	if (input.rounds.length !== 7)
-		throw new KrillionError('A dive has 7 rounds; this one has ' + input.rounds.length + '.');
+	return { date, day };
+}
+
+function cleanRounds(input: PastedRound[]): PastedRound[] {
+	if (input.length !== 7)
+		throw new KrillionError('A dive has 7 rounds; this one has ' + input.length + '.');
 	const okPoints = (v: unknown) =>
 		typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 110 ? v : null;
-
-	let email: string | null = null;
-	if (!userId && input.notify) {
-		email = (input.email ?? '').trim().toLowerCase();
-		if (!EMAIL_RE.test(email) || email.length > 254)
-			throw new KrillionError('That email address doesn’t look right.');
-	}
-
-	const rounds = input.rounds.map((r, i) => ({
+	return input.map((r, i) => ({
 		round: i + 1,
 		prompt: String(r.prompt ?? '').slice(0, 300),
 		answer: r.answer ? String(r.answer).slice(0, 200) : null,
@@ -618,11 +623,13 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		found: Boolean(r.found),
 		override: r.override ? String(r.override).trim().slice(0, 200) || null : null
 	}));
+}
 
-	// With the day's list in, every answer has to be on it: a word that isn't
-	// is refused, naming the rounds, so the page can move it to an override
-	// for review. So is an override that's already on the list -- that's just
-	// an answer.
+// With the day's list in, every answer has to be on it: a word that isn't is
+// refused, naming the rounds, so the page can move it to an override for
+// review. So is an override that's already on the list -- that's just an
+// answer. Returns what the dive is scored against (null before the counts).
+async function checkRounds(date: string, day: DayView, rounds: PastedRound[]) {
 	const scoring = day.scored ? await loadScoring(date) : null;
 	if (scoring) {
 		const { scored } = scoreRounds(rounds, day.prompts, scoring.answers, scoring.reviews);
@@ -650,6 +657,40 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 			);
 		}
 	}
+	return scoring;
+}
+
+// Score a saved dive (when the day's counts are in), filing its overrides.
+async function scoreSaved(
+	id: number,
+	userId: number | null,
+	date: string,
+	day: DayView,
+	rounds: PastedRound[],
+	scoring: Awaited<ReturnType<typeof loadScoring>>
+) {
+	const { answers, reviews } = scoring;
+	const first = scoreRounds(rounds, day.prompts, answers, reviews);
+	await fileReviews(date, { id, user_id: userId }, first.scored, reviews);
+	const { scored, total } = scoreRounds(rounds, day.prompts, answers, reviews);
+	await sql`
+		update krillion_submissions set scored = ${sql.json(scored as never)}, updated_score = ${total},
+			scored_at = now(), game_score = coalesce(game_score, ${gameTotal(scored)})
+		where id = ${id}
+	`;
+	return { scored, total };
+}
+
+export async function submitDive(userId: number | null, input: SubmitInput): Promise<SubmitResult> {
+	const { date, day } = await diveDay(input.dayNumber);
+	let email: string | null = null;
+	if (!userId && input.notify) {
+		email = (input.email ?? '').trim().toLowerCase();
+		if (!EMAIL_RE.test(email) || email.length > 254)
+			throw new KrillionError('That email address doesn’t look right.');
+	}
+	const rounds = cleanRounds(input.rounds);
+	const scoring = await checkRounds(date, day, rounds);
 	// The game's total: the paste's own figure if it had one, else the rounds' sum.
 	const gameScore = okTotal(input.gameScore) ?? gameTotal(rounds);
 
@@ -662,7 +703,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 			on conflict (user_id, date) where user_id is not null do update set
 				notify = excluded.notify, rounds = excluded.rounds, game_score = excluded.game_score,
 				game_better_than = excluded.game_better_than, scored = null, updated_score = null,
-				scored_at = null, notified_at = null, created_at = now()
+				scored_at = null, notified_at = null, created_at = now(), edited_by = null, edited_at = null
 			returning id
 		`;
 		id = Number(row.id);
@@ -677,15 +718,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 	}
 
 	if (scoring) {
-		const { answers, reviews } = scoring;
-		const first = scoreRounds(rounds, day.prompts, answers, reviews);
-		await fileReviews(date, { id, user_id: userId }, first.scored, reviews);
-		const { scored, total } = scoreRounds(rounds, day.prompts, answers, reviews);
-		await sql`
-			update krillion_submissions set scored = ${sql.json(scored as never)}, updated_score = ${total},
-				scored_at = now(), game_score = coalesce(game_score, ${gameTotal(scored)})
-			where id = ${id}
-		`;
+		const { scored, total } = await scoreSaved(id, userId, date, day, rounds, scoring);
 		return {
 			id,
 			date,
@@ -783,9 +816,9 @@ export async function forceFetch(now = new Date()) {
 	return { ...result, rescoredDives: rescored.n };
 }
 
-// Final scores, once the day is over (any date before today's in ET).
+// Final scores, once a dive's submissions have closed (12:15am ET the next day).
 export async function sendFinalEmailsIfDue(now = new Date()) {
-	const today = etDate(now);
+	const today = openDiveDate(now);
 	const due = await sql<
 		{
 			id: string;
@@ -975,16 +1008,21 @@ export interface AdminDay {
 	prompts: { id: string; text: string; fit: PromptFit | null; answers: AdminAnswer[] }[];
 }
 
-// Today's answers and dives stay hidden from an admin until they've submitted
-// their own dive, so the admin page can't be used to look up a good answer.
-export async function assertAdminCanSee(userId: number, date: string): Promise<void> {
-	if (date !== etDate()) return;
+// A dive still open for submissions (today's, or yesterday's until 12:15am
+// ET) stays hidden from an admin until they've submitted their own, so the
+// admin page can't be used to look up a good answer.
+async function adminCanSee(userId: number, date: string): Promise<boolean> {
+	if (date < openDiveDate()) return true;
 	const [mine] = await sql`
 		select 1 from krillion_submissions where user_id = ${userId} and date = ${date}
 	`;
-	if (!mine) {
+	return Boolean(mine);
+}
+
+export async function assertAdminCanSee(userId: number, date: string): Promise<void> {
+	if (!(await adminCanSee(userId, date))) {
 		throw new KrillionError(
-			"Submit your own dive for today first: today's answer scores stay hidden until you have.",
+			"Submit your own dive for this one first: an open dive's answer scores stay hidden until you have.",
 			403
 		);
 	}
@@ -998,7 +1036,11 @@ export interface AdminSubmission {
 	betterThan: number | null;
 	updatedScore: number | null; // null while the day's counts aren't in
 	submittedAt: string;
+	editedBy: string | null; // the admin who last changed it on the player's behalf
+	editedAt: string | null;
 	rounds: ScoredRound[];
+	// The answers as stored, for editing.
+	answers: { answer: string | null; override: string | null }[];
 }
 
 // Every dive submitted for a day, signed in or not, with each round's
@@ -1015,11 +1057,15 @@ export async function adminSubmissions(userId: number, date: string): Promise<Ad
 			created_at: Date;
 			rounds: PastedRound[];
 			scored: ScoredRound[] | null;
+			edited_by: string | null;
+			edited_at: Date | null;
 		}[]
 	>`
 		select s.id::int as id, coalesce(u.real_name, u.username) as name, s.game_score,
-			s.game_better_than, s.updated_score, s.created_at, s.rounds, s.scored
+			s.game_better_than, s.updated_score, s.created_at, s.rounds, s.scored,
+			coalesce(e.real_name, e.username) as edited_by, s.edited_at
 		from krillion_submissions s left join users u on u.id = s.user_id
+		left join users e on e.id = s.edited_by
 		where s.date = ${date}
 		order by s.updated_score desc nulls last, s.game_score desc nulls last, s.created_at
 	`;
@@ -1031,6 +1077,12 @@ export async function adminSubmissions(userId: number, date: string): Promise<Ad
 		betterThan: r.game_better_than,
 		updatedScore: r.updated_score,
 		submittedAt: r.created_at.toISOString(),
+		editedBy: r.edited_by,
+		editedAt: r.edited_at?.toISOString() ?? null,
+		answers: r.rounds.map((x) => ({
+			answer: x.miss ? null : x.answer,
+			override: x.override ?? null
+		})),
 		rounds:
 			r.scored ??
 			r.rounds.map((x) => ({
@@ -1110,12 +1162,9 @@ export interface ReviewItem {
 export async function listReviews(
 	userId: number
 ): Promise<{ pending: ReviewItem[]; decided: ReviewItem[]; hiddenToday: number }> {
-	const today = etDate();
-	let seeToday = true;
-	try {
-		await assertAdminCanSee(userId, today);
-	} catch {
-		seeToday = false;
+	const hidden = new Set<string>();
+	for (const d of new Set([openDiveDate(), etDate()])) {
+		if (!(await adminCanSee(userId, d))) hidden.add(d);
 	}
 	const rows = await sql<
 		{
@@ -1170,7 +1219,7 @@ export async function listReviews(
 			acceptedPoints: r.model?.[r.prompt_id] ? acceptedPoints(r.model[r.prompt_id]) : null
 		})
 	);
-	const visible = items.filter((r) => seeToday || r.date !== today);
+	const visible = items.filter((r) => !hidden.has(r.date));
 	return {
 		pending: visible.filter((r) => r.status === 'pending'),
 		decided: visible.filter((r) => r.status !== 'pending'),
@@ -1200,4 +1249,125 @@ export async function decideReview(
 		where id = ${id}
 	`;
 	return { date: row.date, rescored: await rescoreDate(row.date) };
+}
+
+// ---------------- admin: a dive on a player's behalf ----------------
+
+export interface AdminDiveInput {
+	dayNumber: number;
+	// Change this dive (a player's or a guest's)...
+	submissionId?: number | null;
+	// ...or enter one for this account (replacing any dive it has that day).
+	player?: string | null; // username or account name
+	answers: { answer: string | null; override: string | null }[];
+	gameScore?: number | null; // null keeps the dive's game score (or sums the rounds)
+}
+
+// Players who've ever submitted a dive, for the admin's player picker.
+export async function krillionPlayers(): Promise<{ username: string; name: string }[]> {
+	const rows = await sql<{ username: string; name: string }[]>`
+		select distinct u.username, coalesce(u.real_name, u.username) as name
+		from krillion_submissions s join users u on u.id = s.user_id
+		order by name
+	`;
+	return rows.map((r) => ({ username: r.username, name: r.name }));
+}
+
+// Enter or change a player's answers as an admin. Past the submission
+// deadline too -- this is how a dive gets fixed after the fact. The same
+// checks as a player's own submission apply (answers on the day's list, or
+// sent as overrides), and the dive is rescored straight away. Rounds whose
+// answer is unchanged keep what the paste said about them.
+export async function adminSaveDive(adminId: number, input: AdminDiveInput) {
+	const { date, day } = await diveDay(input.dayNumber, true);
+	await assertAdminCanSee(adminId, date);
+	if (!Array.isArray(input.answers) || input.answers.length !== 7) {
+		throw new KrillionError('A dive has 7 rounds.');
+	}
+
+	let existing:
+		| { id: number; user_id: number | null; rounds: PastedRound[]; game_score: number | null }
+		| undefined;
+	let userId: number | null = null;
+	if (input.submissionId) {
+		[existing] = await sql<NonNullable<typeof existing>[]>`
+			select id::int as id, user_id::int as user_id, rounds, game_score
+			from krillion_submissions where id = ${input.submissionId} and date = ${date}
+		`;
+		if (!existing) throw new KrillionError('No such dive on that day.', 404);
+		userId = existing.user_id;
+	} else {
+		const who = String(input.player ?? '').trim();
+		if (!who) throw new KrillionError('Pick a player.');
+		const users = await sql<{ id: number }[]>`
+			select id::int as id from users
+			where lower(username) = lower(${who}) or lower(real_name) = lower(${who})
+			limit 2
+		`;
+		if (users.length !== 1) {
+			throw new KrillionError(
+				users.length
+					? `More than one account is called “${who}”: use the username.`
+					: `No account “${who}”.`
+			);
+		}
+		userId = users[0].id;
+		[existing] = await sql<NonNullable<typeof existing>[]>`
+			select id::int as id, user_id::int as user_id, rounds, game_score
+			from krillion_submissions where user_id = ${userId} and date = ${date}
+		`;
+	}
+
+	// What a round's answer is, as typed: '' for a miss.
+	const answerOf = (r?: PastedRound) => (r && !r.miss ? (r.answer ?? '').trim() : '');
+	const rounds = cleanRounds(
+		input.answers.map((a, i): PastedRound => {
+			const answer = typeof a?.answer === 'string' ? a.answer.trim() : '';
+			const override = typeof a?.override === 'string' ? a.override.trim() : '';
+			const before = existing?.rounds[i];
+			// An unchanged answer keeps the paste's prompt, points and the rest.
+			if (before && answerOf(before) === answer) {
+				return { ...before, override: override || null };
+			}
+			return {
+				round: i + 1,
+				prompt: before?.prompt ?? '',
+				answer: answer || null,
+				typed: null,
+				miss: !answer,
+				othersChose: null,
+				gamePoints: answer ? null : 0,
+				found: false,
+				override: override || null
+			};
+		})
+	);
+	const scoring = await checkRounds(date, day, rounds);
+	const given = okTotal(input.gameScore);
+	// A changed answer changes the game's total too, unless one is given: the
+	// changed rounds' game points come from the day's sheet when it's scored.
+	const changed = !existing || rounds.some((r, i) => answerOf(r) !== answerOf(existing.rounds[i]));
+	const gameScore = given ?? (changed ? gameTotal(rounds) : existing!.game_score);
+
+	let id: number;
+	if (existing) {
+		await sql`
+			update krillion_submissions
+			set rounds = ${sql.json(rounds as never)}, game_score = ${gameScore}, scored = null,
+				updated_score = null, scored_at = null, edited_by = ${adminId}, edited_at = now()
+			where id = ${existing.id}
+		`;
+		id = existing.id;
+	} else {
+		const [row] = await sql<{ id: number }[]>`
+			insert into krillion_submissions
+				(date, day_number, user_id, notify, rounds, game_score, edited_by, edited_at)
+			values (${date}, ${input.dayNumber}, ${userId}, false, ${sql.json(rounds as never)},
+				${gameScore}, ${adminId}, now())
+			returning id::int as id
+		`;
+		id = row.id;
+	}
+	if (scoring) await scoreSaved(id, userId, date, day, rounds, scoring);
+	return { id, date };
 }

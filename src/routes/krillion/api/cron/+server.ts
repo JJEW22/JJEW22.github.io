@@ -3,7 +3,8 @@
 // Both jobs self-gate, so the extra ticks cost nothing:
 //   - the day's two fetches from krillion.io: first tick at/after 11am ET, and
 //     first at/after 11pm ET (refreshing the counts before the day ends)
-//   - final-score emails: first tick after midnight ET, for the day just ended
+//   - final-score emails: first tick after submissions close at 12:15am ET (the
+//     1:05am tick), for the dive just ended
 import { json } from '@sveltejs/kit';
 import { requireAdmin } from '$lib/server/roles';
 import { fetchIfDue, sendFinalEmailsIfDue } from '$lib/server/krillion';

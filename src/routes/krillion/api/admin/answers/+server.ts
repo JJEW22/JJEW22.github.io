@@ -4,7 +4,7 @@
 // krillion:admin (or site:admin) only, and today's only once the admin has
 // submitted their own dive -- enforced in assertAdminCanSee().
 import { json } from '@sveltejs/kit';
-import { dateForDay, etDate } from '$lib/krillion';
+import { dateForDay, openDiveDate } from '$lib/krillion';
 import { hasRole } from '$lib/server/roles';
 import {
 	KRILLION_ADMIN_ROLE,
@@ -24,7 +24,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		return json({ ok: false, error: 'This page needs the krillion:admin role.' }, { status: 403 });
 	}
 	const n = Number(url.searchParams.get('day'));
-	const date = Number.isInteger(n) && n > 0 ? dateForDay(n) : etDate();
+	const date = Number.isInteger(n) && n > 0 ? dateForDay(n) : openDiveDate();
 	const days = await listScoredDays();
 	try {
 		const submissions = await adminSubmissions(locals.user.id, date);
@@ -35,7 +35,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			// No counts yet (before 11am): the dives are still worth seeing.
 			if (err instanceof KrillionError && err.status === 404) {
 				return json(
-					{ ok: false, error: err.message, today: etDate(), days, date, submissions },
+					{ ok: false, error: err.message, today: openDiveDate(), days, date, submissions },
 					{ status: 404, headers: { 'cache-control': 'private, no-store' } }
 				);
 			}
@@ -43,13 +43,20 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		}
 		const range = await getBreadthRange();
 		return json(
-			{ ok: true, today: etDate(), days, range, submissions, ...data },
+			{ ok: true, today: openDiveDate(), days, range, submissions, ...data },
 			{ headers: { 'cache-control': 'private, no-store' } }
 		);
 	} catch (err) {
 		if (err instanceof KrillionError) {
 			return json(
-				{ ok: false, error: err.message, gated: err.status === 403, today: etDate(), days, date },
+				{
+					ok: false,
+					error: err.message,
+					gated: err.status === 403,
+					today: openDiveDate(),
+					days,
+					date
+				},
 				{ status: err.status }
 			);
 		}

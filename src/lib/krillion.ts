@@ -54,6 +54,18 @@ export function etDate(at: Date = new Date()): string {
 	}).format(at);
 }
 
+// krillion.io's dive ends at midnight ET, so a dive finished at 11:59pm still
+// needs a moment to be pasted in: submissions stay open this many minutes into
+// the next day.
+export const SUBMIT_GRACE_MIN = 15;
+export const SUBMIT_DEADLINE_TEXT = '12:15 AM ET';
+
+// The oldest dive still open for submissions -- the one a submission with no
+// dive number goes to: today's, or yesterday's until 12:15am ET.
+export function openDiveDate(at: Date = new Date()): string {
+	return etDate(new Date(at.getTime() - SUBMIT_GRACE_MIN * 60_000));
+}
+
 export function etHour(at: Date = new Date()): number {
 	const h = new Intl.DateTimeFormat('en-US', {
 		timeZone: 'America/New_York',

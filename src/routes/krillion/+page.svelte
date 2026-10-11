@@ -13,7 +13,8 @@
 	import { onMount } from 'svelte';
 	import {
 		MIN_DIVES_FOR_AVERAGE,
-		etDate,
+		openDiveDate,
+		SUBMIT_DEADLINE_TEXT,
 		formatPercentile,
 		parsePaste,
 		rescoreShareText,
@@ -227,7 +228,8 @@
 	// latest scores, and put its answers back in the boxes so it can be edited
 	// and resubmitted (a resubmission replaces it).
 	function restoreToday() {
-		const today = etDate();
+		// The dive still open: today's, or yesterday's until 12:15am ET.
+		const today = day?.date ?? openDiveDate();
 		const mine = myDives.find((d) => d.date === today);
 		if (!mine || result) return;
 		const scoredRounds: ScoredRound[] =
@@ -432,8 +434,8 @@
 				between follows the counts.
 			</p>
 			<p class="notice">
-				Your rescored total can change during the day as more people play. Final scores are locked
-				in after the dive closes at midnight ET.
+				Your rescored total can change during the day as more people play. The dive ends at midnight
+				ET; you have until {SUBMIT_DEADLINE_TEXT} to submit it, and final scores are locked in then.
 			</p>
 		</header>
 
@@ -567,7 +569,7 @@
 					{#if me}
 						<label class="check">
 							<input type="checkbox" bind:checked={notify} />
-							<span>Email me my final score after midnight ET</span>
+							<span>Email me my final score once the dive closes ({SUBMIT_DEADLINE_TEXT})</span>
 						</label>
 						<p class="sub">
 							Signed in as <b>{me}</b> — your final score is saved to your account either way.
@@ -575,7 +577,7 @@
 					{:else}
 						<label class="check">
 							<input type="checkbox" bind:checked={notify} />
-							<span>Email me my final score after midnight ET</span>
+							<span>Email me my final score once the dive closes ({SUBMIT_DEADLINE_TEXT})</span>
 						</label>
 						{#if notify}
 							<input type="email" bind:value={email} placeholder="you@example.com" class="email" />
@@ -617,7 +619,7 @@
 				{#if result.status === 'waiting'}
 					<p>
 						Saved. Today's counts arrive at {day?.nextFetch ?? '11:00 ET'} — come back then for your
-						rescored total{#if result.notify}, or watch for the email after midnight{/if}.
+						rescored total{#if result.notify}, or watch for the email after {SUBMIT_DEADLINE_TEXT}{/if}.
 					</p>
 					<table>
 						<thead><tr><th>#</th><th>Your answer</th><th class="num">Game</th></tr></thead>
@@ -728,7 +730,7 @@
 					{/if}
 					<p class="notice">
 						Based on counts as of {time(result.countsAsOf)} ET. Your rescored total can change during
-						the day; it's final after midnight ET.
+						the day; it's final once submissions close at {SUBMIT_DEADLINE_TEXT}.
 					</p>
 				{/if}
 			</section>
