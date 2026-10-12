@@ -281,6 +281,27 @@
 		}
 	}
 
+	async function deleteDive(s: Submission) {
+		const what = `${s.name}${s.guest ? ' (guest)' : ''}'s dive #${diveNumber}`;
+		if (!confirm(`Delete ${what}? This can't be undone.`)) return;
+		editMsg = '';
+		editBad = false;
+		const r = await fetch('/krillion/api/admin/dive', {
+			method: 'DELETE',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ submissionId: s.id })
+		});
+		const data = await r.json().catch(() => null);
+		if (!r.ok || !data?.ok) {
+			alert(data?.error ?? `Couldn't delete (${r.status}).`);
+			return;
+		}
+		editing = null;
+		await load(picked);
+		view = 'submissions';
+		editMsg = `Deleted ${what}.`;
+	}
+
 	// The dive on show, for saving: from its date, so it's right on a day
 	// whose counts aren't in yet too.
 	$: diveNumber = date ? dayForDate(date) : null;
@@ -850,6 +871,8 @@
 												{new Date(s.editedAt).toLocaleString()}{/if}
 											<button type="button" class="link edit-link" on:click={() => startEdit(s)}
 												>Edit answers</button
+											><button type="button" class="link delete-link" on:click={() => deleteDive(s)}
+												>Delete dive</button
 											>
 										</p>
 									{/if}
@@ -1483,8 +1506,13 @@
 		color: #fff;
 	}
 
-	.edit-link {
+	.edit-link,
+	.delete-link {
 		margin: 0 0 0 0.6rem;
+	}
+
+	button.link.delete-link {
+		color: #9a2c2c;
 	}
 
 	.more {

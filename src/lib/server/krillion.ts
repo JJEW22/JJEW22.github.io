@@ -660,6 +660,28 @@ async function checkRounds(date: string, day: DayView, rounds: PastedRound[]) {
 	return scoring;
 }
 
+// A dive saved before the day's counts are in can't be checked or scored yet,
+// but its overrides go into the review queue straight away rather than
+// waiting for the 11am fetch. Without the day's prompts, each is filed under
+// its round's prompt id: krillion.io numbers them p1-p7 in round order (true
+// of every stored day), which is the key the fetch's own filing uses too, so
+// there's no duplicate when the counts arrive.
+async function fileEarlyReviews(
+	date: string,
+	sub: { id: number; user_id: number | null },
+	rounds: PastedRound[]
+): Promise<void> {
+	for (const r of rounds) {
+		const word = r.override?.trim();
+		if (!word) continue;
+		await sql`
+			insert into krillion_word_reviews (date, prompt_id, answer, user_id, submission_id)
+			values (${date}, ${'p' + r.round}, ${word.slice(0, 200)}, ${sub.user_id}, ${sub.id})
+			on conflict do nothing
+		`;
+	}
+}
+
 // Score a saved dive (when the day's counts are in), filing its overrides.
 async function scoreSaved(
 	id: number,
@@ -731,6 +753,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 			notify: input.notify
 		};
 	}
+	await fileEarlyReviews(date, { id, user_id: userId }, rounds);
 	return {
 		id,
 		date,
@@ -1180,13 +1203,16 @@ export async function listReviews(
 			created_at: Date;
 			decided_at: Date | null;
 			decided_by: string | null;
+			asked_rounds: PastedRound[] | null;
 		}[]
 	>`
 		(select r.id::int as id, to_char(r.date, 'YYYY-MM-DD') as date, d.day_number, r.prompt_id,
 			d.prompts, d.model, r.answer, r.status, coalesce(u.real_name, u.username) as asked_by,
-			r.created_at, r.decided_at, coalesce(a.real_name, a.username) as decided_by
+			r.created_at, r.decided_at, coalesce(a.real_name, a.username) as decided_by,
+			s.rounds as asked_rounds
 		from krillion_word_reviews r
 		left join krillion_days d on d.date = r.date
+		left join krillion_submissions s on s.id = r.submission_id
 		left join users u on u.id = r.user_id
 		left join users a on a.id = r.decided_by
 		where r.status = 'pending'
@@ -1194,9 +1220,10 @@ export async function listReviews(
 		union all
 		(select r.id::int, to_char(r.date, 'YYYY-MM-DD'), d.day_number, r.prompt_id, d.prompts, d.model,
 			r.answer, r.status, coalesce(u.real_name, u.username), r.created_at, r.decided_at,
-			coalesce(a.real_name, a.username)
+			coalesce(a.real_name, a.username), s.rounds
 		from krillion_word_reviews r
 		left join krillion_days d on d.date = r.date
+		left join krillion_submissions s on s.id = r.submission_id
 		left join users u on u.id = r.user_id
 		left join users a on a.id = r.decided_by
 		where r.status <> 'pending'
@@ -1209,7 +1236,12 @@ export async function listReviews(
 			date: r.date,
 			dayNumber: r.day_number ?? dayForDate(r.date),
 			promptId: r.prompt_id,
-			prompt: r.prompts?.find((p) => p.id === r.prompt_id)?.text ?? r.prompt_id,
+			// Before the day's counts are in there's no prompt list: the asking
+			// dive's paste has the prompt text (in capitals, from a phone).
+			prompt:
+				r.prompts?.find((p) => p.id === r.prompt_id)?.text ||
+				r.asked_rounds?.find((x) => `p${x.round}` === r.prompt_id)?.prompt ||
+				`Round ${r.prompt_id.replace(/^p/, '')}`,
 			answer: r.answer,
 			status: r.status,
 			askedBy: r.asked_by ?? 'Guest',
@@ -1369,5 +1401,23 @@ export async function adminSaveDive(adminId: number, input: AdminDiveInput) {
 		id = row.id;
 	}
 	if (scoring) await scoreSaved(id, userId, date, day, rounds, scoring);
+	else await fileEarlyReviews(date, { id, user_id: userId }, rounds);
 	return { id, date };
+}
+
+// Delete a dive outright (a player's or a guest's), on any day. Words it sent
+// for review stay in the queue; others may have given them too.
+export async function adminDeleteDive(
+	adminId: number,
+	id: number
+): Promise<{ date: string; name: string }> {
+	const [row] = await sql<{ date: string; name: string | null }[]>`
+		select to_char(s.date, 'YYYY-MM-DD') as date, coalesce(u.real_name, u.username) as name
+		from krillion_submissions s left join users u on u.id = s.user_id
+		where s.id = ${id}
+	`;
+	if (!row) throw new KrillionError('No such dive.', 404);
+	await assertAdminCanSee(adminId, row.date);
+	await sql`delete from krillion_submissions where id = ${id}`;
+	return { date: row.date, name: row.name ?? 'Guest' };
 }

@@ -8,11 +8,13 @@
 //   GET                                       players who've submitted before
 //   POST { dayNumber, submissionId | player, answers: [{ answer, override }] x7,
 //          gameScore? }
+//   DELETE { submissionId }                   delete a dive
 import { json } from '@sveltejs/kit';
 import { hasRole } from '$lib/server/roles';
 import {
 	KRILLION_ADMIN_ROLE,
 	KrillionError,
+	adminDeleteDive,
 	adminSaveDive,
 	krillionPlayers
 } from '$lib/server/krillion';
@@ -60,6 +62,27 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	} catch (err) {
 		if (err instanceof KrillionError) {
 			return json({ ok: false, error: err.message, ...err.details }, { status: err.status });
+		}
+		throw err;
+	}
+};
+
+export const DELETE: RequestHandler = async ({ locals, request }) => {
+	const denied = gate(locals);
+	if (denied) return denied;
+	const body = await request.json().catch(() => null);
+	const id = Number(body?.submissionId);
+	if (!Number.isInteger(id) || id <= 0) {
+		return json({ ok: false, error: 'Send { submissionId }.' }, { status: 400 });
+	}
+	try {
+		return json(
+			{ ok: true, ...(await adminDeleteDive(locals.user!.id, id)) },
+			{ headers: NO_STORE }
+		);
+	} catch (err) {
+		if (err instanceof KrillionError) {
+			return json({ ok: false, error: err.message }, { status: err.status });
 		}
 		throw err;
 	}
