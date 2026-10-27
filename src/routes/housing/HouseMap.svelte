@@ -8,6 +8,11 @@
 	A house appears once it has coordinates, which the server finds from its
 	address (see locatePending in $lib/server/housing). Those it couldn't place
 	are listed under the map.
+
+	Scrolling over the map scrolls the page, not the map, so the map never
+	traps someone scrolling past it. Holding Ctrl (or ⌘) while scrolling zooms
+	it, and a plain scroll over it shows a hint saying so. A trackpad pinch
+	arrives as a Ctrl+scroll, so pinching zooms too.
 -->
 <script lang="ts">
 	import 'leaflet/dist/leaflet.css';
@@ -29,9 +34,33 @@
 	// someone has panned.
 	let fittedTo = '';
 
+	// The "hold Ctrl" hint: shown on a plain scroll over the map, hidden again
+	// shortly after the scrolling stops.
+	const HINT_MS = 1200;
+	let hint = false;
+	let hintTimer: ReturnType<typeof setTimeout> | undefined;
+	let zoomKey = 'Ctrl';
+
+	// In the capture phase, ahead of Leaflet's own wheel handler on the same
+	// element: a scroll without the modifier is stopped here, so Leaflet never
+	// zooms on it and the page scrolls as normal. With the modifier it goes on
+	// to Leaflet, which zooms and keeps the browser from zooming the page.
+	function onWheel(e: WheelEvent) {
+		if (e.ctrlKey || e.metaKey) {
+			hint = false;
+			return;
+		}
+		e.stopPropagation();
+		hint = true;
+		clearTimeout(hintTimer);
+		hintTimer = setTimeout(() => (hint = false), HINT_MS);
+	}
+
 	onMount(async () => {
 		L = await import('leaflet');
-		map = L.map(el, { scrollWheelZoom: false }).setView([42.36, -71.06], 11);
+		if (/Mac|iPhone|iPad/.test(navigator.platform)) zoomKey = '⌘ or Ctrl';
+		el.addEventListener('wheel', onWheel, { capture: true, passive: true });
+		map = L.map(el, { scrollWheelZoom: true }).setView([42.36, -71.06], 11);
 		L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 			maxZoom: 19,
 			attribution: '&copy; OpenStreetMap contributors'
@@ -40,7 +69,11 @@
 		draw(placed, selectedId);
 	});
 
-	onDestroy(() => map?.remove());
+	onDestroy(() => {
+		el?.removeEventListener('wheel', onWheel, { capture: true });
+		clearTimeout(hintTimer);
+		map?.remove();
+	});
 
 	$: placed = houses.filter((h) => h.lat !== null && h.lng !== null);
 	$: unplaced = houses.filter((h) => h.lat === null || h.lng === null);
@@ -104,6 +137,9 @@
 	{#if !placed.length}
 		<p class="overlay">Houses appear here once their address is found.</p>
 	{/if}
+	<div class="zoom-hint" class:shown={hint} aria-hidden="true">
+		<span>Hold {zoomKey} while scrolling to zoom</span>
+	</div>
 </div>
 {#if unplaced.length}
 	<p class="note">
@@ -122,6 +158,34 @@
 		border: 1px solid rgba(11, 11, 11, 0.1);
 		border-radius: 10px;
 		z-index: 0; /* keep Leaflet's panes under the page's own overlays */
+	}
+
+	/* Above Leaflet's panes and controls (z-index up to 1000). */
+	.zoom-hint {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		background: rgba(11, 11, 11, 0.45);
+		border-radius: 10px;
+		opacity: 0;
+		transition: opacity 0.2s;
+		pointer-events: none;
+		z-index: 1001;
+	}
+
+	.zoom-hint.shown {
+		opacity: 1;
+	}
+
+	.zoom-hint span {
+		padding: 0.5rem 0.9rem;
+		background: rgba(11, 11, 11, 0.75);
+		border-radius: 8px;
+		color: #fff;
+		font-size: 1rem;
+		font-weight: 600;
+		text-align: center;
 	}
 
 	.overlay {

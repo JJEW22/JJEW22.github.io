@@ -16,14 +16,21 @@
 	import HouseAnalysis from './HouseAnalysis.svelte';
 	import HouseMap from './HouseMap.svelte';
 	import {
+		HOUSE_SORTS,
 		RATING_FLAGS,
 		RATING_MAX,
 		averageRating,
 		flagSummary,
 		formatDollars,
+		housePeople,
+		myScore as scoreBy,
 		parseZillowUrl,
+		pricePerPerson,
+		pricePerSqft,
+		sortHouses,
 		type Assumptions,
-		type House
+		type House,
+		type HouseSort
 	} from '$lib/housing';
 
 	export let marketRate: number | null = null;
@@ -68,17 +75,88 @@
 	let myComment = '';
 	const SCORES = Array.from({ length: RATING_MAX }, (_, i) => i + 1);
 
+	// How the list is shown. Remembered per browser: a convenience, so a
+	// browser that won't store it just starts on the defaults.
+	const VIEW_KEY = 'housing.houses.view';
+	let view: 'cards' | 'table' = 'cards';
+	let sortKey: HouseSort = 'newest';
+	let sortDir: 'asc' | 'desc' = 'desc';
+
 	onMount(async () => {
+		try {
+			const saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null');
+			if (saved?.view === 'cards' || saved?.view === 'table') view = saved.view;
+			if (HOUSE_SORTS.some((s) => s.key === saved?.sortKey)) sortKey = saved.sortKey;
+			if (saved?.sortDir === 'asc' || saved?.sortDir === 'desc') sortDir = saved.sortDir;
+		} catch {
+			/* no storage: defaults */
+		}
 		await send('GET');
 		loading = false;
 	});
+
+	function remember() {
+		try {
+			localStorage.setItem(VIEW_KEY, JSON.stringify({ view, sortKey, sortDir }));
+		} catch {
+			/* no storage: nothing to remember */
+		}
+	}
+
+	function setView(v: 'cards' | 'table') {
+		view = v;
+		remember();
+	}
+
+	// Picking a sort starts it in its natural direction; picking the one
+	// already on flips it (a table header clicked twice).
+	function sortBy(key: HouseSort) {
+		const def = HOUSE_SORTS.find((s) => s.key === key)?.dir ?? 'asc';
+		sortDir = key === sortKey ? (sortDir === 'asc' ? 'desc' : 'asc') : def;
+		sortKey = key;
+		remember();
+	}
+
+	$: sortHasDir = HOUSE_SORTS.find((s) => s.key === sortKey)?.dir !== null;
+
+	// The sort state is passed in, not read from the component, so the
+	// template re-runs these whenever it changes.
+	function arrow(key: HouseSort, current: HouseSort, dir: 'asc' | 'desc'): string {
+		if (key !== current || !HOUSE_SORTS.find((s) => s.key === key)?.dir) return '';
+		return dir === 'asc' ? ' ▲' : ' ▼';
+	}
+
+	function ariaSort(
+		key: HouseSort,
+		current: HouseSort,
+		dir: 'asc' | 'desc'
+	): 'ascending' | 'descending' | 'none' {
+		if (key !== current || !HOUSE_SORTS.find((s) => s.key === key)?.dir) return 'none';
+		return dir === 'asc' ? 'ascending' : 'descending';
+	}
+
+	function perPersonText(h: House): string {
+		const per = pricePerPerson(h);
+		const people = housePeople(h);
+		return per !== null && people ? `${formatDollars(per)} per person · ${people} splitting` : '';
+	}
 
 	$: preview = url.trim() ? parseZillowUrl(url) : null;
 	$: selected = houses.find((h) => h.id === selectedId) ?? null;
 	// Eliminated houses leave the map and the main list; they're still here,
 	// behind "Show eliminated", and can be restored.
-	$: activeHouses = houses.filter((h) => !h.eliminatedAt);
-	$: eliminatedHouses = houses.filter((h) => h.eliminatedAt);
+	$: activeHouses = sortHouses(
+		houses.filter((h) => !h.eliminatedAt),
+		sortKey,
+		sortDir,
+		me
+	);
+	$: eliminatedHouses = sortHouses(
+		houses.filter((h) => h.eliminatedAt),
+		sortKey,
+		sortDir,
+		me
+	);
 	let showEliminated = false;
 
 	async function setEliminated(h: House, eliminated: boolean) {
@@ -310,34 +388,156 @@
 	{#if !activeHouses.length}
 		<p class="note">Every house has been eliminated. Add another, or restore one below.</p>
 	{/if}
-	<ul class="houses">
-		{#each activeHouses as h (h.id)}
-			<li class:selected={h.id === selectedId}>
-				<button type="button" class="pick" on:click={() => pick(h.id, true)}>
-					<span class="name">{title(h)}</span>
-					<span class="price">{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span>
-					{#if facts(h)}<span class="facts">{facts(h)}</span>{/if}
-					{#if averageRating(h) !== null}
-						{@const avg = averageRating(h) ?? 0}
-						<span class="rating" title="{avg.toFixed(1)} out of {RATING_MAX}">
-							<span class="avg">{avg.toFixed(1)}</span>/{RATING_MAX} · {h.ratings.length}
-							{h.ratings.length === 1 ? 'rating' : 'ratings'}
+
+	<div class="list-controls">
+		<span class="seg" role="group" aria-label="Show houses as">
+			<button
+				type="button"
+				class:on={view === 'cards'}
+				aria-pressed={view === 'cards'}
+				on:click={() => setView('cards')}>Cards</button
+			>
+			<button
+				type="button"
+				class:on={view === 'table'}
+				aria-pressed={view === 'table'}
+				on:click={() => setView('table')}>Table</button
+			>
+		</span>
+		<label class="sort">
+			<span>Sort by</span>
+			<select value={sortKey} on:change={(e) => sortBy(e.currentTarget.value as HouseSort)}>
+				{#each HOUSE_SORTS as s (s.key)}
+					<option value={s.key}>{s.label}</option>
+				{/each}
+			</select>
+		</label>
+		{#if sortHasDir}
+			<button
+				type="button"
+				class="secondary dir"
+				on:click={() => sortBy(sortKey)}
+				aria-label="Sort {sortDir === 'asc' ? 'ascending' : 'descending'}; switch direction"
+			>
+				{sortDir === 'asc' ? '▲ Low to high' : '▼ High to low'}
+			</button>
+		{/if}
+	</div>
+
+	{#if view === 'table'}
+		<div class="table-scroll">
+			<table class="house-table">
+				<thead>
+					<tr>
+						<th>House</th>
+						<th aria-sort={ariaSort('price', sortKey, sortDir)}>
+							<button type="button" on:click={() => sortBy('price')}
+								>Price{arrow('price', sortKey, sortDir)}</button
+							>
+						</th>
+						<th aria-sort={ariaSort('perPerson', sortKey, sortDir)}>
+							<button type="button" on:click={() => sortBy('perPerson')}
+								>Per person{arrow('perPerson', sortKey, sortDir)}</button
+							>
+						</th>
+						<th>Beds</th>
+						<th>Baths</th>
+						<th aria-sort={ariaSort('sqft', sortKey, sortDir)}>
+							<button type="button" on:click={() => sortBy('sqft')}
+								>Sq ft{arrow('sqft', sortKey, sortDir)}</button
+							>
+						</th>
+						<th aria-sort={ariaSort('perSqft', sortKey, sortDir)}>
+							<button type="button" on:click={() => sortBy('perSqft')}
+								>$ / sq ft{arrow('perSqft', sortKey, sortDir)}</button
+							>
+						</th>
+						<th aria-sort={ariaSort('rating', sortKey, sortDir)}>
+							<button type="button" on:click={() => sortBy('rating')}
+								>Rating{arrow('rating', sortKey, sortDir)}</button
+							>
+						</th>
+						<th>
+							<button type="button" on:click={() => sortBy('unrated')}>You</button>
+						</th>
+						<th>Flags</th>
+						<th aria-sort={ariaSort('newest', sortKey, sortDir)}>
+							<button type="button" on:click={() => sortBy('newest')}
+								>Added{arrow('newest', sortKey, sortDir)}</button
+							>
+						</th>
+						<th><span class="sr-only">Zillow</span></th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each activeHouses as h (h.id)}
+						{@const avg = averageRating(h)}
+						{@const mine = scoreBy(h, me)}
+						<tr class:selected={h.id === selectedId}>
+							<td class="house-cell">
+								<button type="button" class="link" on:click={() => pick(h.id, true)}>
+									{title(h)}
+								</button>
+							</td>
+							<td>{h.price !== null ? formatDollars(h.price) : '—'}</td>
+							<td>
+								{pricePerPerson(h) !== null ? formatDollars(pricePerPerson(h) ?? 0) : '—'}
+								{#if housePeople(h)}<span class="sub">÷ {housePeople(h)}</span>{/if}
+							</td>
+							<td>{h.beds ?? '—'}</td>
+							<td>{h.baths ?? '—'}</td>
+							<td>{h.sqft !== null ? h.sqft.toLocaleString('en-US') : '—'}</td>
+							<td>{pricePerSqft(h) !== null ? formatDollars(pricePerSqft(h) ?? 0) : '—'}</td>
+							<td>
+								{#if avg !== null}{avg.toFixed(1)}<span class="sub">
+										/{RATING_MAX} · {h.ratings.length}</span
+									>{:else}—{/if}
+							</td>
+							<td
+								>{#if mine !== null}{mine}{:else}<span class="todo">Not yet</span>{/if}</td
+							>
+							<td class="flags-cell">{flagSummary(h) || '—'}</td>
+							<td>{new Date(h.createdAt).toLocaleDateString('en-US')}</td>
+							<td>
+								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
+								<a href={h.url} target="_blank" rel="noopener noreferrer">Zillow ↗</a>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{:else}
+		<ul class="houses">
+			{#each activeHouses as h (h.id)}
+				<li class:selected={h.id === selectedId}>
+					<button type="button" class="pick" on:click={() => pick(h.id, true)}>
+						<span class="name">{title(h)}</span>
+						<span class="price">{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span>
+						{#if perPersonText(h)}<span class="per-person">{perPersonText(h)}</span>{/if}
+						{#if facts(h)}<span class="facts">{facts(h)}</span>{/if}
+						{#if averageRating(h) !== null}
+							{@const avg = averageRating(h) ?? 0}
+							<span class="rating" title="{avg.toFixed(1)} out of {RATING_MAX}">
+								<span class="avg">{avg.toFixed(1)}</span>/{RATING_MAX} · {h.ratings.length}
+								{h.ratings.length === 1 ? 'rating' : 'ratings'}
+							</span>
+							{#if flagSummary(h)}<span class="rating flagged">{flagSummary(h)}</span>{/if}
+						{:else}
+							<span class="rating none">Not rated yet</span>
+						{/if}
+						<span class="by">
+							Added {new Date(h.createdAt).toLocaleDateString('en-US')}{h.addedBy
+								? ` by ${h.addedBy}`
+								: ''}{h.assumptions ? ' · assumptions saved' : ''}
 						</span>
-						{#if flagSummary(h)}<span class="rating flagged">{flagSummary(h)}</span>{/if}
-					{:else}
-						<span class="rating none">Not rated yet</span>
-					{/if}
-					<span class="by">
-						Added {new Date(h.createdAt).toLocaleDateString('en-US')}{h.addedBy
-							? ` by ${h.addedBy}`
-							: ''}{h.assumptions ? ' · assumptions saved' : ''}
-					</span>
-				</button>
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
-				<a href={h.url} target="_blank" rel="noopener noreferrer">Open on Zillow ↗</a>
-			</li>
-		{/each}
-	</ul>
+					</button>
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
+					<a href={h.url} target="_blank" rel="noopener noreferrer">Open on Zillow ↗</a>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 
 	{#if eliminatedHouses.length}
 		<button
@@ -356,6 +556,18 @@
 							<span class="name">{title(h)}</span>
 							<span class="price">{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span
 							>
+							{#if perPersonText(h)}<span class="per-person">{perPersonText(h)}</span>{/if}
+							{#if facts(h)}<span class="facts">{facts(h)}</span>{/if}
+							{#if averageRating(h) !== null}
+								{@const avg = averageRating(h) ?? 0}
+								<span class="rating" title="{avg.toFixed(1)} out of {RATING_MAX}">
+									<span class="avg">{avg.toFixed(1)}</span>/{RATING_MAX} · {h.ratings.length}
+									{h.ratings.length === 1 ? 'rating' : 'ratings'}
+								</span>
+								{#if flagSummary(h)}<span class="rating flagged">{flagSummary(h)}</span>{/if}
+							{:else}
+								<span class="rating none">No one rated it</span>
+							{/if}
 							<span class="by">
 								Eliminated {new Date(h.eliminatedAt ?? '').toLocaleDateString(
 									'en-US'
@@ -441,66 +653,95 @@
 
 		<div class="ratings">
 			<h3>How everyone feels</h3>
-			<div class="mine">
-				<span class="who">You</span>
-				<div class="scale" role="radiogroup" aria-label="Your score, 1 to {RATING_MAX}">
-					{#each SCORES as n (n)}
-						<button
-							type="button"
-							role="radio"
-							aria-checked={myScore === n}
-							class="score"
-							class:on={myScore === n}
-							on:click={() => (myScore = myScore === n ? null : n)}
-						>
-							{n}
-						</button>
-					{/each}
-				</div>
-				<div class="toggles">
-					{#each RATING_FLAGS as f (f.key)}
-						<button
-							type="button"
-							class="toggle"
-							class:on={myFlags[f.key]}
-							aria-pressed={myFlags[f.key]}
-							on:click={() => (myFlags = { ...myFlags, [f.key]: !myFlags[f.key] })}
-						>
-							<span class="box" aria-hidden="true">{myFlags[f.key] ? '✕' : ''}</span>
-							{f.label}
-						</button>
-					{/each}
-				</div>
-				<input
-					class="comment"
-					bind:value={myComment}
-					placeholder="Why? (optional)"
-					maxlength="1000"
-				/>
-				<button
-					type="button"
-					on:click={saveRating}
-					disabled={busy || !ratingDirty || me === null || (myScore === null && !myRating)}
-				>
-					{myScore === null && myRating ? 'Remove rating' : 'Save rating'}
-				</button>
-			</div>
-			{#if myScore === null && (myFlags.wouldntBuy || myFlags.wouldntRent)}
-				<p class="note">Pick a score too: the toggles go alongside a score, not instead of one.</p>
-			{/if}
-			{#if selected.ratings.filter((r) => r.userId !== me).length}
-				<ul class="others">
-					{#each selected.ratings.filter((r) => r.userId !== me) as r (r.userId)}
-						<li>
-							<span class="who">{r.name}</span>
-							<span class="their-score">{r.score}/{RATING_MAX}</span>
-							{#if flagText(r)}<span class="their-flags">{flagText(r)}</span>{/if}
-							{#if r.comment}<span class="their-comment">“{r.comment}”</span>{/if}
-						</li>
-					{/each}
-				</ul>
+			{#if selected.eliminatedAt}
+				<!-- Frozen as it stood when the house was eliminated: everyone's
+				     rating, yours included, as a list. Restoring it brings the
+				     controls back. -->
+				{#if selected.ratings.length}
+					{@const avg = averageRating(selected) ?? 0}
+					<p class="note">
+						Average {avg.toFixed(1)}/{RATING_MAX} from {selected.ratings.length}
+						{selected.ratings.length === 1 ? 'rating' : 'ratings'}{flagSummary(selected)
+							? ` · ${flagSummary(selected)}`
+							: ''}. Restore the house to change a rating.
+					</p>
+					<ul class="others frozen">
+						{#each selected.ratings as r (r.userId)}
+							<li>
+								<span class="who">{r.userId === me ? 'You' : r.name}</span>
+								<span class="their-score">{r.score}/{RATING_MAX}</span>
+								{#if flagText(r)}<span class="their-flags">{flagText(r)}</span>{/if}
+								{#if r.comment}<span class="their-comment">“{r.comment}”</span>{/if}
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="note">No one rated this house before it was eliminated.</p>
+				{/if}
 			{:else}
-				<p class="note">No one else has rated this house yet.</p>
+				<div class="mine">
+					<span class="who">You</span>
+					<div class="scale" role="radiogroup" aria-label="Your score, 1 to {RATING_MAX}">
+						{#each SCORES as n (n)}
+							<button
+								type="button"
+								role="radio"
+								aria-checked={myScore === n}
+								class="score"
+								class:on={myScore === n}
+								on:click={() => (myScore = myScore === n ? null : n)}
+							>
+								{n}
+							</button>
+						{/each}
+					</div>
+					<div class="toggles">
+						{#each RATING_FLAGS as f (f.key)}
+							<button
+								type="button"
+								class="toggle"
+								class:on={myFlags[f.key]}
+								aria-pressed={myFlags[f.key]}
+								on:click={() => (myFlags = { ...myFlags, [f.key]: !myFlags[f.key] })}
+							>
+								<span class="box" aria-hidden="true">{myFlags[f.key] ? '✕' : ''}</span>
+								{f.label}
+							</button>
+						{/each}
+					</div>
+					<input
+						class="comment"
+						bind:value={myComment}
+						placeholder="Why? (optional)"
+						maxlength="1000"
+					/>
+					<button
+						type="button"
+						on:click={saveRating}
+						disabled={busy || !ratingDirty || me === null || (myScore === null && !myRating)}
+					>
+						{myScore === null && myRating ? 'Remove rating' : 'Save rating'}
+					</button>
+				</div>
+				{#if myScore === null && (myFlags.wouldntBuy || myFlags.wouldntRent)}
+					<p class="note">
+						Pick a score too: the toggles go alongside a score, not instead of one.
+					</p>
+				{/if}
+				{#if selected.ratings.filter((r) => r.userId !== me).length}
+					<ul class="others">
+						{#each selected.ratings.filter((r) => r.userId !== me) as r (r.userId)}
+							<li>
+								<span class="who">{r.name}</span>
+								<span class="their-score">{r.score}/{RATING_MAX}</span>
+								{#if flagText(r)}<span class="their-flags">{flagText(r)}</span>{/if}
+								{#if r.comment}<span class="their-comment">“{r.comment}”</span>{/if}
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="note">No one else has rated this house yet.</p>
+				{/if}
 			{/if}
 		</div>
 
@@ -839,12 +1080,193 @@
 		gap: 0.3rem 0.75rem;
 	}
 
+	.others.frozen {
+		margin-top: 0.25rem;
+		padding-top: 0;
+		border-top: none;
+	}
+
 	.their-score {
 		color: #374151;
 	}
 
 	.their-comment {
 		color: #6b7280;
+	}
+
+	.list-controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem 0.9rem;
+		margin: 1rem 0 0.85rem;
+	}
+
+	.seg {
+		display: inline-flex;
+		border: 1px solid #d5dae1;
+		border-radius: 8px;
+		overflow: hidden;
+	}
+
+	.seg button {
+		margin: 0;
+		padding: 0.4rem 0.9rem;
+		background: #fff;
+		border: none;
+		border-radius: 0;
+		color: #374151;
+		font-size: 0.88rem;
+	}
+
+	.seg button + button {
+		border-left: 1px solid #d5dae1;
+	}
+
+	.seg button.on {
+		background: #0066cc;
+		color: #fff;
+	}
+
+	.sort {
+		flex-direction: row;
+		align-items: center;
+		gap: 0.45rem;
+	}
+
+	.sort select {
+		padding: 0.4rem 0.5rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.88rem;
+	}
+
+	button.dir {
+		margin: 0;
+		padding: 0.4rem 0.75rem;
+		font-size: 0.85rem;
+	}
+
+	.per-person {
+		color: #374151;
+		font-size: 0.85rem;
+		font-weight: 600;
+	}
+
+	.table-scroll {
+		/* Positioned, so the visually-hidden header label is placed (and
+		   clipped) inside the scroll box instead of stretching the page. */
+		position: relative;
+		overflow-x: auto;
+		border: 1px solid rgba(11, 11, 11, 0.1);
+		border-radius: 10px;
+		background: #fcfcfb;
+	}
+
+	.house-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.88rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.house-table th,
+	.house-table td {
+		padding: 0.5rem 0.65rem;
+		border-bottom: 1px solid #e1e0d9;
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.house-table th:first-child,
+	.house-table td:first-child,
+	.house-table .flags-cell {
+		text-align: left;
+	}
+
+	.house-table thead th {
+		background: #fff;
+		color: #52514e;
+		font-weight: 600;
+	}
+
+	.house-table th button {
+		margin: 0;
+		padding: 0;
+		background: none;
+		border: none;
+		border-radius: 0;
+		color: inherit;
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.house-table th button:hover {
+		color: #0066cc;
+	}
+
+	.house-table tbody tr:last-child td {
+		border-bottom: none;
+	}
+
+	.house-table tr.selected td {
+		background: #eef5ff;
+	}
+
+	.house-cell {
+		max-width: 18rem;
+		white-space: normal;
+	}
+
+	button.link {
+		margin: 0;
+		padding: 0;
+		background: none;
+		border: none;
+		border-radius: 0;
+		color: #0b0b0b;
+		font: inherit;
+		font-weight: 600;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	button.link:hover {
+		color: #0066cc;
+		text-decoration: underline;
+	}
+
+	.sub {
+		margin-left: 0.2rem;
+		color: #898781;
+		font-size: 0.78rem;
+	}
+
+	.todo {
+		color: #8a5a00;
+	}
+
+	.flags-cell {
+		color: #b42318;
+		white-space: normal;
+		min-width: 9rem;
+	}
+
+	.house-table a {
+		color: #0066cc;
+		text-decoration: none;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 
 	.banner.warn {

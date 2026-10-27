@@ -223,6 +223,83 @@ export function flagSummary(h: House): string {
 		.join(', ');
 }
 
+// --- comparing houses ---
+
+// The people splitting a house: what its saved analysis says, or else one per
+// bedroom, the analysis's own default (see houseDefaults).
+export function housePeople(h: Pick<House, 'beds' | 'assumptions'>): number | null {
+	const saved = h.assumptions?.people;
+	if (typeof saved === 'number' && saved > 0) return Math.round(saved);
+	return h.beds !== null ? Math.max(1, Math.round(h.beds)) : null;
+}
+
+export function pricePerPerson(h: House): number | null {
+	const people = housePeople(h);
+	return h.price !== null && people ? h.price / people : null;
+}
+
+export function pricePerSqft(h: House): number | null {
+	return h.price !== null && h.sqft ? h.price / h.sqft : null;
+}
+
+export function myScore(h: House, me: number | null): number | null {
+	return h.ratings.find((r) => r.userId === me)?.score ?? null;
+}
+
+export type HouseSort =
+	| 'newest'
+	| 'price'
+	| 'sqft'
+	| 'perPerson'
+	| 'perSqft'
+	| 'rating'
+	| 'unrated';
+
+// `dir` is the direction a sort starts in when picked. "I haven't rated" has
+// no direction: houses you haven't rated first, newest first within each.
+export const HOUSE_SORTS: { key: HouseSort; label: string; dir: 'asc' | 'desc' | null }[] = [
+	{ key: 'newest', label: 'Newest', dir: 'desc' },
+	{ key: 'price', label: 'Price', dir: 'asc' },
+	{ key: 'perPerson', label: 'Price per person', dir: 'asc' },
+	{ key: 'sqft', label: 'Square feet', dir: 'desc' },
+	{ key: 'perSqft', label: 'Price per sq ft', dir: 'asc' },
+	{ key: 'rating', label: 'Average rating', dir: 'desc' },
+	{ key: 'unrated', label: "I haven't rated", dir: null }
+];
+
+// A sorted copy. Houses missing the value being sorted on (no price, no
+// ratings yet) always go last, whichever way the sort runs.
+export function sortHouses(
+	list: House[],
+	key: HouseSort,
+	dir: 'asc' | 'desc',
+	me: number | null
+): House[] {
+	const newest = (a: House, b: House) => b.createdAt.localeCompare(a.createdAt);
+	if (key === 'unrated') {
+		const rated = (h: House) => (myScore(h, me) === null ? 0 : 1);
+		return [...list].sort((a, b) => rated(a) - rated(b) || newest(a, b));
+	}
+	const value: Record<Exclude<HouseSort, 'unrated'>, (h: House) => number | null> = {
+		newest: (h) => Date.parse(h.createdAt),
+		price: (h) => h.price,
+		sqft: (h) => h.sqft,
+		perPerson: pricePerPerson,
+		perSqft: pricePerSqft,
+		rating: averageRating
+	};
+	const get = value[key];
+	const sign = dir === 'asc' ? 1 : -1;
+	return [...list].sort((a, b) => {
+		const va = get(a);
+		const vb = get(b);
+		if (va === null && vb === null) return newest(a, b);
+		if (va === null) return 1;
+		if (vb === null) return -1;
+		return (va - vb) * sign || newest(a, b);
+	});
+}
+
 // What a Zillow link tells us without fetching it. A listing URL looks like
 //   https://www.zillow.com/homedetails/66-Round-Hill-St-Boston-MA-02130/59139347_zpid/
 // so the address is the slug and the zpid is the segment ending in _zpid.

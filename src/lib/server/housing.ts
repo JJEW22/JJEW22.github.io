@@ -802,6 +802,14 @@ export async function setRating(
 	flags: { wouldntBuy: boolean; wouldntRent: boolean },
 	comment: string
 ): Promise<void> {
+	// An eliminated house's ratings stay as they were when it went; the page
+	// shows them read-only, and this keeps them that way.
+	const [house] = await sql<{ eliminated_at: Date | null }[]>`
+		select eliminated_at from housing_houses where id = ${houseId}
+	`;
+	if (house?.eliminated_at) {
+		throw new HouseError('This house is eliminated. Restore it to change its ratings.', 409);
+	}
 	if (score === null) {
 		if (flags.wouldntBuy || flags.wouldntRent) {
 			throw new HouseError(`Pick a score from 1 to ${RATING_MAX} to go with the toggles.`);
