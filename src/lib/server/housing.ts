@@ -17,6 +17,7 @@ import {
 	parseZillowUrl,
 	type Assumptions,
 	type House,
+	RATING_MAX,
 	type Point,
 	type Rating,
 	type RentcastDetails
@@ -331,6 +332,8 @@ interface HouseRow {
 	lat: number | null;
 	lng: number | null;
 	ratings: Rating[];
+	eliminated_at: Date | null;
+	eliminated_by_name: string | null;
 	added_by_name: string | null;
 	created_at: Date;
 }
@@ -353,6 +356,8 @@ function toHouse(r: HouseRow): House {
 		lat: r.lat,
 		lng: r.lng,
 		ratings: r.ratings ?? [],
+		eliminatedAt: r.eliminated_at ? new Date(r.eliminated_at).toISOString() : null,
+		eliminatedBy: r.eliminated_by_name,
 		addedBy: r.added_by_name,
 		createdAt: new Date(r.created_at).toISOString()
 	};
@@ -368,16 +373,20 @@ export async function listHouses(): Promise<House[]> {
 		                      'userId', r.user_id,
 		                      'name', coalesce(ru.real_name, ru.username),
 		                      'score', r.score,
+		                      'wouldntBuy', r.wouldnt_buy,
+		                      'wouldntRent', r.wouldnt_rent,
 		                      'comment', r.comment,
 		                      'updatedAt', r.updated_at
 		                  ) order by r.updated_at desc)
 		           from housing_house_ratings r join users ru on ru.id = r.user_id
 		           where r.house_id = h.id
 		       ), '[]') as ratings,
+		       h.eliminated_at, coalesce(eu.real_name, eu.username) as eliminated_by_name,
 		       coalesce(u.real_name, u.username) as added_by_name,
 		       h.created_at
 		from housing_houses h
 		left join users u on u.id = h.added_by
+		left join users eu on eu.id = h.eliminated_by
 		order by h.created_at desc
 	`;
 	return rows.map(toHouse);
@@ -406,7 +415,11 @@ export function readFields(body: Record<string, unknown> | null): HouseFields {
 		}
 		const n = Number(v);
 		if (!Number.isFinite(n) || n < 0 || n > max) throw new HouseError(`${key} must be a number.`);
-		out[key] = key === 'sqft' ? Math.round(n) : n;
+		// The column is an int; refuse a fraction rather than quietly rounding it.
+		if (key === 'sqft' && !Number.isInteger(n)) {
+			throw new HouseError('sqft must be a whole number.');
+		}
+		out[key] = n;
 	};
 	numeric('price', 1e10);
 	numeric('beds', 99);
@@ -498,10 +511,17 @@ export async function deleteHouse(id: number): Promise<void> {
 // RentCast instead, looked up by the address in the Zillow link. Each lookup
 // spends 3-4 of the free plan's 50 requests a month: the sale listing (asking
 // price), the property record (beds, baths, taxes, HOA), the rent estimate, and
-// a value estimate only when the home isn't listed for sale.
+// a value estimate only when the home isn't listed for sale. A lookup happens
+// once, when a house is added (or on "Update from RentCast"); after that only
+// the weekly listing check below touches RentCast, a request per ZIP code.
 
 const RENTCAST_BASE = 'https://api.rentcast.io/v1';
 export const RENTCAST_MONTHLY_LIMIT = 50;
+// Lookups stop once this many requests are spent in a month. A lookup costs up
+// to 4, so one started at 39 still ends under 50, and the margin covers the
+// count here being by calendar month while RentCast's resets on the billing
+// date. Past 50 RentCast bills per request, so stopping short is the point.
+export const RENTCAST_STOP_AT = 40;
 
 export function rentcastConfigured(): boolean {
 	return Boolean(env.RENTCAST_API_KEY);
@@ -634,10 +654,20 @@ async function lookupRentcastWithCoords(
 // replaced. Returns a one-line summary for the page.
 export async function refreshFromRentcast(id: number, overwrite: boolean): Promise<string> {
 	const [house] = await sql<HouseRow[]>`
-		select id, address, price, beds, baths, sqft, lat from housing_houses where id = ${id}
+		select id, address, price, beds, baths, sqft, lat, eliminated_at
+		from housing_houses where id = ${id}
 	`;
 	if (!house) throw new HouseError(`No house with id ${id}.`, 404);
+	if (house.eliminated_at) {
+		throw new HouseError(
+			'This house is eliminated, so it is not looked up. Restore it first.',
+			409
+		);
+	}
 	if (!house.address) throw new HouseError('This house needs an address to look up.');
+	// Checked here, where every lookup passes, rather than only in the page.
+	const usage = await rentcastUsage();
+	if (usage.paused) throw new HouseError(rentcastPausedMessage(usage.used), 429);
 
 	const { details: d, coords } = await lookupRentcastWithCoords(house.address);
 	await sql`
@@ -682,13 +712,29 @@ export async function refreshFromRentcast(id: number, overwrite: boolean): Promi
 export async function rentcastUsage(): Promise<{
 	used: number;
 	limit: number;
+	stopAt: number;
+	paused: boolean;
 	configured: boolean;
 }> {
 	const [row] = await sql<{ used: number }[]>`
 		select coalesce(sum(calls), 0)::int as used from housing_syncs
 		where source = 'rentcast' and ran_at >= date_trunc('month', now())
 	`;
-	return { used: row.used, limit: RENTCAST_MONTHLY_LIMIT, configured: rentcastConfigured() };
+	return {
+		used: row.used,
+		limit: RENTCAST_MONTHLY_LIMIT,
+		stopAt: RENTCAST_STOP_AT,
+		paused: row.used >= RENTCAST_STOP_AT,
+		configured: rentcastConfigured()
+	};
+}
+
+export function rentcastPausedMessage(used: number): string {
+	return (
+		`RentCast autofill is paused until next month: ${used} of the ` +
+		`${RENTCAST_MONTHLY_LIMIT} free requests are used, and lookups stop at ` +
+		`${RENTCAST_STOP_AT} so the free plan is never exceeded. Fill the details in by hand.`
+	);
 }
 
 // --- map ---
@@ -696,7 +742,9 @@ export async function rentcastUsage(): Promise<{
 // The US Census geocoder: free, no key, public-domain data. It only knows US
 // addresses, which is all Zillow has.
 
-async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
+async function geocode(
+	address: string
+): Promise<{ lat: number; lng: number; zip: string | null } | null> {
 	const params = new URLSearchParams({
 		address,
 		benchmark: 'Public_AR_Current',
@@ -708,8 +756,11 @@ async function geocode(address: string): Promise<{ lat: number; lng: number } | 
 	);
 	if (!res.ok) throw new Error(`Census geocoder ${res.status}`);
 	const data = await res.json();
-	const c = data?.result?.addressMatches?.[0]?.coordinates;
-	return typeof c?.x === 'number' && typeof c?.y === 'number' ? { lat: c.y, lng: c.x } : null;
+	const match = data?.result?.addressMatches?.[0];
+	const c = match?.coordinates;
+	if (typeof c?.x !== 'number' || typeof c?.y !== 'number') return null;
+	const zip = match?.addressComponents?.zip;
+	return { lat: c.y, lng: c.x, zip: typeof zip === 'string' && /^\d{5}$/.test(zip) ? zip : null };
 }
 
 // Place any house that has an address but hasn't been tried yet. A handful per
@@ -724,9 +775,13 @@ async function locatePending(limit = 5): Promise<void> {
 	for (const h of pending) {
 		try {
 			const at = await geocode(h.address);
+			// An address without a ZIP can't be grouped for the weekly listing
+			// check, so take the geocoder's.
+			const address = at?.zip && !zipOf(h.address) ? `${h.address.trim()} ${at.zip}` : h.address;
 			await sql`
 				update housing_houses
-				set lat = ${at?.lat ?? null}, lng = ${at?.lng ?? null}, geocoded_at = now()
+				set lat = ${at?.lat ?? null}, lng = ${at?.lng ?? null}, address = ${address},
+				    geocoded_at = now()
 				where id = ${h.id}
 			`;
 		} catch (err) {
@@ -737,26 +792,38 @@ async function locatePending(limit = 5): Promise<void> {
 
 // --- ratings ---
 
-// Set (or, with a null score, remove) one admin's rating of a house.
+// Set (or, with a null score, remove) one admin's rating of a house. The
+// wouldn't-buy / wouldn't-rent toggles ride along with the score; they are
+// never set without one.
 export async function setRating(
 	houseId: number,
 	userId: number,
 	score: number | null,
+	flags: { wouldntBuy: boolean; wouldntRent: boolean },
 	comment: string
 ): Promise<void> {
 	if (score === null) {
+		if (flags.wouldntBuy || flags.wouldntRent) {
+			throw new HouseError(`Pick a score from 1 to ${RATING_MAX} to go with the toggles.`);
+		}
 		await sql`delete from housing_house_ratings where house_id = ${houseId} and user_id = ${userId}`;
 		return;
 	}
-	if (!Number.isInteger(score) || score < 1 || score > 5) {
-		throw new HouseError('A rating is a whole number from 1 to 5.');
+	if (!Number.isInteger(score) || score < 1 || score > RATING_MAX) {
+		throw new HouseError(`A rating is a whole number from 1 to ${RATING_MAX}.`);
 	}
 	try {
 		await sql`
-			insert into housing_house_ratings (house_id, user_id, score, comment)
-			values (${houseId}, ${userId}, ${score}, ${comment.slice(0, 1000)})
+			insert into housing_house_ratings
+				(house_id, user_id, score, wouldnt_buy, wouldnt_rent, comment)
+			values (${houseId}, ${userId}, ${score}, ${flags.wouldntBuy}, ${flags.wouldntRent},
+			        ${comment.slice(0, 1000)})
 			on conflict (house_id, user_id) do update set
-				score = excluded.score, comment = excluded.comment, updated_at = now()
+				score = excluded.score,
+				wouldnt_buy = excluded.wouldnt_buy,
+				wouldnt_rent = excluded.wouldnt_rent,
+				comment = excluded.comment,
+				updated_at = now()
 		`;
 	} catch (err) {
 		// 23503: the house was removed while the rating was being made.
@@ -765,4 +832,257 @@ export async function setRating(
 		}
 		throw err;
 	}
+}
+
+// --- weekly listing check ---
+//
+// RentCast has no request that returns everything for a list of addresses:
+// property records and estimates are one request per address. Its sale
+// listings search, though, takes a ZIP code and returns up to 500 active
+// listings at once. So once a week this makes one request per ZIP code the
+// active houses are in, and matches each house to its listing by address. That
+// catches price changes and homes taken off the market, for far fewer requests
+// than looking each house up. Full details still come from the lookup made when
+// a house is added.
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const LISTINGS_PER_REQUEST = 500;
+
+const STREET_WORDS: Record<string, string> = {
+	street: 'st',
+	avenue: 'ave',
+	road: 'rd',
+	drive: 'dr',
+	lane: 'ln',
+	terrace: 'ter',
+	place: 'pl',
+	court: 'ct',
+	boulevard: 'blvd',
+	parkway: 'pkwy',
+	circle: 'cir',
+	square: 'sq',
+	highway: 'hwy',
+	north: 'n',
+	south: 's',
+	east: 'e',
+	west: 'w',
+	apartment: '#',
+	apt: '#',
+	unit: '#',
+	ste: '#',
+	suite: '#',
+	building: '#',
+	bldg: '#'
+};
+
+// "66 Round Hill Street, Apt 2" and "66 ROUND HILL ST #2" compare equal.
+function streetKey(line: string): string {
+	return line
+		.toLowerCase()
+		.replace(/[.,]/g, ' ')
+		.replace(/#/g, ' # ')
+		.split(/\s+/)
+		.filter(Boolean)
+		.map((w) => STREET_WORDS[w] ?? w)
+		.join(' ');
+}
+
+// The street (number and name) and the unit, apart: "64 bartlett st" + "4".
+function streetParts(line: string): { base: string; unit: string | null } {
+	const words = streetKey(line).split(' ');
+	const i = words.indexOf('#');
+	if (i < 0) return { base: words.join(' '), unit: null };
+	return { base: words.slice(0, i).join(' '), unit: words.slice(i + 1).join(' ') || null };
+}
+
+// The listing for a house, or null when there's none or more than one could be
+// it. Street must agree; the unit decides between listings at one address, and
+// a house with no unit only matches an address with a single listing.
+function findListing<T extends { base: string; unit: string | null }>(
+	house: { base: string; unit: string | null },
+	listings: T[]
+): T | null {
+	const same = listings.filter((l) => l.base === house.base);
+	if (house.unit) {
+		return (
+			same.find((l) => l.unit === house.unit) ??
+			(same.length === 1 && !same[0].unit ? same[0] : null)
+		);
+	}
+	return same.length === 1 ? same[0] : null;
+}
+
+function zipOf(address: string): string | null {
+	return address.match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1] ?? null;
+}
+
+interface RcSaleListing {
+	addressLine1?: string;
+	addressLine2?: string;
+	formattedAddress?: string;
+	price?: number;
+	status?: string;
+	listedDate?: string;
+}
+
+export interface ListingCheckResult {
+	ran: boolean;
+	detail: string;
+}
+
+// Run the weekly check. Skips itself if one ran in the last 6 days, unless
+// `force`, so the workflow can fire on a schedule without double-spending.
+// Never goes past RENTCAST_STOP_AT: ZIP codes that don't fit wait a week.
+export async function checkListings(force = false): Promise<ListingCheckResult> {
+	if (!env.RENTCAST_API_KEY) return { ran: false, detail: 'RENTCAST_API_KEY is not set.' };
+
+	if (!force) {
+		const [last] = await sql<{ ran_at: Date }[]>`
+			select ran_at from housing_syncs
+			where source = 'rentcast' and detail like 'Weekly listing check%'
+			order by ran_at desc limit 1
+		`;
+		if (last && Date.now() - new Date(last.ran_at).getTime() < WEEK_MS - 24 * 60 * 60 * 1000) {
+			return { ran: false, detail: `Already checked ${new Date(last.ran_at).toISOString()}.` };
+		}
+	}
+
+	const houses = await sql<HouseRow[]>`
+		select id, address, price, rentcast from housing_houses
+		where eliminated_at is null and address is not null
+	`;
+	const byZip = new Map<string, HouseRow[]>();
+	for (const h of houses) {
+		const zip = zipOf(h.address as string);
+		if (zip) byZip.set(zip, [...(byZip.get(zip) ?? []), h]);
+	}
+	if (!byZip.size) return { ran: false, detail: 'No active houses with a ZIP code to check.' };
+
+	const usage = await rentcastUsage();
+	const budget = Math.max(RENTCAST_STOP_AT - usage.used, 0);
+	const zips = [...byZip.keys()].slice(0, budget);
+	const skipped = byZip.size - zips.length;
+
+	let calls = 0;
+	let changed = 0;
+	let delisted = 0;
+	const errors: string[] = [];
+	const now = new Date().toISOString();
+
+	for (const zip of zips) {
+		calls++;
+		let listings: RcSaleListing[];
+		try {
+			const params = new URLSearchParams({
+				zipCode: zip,
+				status: 'Active',
+				limit: String(LISTINGS_PER_REQUEST)
+			});
+			const res = await fetch(`${RENTCAST_BASE}/listings/sale?${params}`, {
+				headers: { 'X-Api-Key': env.RENTCAST_API_KEY ?? '', accept: 'application/json' }
+			});
+			if (res.status === 404) listings = [];
+			else if (!res.ok) throw new Error(`${zip}: ${res.status} ${res.statusText}`);
+			else listings = await res.json();
+		} catch (err) {
+			errors.push(err instanceof Error ? err.message : String(err));
+			continue;
+		}
+		// A full page means there may be more; a house missing from it can't be
+		// called delisted, only left as it was.
+		const complete = listings.length < LISTINGS_PER_REQUEST;
+		const parsed = listings.map((l) => ({
+			...streetParts(
+				[l.addressLine1, l.addressLine2].filter(Boolean).join(' ') ||
+					(l.formattedAddress ?? '').split(',')[0]
+			),
+			listing: l
+		}));
+
+		for (const h of byZip.get(zip) ?? []) {
+			const match = findListing(streetParts((h.address as string).split(',')[0]), parsed)?.listing;
+			const prev = h.rentcast;
+			const prevPrice = prev?.listing?.price ?? null;
+			const found =
+				match && typeof match.price === 'number' && match.price > 0
+					? { price: match.price, status: 'Active', listedDate: match.listedDate ?? null }
+					: null;
+
+			// No match is only "no longer listed" for a house that was matched
+			// before, against a complete page. Otherwise it's an address the
+			// check couldn't pair up, and the listing is left as it was.
+			const delistedNow = !found && Boolean(prev?.listing) && complete;
+			const listing = found ?? (delistedNow ? null : (prev?.listing ?? null));
+			if (delistedNow) delisted++;
+
+			const history = [...(prev?.priceHistory ?? [])];
+			if (found && history.at(-1)?.price !== found.price) {
+				history.push({ date: now, price: found.price });
+				// The first price seen isn't a change.
+				if (prevPrice !== null && found.price !== prevPrice) changed++;
+			}
+
+			const details = {
+				...(prev ?? emptyDetails()),
+				listing,
+				listingCheckedAt: now,
+				listingUnmatched: !found && !delistedNow,
+				priceHistory: history.slice(-24)
+			};
+			const set: Record<string, unknown> = { rentcast: sql.json(details as never) };
+			// Follow the asking price only while the house's price is still the one
+			// RentCast gave; a price someone typed in stays theirs.
+			const current = num(h.price);
+			if (listing && (current === null || current === prevPrice)) set.price = listing.price;
+			await sql`update housing_houses set ${sql(set)}, updated_at = now() where id = ${h.id}`;
+		}
+	}
+
+	const detail =
+		`Weekly listing check: ${zips.length} ZIP code${zips.length === 1 ? '' : 's'}, ` +
+		`${changed} price change${changed === 1 ? '' : 's'}, ${delisted} no longer listed` +
+		(skipped
+			? `, ${skipped} ZIP code${skipped === 1 ? '' : 's'} left for next week (request cap)`
+			: '') +
+		(errors.length ? `; failed: ${errors.join('; ')}` : '');
+	await sql`
+		insert into housing_syncs (source, ok, detail, calls)
+		values ('rentcast', ${!errors.length}, ${detail}, ${calls})
+	`;
+	return { ran: true, detail };
+}
+
+function emptyDetails(): RentcastDetails {
+	return {
+		lookedUpAt: new Date().toISOString(),
+		matchedAddress: null,
+		listing: null,
+		valueEstimate: null,
+		rentEstimate: null,
+		propertyType: null,
+		beds: null,
+		baths: null,
+		sqft: null,
+		lotSize: null,
+		yearBuilt: null,
+		lastSale: null,
+		hoaMonthly: null,
+		annualTax: null,
+		calls: 0,
+		errors: []
+	};
+}
+
+// --- eliminating ---
+
+export async function setEliminated(id: number, userId: number | null, eliminated: boolean) {
+	const rows = await sql`
+		update housing_houses
+		set eliminated_at = ${eliminated ? new Date() : null},
+		    eliminated_by = ${eliminated ? userId : null},
+		    updated_at = now()
+		where id = ${id}
+		returning id
+	`;
+	if (!rows.length) throw new HouseError(`No house with id ${id}.`, 404);
 }

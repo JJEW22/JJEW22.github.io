@@ -1,7 +1,8 @@
 <!-- src/routes/housing/Houses.svelte -->
 <!--
 	The houses tab: the shared list of houses being considered, added by Zillow
-	link, on a map and as cards; each admin's 1-5 rating of each; and the cost
+	link, on a map and as cards; each admin's 1-10 rating of each, with
+	"wouldn't buy" / "wouldn't rent" toggles beside the score; and the cost
 	analysis for whichever one is selected.
 
 	Only the link is required. The address and zpid are read out of the link
@@ -15,8 +16,10 @@
 	import HouseAnalysis from './HouseAnalysis.svelte';
 	import HouseMap from './HouseMap.svelte';
 	import {
-		RATING_LABELS,
+		RATING_FLAGS,
+		RATING_MAX,
 		averageRating,
+		flagSummary,
 		formatDollars,
 		parseZillowUrl,
 		type Assumptions,
@@ -31,7 +34,13 @@
 	let busy = false;
 	let msg = '';
 	let error = '';
-	let usage: { used: number; limit: number; configured: boolean } | null = null;
+	let usage: {
+		used: number;
+		limit: number;
+		stopAt: number;
+		paused: boolean;
+		configured: boolean;
+	} | null = null;
 	// The signed-in admin's id, from the server, to find their own rating.
 	let me: number | null = null;
 	let detailEl: HTMLElement;
@@ -55,7 +64,9 @@
 
 	// Your rating of the selected house
 	let myScore: number | null = null;
+	let myFlags = { wouldntBuy: false, wouldntRent: false };
 	let myComment = '';
+	const SCORES = Array.from({ length: RATING_MAX }, (_, i) => i + 1);
 
 	onMount(async () => {
 		await send('GET');
@@ -64,6 +75,16 @@
 
 	$: preview = url.trim() ? parseZillowUrl(url) : null;
 	$: selected = houses.find((h) => h.id === selectedId) ?? null;
+	// Eliminated houses leave the map and the main list; they're still here,
+	// behind "Show eliminated", and can be restored.
+	$: activeHouses = houses.filter((h) => !h.eliminatedAt);
+	$: eliminatedHouses = houses.filter((h) => h.eliminatedAt);
+	let showEliminated = false;
+
+	async function setEliminated(h: House, eliminated: boolean) {
+		msg = '';
+		await send('PATCH', { id: h.id, eliminated });
+	}
 	$: if (selected && selected.id !== editingFor) syncEdit(selected);
 
 	function syncEdit(h: House) {
@@ -76,12 +97,16 @@
 		eNotes = h.notes;
 		const mine = h.ratings.find((r) => r.userId === me);
 		myScore = mine?.score ?? null;
+		myFlags = { wouldntBuy: mine?.wouldntBuy ?? false, wouldntRent: mine?.wouldntRent ?? false };
 		myComment = mine?.comment ?? '';
 	}
 
 	$: myRating = selected?.ratings.find((r) => r.userId === me) ?? null;
 	$: ratingDirty =
-		myScore !== (myRating?.score ?? null) || myComment.trim() !== (myRating?.comment ?? '');
+		myScore !== (myRating?.score ?? null) ||
+		myFlags.wouldntBuy !== (myRating?.wouldntBuy ?? false) ||
+		myFlags.wouldntRent !== (myRating?.wouldntRent ?? false) ||
+		myComment.trim() !== (myRating?.comment ?? '');
 
 	async function pick(id: number, scroll = false) {
 		selectedId = id;
@@ -95,14 +120,15 @@
 		msg = '';
 		await send(
 			'POST',
-			{ id: selected.id, score: myScore, comment: myComment },
+			{ id: selected.id, score: myScore, ...myFlags, comment: myComment },
 			'/housing/api/houses/rating'
 		);
 	}
 
-	function stars(avg: number): string {
-		const n = Math.round(avg);
-		return '★'.repeat(n) + '☆'.repeat(5 - n);
+	// "Wouldn't buy or rent" when both toggles are on; one label otherwise.
+	function flagText(r: { wouldntBuy: boolean; wouldntRent: boolean }): string {
+		if (r.wouldntBuy && r.wouldntRent) return "Wouldn't buy or rent";
+		return r.wouldntBuy ? "Wouldn't buy" : r.wouldntRent ? "Wouldn't rent" : '';
 	}
 
 	async function send(
@@ -177,7 +203,8 @@
 	async function lookup(h: House) {
 		const ask =
 			`Look ${h.address} up on RentCast again? This uses 3-4 of the month's ` +
-			`${usage?.limit ?? 50} free requests and replaces the price, beds, baths and sqft ` +
+			`${usage?.limit ?? 50} free requests (${usage?.used ?? 0} used so far; autofill ` +
+			`pauses at ${usage?.stopAt ?? 40}) and replaces the price, beds, baths and sqft ` +
 			'with what RentCast has.';
 		if (!confirm(ask)) return;
 		msg = '';
@@ -243,14 +270,19 @@
 		</label>
 		<label>
 			<span>Sqft</span>
-			<input type="number" min="0" step="10" bind:value={sqft} />
+			<input type="number" min="0" step="1" bind:value={sqft} />
 		</label>
 		<button type="submit" disabled={busy || !preview}>{busy ? 'Adding…' : 'Add'}</button>
 	</form>
 	<p class="note">
-		{#if usage?.configured}
+		{#if usage?.configured && usage.paused}
+			<span class="paused">
+				⚠ RentCast autofill is paused until next month ({usage.used} of {usage.limit} free requests
+				used; it stops at {usage.stopAt} to stay on the free plan). Fill in the numbers by hand.
+			</span>
+		{:else if usage?.configured}
 			Leave the numbers blank to fill them from RentCast · {usage.used} of {usage.limit} free requests
-			used this month, 3–4 per house.
+			used this month, 3–4 per house; autofill pauses at {usage.stopAt}.
 		{:else if usage}
 			Add <code>RENTCAST_API_KEY</code> to fill these in automatically.
 		{/if}
@@ -274,9 +306,12 @@
 {:else if !houses.length}
 	<p class="note">No houses yet. Add one with its Zillow link above.</p>
 {:else}
-	<HouseMap {houses} {selectedId} on:select={(e) => pick(e.detail, true)} />
+	<HouseMap houses={activeHouses} {selectedId} on:select={(e) => pick(e.detail, true)} />
+	{#if !activeHouses.length}
+		<p class="note">Every house has been eliminated. Add another, or restore one below.</p>
+	{/if}
 	<ul class="houses">
-		{#each houses as h (h.id)}
+		{#each activeHouses as h (h.id)}
 			<li class:selected={h.id === selectedId}>
 				<button type="button" class="pick" on:click={() => pick(h.id, true)}>
 					<span class="name">{title(h)}</span>
@@ -284,11 +319,11 @@
 					{#if facts(h)}<span class="facts">{facts(h)}</span>{/if}
 					{#if averageRating(h) !== null}
 						{@const avg = averageRating(h) ?? 0}
-						<span class="rating" title="{avg.toFixed(1)} out of 5">
-							<span class="stars" aria-hidden="true">{stars(avg)}</span>
-							{avg.toFixed(1)} · {h.ratings.length}
+						<span class="rating" title="{avg.toFixed(1)} out of {RATING_MAX}">
+							<span class="avg">{avg.toFixed(1)}</span>/{RATING_MAX} · {h.ratings.length}
 							{h.ratings.length === 1 ? 'rating' : 'ratings'}
 						</span>
+						{#if flagSummary(h)}<span class="rating flagged">{flagSummary(h)}</span>{/if}
 					{:else}
 						<span class="rating none">Not rated yet</span>
 					{/if}
@@ -303,11 +338,60 @@
 			</li>
 		{/each}
 	</ul>
+
+	{#if eliminatedHouses.length}
+		<button
+			type="button"
+			class="secondary show-eliminated"
+			aria-expanded={showEliminated}
+			on:click={() => (showEliminated = !showEliminated)}
+		>
+			{showEliminated ? 'Hide' : 'Show'} eliminated ({eliminatedHouses.length})
+		</button>
+		{#if showEliminated}
+			<ul class="houses eliminated">
+				{#each eliminatedHouses as h (h.id)}
+					<li class:selected={h.id === selectedId}>
+						<button type="button" class="pick" on:click={() => pick(h.id, true)}>
+							<span class="name">{title(h)}</span>
+							<span class="price">{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span
+							>
+							<span class="by">
+								Eliminated {new Date(h.eliminatedAt ?? '').toLocaleDateString(
+									'en-US'
+								)}{h.eliminatedBy ? ` by ${h.eliminatedBy}` : ''}
+							</span>
+						</button>
+						<div class="card-actions">
+							<button
+								type="button"
+								class="secondary mini"
+								on:click={() => setEliminated(h, false)}
+								disabled={busy}
+							>
+								Restore
+							</button>
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
+							<a href={h.url} target="_blank" rel="noopener noreferrer">Open on Zillow ↗</a>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
 {/if}
 
 {#if selected}
-	<section class="panel detail" bind:this={detailEl}>
+	<section class="panel detail" class:is-eliminated={selected.eliminatedAt} bind:this={detailEl}>
 		<h2>{title(selected)}</h2>
+		{#if selected.eliminatedAt}
+			<p class="banner warn">
+				Eliminated {new Date(selected.eliminatedAt).toLocaleDateString(
+					'en-US'
+				)}{selected.eliminatedBy ? ` by ${selected.eliminatedBy}` : ''}. It's off the main list and
+				the map, and RentCast won't sync it.
+			</p>
+		{/if}
 		<form class="edit" on:submit|preventDefault={saveDetails}>
 			<label class="wide">
 				<span>Address</span>
@@ -327,7 +411,7 @@
 			</label>
 			<label>
 				<span>Sqft</span>
-				<input type="number" min="0" step="10" bind:value={eSqft} />
+				<input type="number" min="0" step="1" bind:value={eSqft} />
 			</label>
 			<label class="full">
 				<span>Notes</span>
@@ -335,6 +419,15 @@
 			</label>
 			<div class="buttons">
 				<button type="submit" disabled={busy}>Save details</button>
+				<label class="eliminate">
+					<input
+						type="checkbox"
+						checked={Boolean(selected.eliminatedAt)}
+						disabled={busy}
+						on:change={(e) => selected && setEliminated(selected, e.currentTarget.checked)}
+					/>
+					Eliminated
+				</label>
 				<button
 					type="button"
 					class="danger"
@@ -350,8 +443,8 @@
 			<h3>How everyone feels</h3>
 			<div class="mine">
 				<span class="who">You</span>
-				<div class="scale" role="radiogroup" aria-label="Your rating">
-					{#each [1, 2, 3, 4, 5] as n (n)}
+				<div class="scale" role="radiogroup" aria-label="Your score, 1 to {RATING_MAX}">
+					{#each SCORES as n (n)}
 						<button
 							type="button"
 							role="radio"
@@ -360,8 +453,21 @@
 							class:on={myScore === n}
 							on:click={() => (myScore = myScore === n ? null : n)}
 						>
-							<span class="num">{n}</span>
-							<span class="word">{RATING_LABELS[n]}</span>
+							{n}
+						</button>
+					{/each}
+				</div>
+				<div class="toggles">
+					{#each RATING_FLAGS as f (f.key)}
+						<button
+							type="button"
+							class="toggle"
+							class:on={myFlags[f.key]}
+							aria-pressed={myFlags[f.key]}
+							on:click={() => (myFlags = { ...myFlags, [f.key]: !myFlags[f.key] })}
+						>
+							<span class="box" aria-hidden="true">{myFlags[f.key] ? '✕' : ''}</span>
+							{f.label}
 						</button>
 					{/each}
 				</div>
@@ -371,16 +477,24 @@
 					placeholder="Why? (optional)"
 					maxlength="1000"
 				/>
-				<button type="button" on:click={saveRating} disabled={busy || !ratingDirty || me === null}>
+				<button
+					type="button"
+					on:click={saveRating}
+					disabled={busy || !ratingDirty || me === null || (myScore === null && !myRating)}
+				>
 					{myScore === null && myRating ? 'Remove rating' : 'Save rating'}
 				</button>
 			</div>
+			{#if myScore === null && (myFlags.wouldntBuy || myFlags.wouldntRent)}
+				<p class="note">Pick a score too: the toggles go alongside a score, not instead of one.</p>
+			{/if}
 			{#if selected.ratings.filter((r) => r.userId !== me).length}
 				<ul class="others">
 					{#each selected.ratings.filter((r) => r.userId !== me) as r (r.userId)}
 						<li>
 							<span class="who">{r.name}</span>
-							<span class="their-score">{r.score} · {RATING_LABELS[r.score]}</span>
+							<span class="their-score">{r.score}/{RATING_MAX}</span>
+							{#if flagText(r)}<span class="their-flags">{flagText(r)}</span>{/if}
 							{#if r.comment}<span class="their-comment">“{r.comment}”</span>{/if}
 						</li>
 					{/each}
@@ -442,21 +556,48 @@
 				{#if rc.errors.length}
 					<p class="note bad-text">Some lookups failed: {rc.errors.join('; ')}</p>
 				{/if}
+				{#if rc.listingCheckedAt && rc.listingUnmatched}
+					<p class="note">
+						The weekly check couldn't find this address among RentCast's active listings for its ZIP
+						code, so its asking price wasn't refreshed. Check the address matches the listing's.
+					</p>
+				{:else if rc.listingCheckedAt && !rc.listing}
+					<p class="note bad-text">
+						Not listed for sale as of {new Date(rc.listingCheckedAt).toLocaleDateString('en-US')}.
+					</p>
+				{/if}
+				{#if (rc.priceHistory?.length ?? 0) > 1}
+					<p class="note">
+						Asking price history: {(rc.priceHistory ?? [])
+							.map(
+								(p) => `${formatDollars(p.price)} (${new Date(p.date).toLocaleDateString('en-US')})`
+							)
+							.join(' → ')}
+					</p>
+				{/if}
 				<p class="note">
-					Looked up {new Date(rc.lookedUpAt).toLocaleString('en-US')}. Its data can lag Zillow's, so
-					check the numbers against the listing.
+					Looked up {new Date(rc.lookedUpAt).toLocaleString('en-US')}{rc.listingCheckedAt
+						? `; asking price last checked ${new Date(rc.listingCheckedAt).toLocaleDateString('en-US')}`
+						: ''}. The asking price is re-checked weekly. RentCast's data can lag Zillow's, so check
+					the numbers against the listing.
 				</p>
 			</div>
 		{/if}
-		{#if usage?.configured && selected.address}
+		{#if usage?.configured && selected.address && !selected.eliminatedAt}
 			<button
 				type="button"
 				class="secondary"
 				on:click={() => selected && lookup(selected)}
-				disabled={busy}
+				disabled={busy || usage.paused}
+				title={usage.paused ? 'Paused for the month to stay on RentCast’s free plan' : undefined}
 			>
 				{selected.rentcast ? 'Update from RentCast' : 'Look up on RentCast'}
 			</button>
+			{#if usage.paused}
+				<span class="paused small"
+					>⚠ Paused until next month: {usage.used} of {usage.limit} used.</span
+				>
+			{/if}
 		{/if}
 
 		{#if selected.price}
@@ -584,10 +725,15 @@
 		color: #898781;
 	}
 
-	.stars {
-		margin-right: 0.25rem;
-		color: #c98500;
-		letter-spacing: 0.05em;
+	.rating .avg {
+		font-weight: 600;
+		color: #0b0b0b;
+	}
+
+	.flagged,
+	.their-flags {
+		color: #b42318;
+		font-weight: 600;
 	}
 
 	.ratings {
@@ -618,32 +764,21 @@
 		color: #0b0b0b;
 	}
 
-	.scale {
+	.scale,
+	.toggles {
 		display: flex;
-		gap: 0.3rem;
+		gap: 0.25rem;
 	}
 
 	.score {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.05rem;
-		min-width: 4.2rem;
-		padding: 0.35rem 0.4rem;
+		min-width: 2.25rem;
+		padding: 0.4rem 0;
 		background: #fff;
 		border: 1px solid #d5dae1;
 		border-radius: 8px;
 		color: #374151;
-	}
-
-	.score .num {
 		font-weight: 600;
 		font-size: 0.95rem;
-	}
-
-	.score .word {
-		font-size: 0.7rem;
-		color: #6b7280;
 	}
 
 	.score.on {
@@ -652,8 +787,34 @@
 		color: #fff;
 	}
 
-	.score.on .word {
-		color: rgba(255, 255, 255, 0.85);
+	.toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.7rem;
+		background: #fff;
+		border: 1px solid #e3a39d;
+		border-radius: 8px;
+		color: #8a3a33;
+		font-size: 0.85rem;
+		white-space: nowrap;
+	}
+
+	.toggle .box {
+		display: inline-grid;
+		place-items: center;
+		width: 1rem;
+		height: 1rem;
+		border: 1px solid currentColor;
+		border-radius: 3px;
+		font-size: 0.7rem;
+		line-height: 1;
+	}
+
+	.toggle.on {
+		background: #b42318;
+		border-color: #b42318;
+		color: #fff;
 	}
 
 	.comment {
@@ -684,6 +845,76 @@
 
 	.their-comment {
 		color: #6b7280;
+	}
+
+	.banner.warn {
+		background: #fff7e6;
+		color: #8a5a00;
+	}
+
+	.is-eliminated h2 {
+		color: #6b7280;
+		text-decoration: line-through;
+	}
+
+	.eliminate {
+		display: inline-flex;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.4rem;
+		margin-left: auto;
+		font-size: 0.9rem;
+		color: #374151;
+		cursor: pointer;
+	}
+
+	.eliminate input {
+		width: 1rem;
+		height: 1rem;
+	}
+
+	.show-eliminated {
+		margin-top: 1rem;
+	}
+
+	.houses.eliminated {
+		margin-top: 0.85rem;
+	}
+
+	.houses.eliminated li {
+		opacity: 0.75;
+	}
+
+	.card-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0 1rem 0.8rem;
+	}
+
+	.card-actions a {
+		padding: 0;
+	}
+
+	button.mini {
+		margin: 0;
+		padding: 0.25rem 0.7rem;
+		font-size: 0.82rem;
+	}
+
+	.paused {
+		display: inline-block;
+		padding: 0.35rem 0.6rem;
+		background: #fff7e6;
+		border: 1px solid #f0dcae;
+		border-radius: 6px;
+		color: #8a5a00;
+	}
+
+	.paused.small {
+		margin-left: 0.5rem;
+		padding: 0.2rem 0.5rem;
+		font-size: 0.8rem;
 	}
 
 	.rentcast {
@@ -811,17 +1042,21 @@
 			grid-column: 1 / -1;
 		}
 
-		.scale {
+		.scale,
+		.toggles {
 			flex-basis: 100%;
+			flex-wrap: wrap;
 		}
 
+		/* Ten scores in two rows of five on a phone. */
 		.score {
-			flex: 1;
+			flex: 1 0 calc(20% - 0.25rem);
 			min-width: 0;
 		}
 
-		.score .word {
-			display: none;
+		.toggle {
+			flex: 1;
+			justify-content: center;
 		}
 	}
 </style>

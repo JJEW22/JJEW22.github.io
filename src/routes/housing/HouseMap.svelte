@@ -13,7 +13,7 @@
 	import 'leaflet/dist/leaflet.css';
 	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 	import type { CircleMarker, LayerGroup, Map as LeafletMap } from 'leaflet';
-	import { averageRating, formatDollars, type House } from '$lib/housing';
+	import { averageRating, flagSummary, formatDollars, type House } from '$lib/housing';
 
 	export let houses: House[] = [];
 	export let selectedId: number | null = null;
@@ -75,7 +75,8 @@
 			facts.textContent = [
 				h.price !== null ? formatDollars(h.price) : 'No price yet',
 				h.beds !== null ? `${h.beds} bd` : '',
-				avg !== null ? `★ ${avg.toFixed(1)}` : ''
+				avg !== null ? `${avg.toFixed(1)}/10` : '',
+				flagSummary(h)
 			]
 				.filter(Boolean)
 				.join(' · ');

@@ -1,5 +1,7 @@
 # .github/workflows/housing-refresh.yml
-# Re-pulls the /housing data from FRED and Zillow Research once a week.
+# Re-pulls the /housing data from FRED and Zillow Research once a week, then
+# runs the weekly RentCast listing check (asking prices, still listed?) for the
+# houses being considered: one request per ZIP code, capped at 40 a month.
 # Thursday afternoon, after Freddie Mac publishes the weekly mortgage rate (noon
 # ET); Zillow's files only change mid-month, so weekly is more than enough.
 # Admins can also refresh any time from the page.
@@ -41,3 +43,24 @@ jobs:
           cat response.json; echo
           [ "$status" = "200" ] || exit 1
           grep -q '"ok":true' response.json || { echo "::error::a source failed to refresh"; exit 1; }
+
+      # Independent of the FRED/Zillow refresh above, so it runs even if that failed.
+      - name: Check RentCast listings
+        if: always()
+        env:
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+        run: |
+          set -uo pipefail
+          status=$(curl -sS -X POST \
+            -H "x-sync-key: ${SYNC_SECRET}" \
+            -H "content-type: application/json" \
+            -d '{}' \
+            --max-time 300 \
+            -o listings.json -w '%{http_code}' \
+            "https://johnjackwilkins.com/housing/api/admin/listings") || {
+            echo "::error::could not reach the listings endpoint"
+            exit 1
+          }
+          echo "HTTP $status"
+          cat listings.json; echo
+          [ "$status" = "200" ] || exit 1

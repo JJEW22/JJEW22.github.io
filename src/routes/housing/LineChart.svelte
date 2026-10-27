@@ -4,6 +4,11 @@
 	the nearest observation, and the same readout on keyboard focus (arrow keys
 	step through the points). Every value is also in the "Show data" table, so the
 	tooltip never gates anything.
+
+	With `signed`, zero is the line that matters: it is always in view and drawn
+	solid, the series is green above it and red below, and each place it crosses
+	is marked with a point and labelled. A legend names the two colours, so the
+	sign never rests on colour alone.
 -->
 <script lang="ts">
 	import { formatMonth, type Point } from '$lib/housing';
@@ -15,6 +20,10 @@
 	export let tick: (v: number) => string = format;
 	export let dateLabel: (day: string) => string = formatMonth;
 	export let height = 220;
+	export let signed = false;
+	export let crossingLabel = 'Crosses zero';
+	export let positiveLabel = 'Above zero';
+	export let negativeLabel = 'Below zero';
 
 	const M = { top: 12, right: 16, bottom: 26, left: 52 };
 
@@ -28,7 +37,9 @@
 	$: t0 = times[0] ?? 0;
 	$: t1 = times.at(-1) ?? 1;
 	$: values = points.map(([, v]) => v);
-	$: yTicks = niceTicks(Math.min(...values), Math.max(...values));
+	$: yTicks = signed
+		? niceTicks(Math.min(0, ...values), Math.max(0, ...values))
+		: niceTicks(Math.min(...values), Math.max(...values));
 	$: yMin = yTicks[0] ?? 0;
 	$: yMax = yTicks.at(-1) ?? 1;
 
@@ -44,7 +55,70 @@
 		: '';
 	$: xTicks = yearTicks(t0, t1, innerW);
 
+	// Signed mode: the series cut into runs that stay on one side of zero, each
+	// ending exactly on zero where the sign flips, so the colours meet at the
+	// axis instead of overlapping.
+	$: runs = signed ? splitBySign(times, values) : { runs: [], crossings: [] };
+	$: runPaths = runs.runs.map((r) => {
+		const d = r.pts.map(([t, v], i) => `${i ? 'L' : 'M'}${sx(scale, t)},${sy(scale, v)}`).join('');
+		const first = r.pts[0][0];
+		const last = r.pts[r.pts.length - 1][0];
+		const z = sy(scale, 0);
+		return {
+			sign: r.sign,
+			line: d,
+			area: `${d}L${sx(scale, last)},${z}L${sx(scale, first)},${z}Z`
+		};
+	});
+
 	type Scale = typeof scale;
+	type TV = [number, number];
+
+	function splitBySign(
+		ts: number[],
+		vs: number[]
+	): { runs: { sign: 1 | -1; pts: TV[] }[]; crossings: number[] } {
+		const out: { sign: 1 | -1; pts: TV[] }[] = [];
+		const crossings: number[] = [];
+		let cur: { sign: 1 | -1; pts: TV[] } | null = null;
+		for (let i = 0; i < ts.length; i++) {
+			const t = ts[i];
+			const v = vs[i];
+			const sign: 1 | -1 = v >= 0 ? 1 : -1;
+			if (!cur) {
+				cur = { sign, pts: [[t, v]] };
+			} else if (sign === cur.sign) {
+				cur.pts.push([t, v]);
+			} else {
+				// Where the straight line between the two points meets zero.
+				const [pt, pv]: TV = cur.pts[cur.pts.length - 1];
+				const tc: number = pv === v ? t : pt + ((t - pt) * (0 - pv)) / (v - pv);
+				cur.pts.push([tc, 0]);
+				out.push(cur);
+				crossings.push(tc);
+				cur = {
+					sign,
+					pts: [
+						[tc, 0],
+						[t, v]
+					]
+				};
+			}
+		}
+		if (cur) out.push(cur);
+		return { runs: out, crossings };
+	}
+
+	// A crossing's label, kept inside the plot near either edge.
+	function labelAnchor(x: number): 'start' | 'middle' | 'end' {
+		if (x < M.left + 60) return 'start';
+		if (x > M.left + innerW - 60) return 'end';
+		return 'middle';
+	}
+
+	function dayOf(t: number): string {
+		return new Date(t).toISOString().slice(0, 10);
+	}
 
 	function sx(s: Scale, t: number): number {
 		return M.left + (s.t1 === s.t0 ? s.innerW / 2 : ((t - s.t0) / (s.t1 - s.t0)) * s.innerW);
@@ -118,6 +192,15 @@
 		<span class="title">{title}</span>
 		{#if latest}<span class="latest">{format(latest[1])} · {dateLabel(latest[0])}</span>{/if}
 		{#if subtitle}<span class="subtitle">{subtitle}</span>{/if}
+		{#if signed}
+			<span class="legend">
+				<span class="key"><span class="swatch pos"></span>{positiveLabel}</span>
+				<span class="key"><span class="swatch neg"></span>{negativeLabel}</span>
+				{#if runs.crossings.length}
+					<span class="key"><span class="ring"></span>{crossingLabel}</span>
+				{/if}
+			</span>
+		{/if}
 	</figcaption>
 
 	{#if points.length < 2}
@@ -163,15 +246,46 @@
 					y2={M.top + innerH}
 				/>
 
-				<path class="area" d={area} />
-				<path class="line" d={line} />
+				{#if signed}
+					{#each runPaths as r, i (i)}
+						<path class="area" class:pos={r.sign > 0} class:neg={r.sign < 0} d={r.area} />
+					{/each}
+					<line class="zero" x1={M.left} x2={M.left + innerW} y1={sy(scale, 0)} y2={sy(scale, 0)} />
+					{#each runPaths as r, i (i)}
+						<path class="line" class:pos={r.sign > 0} class:neg={r.sign < 0} d={r.line} />
+					{/each}
+				{:else}
+					<path class="area" d={area} />
+					<path class="line" d={line} />
+				{/if}
 
 				{#if latest && active === null}
-					<circle class="dot" cx={sx(scale, t1)} cy={sy(scale, latest[1])} r="4" />
+					<circle
+						class="dot"
+						class:pos={signed && latest[1] >= 0}
+						class:neg={signed && latest[1] < 0}
+						cx={sx(scale, t1)}
+						cy={sy(scale, latest[1])}
+						r="4"
+					/>
 				{/if}
+				{#each runs.crossings as tc (tc)}
+					{@const cx = sx(scale, tc)}
+					<circle class="crossing" {cx} cy={sy(scale, 0)} r="5" />
+					<text class="crossing-label" x={cx} y={sy(scale, 0) - 10} text-anchor={labelAnchor(cx)}>
+						{crossingLabel} · {dateLabel(dayOf(tc))}
+					</text>
+				{/each}
 				{#if activePoint && active !== null}
 					<line class="crosshair" x1={tipLeft} x2={tipLeft} y1={M.top} y2={M.top + innerH} />
-					<circle class="dot" cx={tipLeft} cy={sy(scale, activePoint[1])} r="4" />
+					<circle
+						class="dot"
+						class:pos={signed && activePoint[1] >= 0}
+						class:neg={signed && activePoint[1] < 0}
+						cx={tipLeft}
+						cy={sy(scale, activePoint[1])}
+						r="4"
+					/>
 				{/if}
 			</svg>
 
@@ -203,6 +317,8 @@
 	.chart {
 		--surface: #fcfcfb;
 		--series: #2a78d6;
+		--good: #0ca30c;
+		--bad: #d03b3b;
 		--ink: #0b0b0b;
 		--ink-2: #52514e;
 		--muted: #898781;
@@ -290,6 +406,91 @@
 		fill: var(--series);
 		stroke: var(--surface);
 		stroke-width: 2;
+	}
+
+	.line.pos,
+	.area.pos,
+	.dot.pos {
+		stroke: var(--good);
+		fill: var(--good);
+	}
+
+	.line.neg,
+	.area.neg,
+	.dot.neg {
+		stroke: var(--bad);
+		fill: var(--bad);
+	}
+
+	.line.pos,
+	.line.neg {
+		fill: none;
+	}
+
+	.area.pos,
+	.area.neg {
+		stroke: none;
+	}
+
+	.dot.pos,
+	.dot.neg {
+		stroke: var(--surface);
+	}
+
+	.zero {
+		stroke: var(--ink-2);
+		stroke-width: 1.25;
+	}
+
+	.crossing {
+		fill: var(--ink);
+		stroke: var(--surface);
+		stroke-width: 2;
+	}
+
+	.crossing-label {
+		fill: var(--ink);
+		font-size: 11px;
+		font-weight: 600;
+		paint-order: stroke;
+		stroke: var(--surface);
+		stroke-width: 3px;
+	}
+
+	.legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.2rem 0.9rem;
+		flex-basis: 100%;
+		color: var(--ink-2);
+		font-size: 0.8rem;
+	}
+
+	.key {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.swatch {
+		width: 14px;
+		height: 2px;
+		border-radius: 1px;
+	}
+
+	.swatch.pos {
+		background: var(--good);
+	}
+
+	.swatch.neg {
+		background: var(--bad);
+	}
+
+	.ring {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--ink);
 	}
 
 	.crosshair {

@@ -179,24 +179,48 @@ export interface House {
 	lat: number | null;
 	lng: number | null;
 	ratings: Rating[];
+	// Set when someone eliminated it: off the main list and the map, and skipped
+	// by the weekly listing check, until restored.
+	eliminatedAt: string | null;
+	eliminatedBy: string | null;
 	addedBy: string | null;
 	createdAt: string;
 }
 
-// One admin's feeling about a house, 1 (no) to 5 (love it).
+// One admin's feeling about a house: a score from 1 to 10, plus two
+// independent toggles. Both on means they'd neither buy nor rent it. The
+// toggles are flags beside the score, not part of it, so the average is only
+// ever an average of scores.
 export interface Rating {
 	userId: number;
 	name: string;
 	score: number;
+	wouldntBuy: boolean;
+	wouldntRent: boolean;
 	comment: string;
 	updatedAt: string;
 }
 
-export const RATING_LABELS = ['', 'No', 'Not really', 'Maybe', 'Like it', 'Love it'];
+export const RATING_MAX = 10;
+
+export const RATING_FLAGS = [
+	{ key: 'wouldntBuy', label: "Wouldn't buy" },
+	{ key: 'wouldntRent', label: "Wouldn't rent" }
+] as const;
+export type RatingFlag = (typeof RATING_FLAGS)[number]['key'];
 
 export function averageRating(h: House): number | null {
 	if (!h.ratings.length) return null;
 	return h.ratings.reduce((s, r) => s + r.score, 0) / h.ratings.length;
+}
+
+// "2 wouldn't buy, 1 wouldn't rent", for a house's card and map pin. Empty
+// when no one flagged it.
+export function flagSummary(h: House): string {
+	return RATING_FLAGS.map((f) => [f, h.ratings.filter((r) => r[f.key]).length] as const)
+		.filter(([, n]) => n)
+		.map(([f, n]) => `${n} ${f.label.toLowerCase()}`)
+		.join(', ');
 }
 
 // What a Zillow link tells us without fetching it. A listing URL looks like
@@ -221,9 +245,13 @@ export function parseZillowUrl(
 	const slug = i >= 0 ? parts[i + 1] : undefined;
 	let address: string | null = null;
 	if (slug && !slug.endsWith('_zpid')) {
-		// "...-Boston-MA-02130": the state and ZIP are always the last two pieces.
-		const m = slug.match(/^(.*)-([A-Z]{2})-(\d{5})$/);
-		address = m ? `${splitStreetCity(m[1].split('-'))}, ${m[2]} ${m[3]}` : slug.replace(/-/g, ' ');
+		// "...-Boston-MA-02130": the state and ZIP are the last two pieces. Some
+		// links stop at the state ("...-Jamaica-Plain-MA"); the geocoder adds the
+		// ZIP later (see locatePending).
+		const m = slug.match(/^(.*)-([A-Z]{2})(?:-(\d{5}))?$/);
+		address = m
+			? `${splitStreetCity(m[1].split('-'))}, ${m[2]}${m[3] ? ` ${m[3]}` : ''}`
+			: slug.replace(/-/g, ' ');
 	}
 	// Tracking parameters and fragments are dropped, so the stored link is the
 	// listing and nothing else.
@@ -236,13 +264,16 @@ const STREET_SUFFIXES = new Set(
 		'pkwy parkway cir circle sq square hwy row park plz path trl aly alley xing loop'
 	).split(' ')
 );
-const UNIT_WORDS = new Set(['apt', 'unit', 'ste', 'fl', '#']);
+const UNIT_WORDS = new Set(['apt', 'unit', 'ste', 'fl', '#', 'building', 'bldg']);
 
 // The slug has no comma between street and city ("66 Round Hill St Boston"),
 // and RentCast wants "Street, City". The street ends at its last suffix (St,
-// Ave, Ter, ...) plus any unit after it; whatever follows is the city. With no
-// recognizable suffix the words are returned as they came.
-function splitStreetCity(words: string[]): string {
+// Ave, Ter, ...) plus any unit after it; whatever follows is the city. A unit
+// can be named ("Apt 2", "Building 1") or bare ("5-Wise-St-1-Jamaica-Plain" is
+// unit 1, not a city called "1 Jamaica Plain"). With no recognizable suffix the
+// words are returned as they came.
+function splitStreetCity(input: string[]): string {
+	const words = [...input];
 	let end = -1;
 	for (let i = words.length - 2; i >= 0; i--) {
 		if (STREET_SUFFIXES.has(words[i].toLowerCase())) {
@@ -251,7 +282,13 @@ function splitStreetCity(words: string[]): string {
 		}
 	}
 	if (end < 0) return words.join(' ');
-	if (UNIT_WORDS.has(words[end + 1]?.toLowerCase()) && end + 3 < words.length) end += 2;
+	const next = words[end + 1];
+	if (UNIT_WORDS.has(next?.toLowerCase()) && end + 3 < words.length) {
+		end += 2;
+	} else if (next && /^(\d+[a-z]?|[a-z])$/i.test(next) && end + 2 < words.length) {
+		words.splice(end + 1, 0, 'Unit');
+		end += 2;
+	}
 	return `${words.slice(0, end + 1).join(' ')}, ${words.slice(end + 1).join(' ')}`;
 }
 
@@ -275,6 +312,13 @@ export interface RentcastDetails {
 	annualTax: { year: number; total: number } | null;
 	calls: number;
 	errors: string[];
+	// Written by the weekly listing check, which only refreshes `listing`.
+	// Optional: a lookup made before the check existed has neither.
+	listingCheckedAt?: string;
+	priceHistory?: { date: string; price: number }[];
+	// The last check couldn't pair this house with any listing in its ZIP code,
+	// which says more about the address than about whether it's for sale.
+	listingUnmatched?: boolean;
 }
 
 // The analysis defaults a house supplies, ahead of the generic ones and behind
@@ -582,11 +626,13 @@ export function formatDollars(value: number): string {
 }
 
 // Compact axis ticks: $450K, $1.2M, 1.5K.
+// The sign goes before the prefix: −$100K, not $-100K.
 export function compact(value: number, prefix = ''): string {
 	const abs = Math.abs(value);
-	if (abs >= 1e6) return `${prefix}${trim(value / 1e6)}M`;
-	if (abs >= 1e3) return `${prefix}${trim(value / 1e3)}K`;
-	return `${prefix}${trim(value)}`;
+	const sign = value < 0 ? '−' : '';
+	if (abs >= 1e6) return `${sign}${prefix}${trim(abs / 1e6)}M`;
+	if (abs >= 1e3) return `${sign}${prefix}${trim(abs / 1e3)}K`;
+	return `${sign}${prefix}${trim(abs)}`;
 }
 
 function trim(n: number): string {

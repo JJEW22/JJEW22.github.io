@@ -318,6 +318,10 @@
 			points={monthsFromNow(result.rows, (r) => r.advantage)}
 			format={(v) => ahead(v)}
 			tick={(v) => compact(v, '$')}
+			signed
+			crossingLabel="Break-even"
+			positiveLabel="Buying is better"
+			negativeLabel="Renting is better"
 		/>
 	</div>
 

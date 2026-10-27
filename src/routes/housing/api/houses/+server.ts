@@ -7,6 +7,7 @@
 //   POST   { url, ...fields }    add one by its Zillow link, then look it up
 //                                on RentCast (when RENTCAST_API_KEY is set)
 //   PATCH  { id, ...fields }     edit details, notes, or saved assumptions
+//   PATCH  { id, eliminated }    eliminate (true) or restore (false) a house
 //   DELETE { id }                remove one
 //
 // Looking an existing house up again is ./lookup; rating one is ./rating.
@@ -17,7 +18,10 @@ import {
 	deleteHouse,
 	readFields,
 	refreshFromRentcast,
+	setEliminated,
 	rentcastConfigured,
+	rentcastPausedMessage,
+	rentcastUsage,
 	updateHouse
 } from '$lib/server/housing';
 import { idOf, respond } from './respond';
@@ -40,6 +44,8 @@ export const POST: RequestHandler = async ({ url, locals, request }) => {
 			readFields(body)
 		);
 		if (!rentcastConfigured()) return 'Added. Set RENTCAST_API_KEY to fill in the details.';
+		const usage = await rentcastUsage();
+		if (usage.paused) return `Added. ${rentcastPausedMessage(usage.used)}`;
 		// The house is in either way; a lookup that fails only costs the details.
 		try {
 			return `Added. ${await refreshFromRentcast(id, false)}`;
@@ -52,7 +58,14 @@ export const POST: RequestHandler = async ({ url, locals, request }) => {
 export const PATCH: RequestHandler = async ({ url, locals, request }) => {
 	requireAdmin(locals.user, url, HOUSING_ADMIN_ROLE, request.headers);
 	const body = await request.json().catch(() => null);
-	return respond(async () => updateHouse(idOf(body), readFields(body)), locals.user?.id ?? null);
+	const me = locals.user?.id ?? null;
+	return respond(async () => {
+		if (typeof body?.eliminated === 'boolean') {
+			await setEliminated(idOf(body), me, body.eliminated);
+			return body.eliminated ? 'Eliminated. It is off the list and won’t be synced.' : 'Restored.';
+		}
+		await updateHouse(idOf(body), readFields(body));
+	}, me);
 };
 
 export const DELETE: RequestHandler = async ({ url, locals, request }) => {
