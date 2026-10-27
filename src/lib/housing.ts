@@ -404,8 +404,11 @@ export interface RentcastDetails {
 //   Boston FY2026:    $351,108 x $12.40 / $1,000 = $4,353.74
 //   Cambridge FY2026: $510,208 x  $6.67 / $1,000 = $3,403.09
 //   Somerville FY2026: $416,961 x $10.98 / $1,000 = $4,578 (the city's own figure)
+//   Brookline FY2026:  $354,974 x $10.24 / $1,000 = $3,634.93 (a 20% exemption;
+//                      the town's worksheet rounds it to $3,635)
 // Sources: boston.gov FY26 tax classification order; cambridgema.gov FY26
-// property tax update; somervillema.gov FY2026 property tax update mailer.
+// property tax update; somervillema.gov FY2026 property tax update mailer;
+// brooklinema.gov FY2026 tax rates and residential exemption worksheet.
 // Update these when the next fiscal year's are set.
 export interface TaxJurisdiction {
 	name: string;
@@ -414,10 +417,14 @@ export interface TaxJurisdiction {
 	exemption: number; // annual $ off an owner-occupant's bill
 }
 
-export const TAX_JURISDICTIONS: Record<'boston' | 'cambridge' | 'somerville', TaxJurisdiction> = {
+export const TAX_JURISDICTIONS: Record<
+	'boston' | 'cambridge' | 'somerville' | 'brookline',
+	TaxJurisdiction
+> = {
 	boston: { name: 'Boston', fiscalYear: 'FY2026', ratePct: 1.24, exemption: 4353.74 },
 	cambridge: { name: 'Cambridge', fiscalYear: 'FY2026', ratePct: 0.667, exemption: 3403.09 },
-	somerville: { name: 'Somerville', fiscalYear: 'FY2026', ratePct: 1.098, exemption: 4578 }
+	somerville: { name: 'Somerville', fiscalYear: 'FY2026', ratePct: 1.098, exemption: 4578 },
+	brookline: { name: 'Brookline', fiscalYear: 'FY2026', ratePct: 1.024, exemption: 3634.93 }
 };
 
 // ZIP codes entirely inside each city. 02467 (Chestnut Hill) is left out on
@@ -431,6 +438,7 @@ const BOSTON_ZIPS = new Set(
 );
 const CAMBRIDGE_ZIPS = new Set(['02138', '02139', '02140', '02141', '02142', '02238']);
 const SOMERVILLE_ZIPS = new Set(['02143', '02144', '02145']);
+const BROOKLINE_ZIPS = new Set(['02445', '02446', '02447']);
 
 // Boston's neighbourhoods go by their own names in addresses ("Jamaica Plain,
 // MA"), so a ZIP-less address is matched on those too.
@@ -449,10 +457,12 @@ export function taxJurisdiction(address: string | null): TaxJurisdiction | null 
 		if (BOSTON_ZIPS.has(zip)) return TAX_JURISDICTIONS.boston;
 		if (CAMBRIDGE_ZIPS.has(zip)) return TAX_JURISDICTIONS.cambridge;
 		if (SOMERVILLE_ZIPS.has(zip)) return TAX_JURISDICTIONS.somerville;
+		if (BROOKLINE_ZIPS.has(zip)) return TAX_JURISDICTIONS.brookline;
 		return null;
 	}
 	const city = (address.split(',').at(-2) ?? '').trim().toLowerCase();
 	if (city === 'cambridge') return TAX_JURISDICTIONS.cambridge;
+	if (city === 'brookline') return TAX_JURISDICTIONS.brookline;
 	if (city === 'somerville' || city === 'west somerville' || city === 'east somerville') {
 		return TAX_JURISDICTIONS.somerville;
 	}
