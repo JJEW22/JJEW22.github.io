@@ -1,7 +1,8 @@
 <!-- src/routes/housing/HouseAnalysis.svelte -->
 <!--
 	The buy-vs-rent cost analysis for one house, laid out like the "Buy vs Rent
-	analysis" sheet: the cost lines with yearly / monthly / per-person columns,
+	analysis" sheet: the cost lines with yearly / monthly / per-person /
+	per-bedroom columns,
 	then year by year what owning has cost against what renting would have. All
 	the math is analyze() in $lib/housing; this only collects the assumptions and
 	shows the result.
@@ -13,10 +14,12 @@
 	import { createEventDispatcher } from 'svelte';
 	import LineChart from './LineChart.svelte';
 	import {
+		ASSUMPTION_LABELS,
 		DEFAULT_ASSUMPTIONS,
 		analyze,
 		compact,
 		formatDollars,
+		houseDefaults,
 		monthsFromNow,
 		type Assumptions,
 		type House
@@ -76,30 +79,42 @@
 			]
 		},
 		{
+			title: 'Bedrooms',
+			fields: [
+				{ key: 'bedrooms', label: 'Bedrooms', step: 1 },
+				{ key: 'people', label: 'People splitting costs', step: 1, hint: 'one bedroom each' },
+				{ key: 'roomRent', label: 'Rent per bedroom $ / mo', step: 25, hint: 'for the rest' },
+				{ key: 'rentalIncome', label: 'Other rental income $ / mo', step: 50, hint: 'a unit' }
+			]
+		},
+		{
 			title: 'The house',
 			fields: [
 				{ key: 'appreciationPct', label: 'Appreciation % / yr', step: 0.1 },
-				{ key: 'people', label: 'People splitting costs', step: 1 },
-				{ key: 'rentalIncome', label: 'Rental income $ / mo', step: 50, hint: 'rooms or a unit' },
 				{ key: 'horizonYears', label: 'Years to model', step: 1 }
 			]
 		}
 	];
 
 	let a: Assumptions = initial(house, marketRate);
-	let loadedFor = house.id;
+	// A house and the figures its defaults came from (bedrooms, price, the
+	// RentCast lookup). Changing any of them re-seeds the inputs, so a corrected
+	// bedroom count or a fresh rent estimate shows up at once.
+	const keyOf = (h: House) => `${h.id}:${h.beds}:${h.price}:${h.rentcast?.lookedUpAt ?? ''}`;
+	let loadedFor = keyOf(house);
 
 	function initial(h: House, rate: number | null): Assumptions {
 		return {
 			...DEFAULT_ASSUMPTIONS,
 			...(rate !== null ? { ratePct: Number(rate.toFixed(2)) } : {}),
+			...houseDefaults(h),
 			...(h.assumptions ?? {})
 		};
 	}
 
 	// Switching houses swaps in that house's saved assumptions.
-	$: if (house.id !== loadedFor) {
-		loadedFor = house.id;
+	$: if (keyOf(house) !== loadedFor) {
+		loadedFor = keyOf(house);
 		a = initial(house, marketRate);
 	}
 
@@ -112,11 +127,28 @@
 		])
 	) as unknown as Assumptions;
 
+	$: fromHouse = Object.keys(houseDefaults(house)).map(
+		(k) => ASSUMPTION_LABELS[k as keyof Assumptions] ?? k
+	);
 	$: result = analyze(price, clean);
-	$: people = Math.max(1, Math.round(clean.people));
+	$: people = result.people;
+	$: bedrooms = result.bedrooms;
+	// Per-bedroom figures leave out rental income: what each bedroom costs before
+	// any rent comes in from the others, to set against the rent per bedroom.
+	$: gross = result.lines.filter((l) => l.monthly > 0).reduce((t, l) => t + l.monthly, 0);
+	$: grossNonEquity =
+		gross - (result.lines.find((l) => l.label === 'Mortgage principal')?.monthly ?? 0);
 	$: last = result.rows.at(-1);
 	$: yearly = result.rows.filter((r) => r.month % 12 === 0);
 	$: dirty = JSON.stringify(clean) !== JSON.stringify(initial(house, marketRate));
+
+	// "Bedrooms, people splitting and tax rate": a list that reads as a sentence.
+	function sentenceList(labels: string[]): string {
+		const words = labels.map((l, i) => (i ? l.toLowerCase() : l));
+		return words.length > 1
+			? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
+			: words.join('');
+	}
 
 	function advantageAt(rows: typeof result.rows, years: number): number | null {
 		return rows[years * 12 - 1]?.advantage ?? null;
@@ -153,6 +185,20 @@
 		{/each}
 	</div>
 
+	<p class="note">
+		{people}
+		{people === 1 ? 'person' : 'people'} splitting {bedrooms === 1
+			? 'the bedroom'
+			: `${bedrooms} bedrooms`}{result.roomsRented
+			? `, renting the other ${result.roomsRented} at ${formatDollars(clean.roomRent)}`
+			: ''}.
+		{#if fromHouse.length}
+			{sentenceList(fromHouse)} start from this house's details{house.rentcast
+				? ' and RentCast'
+				: ''}{house.assumptions ? ', unless saved assumptions say otherwise' : ''}.
+		{/if}
+	</p>
+
 	<div class="actions">
 		<button type="button" on:click={() => dispatch('save', clean)} disabled={busy}>
 			Save assumptions for this house
@@ -188,6 +234,13 @@
 			</span>
 		</div>
 		<div class="tile">
+			<span class="label">Monthly cost per bedroom</span>
+			<span class="value">{formatDollars(gross / bedrooms)}</span>
+			<span class="delta">
+				before rent from other rooms · rent per bedroom {formatDollars(clean.roomRent)}
+			</span>
+		</div>
+		<div class="tile">
 			<span class="label">Rent instead</span>
 			<span class="value">{formatDollars(clean.rent)}</span>
 			<span class="delta">per person, month one</span>
@@ -218,6 +271,7 @@
 					<th>Yearly</th>
 					<th>Monthly</th>
 					<th>Per person</th>
+					<th>Per bedroom</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -228,6 +282,7 @@
 						<td>{formatDollars(l.monthly * 12)}</td>
 						<td>{formatDollars(l.monthly)}</td>
 						<td>{formatDollars(l.monthly / people)}</td>
+						<td>{l.monthly > 0 ? formatDollars(l.monthly / bedrooms) : '—'}</td>
 					</tr>
 				{/each}
 			</tbody>
@@ -238,6 +293,7 @@
 					<td>{formatDollars(result.totalMonthly * 12)}</td>
 					<td>{formatDollars(result.totalMonthly)}</td>
 					<td>{formatDollars(result.totalMonthly / people)}</td>
+					<td>{formatDollars(gross / bedrooms)}</td>
 				</tr>
 				<tr>
 					<th>Excluding principal</th>
@@ -245,6 +301,7 @@
 					<td>{formatDollars(result.nonEquityMonthly * 12)}</td>
 					<td>{formatDollars(result.nonEquityMonthly)}</td>
 					<td>{formatDollars(result.nonEquityMonthly / people)}</td>
+					<td>{formatDollars(grossNonEquity / bedrooms)}</td>
 				</tr>
 			</tfoot>
 		</table>

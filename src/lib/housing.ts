@@ -175,8 +175,28 @@ export interface House {
 	sqft: number | null;
 	notes: string;
 	assumptions: Partial<Assumptions> | null;
+	rentcast: RentcastDetails | null;
+	lat: number | null;
+	lng: number | null;
+	ratings: Rating[];
 	addedBy: string | null;
 	createdAt: string;
+}
+
+// One admin's feeling about a house, 1 (no) to 5 (love it).
+export interface Rating {
+	userId: number;
+	name: string;
+	score: number;
+	comment: string;
+	updatedAt: string;
+}
+
+export const RATING_LABELS = ['', 'No', 'Not really', 'Maybe', 'Like it', 'Love it'];
+
+export function averageRating(h: House): number | null {
+	if (!h.ratings.length) return null;
+	return h.ratings.reduce((s, r) => s + r.score, 0) / h.ratings.length;
 }
 
 // What a Zillow link tells us without fetching it. A listing URL looks like
@@ -203,12 +223,97 @@ export function parseZillowUrl(
 	if (slug && !slug.endsWith('_zpid')) {
 		// "...-Boston-MA-02130": the state and ZIP are always the last two pieces.
 		const m = slug.match(/^(.*)-([A-Z]{2})-(\d{5})$/);
-		address = m ? `${m[1].replace(/-/g, ' ')}, ${m[2]} ${m[3]}` : slug.replace(/-/g, ' ');
+		address = m ? `${splitStreetCity(m[1].split('-'))}, ${m[2]} ${m[3]}` : slug.replace(/-/g, ' ');
 	}
 	// Tracking parameters and fragments are dropped, so the stored link is the
 	// listing and nothing else.
 	return { url: `https://www.zillow.com${u.pathname}`, zpid, address };
 }
+
+const STREET_SUFFIXES = new Set(
+	(
+		'st street ave avenue rd road dr drive ln lane way ter terrace pl place ct court blvd ' +
+		'pkwy parkway cir circle sq square hwy row park plz path trl aly alley xing loop'
+	).split(' ')
+);
+const UNIT_WORDS = new Set(['apt', 'unit', 'ste', 'fl', '#']);
+
+// The slug has no comma between street and city ("66 Round Hill St Boston"),
+// and RentCast wants "Street, City". The street ends at its last suffix (St,
+// Ave, Ter, ...) plus any unit after it; whatever follows is the city. With no
+// recognizable suffix the words are returned as they came.
+function splitStreetCity(words: string[]): string {
+	let end = -1;
+	for (let i = words.length - 2; i >= 0; i--) {
+		if (STREET_SUFFIXES.has(words[i].toLowerCase())) {
+			end = i;
+			break;
+		}
+	}
+	if (end < 0) return words.join(' ');
+	if (UNIT_WORDS.has(words[end + 1]?.toLowerCase()) && end + 3 < words.length) end += 2;
+	return `${words.slice(0, end + 1).join(' ')}, ${words.slice(end + 1).join(' ')}`;
+}
+
+// What RentCast knew about a house when it was last looked up. Normalized from
+// its four endpoints, so the page never deals with RentCast's own shapes. A
+// field is null when RentCast had nothing for it.
+export interface RentcastDetails {
+	lookedUpAt: string;
+	matchedAddress: string | null;
+	listing: { price: number; status: string; listedDate: string | null } | null;
+	valueEstimate: { price: number; low: number | null; high: number | null } | null;
+	rentEstimate: { rent: number; low: number | null; high: number | null } | null;
+	propertyType: string | null;
+	beds: number | null;
+	baths: number | null;
+	sqft: number | null;
+	lotSize: number | null;
+	yearBuilt: number | null;
+	lastSale: { price: number; date: string | null } | null;
+	hoaMonthly: number | null;
+	annualTax: { year: number; total: number } | null;
+	calls: number;
+	errors: string[];
+}
+
+// The analysis defaults a house supplies, ahead of the generic ones and behind
+// anything saved:
+//   - bedrooms and people splitting both start at the bedroom count, since the
+//     per-bedroom figure is the one that always matters;
+//   - rent per bedroom is RentCast's whole-house rent estimate split by
+//     bedrooms, and it is also the default rent a person pays renting instead;
+//   - HOA and the tax rate come from RentCast's property record.
+// Rooms not taken by the people splitting are rented out at the per-bedroom
+// rent (see analyze), so lowering "people splitting" adds rental income.
+export function houseDefaults(h: Pick<House, 'beds' | 'price' | 'rentcast'>): Partial<Assumptions> {
+	const out: Partial<Assumptions> = {};
+	const beds = h.beds !== null ? Math.max(1, Math.round(h.beds)) : null;
+	if (beds) {
+		out.bedrooms = beds;
+		out.people = beds;
+	}
+	const d = h.rentcast;
+	if (d?.rentEstimate) {
+		const perRoom = Math.round(d.rentEstimate.rent / (beds ?? 1));
+		out.roomRent = perRoom;
+		out.rent = perRoom;
+	}
+	if (d?.hoaMonthly) out.hoaMonthly = Math.round(d.hoaMonthly);
+	if (d?.annualTax && h.price) {
+		out.taxPct = Number(((d.annualTax.total / h.price) * 100).toFixed(2));
+	}
+	return out;
+}
+
+export const ASSUMPTION_LABELS: Partial<Record<keyof Assumptions, string>> = {
+	bedrooms: 'Bedrooms',
+	people: 'People splitting',
+	roomRent: 'Rent per bedroom',
+	rent: 'Rent instead',
+	hoaMonthly: 'HOA',
+	taxPct: 'Tax rate'
+};
 
 // --- cost analysis ---
 //
@@ -243,8 +348,10 @@ export interface Assumptions {
 	rent: number; // monthly rent you'd pay instead, per person
 	rentGrowthPct: number; // annual, applied once a year
 	investReturnPct: number; // annual return on money not put into the house
-	people: number; // owners splitting the costs
-	rentalIncome: number; // monthly rent collected (rooms, a unit), total
+	bedrooms: number;
+	people: number; // owners splitting the costs, each taking a bedroom
+	roomRent: number; // monthly rent per bedroom, charged for the rooms left over
+	rentalIncome: number; // other monthly rent collected (a unit, parking), total
 	horizonYears: number;
 }
 
@@ -266,10 +373,12 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
 	renoRoiPct: 70,
 	appreciationPct: 3,
 	sellingPct: 4,
-	rent: 2000,
+	rent: 1225,
 	rentGrowthPct: 3.5,
 	investReturnPct: 8.5,
+	bedrooms: 1,
 	people: 1,
+	roomRent: 1225,
 	rentalIncome: 0,
 	horizonYears: 30
 };
@@ -305,6 +414,9 @@ export interface Analysis {
 	lines: CostLine[]; // month one
 	totalMonthly: number; // month one, whole house
 	nonEquityMonthly: number; // month one, whole house
+	bedrooms: number;
+	people: number;
+	roomsRented: number; // bedrooms not taken by the people splitting
 	rows: MonthRow[];
 	breakEvenMonth: number | null; // first month buying is ahead, if any
 }
@@ -312,6 +424,11 @@ export interface Analysis {
 export function analyze(price: number, input: Partial<Assumptions> = {}): Analysis {
 	const a = { ...DEFAULT_ASSUMPTIONS, ...input };
 	const people = Math.max(1, Math.round(a.people));
+	const bedrooms = Math.max(1, Math.round(a.bedrooms));
+	// Each person splitting takes a bedroom; the rest are rented out. More
+	// people than bedrooms (a couple sharing) just means none are.
+	const roomsRented = Math.max(bedrooms - people, 0);
+	const roomIncome = roomsRented * a.roomRent;
 	const n = Math.round(a.termYears * 12);
 	const r = a.ratePct / 100 / 12;
 	const down = (price * a.downPct) / 100;
@@ -350,7 +467,12 @@ export function analyze(price: number, input: Partial<Assumptions> = {}): Analys
 			monthly: pmiWhile
 		},
 		{ label: 'Utilities', rate: 'flat', monthly: a.utilitiesMonthly },
-		{ label: 'Rental income', rate: 'flat', monthly: -a.rentalIncome }
+		{
+			label: roomsRented === 1 ? 'Rent from 1 bedroom' : `Rent from ${roomsRented} bedrooms`,
+			rate: `${roomsRented} × ${formatDollars(a.roomRent)}`,
+			monthly: -roomIncome
+		},
+		{ label: 'Other rental income', rate: 'flat', monthly: -a.rentalIncome }
 	];
 	const totalMonthly = lines.reduce((s, l) => s + l.monthly, 0);
 
@@ -367,7 +489,7 @@ export function analyze(price: number, input: Partial<Assumptions> = {}): Analys
 		const yearsIn = Math.floor((m - 1) / 12);
 		const growth = Math.pow(1 + a.rentGrowthPct / 100, yearsIn);
 		const rent = a.rent * growth;
-		const income = a.rentalIncome * growth;
+		const income = (roomIncome + a.rentalIncome) * growth;
 
 		const interest = m <= n ? balance * r : 0;
 		const principal = m <= n ? Math.min(payment - interest, balance) : 0;
@@ -421,6 +543,9 @@ export function analyze(price: number, input: Partial<Assumptions> = {}): Analys
 		lines,
 		totalMonthly,
 		nonEquityMonthly: totalMonthly - (payment - firstInterest),
+		bedrooms,
+		people,
+		roomsRented,
 		rows,
 		breakEvenMonth
 	};
@@ -450,8 +575,10 @@ export function formatValue(value: number, format: FredSeries['format']): string
 	}
 }
 
+// −$2,400 rather than $-2,400. Rounds first, so −0.4 reads as $0.
 export function formatDollars(value: number): string {
-	return `$${Math.round(value).toLocaleString('en-US')}`;
+	const n = Math.round(value);
+	return `${n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString('en-US')}`;
 }
 
 // Compact axis ticks: $450K, $1.2M, 1.5K.

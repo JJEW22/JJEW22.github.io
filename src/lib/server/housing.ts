@@ -17,7 +17,9 @@ import {
 	parseZillowUrl,
 	type Assumptions,
 	type House,
-	type Point
+	type Point,
+	type Rating,
+	type RentcastDetails
 } from '$lib/housing';
 
 // site:admin implies this one, via hasRole().
@@ -325,6 +327,10 @@ interface HouseRow {
 	sqft: number | null;
 	notes: string;
 	assumptions: Partial<Assumptions> | null;
+	rentcast: RentcastDetails | null;
+	lat: number | null;
+	lng: number | null;
+	ratings: Rating[];
 	added_by_name: string | null;
 	created_at: Date;
 }
@@ -343,15 +349,33 @@ function toHouse(r: HouseRow): House {
 		sqft: r.sqft,
 		notes: r.notes,
 		assumptions: r.assumptions,
+		rentcast: r.rentcast,
+		lat: r.lat,
+		lng: r.lng,
+		ratings: r.ratings ?? [],
 		addedBy: r.added_by_name,
 		createdAt: new Date(r.created_at).toISOString()
 	};
 }
 
 export async function listHouses(): Promise<House[]> {
+	await locatePending();
 	const rows = await sql<HouseRow[]>`
 		select h.id, h.url, h.zpid, h.address, h.price, h.beds, h.baths, h.sqft, h.notes,
-		       h.assumptions, coalesce(u.real_name, u.username) as added_by_name, h.created_at
+		       h.assumptions, h.rentcast, h.lat, h.lng,
+		       coalesce((
+		           select json_agg(json_build_object(
+		                      'userId', r.user_id,
+		                      'name', coalesce(ru.real_name, ru.username),
+		                      'score', r.score,
+		                      'comment', r.comment,
+		                      'updatedAt', r.updated_at
+		                  ) order by r.updated_at desc)
+		           from housing_house_ratings r join users ru on ru.id = r.user_id
+		           where r.house_id = h.id
+		       ), '[]') as ratings,
+		       coalesce(u.real_name, u.username) as added_by_name,
+		       h.created_at
 		from housing_houses h
 		left join users u on u.id = h.added_by
 		order by h.created_at desc
@@ -421,11 +445,11 @@ export async function addHouse(
 	userId: number | null,
 	rawUrl: string,
 	fields: HouseFields
-): Promise<void> {
+): Promise<number> {
 	const parsed = parseZillowUrl(rawUrl);
 	if (!parsed) throw new HouseError('That is not a Zillow link.');
 	try {
-		await sql`
+		const [row] = await sql<{ id: string | number }[]>`
 			insert into housing_houses
 				(url, zpid, address, price, beds, baths, sqft, notes, assumptions, added_by)
 			values (
@@ -434,7 +458,9 @@ export async function addHouse(
 				${fields.sqft ?? null}, ${fields.notes ?? ''},
 				${fields.assumptions ? sql.json(fields.assumptions as never) : null}, ${userId}
 			)
+			returning id
 		`;
+		return Number(row.id);
 	} catch (err) {
 		if (isUniqueViolation(err)) throw new HouseError('That house is already on the list.', 409);
 		throw err;
@@ -449,6 +475,12 @@ export async function updateHouse(id: number, fields: HouseFields): Promise<void
 	if ('assumptions' in fields) {
 		set.assumptions = fields.assumptions ? sql.json(fields.assumptions as never) : null;
 	}
+	// A new address needs placing on the map again; the next list does it.
+	if ('address' in fields) {
+		set.lat = null;
+		set.lng = null;
+		set.geocoded_at = null;
+	}
 	if (!Object.keys(set).length) return;
 	const rows = await sql`
 		update housing_houses set ${sql(set)}, updated_at = now() where id = ${id} returning id
@@ -458,4 +490,279 @@ export async function updateHouse(id: number, fields: HouseFields): Promise<void
 
 export async function deleteHouse(id: number): Promise<void> {
 	await sql`delete from housing_houses where id = ${id}`;
+}
+
+// --- RentCast ---
+//
+// Zillow won't serve its listing pages to a server, so the details come from
+// RentCast instead, looked up by the address in the Zillow link. Each lookup
+// spends 3-4 of the free plan's 50 requests a month: the sale listing (asking
+// price), the property record (beds, baths, taxes, HOA), the rent estimate, and
+// a value estimate only when the home isn't listed for sale.
+
+const RENTCAST_BASE = 'https://api.rentcast.io/v1';
+export const RENTCAST_MONTHLY_LIMIT = 50;
+
+export function rentcastConfigured(): boolean {
+	return Boolean(env.RENTCAST_API_KEY);
+}
+
+class NotFound extends Error {}
+
+async function rentcastGet<T>(path: string, address: string): Promise<T> {
+	const res = await fetch(`${RENTCAST_BASE}${path}?${new URLSearchParams({ address })}`, {
+		headers: { 'X-Api-Key': env.RENTCAST_API_KEY ?? '', accept: 'application/json' }
+	});
+	if (res.status === 404) throw new NotFound();
+	if (!res.ok) {
+		const body = await res.json().catch(() => null);
+		throw new Error(`${path}: ${res.status} ${body?.message ?? res.statusText}`);
+	}
+	return res.json();
+}
+
+// The slices of RentCast's responses this reads.
+interface RcListing {
+	price?: number;
+	status?: string;
+	listedDate?: string;
+	formattedAddress?: string;
+}
+interface RcProperty {
+	formattedAddress?: string;
+	latitude?: number;
+	longitude?: number;
+	propertyType?: string;
+	bedrooms?: number;
+	bathrooms?: number;
+	squareFootage?: number;
+	lotSize?: number;
+	yearBuilt?: number;
+	lastSalePrice?: number;
+	lastSaleDate?: string;
+	hoa?: { fee?: number };
+	propertyTaxes?: Record<string, { year?: number; total?: number }>;
+}
+interface RcEstimate {
+	price?: number;
+	priceRangeLow?: number;
+	priceRangeHigh?: number;
+	rent?: number;
+	rentRangeLow?: number;
+	rentRangeHigh?: number;
+}
+
+const pos = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
+
+export async function lookupRentcast(address: string): Promise<RentcastDetails> {
+	return (await lookupRentcastWithCoords(address)).details;
+}
+
+// The coordinates aren't part of RentcastDetails (the house's own lat/lng
+// columns hold them), so they come back alongside.
+async function lookupRentcastWithCoords(
+	address: string
+): Promise<{ details: RentcastDetails; coords: { lat: number; lng: number } | null }> {
+	if (!env.RENTCAST_API_KEY) throw new HouseError('RENTCAST_API_KEY is not set.', 503);
+	const errors: string[] = [];
+	let calls = 0;
+
+	// One endpoint failing (or knowing nothing about the address) shouldn't sink
+	// the others, so each is tried on its own. A 404 is "no data", not an error.
+	async function attempt<T>(path: string): Promise<T | null> {
+		calls++;
+		try {
+			return await rentcastGet<T>(path, address);
+		} catch (err) {
+			if (!(err instanceof NotFound)) errors.push(err instanceof Error ? err.message : String(err));
+			return null;
+		}
+	}
+
+	const listings = await attempt<RcListing[]>('/listings/sale');
+	const active = (listings ?? []).find((l) => l.status === 'Active' && pos(l.price));
+	const properties = await attempt<RcProperty[]>('/properties');
+	const p = properties?.[0];
+	const rent = await attempt<RcEstimate>('/avm/rent/long-term');
+	const value = active ? null : await attempt<RcEstimate>('/avm/value');
+
+	const taxes = Object.values(p?.propertyTaxes ?? {})
+		.filter((t) => pos(t.year) && pos(t.total))
+		.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+
+	const coords =
+		typeof p?.latitude === 'number' && typeof p?.longitude === 'number'
+			? { lat: p.latitude, lng: p.longitude }
+			: null;
+
+	const details: RentcastDetails = {
+		lookedUpAt: new Date().toISOString(),
+		matchedAddress: p?.formattedAddress ?? active?.formattedAddress ?? null,
+		listing: active
+			? { price: active.price as number, status: 'Active', listedDate: active.listedDate ?? null }
+			: null,
+		valueEstimate: pos(value?.price)
+			? {
+					price: value?.price as number,
+					low: pos(value?.priceRangeLow),
+					high: pos(value?.priceRangeHigh)
+				}
+			: null,
+		rentEstimate: pos(rent?.rent)
+			? { rent: rent?.rent as number, low: pos(rent?.rentRangeLow), high: pos(rent?.rentRangeHigh) }
+			: null,
+		propertyType: p?.propertyType ?? null,
+		beds: typeof p?.bedrooms === 'number' ? p.bedrooms : null,
+		baths: pos(p?.bathrooms),
+		sqft: pos(p?.squareFootage),
+		lotSize: pos(p?.lotSize),
+		yearBuilt: pos(p?.yearBuilt),
+		lastSale: pos(p?.lastSalePrice)
+			? { price: p?.lastSalePrice as number, date: p?.lastSaleDate ?? null }
+			: null,
+		hoaMonthly: pos(p?.hoa?.fee),
+		annualTax: taxes[0] ? { year: taxes[0].year as number, total: taxes[0].total as number } : null,
+		calls,
+		errors
+	};
+	return { details, coords };
+}
+
+// Look a house up and store the result. Its price, beds, baths and sqft are
+// filled from RentCast only where empty, unless `overwrite` (the page's
+// "Update from RentCast"), so a figure someone typed in is never silently
+// replaced. Returns a one-line summary for the page.
+export async function refreshFromRentcast(id: number, overwrite: boolean): Promise<string> {
+	const [house] = await sql<HouseRow[]>`
+		select id, address, price, beds, baths, sqft, lat from housing_houses where id = ${id}
+	`;
+	if (!house) throw new HouseError(`No house with id ${id}.`, 404);
+	if (!house.address) throw new HouseError('This house needs an address to look up.');
+
+	const { details: d, coords } = await lookupRentcastWithCoords(house.address);
+	await sql`
+		insert into housing_syncs (source, ok, detail, calls)
+		values ('rentcast', ${!d.errors.length}, ${`${house.address}: ${d.errors.join('; ') || 'ok'}`},
+		        ${d.calls})
+	`;
+
+	const found = {
+		price: d.listing?.price ?? d.valueEstimate?.price ?? null,
+		beds: d.beds,
+		baths: d.baths,
+		sqft: d.sqft === null ? null : Math.round(d.sqft)
+	};
+	const set: Record<string, unknown> = { rentcast: sql.json(d as never) };
+	if (house.lat === null && coords) {
+		set.lat = coords.lat;
+		set.lng = coords.lng;
+		set.geocoded_at = new Date();
+	}
+	const filled: string[] = [];
+	for (const key of ['price', 'beds', 'baths', 'sqft'] as const) {
+		if (found[key] !== null && (overwrite || house[key] === null)) {
+			set[key] = found[key];
+			filled.push(key);
+		}
+	}
+	await sql`update housing_houses set ${sql(set)}, updated_at = now() where id = ${id}`;
+
+	if (d.errors.length) return `RentCast had trouble: ${d.errors.join('; ')}`;
+	if (!d.matchedAddress && !d.listing && !d.rentEstimate && !d.valueEstimate) {
+		return `RentCast has no record of ${house.address}. Check the address, then try again.`;
+	}
+	const priceFrom = d.listing ? 'asking price' : 'value estimate';
+	return filled.length
+		? `Filled from RentCast: ${filled.map((k) => (k === 'price' ? `price (${priceFrom})` : k)).join(', ')}.`
+		: 'Looked up on RentCast. Nothing was empty, so nothing was changed.';
+}
+
+// RentCast requests spent this calendar month. The free plan resets on the
+// account's billing date, which may not be the 1st, so this is a guide.
+export async function rentcastUsage(): Promise<{
+	used: number;
+	limit: number;
+	configured: boolean;
+}> {
+	const [row] = await sql<{ used: number }[]>`
+		select coalesce(sum(calls), 0)::int as used from housing_syncs
+		where source = 'rentcast' and ran_at >= date_trunc('month', now())
+	`;
+	return { used: row.used, limit: RENTCAST_MONTHLY_LIMIT, configured: rentcastConfigured() };
+}
+
+// --- map ---
+//
+// The US Census geocoder: free, no key, public-domain data. It only knows US
+// addresses, which is all Zillow has.
+
+async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
+	const params = new URLSearchParams({
+		address,
+		benchmark: 'Public_AR_Current',
+		format: 'json'
+	});
+	const res = await fetch(
+		`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${params}`,
+		{ signal: AbortSignal.timeout(10_000) }
+	);
+	if (!res.ok) throw new Error(`Census geocoder ${res.status}`);
+	const data = await res.json();
+	const c = data?.result?.addressMatches?.[0]?.coordinates;
+	return typeof c?.x === 'number' && typeof c?.y === 'number' ? { lat: c.y, lng: c.x } : null;
+}
+
+// Place any house that has an address but hasn't been tried yet. A handful per
+// call, so a backlog never makes one page load slow; a failure leaves
+// geocoded_at null to retry next time, while "no match" records the attempt.
+async function locatePending(limit = 5): Promise<void> {
+	const pending = await sql<{ id: string | number; address: string }[]>`
+		select id, address from housing_houses
+		where address is not null and lat is null and geocoded_at is null
+		order by created_at desc limit ${limit}
+	`;
+	for (const h of pending) {
+		try {
+			const at = await geocode(h.address);
+			await sql`
+				update housing_houses
+				set lat = ${at?.lat ?? null}, lng = ${at?.lng ?? null}, geocoded_at = now()
+				where id = ${h.id}
+			`;
+		} catch (err) {
+			console.warn(`Geocoding ${h.address} failed:`, err);
+		}
+	}
+}
+
+// --- ratings ---
+
+// Set (or, with a null score, remove) one admin's rating of a house.
+export async function setRating(
+	houseId: number,
+	userId: number,
+	score: number | null,
+	comment: string
+): Promise<void> {
+	if (score === null) {
+		await sql`delete from housing_house_ratings where house_id = ${houseId} and user_id = ${userId}`;
+		return;
+	}
+	if (!Number.isInteger(score) || score < 1 || score > 5) {
+		throw new HouseError('A rating is a whole number from 1 to 5.');
+	}
+	try {
+		await sql`
+			insert into housing_house_ratings (house_id, user_id, score, comment)
+			values (${houseId}, ${userId}, ${score}, ${comment.slice(0, 1000)})
+			on conflict (house_id, user_id) do update set
+				score = excluded.score, comment = excluded.comment, updated_at = now()
+		`;
+	} catch (err) {
+		// 23503: the house was removed while the rating was being made.
+		if ((err as { code?: string }).code === '23503') {
+			throw new HouseError(`No house with id ${houseId}.`, 404);
+		}
+		throw err;
+	}
 }

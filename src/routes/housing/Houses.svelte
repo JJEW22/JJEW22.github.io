@@ -1,16 +1,27 @@
 <!-- src/routes/housing/Houses.svelte -->
 <!--
 	The houses tab: the shared list of houses being considered, added by Zillow
-	link, and the cost analysis for whichever one is selected.
+	link, on a map and as cards; each admin's 1-5 rating of each; and the cost
+	analysis for whichever one is selected.
 
 	Only the link is required. The address and zpid are read out of the link
-	itself; price, beds, baths and square feet are typed in, because Zillow
-	blocks automated requests to its listing pages.
+	itself. Zillow blocks automated requests to its listing pages, so price,
+	beds, baths and square feet come from RentCast instead, looked up by that
+	address when the house is added (when RENTCAST_API_KEY is set). Anything
+	typed in wins over what RentCast says.
 -->
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import HouseAnalysis from './HouseAnalysis.svelte';
-	import { formatDollars, parseZillowUrl, type Assumptions, type House } from '$lib/housing';
+	import HouseMap from './HouseMap.svelte';
+	import {
+		RATING_LABELS,
+		averageRating,
+		formatDollars,
+		parseZillowUrl,
+		type Assumptions,
+		type House
+	} from '$lib/housing';
 
 	export let marketRate: number | null = null;
 
@@ -20,6 +31,10 @@
 	let busy = false;
 	let msg = '';
 	let error = '';
+	let usage: { used: number; limit: number; configured: boolean } | null = null;
+	// The signed-in admin's id, from the server, to find their own rating.
+	let me: number | null = null;
+	let detailEl: HTMLElement;
 
 	// Add form
 	// Number inputs bind as number, or null when empty.
@@ -38,6 +53,10 @@
 	let eNotes = '';
 	let editingFor: number | null = null;
 
+	// Your rating of the selected house
+	let myScore: number | null = null;
+	let myComment = '';
+
 	onMount(async () => {
 		await send('GET');
 		loading = false;
@@ -55,13 +74,46 @@
 		eBaths = h.baths;
 		eSqft = h.sqft;
 		eNotes = h.notes;
+		const mine = h.ratings.find((r) => r.userId === me);
+		myScore = mine?.score ?? null;
+		myComment = mine?.comment ?? '';
 	}
 
-	async function send(method: string, body?: Record<string, unknown>): Promise<boolean> {
+	$: myRating = selected?.ratings.find((r) => r.userId === me) ?? null;
+	$: ratingDirty =
+		myScore !== (myRating?.score ?? null) || myComment.trim() !== (myRating?.comment ?? '');
+
+	async function pick(id: number, scroll = false) {
+		selectedId = id;
+		if (!scroll) return;
+		await tick();
+		detailEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	async function saveRating() {
+		if (!selected) return;
+		msg = '';
+		await send(
+			'POST',
+			{ id: selected.id, score: myScore, comment: myComment },
+			'/housing/api/houses/rating'
+		);
+	}
+
+	function stars(avg: number): string {
+		const n = Math.round(avg);
+		return '★'.repeat(n) + '☆'.repeat(5 - n);
+	}
+
+	async function send(
+		method: string,
+		body?: Record<string, unknown>,
+		path = '/housing/api/houses'
+	): Promise<boolean> {
 		busy = true;
 		error = '';
 		try {
-			const res = await fetch('/housing/api/houses', {
+			const res = await fetch(path, {
 				method,
 				headers: body ? { 'content-type': 'application/json' } : undefined,
 				body: body ? JSON.stringify(body) : undefined
@@ -72,6 +124,9 @@
 				return false;
 			}
 			houses = data.houses ?? [];
+			usage = data.rentcast ?? usage;
+			me = data.me ?? me;
+			if (data.message) msg = data.message;
 			return true;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -89,7 +144,6 @@
 		}
 		const ok = await send('POST', { url, price, beds, baths, sqft });
 		if (ok) {
-			msg = 'Added.';
 			url = '';
 			price = beds = baths = sqft = null;
 			selectedId = houses[0]?.id ?? null;
@@ -99,9 +153,11 @@
 	async function saveDetails() {
 		if (!selected) return;
 		msg = '';
+		// The address only goes when it changed: changing it re-places the house
+		// on the map, which a save of the price shouldn't do.
 		const ok = await send('PATCH', {
 			id: selected.id,
-			address: eAddress,
+			...(eAddress.trim() !== (selected.address ?? '') ? { address: eAddress } : {}),
 			price: ePrice,
 			beds: eBeds,
 			baths: eBaths,
@@ -118,6 +174,18 @@
 		if (ok) msg = e.detail ? 'Assumptions saved.' : 'Assumptions reset to the defaults.';
 	}
 
+	async function lookup(h: House) {
+		const ask =
+			`Look ${h.address} up on RentCast again? This uses 3-4 of the month's ` +
+			`${usage?.limit ?? 50} free requests and replaces the price, beds, baths and sqft ` +
+			'with what RentCast has.';
+		if (!confirm(ask)) return;
+		msg = '';
+		if (await send('POST', { id: h.id, overwrite: true }, '/housing/api/houses/lookup')) {
+			editingFor = null; // re-mirror the edit form from the updated house
+		}
+	}
+
 	async function remove(h: House) {
 		if (!confirm(`Remove ${h.address ?? 'this house'} from the list?`)) return;
 		msg = '';
@@ -125,6 +193,10 @@
 			if (selectedId === h.id) selectedId = null;
 			msg = 'Removed.';
 		}
+	}
+
+	function range(r: { low: number | null; high: number | null }): string {
+		return r.low && r.high ? ` (${formatDollars(r.low)}–${formatDollars(r.high)})` : '';
 	}
 
 	function title(h: House): string {
@@ -173,8 +245,16 @@
 			<span>Sqft</span>
 			<input type="number" min="0" step="10" bind:value={sqft} />
 		</label>
-		<button type="submit" disabled={busy || !preview}>Add</button>
+		<button type="submit" disabled={busy || !preview}>{busy ? 'Adding…' : 'Add'}</button>
 	</form>
+	<p class="note">
+		{#if usage?.configured}
+			Leave the numbers blank to fill them from RentCast · {usage.used} of {usage.limit} free requests
+			used this month, 3–4 per house.
+		{:else if usage}
+			Add <code>RENTCAST_API_KEY</code> to fill these in automatically.
+		{/if}
+	</p>
 	{#if url.trim()}
 		<p class="note">
 			{#if !preview}
@@ -194,13 +274,24 @@
 {:else if !houses.length}
 	<p class="note">No houses yet. Add one with its Zillow link above.</p>
 {:else}
+	<HouseMap {houses} {selectedId} on:select={(e) => pick(e.detail, true)} />
 	<ul class="houses">
 		{#each houses as h (h.id)}
 			<li class:selected={h.id === selectedId}>
-				<button type="button" class="pick" on:click={() => (selectedId = h.id)}>
+				<button type="button" class="pick" on:click={() => pick(h.id, true)}>
 					<span class="name">{title(h)}</span>
 					<span class="price">{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span>
 					{#if facts(h)}<span class="facts">{facts(h)}</span>{/if}
+					{#if averageRating(h) !== null}
+						{@const avg = averageRating(h) ?? 0}
+						<span class="rating" title="{avg.toFixed(1)} out of 5">
+							<span class="stars" aria-hidden="true">{stars(avg)}</span>
+							{avg.toFixed(1)} · {h.ratings.length}
+							{h.ratings.length === 1 ? 'rating' : 'ratings'}
+						</span>
+					{:else}
+						<span class="rating none">Not rated yet</span>
+					{/if}
 					<span class="by">
 						Added {new Date(h.createdAt).toLocaleDateString('en-US')}{h.addedBy
 							? ` by ${h.addedBy}`
@@ -215,7 +306,7 @@
 {/if}
 
 {#if selected}
-	<section class="panel detail">
+	<section class="panel detail" bind:this={detailEl}>
 		<h2>{title(selected)}</h2>
 		<form class="edit" on:submit|preventDefault={saveDetails}>
 			<label class="wide">
@@ -254,6 +345,119 @@
 				</button>
 			</div>
 		</form>
+
+		<div class="ratings">
+			<h3>How everyone feels</h3>
+			<div class="mine">
+				<span class="who">You</span>
+				<div class="scale" role="radiogroup" aria-label="Your rating">
+					{#each [1, 2, 3, 4, 5] as n (n)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={myScore === n}
+							class="score"
+							class:on={myScore === n}
+							on:click={() => (myScore = myScore === n ? null : n)}
+						>
+							<span class="num">{n}</span>
+							<span class="word">{RATING_LABELS[n]}</span>
+						</button>
+					{/each}
+				</div>
+				<input
+					class="comment"
+					bind:value={myComment}
+					placeholder="Why? (optional)"
+					maxlength="1000"
+				/>
+				<button type="button" on:click={saveRating} disabled={busy || !ratingDirty || me === null}>
+					{myScore === null && myRating ? 'Remove rating' : 'Save rating'}
+				</button>
+			</div>
+			{#if selected.ratings.filter((r) => r.userId !== me).length}
+				<ul class="others">
+					{#each selected.ratings.filter((r) => r.userId !== me) as r (r.userId)}
+						<li>
+							<span class="who">{r.name}</span>
+							<span class="their-score">{r.score} · {RATING_LABELS[r.score]}</span>
+							{#if r.comment}<span class="their-comment">“{r.comment}”</span>{/if}
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="note">No one else has rated this house yet.</p>
+			{/if}
+		</div>
+
+		{#if selected.rentcast}
+			{@const rc = selected.rentcast}
+			<div class="rentcast">
+				<h3>RentCast</h3>
+				<dl>
+					{#if rc.listing}
+						<dt>Asking price</dt>
+						<dd>
+							{formatDollars(rc.listing.price)}{rc.listing.listedDate
+								? ` · listed ${new Date(rc.listing.listedDate).toLocaleDateString('en-US')}`
+								: ''}
+						</dd>
+					{/if}
+					{#if rc.valueEstimate}
+						<dt>Value estimate</dt>
+						<dd>{formatDollars(rc.valueEstimate.price)}{range(rc.valueEstimate)}</dd>
+					{/if}
+					{#if rc.rentEstimate}
+						<dt>Rent estimate</dt>
+						<dd>
+							{formatDollars(rc.rentEstimate.rent)}/mo{range({
+								low: rc.rentEstimate.low,
+								high: rc.rentEstimate.high
+							})}
+						</dd>
+					{/if}
+					{#if rc.propertyType}<dt>Type</dt>
+						<dd>{rc.propertyType}</dd>{/if}
+					{#if rc.yearBuilt}<dt>Built</dt>
+						<dd>{rc.yearBuilt}</dd>{/if}
+					{#if rc.lotSize}<dt>Lot</dt>
+						<dd>{rc.lotSize.toLocaleString('en-US')} sqft</dd>{/if}
+					{#if rc.lastSale}
+						<dt>Last sold</dt>
+						<dd>
+							{formatDollars(rc.lastSale.price)}{rc.lastSale.date
+								? ` · ${new Date(rc.lastSale.date).toLocaleDateString('en-US')}`
+								: ''}
+						</dd>
+					{/if}
+					{#if rc.annualTax}
+						<dt>Property tax</dt>
+						<dd>{formatDollars(rc.annualTax.total)} ({rc.annualTax.year})</dd>
+					{/if}
+					{#if rc.hoaMonthly}<dt>HOA</dt>
+						<dd>{formatDollars(rc.hoaMonthly)}/mo</dd>{/if}
+					{#if rc.matchedAddress}<dt>Matched</dt>
+						<dd>{rc.matchedAddress}</dd>{/if}
+				</dl>
+				{#if rc.errors.length}
+					<p class="note bad-text">Some lookups failed: {rc.errors.join('; ')}</p>
+				{/if}
+				<p class="note">
+					Looked up {new Date(rc.lookedUpAt).toLocaleString('en-US')}. Its data can lag Zillow's, so
+					check the numbers against the listing.
+				</p>
+			</div>
+		{/if}
+		{#if usage?.configured && selected.address}
+			<button
+				type="button"
+				class="secondary"
+				on:click={() => selected && lookup(selected)}
+				disabled={busy}
+			>
+				{selected.rentcast ? 'Update from RentCast' : 'Look up on RentCast'}
+			</button>
+		{/if}
 
 		{#if selected.price}
 			<HouseAnalysis
@@ -364,6 +568,166 @@
 		cursor: pointer;
 	}
 
+	button.secondary {
+		margin-bottom: 0.5rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		color: #333;
+	}
+
+	.rating {
+		color: #52514e;
+		font-size: 0.82rem;
+	}
+
+	.rating.none {
+		color: #898781;
+	}
+
+	.stars {
+		margin-right: 0.25rem;
+		color: #c98500;
+		letter-spacing: 0.05em;
+	}
+
+	.ratings {
+		margin: 1.25rem 0 0.75rem;
+		padding: 0.9rem 1rem;
+		background: #fff;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+	}
+
+	.ratings h3 {
+		margin: 0 0 0.75rem;
+		font-size: 0.95rem;
+		color: #333;
+	}
+
+	.mine {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+	}
+
+	.who {
+		min-width: 4rem;
+		font-weight: 600;
+		font-size: 0.88rem;
+		color: #0b0b0b;
+	}
+
+	.scale {
+		display: flex;
+		gap: 0.3rem;
+	}
+
+	.score {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.05rem;
+		min-width: 4.2rem;
+		padding: 0.35rem 0.4rem;
+		background: #fff;
+		border: 1px solid #d5dae1;
+		border-radius: 8px;
+		color: #374151;
+	}
+
+	.score .num {
+		font-weight: 600;
+		font-size: 0.95rem;
+	}
+
+	.score .word {
+		font-size: 0.7rem;
+		color: #6b7280;
+	}
+
+	.score.on {
+		background: #0066cc;
+		border-color: #0066cc;
+		color: #fff;
+	}
+
+	.score.on .word {
+		color: rgba(255, 255, 255, 0.85);
+	}
+
+	.comment {
+		flex: 1;
+		min-width: 12rem;
+	}
+
+	.others {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		margin: 0.9rem 0 0;
+		padding: 0.75rem 0 0;
+		border-top: 1px solid #f0f0f0;
+		list-style: none;
+		font-size: 0.88rem;
+	}
+
+	.others li {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem 0.75rem;
+	}
+
+	.their-score {
+		color: #374151;
+	}
+
+	.their-comment {
+		color: #6b7280;
+	}
+
+	.rentcast {
+		margin: 1.25rem 0 0.75rem;
+		padding: 0.9rem 1rem;
+		background: #fff;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+	}
+
+	.rentcast h3 {
+		margin: 0 0 0.6rem;
+		font-size: 0.95rem;
+		color: #333;
+	}
+
+	dl {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 0.3rem 1rem;
+		margin: 0;
+		font-size: 0.88rem;
+	}
+
+	dt {
+		color: #666;
+	}
+
+	dd {
+		margin: 0;
+		color: #0b0b0b;
+	}
+
+	.bad-text {
+		color: #b42318;
+	}
+
+	code {
+		padding: 0.1rem 0.35rem;
+		background: #f3f4f6;
+		border-radius: 4px;
+		font-size: 0.9em;
+	}
+
 	button.danger {
 		background: #fff;
 		border: 1px solid #f0c4c0;
@@ -445,6 +809,19 @@
 	@media (max-width: 768px) {
 		.wide {
 			grid-column: 1 / -1;
+		}
+
+		.scale {
+			flex-basis: 100%;
+		}
+
+		.score {
+			flex: 1;
+			min-width: 0;
+		}
+
+		.score .word {
+			display: none;
 		}
 	}
 </style>
