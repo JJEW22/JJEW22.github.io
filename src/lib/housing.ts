@@ -321,16 +321,75 @@ export interface RentcastDetails {
 	listingUnmatched?: boolean;
 }
 
+// Cities whose own tax rate and residential exemption a house there defaults
+// to. The exemption is a fixed amount off the assessed value of an
+// owner-occupied home, so in dollars it is that amount times the rate:
+//   Boston FY2026:    $351,108 x $12.40 / $1,000 = $4,353.74
+//   Cambridge FY2026: $510,208 x  $6.67 / $1,000 = $3,403.09
+// Sources: boston.gov FY26 tax classification order; cambridgema.gov FY26
+// property tax update. Update these when the next fiscal year's are set.
+export interface TaxJurisdiction {
+	name: string;
+	fiscalYear: string;
+	ratePct: number; // residential rate, % of assessed value
+	exemption: number; // annual $ off an owner-occupant's bill
+}
+
+export const TAX_JURISDICTIONS: Record<'boston' | 'cambridge', TaxJurisdiction> = {
+	boston: { name: 'Boston', fiscalYear: 'FY2026', ratePct: 1.24, exemption: 4353.74 },
+	cambridge: { name: 'Cambridge', fiscalYear: 'FY2026', ratePct: 0.667, exemption: 3403.09 }
+};
+
+// ZIP codes entirely inside each city. 02467 (Chestnut Hill) is left out on
+// purpose: it is split between Boston, Brookline and Newton.
+const BOSTON_ZIPS = new Set(
+	(
+		'02108 02109 02110 02111 02113 02114 02115 02116 02118 02119 02120 02121 02122 02124 ' +
+		'02125 02126 02127 02128 02129 02130 02131 02132 02134 02135 02136 02163 02199 02203 ' +
+		'02210 02215'
+	).split(' ')
+);
+const CAMBRIDGE_ZIPS = new Set(['02138', '02139', '02140', '02141', '02142', '02238']);
+
+// Boston's neighbourhoods go by their own names in addresses ("Jamaica Plain,
+// MA"), so a ZIP-less address is matched on those too.
+const BOSTON_PLACES = (
+	'boston|allston|brighton|charlestown|dorchester|east boston|hyde park|jamaica plain|' +
+	'mattapan|mission hill|roslindale|roxbury|south boston|west roxbury|readville|back bay|' +
+	'beacon hill|south end|north end|fenway|seaport'
+).split('|');
+
+// Where a house's property tax is set, from its address. Null for anywhere
+// else, which keeps the generic defaults.
+export function taxJurisdiction(address: string | null): TaxJurisdiction | null {
+	if (!address) return null;
+	const zip = address.match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1];
+	if (zip) {
+		if (BOSTON_ZIPS.has(zip)) return TAX_JURISDICTIONS.boston;
+		if (CAMBRIDGE_ZIPS.has(zip)) return TAX_JURISDICTIONS.cambridge;
+		return null;
+	}
+	const city = (address.split(',').at(-2) ?? '').trim().toLowerCase();
+	if (city === 'cambridge') return TAX_JURISDICTIONS.cambridge;
+	if (BOSTON_PLACES.includes(city)) return TAX_JURISDICTIONS.boston;
+	return null;
+}
+
 // The analysis defaults a house supplies, ahead of the generic ones and behind
 // anything saved:
 //   - bedrooms and people splitting both start at the bedroom count, since the
 //     per-bedroom figure is the one that always matters;
 //   - rent per bedroom is RentCast's whole-house rent estimate split by
 //     bedrooms, and it is also the default rent a person pays renting instead;
-//   - HOA and the tax rate come from RentCast's property record.
+//   - HOA and the tax rate come from RentCast's property record;
+//   - in Boston or Cambridge, the city's own rate and residential exemption
+//     win over RentCast's rate, which is read off the current owner's bill
+//     and may already include their exemption.
 // Rooms not taken by the people splitting are rented out at the per-bedroom
 // rent (see analyze), so lowering "people splitting" adds rental income.
-export function houseDefaults(h: Pick<House, 'beds' | 'price' | 'rentcast'>): Partial<Assumptions> {
+export function houseDefaults(
+	h: Pick<House, 'beds' | 'price' | 'rentcast' | 'address'>
+): Partial<Assumptions> {
 	const out: Partial<Assumptions> = {};
 	const beds = h.beds !== null ? Math.max(1, Math.round(h.beds)) : null;
 	if (beds) {
@@ -344,7 +403,11 @@ export function houseDefaults(h: Pick<House, 'beds' | 'price' | 'rentcast'>): Pa
 		out.rent = perRoom;
 	}
 	if (d?.hoaMonthly) out.hoaMonthly = Math.round(d.hoaMonthly);
-	if (d?.annualTax && h.price) {
+	const city = taxJurisdiction(h.address);
+	if (city) {
+		out.taxPct = city.ratePct;
+		out.taxExemption = city.exemption;
+	} else if (d?.annualTax && h.price) {
 		out.taxPct = Number(((d.annualTax.total / h.price) * 100).toFixed(2));
 	}
 	return out;
@@ -356,7 +419,8 @@ export const ASSUMPTION_LABELS: Partial<Record<keyof Assumptions, string>> = {
 	roomRent: 'Rent per bedroom',
 	rent: 'Rent instead',
 	hoaMonthly: 'HOA',
-	taxPct: 'Tax rate'
+	taxPct: 'Tax rate',
+	taxExemption: 'Residential exemption'
 };
 
 // --- cost analysis ---
@@ -448,6 +512,17 @@ export interface MonthRow {
 	ownCost: number;
 	rentCost: number;
 	advantage: number; // rentCost − ownCost; positive means buying is ahead
+	lost: number; // whole house: this month's interest, tax, insurance, upkeep, HOA, PMI, utilities
+}
+
+// A year of owning's lost costs as a share of what the home is worth: the
+// "rent" an owner pays. Before any rental income, so it is the cost of the
+// house itself, comparable with a year of rent for the whole place over its
+// price.
+export interface EffectiveRentYear {
+	year: number;
+	lost: number; // whole house, that year
+	pct: number; // lost ÷ the home's value at the start of that year × 100
 }
 
 export interface Analysis {
@@ -463,6 +538,10 @@ export interface Analysis {
 	roomsRented: number; // bedrooms not taken by the people splitting
 	rows: MonthRow[];
 	breakEvenMonth: number | null; // first month buying is ahead, if any
+	effectiveRent: EffectiveRentYear[];
+	// Renting the whole place instead, at the rent per bedroom: a year of it
+	// over the price, to set beside effectiveRent[0].pct.
+	rentToPricePct: number;
 }
 
 export function analyze(price: number, input: Partial<Assumptions> = {}): Analysis {
@@ -575,8 +654,17 @@ export function analyze(price: number, input: Partial<Assumptions> = {}): Analys
 			opportunityCost,
 			ownCost,
 			rentCost: cumRent,
-			advantage
+			advantage,
+			lost: interest + tax + insurance + upkeep + a.hoaMonthly + pmi + a.utilitiesMonthly
 		});
+	}
+
+	const effectiveRent: EffectiveRentYear[] = [];
+	for (let y = 1; y * 12 <= rows.length; y++) {
+		const months = rows.slice((y - 1) * 12, y * 12);
+		const lost = months.reduce((t, row) => t + row.lost, 0);
+		const startOfYear = y === 1 ? startValue : rows[(y - 1) * 12 - 1].homeValue;
+		effectiveRent.push({ year: y, lost, pct: (lost / startOfYear) * 100 });
 	}
 
 	return {
@@ -591,7 +679,9 @@ export function analyze(price: number, input: Partial<Assumptions> = {}): Analys
 		people,
 		roomsRented,
 		rows,
-		breakEvenMonth
+		breakEvenMonth,
+		effectiveRent,
+		rentToPricePct: price > 0 ? ((a.roomRent * bedrooms * 12) / price) * 100 : 0
 	};
 }
 

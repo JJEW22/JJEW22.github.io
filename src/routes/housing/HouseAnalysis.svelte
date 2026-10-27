@@ -21,6 +21,7 @@
 		formatDollars,
 		houseDefaults,
 		monthsFromNow,
+		taxJurisdiction,
 		type Assumptions,
 		type House
 	} from '$lib/housing';
@@ -54,7 +55,12 @@
 			title: 'Ongoing costs',
 			fields: [
 				{ key: 'taxPct', label: 'Property tax % / yr', step: 0.01 },
-				{ key: 'taxExemption', label: 'Tax exemption $ / yr', step: 100 },
+				{
+					key: 'taxExemption',
+					label: 'Tax exemption $ / yr',
+					step: 100,
+					hint: 'owner-occupied'
+				},
 				{ key: 'insurancePct', label: 'Insurance % / yr', step: 0.01 },
 				{ key: 'upkeepPct', label: 'Upkeep % / yr', step: 0.05 },
 				{ key: 'hoaMonthly', label: 'HOA $ / mo', step: 25 },
@@ -127,10 +133,15 @@
 		])
 	) as unknown as Assumptions;
 
-	$: fromHouse = Object.keys(houseDefaults(house)).map(
-		(k) => ASSUMPTION_LABELS[k as keyof Assumptions] ?? k
-	);
+	$: city = taxJurisdiction(house.address);
+	// The city's tax figures get their own sentence in the note, so they're
+	// left out of this list.
+	$: fromHouse = Object.keys(houseDefaults(house))
+		.filter((k) => !city || (k !== 'taxPct' && k !== 'taxExemption'))
+		.map((k) => ASSUMPTION_LABELS[k as keyof Assumptions] ?? k);
 	$: result = analyze(price, clean);
+	$: firstYear = result.effectiveRent[0] ?? null;
+	$: effectiveByYear = new Map(result.effectiveRent.map((e) => [e.year, e.pct]));
 	$: people = result.people;
 	$: bedrooms = result.bedrooms;
 	// Per-bedroom figures leave out rental income: what each bedroom costs before
@@ -192,6 +203,10 @@
 			: `${bedrooms} bedrooms`}{result.roomsRented
 			? `, renting the other ${result.roomsRented} at ${formatDollars(clean.roomRent)}`
 			: ''}.
+		{#if city}
+			Tax rate and residential exemption are {city.name}'s {city.fiscalYear} figures ({city.ratePct}%,
+			{formatDollars(city.exemption)} off a year for an owner-occupant).
+		{/if}
 		{#if fromHouse.length}
 			{sentenceList(fromHouse)} start from this house's details{house.rentcast
 				? ' and RentCast'
@@ -238,6 +253,14 @@
 			<span class="value">{formatDollars(gross / bedrooms)}</span>
 			<span class="delta">
 				before rent from other rooms · rent per bedroom {formatDollars(clean.roomRent)}
+			</span>
+		</div>
+		<div class="tile">
+			<span class="label">Effective rent</span>
+			<span class="value">{firstYear ? `${firstYear.pct.toFixed(2)}% / yr` : '—'}</span>
+			<span class="delta">
+				{firstYear ? formatDollars(firstYear.lost) : '—'} lost in year one, of the home's value · renting
+				the whole place: {result.rentToPricePct.toFixed(2)}%
 			</span>
 		</div>
 		<div class="tile">
@@ -344,6 +367,7 @@
 					<th>Cost of owning</th>
 					<th>Cost of renting</th>
 					<th>Buying ahead by</th>
+					<th title="That year's lost costs ÷ the home's value at its start">Effective rent</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -361,6 +385,7 @@
 						<td class:good={r.advantage >= 0} class:bad={r.advantage < 0}>
 							{r.advantage >= 0 ? '' : '−'}{formatDollars(Math.abs(r.advantage))}
 						</td>
+						<td>{effectiveByYear.get(r.month / 12)?.toFixed(2) ?? '—'}%</td>
 					</tr>
 				{/each}
 			</tbody>
