@@ -1,180 +1,92 @@
 <script>
     import { resolve } from '$app/paths';
     import '../../app.css';
-    import { onMount } from 'svelte';
+    import jpFlicksLogo from '$lib/assets/colorJPFlicksLogo.svg';
 
-     // Projects data - each project now has a "display" parameter
+    // Every image in src/lib/assets/me/, by file name without its extension
+    // ("snow.jpg" -> "snow"). Found at build time, so a card only links an image
+    // that exists -- a missing one would 404 and fail the prerender.
+    /** @type {Record<string, string>} */
+    const cardImages = Object.fromEntries(
+        Object.entries(
+            import.meta.glob('/src/lib/assets/me/*.{jpg,jpeg,png,webp,gif,svg}', {
+                eager: true,
+                import: 'default'
+            })
+        ).map(([path, url]) => [(path.split('/').pop() ?? '').replace(/\.[^.]+$/, ''), String(url)])
+    );
+
+    // Each project's card image: `image` names a file in src/lib/assets/me/
+    // (see the README there), or `imageUrl` gives one directly. `fit: 'contain'`
+    // shows a logo whole on a plain background instead of cropping it. A project
+    // with no image file yet keeps the folder placeholder.
     const projects = [
         {
             title: "JP Flicks",
             description: "Website for hosting Boston's premier Crokinole league. We play weekly, reach out if you are interested!",
             link: "/jpFlicks",
-            image: 'none',
-            display: true  // Show this project
+            imageUrl: jpFlicksLogo,
+            fit: 'contain',
+            display: true
         },
         {
             title: "Snow Predictions",
             description: "Track and compete on first snow predictions with friends",
             link: "/snow",
-            image: 'none',
-            display: true  // Show this project
+            image: 'snow',
+            display: true
         },
         {
             title: "March Madness Bracket",
             description: "Create and manage March Madness tournament brackets",
             link: "/marchMadness",
-            image: 'none',
-            display: true  // Show this project
+            image: 'marchMadness',
+            display: true
         },
         {
             title: "JP Pizza Bracket",
             description: "24 pizzerias, 4 divisions, 1 champion. Rating the best pizza in JP and Mission Hill.",
             link: "/pizzaBracket",
-            image: 'none',
+            image: 'pizzaBracket',
             display: true
         },
         {
             title: "Premier League Pickem",
             description: "Pick a winner in every match, predict where all 20 clubs finish, and get scored on both across the season.",
             link: "/premierLeaguePickem",
-            image: 'none',
+            image: 'premierLeaguePickem',
             display: true
         },
         {
             title: "meSoup",
             description: "A map of every body of water I've swum in — ocean, lake, river, quarry and the odd hotel pool.",
             link: "/meSoup",
-            image: 'none',
+            image: 'meSoup',
             display: true
         },
         {
             title: "Krillion, rescored",
             description: "Paste your Krillion end screen and get a score based on how many players actually gave each answer.",
             link: "/krillion",
-            image: 'none',
+            image: 'krillion',
             display: true
         },
         {
             title: "Ultra tracker",
             description: "Follow me live during an ultra marathon — my phone posts its GPS here as I run.",
             link: "/ultra",
-            image: 'none',
+            image: 'ultra',
             display: true
         },
     ];
 
-// Filter to only show projects where display is true
-const displayedProjects = projects.filter(project => project.display);
-
-// Then in your template, use displayedProjects instead of projects:
-// {#each displayedProjects as project, index}
-        // {
-        //     title: "Project Two",
-        //     description: "A brief description of your second project. What problem does it solve? What technologies did you use?",
-        //     link: "#",
-        //     image: null, // Will use placeholder
-        //     tags: ["React", "TypeScript"]
-        // },
-        // {
-        //     title: "Project Three",
-        //     description: "Description of your third project goes here. Keep it concise but informative.",
-        //     link: "#",
-        //     image: "none", // Will try to fetch from the page
-        //     tags: ["Python", "Data Science"]
-        // },
-
-
-// Store resolved images - make it reactive by reassigning
-let projectImages = {};
-
-onMount(async () => {
-    console.log('Starting image fetch...');
-    
-    // Fetch images for projects with image="none"
-    for (let i = 0; i < projects.length; i++) {
-        const project = projects[i];
-        
-        if (project.image === "none" && project.link) {
-            try {
-                console.log(`Fetching image for project ${i}: ${project.link}`);
-                const imageUrl = await fetchPageImage(project.link);
-                
-                if (imageUrl) {
-                    // CRITICAL: Reassign the entire object to trigger reactivity
-                    projectImages = { ...projectImages, [i]: imageUrl };
-                    console.log(`Added image to projectImages at index ${i}:`, projectImages);
-                }
-            } catch (error) {
-                console.error(`Failed to fetch image for ${project.title}:`, error);
-            }
-        }
-    }
-    
-    console.log('Finished fetching images. Final projectImages:', projectImages);
-});
-
-async function fetchPageImage(url) {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            console.warn(`Failed to fetch ${url}: ${response.status}`);
-            return null;
-        }
-        
-        const html = await response.text();
-        
-        // Create a temporary DOM parser
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // Try to find og:image meta tag (most common)
-        let ogImage = doc.querySelector('meta[property="og:image"]');
-        if (ogImage) {
-            const content = ogImage.getAttribute('content');
-            console.log(`Found og:image for ${url}:`, content);
-            return content;
-        }
-        
-        // Try to find twitter:image meta tag
-        let twitterImage = doc.querySelector('meta[name="twitter:image"]');
-        if (twitterImage) {
-            const content = twitterImage.getAttribute('content');
-            console.log(`Found twitter:image for ${url}:`, content);
-            return content;
-        }
-        
-        // Try to find a regular image meta tag
-        let imageTag = doc.querySelector('meta[name="image"]');
-        if (imageTag) {
-            const content = imageTag.getAttribute('content');
-            console.log(`Found image meta tag for ${url}:`, content);
-            return content;
-        }
-        
-        console.warn(`No image meta tags found for ${url}`);
-        return null;
-    } catch (error) {
-        console.error(`Error fetching page image from ${url}:`, error);
-        return null;
-    }
-}
-
-// Make this a reactive statement so it updates when projectImages changes
-function getProjectImage(project, index) {
-    // Check if we have a fetched image
-    if (projectImages[index]) {
-        console.log(`Using fetched image for ${index}:`, projectImages[index]);
-        return projectImages[index];
-    }
-    
-    // If image is a valid URL (not null or "none"), use it
-    if (project.image && project.image !== "none") {
-        return project.image;
-    }
-    
-    // Otherwise, return null to use placeholder
-    return null;
-}
+    // Only the projects switched on above, each with its image resolved.
+    const displayedProjects = projects
+        .filter(project => project.display)
+        .map(project => ({
+            ...project,
+            src: project.imageUrl ?? (project.image ? cardImages[project.image] : null) ?? null
+        }));
 </script>
 
 <svelte:head>
@@ -197,11 +109,13 @@ function getProjectImage(project, index) {
         </section>
         
         <div class="projects-grid">
-            {#each displayedProjects as project, index (index)}
+            {#each displayedProjects as project (project.link)}
                 <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- links come from the static project list above; resolve() only takes a literal route -->
                 <a href={project.link} class="project-card">
-                    {#if getProjectImage(project, index)}
-                        <div class="card-image" style="background-image: url({getProjectImage(project, index)})"></div>
+                    {#if project.src}
+                        <div class="card-image" class:contain={project.fit === 'contain'}>
+                            <img src={project.src} alt="" loading="lazy" />
+                        </div>
                     {:else}
                         <div class="card-image placeholder">
                             <span class="placeholder-icon">📁</span>
@@ -294,9 +208,26 @@ function getProjectImage(project, index) {
     .card-image {
         width: 100%;
         height: 200px;
-        background-size: cover;
-        background-position: center;
+        overflow: hidden;
         background-color: #f3f4f6;
+    }
+
+    .card-image img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* A logo, shown whole rather than cropped. */
+    .card-image.contain {
+        padding: 1.25rem;
+        box-sizing: border-box;
+        background: #f8f5ef;
+    }
+
+    .card-image.contain img {
+        object-fit: contain;
     }
     
     .card-image.placeholder {

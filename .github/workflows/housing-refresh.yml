@@ -1,0 +1,43 @@
+# .github/workflows/housing-refresh.yml
+# Re-pulls the /housing data from FRED and Zillow Research once a week.
+# Thursday afternoon, after Freddie Mac publishes the weekly mortgage rate (noon
+# ET); Zillow's files only change mid-month, so weekly is more than enough.
+# Admins can also refresh any time from the page.
+#
+# Setup: the same repo Actions secret SYNC_SECRET as the pickem cron (it must
+# match the SYNC_SECRET env var on the Render service byte for byte), and
+# FRED_API_KEY set on the Render service.
+name: Housing refresh
+
+on:
+  schedule:
+    - cron: '0 19 * * 4'
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger refresh endpoint
+        env:
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+        run: |
+          set -uo pipefail
+          if [ -z "${SYNC_SECRET}" ]; then
+            echo "::error::SYNC_SECRET is not set for this repo (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          status=$(curl -sS -X POST \
+            -H "x-sync-key: ${SYNC_SECRET}" \
+            -H "content-type: application/json" \
+            -d '{}' \
+            --max-time 300 \
+            -o response.json -w '%{http_code}' \
+            "https://johnjackwilkins.com/housing/api/admin/refresh") || {
+            echo "::error::could not reach the refresh endpoint"
+            exit 1
+          }
+          echo "HTTP $status"
+          cat response.json; echo
+          [ "$status" = "200" ] || exit 1
+          grep -q '"ok":true' response.json || { echo "::error::a source failed to refresh"; exit 1; }
