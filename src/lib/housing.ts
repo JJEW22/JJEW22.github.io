@@ -326,8 +326,10 @@ export interface RentcastDetails {
 // owner-occupied home, so in dollars it is that amount times the rate:
 //   Boston FY2026:    $351,108 x $12.40 / $1,000 = $4,353.74
 //   Cambridge FY2026: $510,208 x  $6.67 / $1,000 = $3,403.09
+//   Somerville FY2026: $416,961 x $10.98 / $1,000 = $4,578 (the city's own figure)
 // Sources: boston.gov FY26 tax classification order; cambridgema.gov FY26
-// property tax update. Update these when the next fiscal year's are set.
+// property tax update; somervillema.gov FY2026 property tax update mailer.
+// Update these when the next fiscal year's are set.
 export interface TaxJurisdiction {
 	name: string;
 	fiscalYear: string;
@@ -335,9 +337,10 @@ export interface TaxJurisdiction {
 	exemption: number; // annual $ off an owner-occupant's bill
 }
 
-export const TAX_JURISDICTIONS: Record<'boston' | 'cambridge', TaxJurisdiction> = {
+export const TAX_JURISDICTIONS: Record<'boston' | 'cambridge' | 'somerville', TaxJurisdiction> = {
 	boston: { name: 'Boston', fiscalYear: 'FY2026', ratePct: 1.24, exemption: 4353.74 },
-	cambridge: { name: 'Cambridge', fiscalYear: 'FY2026', ratePct: 0.667, exemption: 3403.09 }
+	cambridge: { name: 'Cambridge', fiscalYear: 'FY2026', ratePct: 0.667, exemption: 3403.09 },
+	somerville: { name: 'Somerville', fiscalYear: 'FY2026', ratePct: 1.098, exemption: 4578 }
 };
 
 // ZIP codes entirely inside each city. 02467 (Chestnut Hill) is left out on
@@ -350,6 +353,7 @@ const BOSTON_ZIPS = new Set(
 	).split(' ')
 );
 const CAMBRIDGE_ZIPS = new Set(['02138', '02139', '02140', '02141', '02142', '02238']);
+const SOMERVILLE_ZIPS = new Set(['02143', '02144', '02145']);
 
 // Boston's neighbourhoods go by their own names in addresses ("Jamaica Plain,
 // MA"), so a ZIP-less address is matched on those too.
@@ -367,10 +371,14 @@ export function taxJurisdiction(address: string | null): TaxJurisdiction | null 
 	if (zip) {
 		if (BOSTON_ZIPS.has(zip)) return TAX_JURISDICTIONS.boston;
 		if (CAMBRIDGE_ZIPS.has(zip)) return TAX_JURISDICTIONS.cambridge;
+		if (SOMERVILLE_ZIPS.has(zip)) return TAX_JURISDICTIONS.somerville;
 		return null;
 	}
 	const city = (address.split(',').at(-2) ?? '').trim().toLowerCase();
 	if (city === 'cambridge') return TAX_JURISDICTIONS.cambridge;
+	if (city === 'somerville' || city === 'west somerville' || city === 'east somerville') {
+		return TAX_JURISDICTIONS.somerville;
+	}
 	if (BOSTON_PLACES.includes(city)) return TAX_JURISDICTIONS.boston;
 	return null;
 }

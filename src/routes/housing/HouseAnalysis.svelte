@@ -342,6 +342,8 @@
 			format={(v) => ahead(v)}
 			tick={(v) => compact(v, '$')}
 			signed
+			log
+			logToggle
 			crossingLabel="Break-even"
 			positiveLabel="Buying is better"
 			negativeLabel="Renting is better"

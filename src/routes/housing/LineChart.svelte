@@ -9,6 +9,11 @@
 	solid, the series is green above it and red below, and each place it crosses
 	is marked with a point and labelled. A legend names the two colours, so the
 	sign never rests on colour alone.
+
+	With `logToggle`, a Log / Linear switch sits in the caption, starting on
+	`log`. The log scale is symmetric (sign · log10(1 + |v| / logThreshold)), so
+	it can show zero and negatives: logarithmic for big values either way,
+	close to linear within about `logThreshold` of zero.
 -->
 <script lang="ts">
 	import { formatMonth, type Point } from '$lib/housing';
@@ -24,6 +29,11 @@
 	export let crossingLabel = 'Crosses zero';
 	export let positiveLabel = 'Above zero';
 	export let negativeLabel = 'Below zero';
+	export let log = false;
+	export let logToggle = false;
+	export let logThreshold = 1000;
+
+	let useLog = log;
 
 	const M = { top: 12, right: 16, bottom: 26, left: 52 };
 
@@ -37,15 +47,16 @@
 	$: t0 = times[0] ?? 0;
 	$: t1 = times.at(-1) ?? 1;
 	$: values = points.map(([, v]) => v);
-	$: yTicks = signed
-		? niceTicks(Math.min(0, ...values), Math.max(0, ...values))
-		: niceTicks(Math.min(...values), Math.max(...values));
-	$: yMin = yTicks[0] ?? 0;
-	$: yMax = yTicks.at(-1) ?? 1;
+	$: lo = signed ? Math.min(0, ...values) : Math.min(...values);
+	$: hi = signed ? Math.max(0, ...values) : Math.max(...values);
+	$: yTicks = useLog ? logTicks(lo, hi, logThreshold) : niceTicks(lo, hi);
+	// The plotted range, in the scale's own units (transformed when on log).
+	$: yMin = fy(useLog, logThreshold, yTicks[0] ?? 0);
+	$: yMax = fy(useLog, logThreshold, yTicks.at(-1) ?? 1);
 
 	// The scale as data rather than a reactive closure: template calls like
 	// sx(scale, t) then re-run whenever the scale changes.
-	$: scale = { t0, t1, yMin, yMax, innerW, innerH };
+	$: scale = { t0, t1, yMin, yMax, innerW, innerH, log: useLog, c: logThreshold };
 
 	$: line = points
 		.map((p, i) => `${i ? 'L' : 'M'}${sx(scale, times[i])},${sy(scale, p[1])}`)
@@ -125,7 +136,35 @@
 	}
 
 	function sy(s: Scale, v: number): number {
-		return M.top + s.innerH - ((v - s.yMin) / (s.yMax - s.yMin || 1)) * s.innerH;
+		const y = fy(s.log, s.c, v);
+		return M.top + s.innerH - ((y - s.yMin) / (s.yMax - s.yMin || 1)) * s.innerH;
+	}
+
+	// Symmetric log: defined at zero and for negatives, unlike log10 itself.
+	function fy(log: boolean, c: number, v: number): number {
+		return log ? Math.sign(v) * Math.log10(1 + Math.abs(v) / c) : v;
+	}
+
+	// Log ticks: zero, then ±10, ±100 ... times the threshold, out to the first
+	// decade past the data on each side that has any. ±1× is skipped: that close
+	// to zero the scale is nearly linear, and its labels would crowd $0's.
+	function logTicks(lo: number, hi: number, c: number): number[] {
+		const decades = (limit: number): number[] => {
+			const out: number[] = [];
+			for (let v = c * 10; ; v *= 10) {
+				out.push(v);
+				if (v >= limit) break;
+			}
+			return out;
+		};
+		const neg =
+			lo < 0
+				? decades(-lo)
+						.map((v) => -v)
+						.reverse()
+				: [];
+		const pos = hi > 0 ? decades(hi) : [];
+		return [...neg, 0, ...pos];
 	}
 
 	// Ticks on round numbers that cover the data, ~4 of them. Zero is kept in
@@ -192,6 +231,22 @@
 		<span class="title">{title}</span>
 		{#if latest}<span class="latest">{format(latest[1])} · {dateLabel(latest[0])}</span>{/if}
 		{#if subtitle}<span class="subtitle">{subtitle}</span>{/if}
+		{#if logToggle}
+			<span class="scale-toggle" role="group" aria-label="Vertical scale">
+				<button
+					type="button"
+					class:on={useLog}
+					aria-pressed={useLog}
+					on:click={() => (useLog = true)}>Log</button
+				>
+				<button
+					type="button"
+					class:on={!useLog}
+					aria-pressed={!useLog}
+					on:click={() => (useLog = false)}>Linear</button
+				>
+			</span>
+		{/if}
 		{#if signed}
 			<span class="legend">
 				<span class="key"><span class="swatch pos"></span>{positiveLabel}</span>
@@ -455,6 +510,33 @@
 		paint-order: stroke;
 		stroke: var(--surface);
 		stroke-width: 3px;
+	}
+
+	.scale-toggle {
+		display: inline-flex;
+		margin-left: auto;
+		border: 1px solid rgba(11, 11, 11, 0.15);
+		border-radius: 6px;
+		overflow: hidden;
+	}
+
+	.scale-toggle button {
+		padding: 0.15rem 0.55rem;
+		background: #fff;
+		border: none;
+		color: var(--ink-2);
+		font: inherit;
+		font-size: 0.78rem;
+		cursor: pointer;
+	}
+
+	.scale-toggle button + button {
+		border-left: 1px solid rgba(11, 11, 11, 0.15);
+	}
+
+	.scale-toggle button.on {
+		background: var(--ink);
+		color: #fff;
 	}
 
 	.legend {
