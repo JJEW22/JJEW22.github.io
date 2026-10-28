@@ -58,7 +58,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			gameScore: num(body.gameScore),
 			betterThan: num(body.betterThan),
 			email: typeof body.email === 'string' ? body.email : null,
-			notify: Boolean(body.notify)
+			notify: Boolean(body.notify),
+			// Ignored for a signed-in player, whose name is the account's.
+			guestName: text(body.guestName, 200) || null
 		});
 		return json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
 	} catch (err) {

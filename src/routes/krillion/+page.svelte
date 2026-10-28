@@ -62,6 +62,9 @@
 		updatedScore: number | null;
 		countsAsOf: string | null;
 		notify: boolean;
+		// Only on a fresh submission; a dive restored from your account has neither.
+		id?: number;
+		guestName?: string | null;
 	}
 
 	let day: Day | null = null;
@@ -122,6 +125,30 @@
 	} | null = null;
 	let notify = false;
 	let email = '';
+	// Not signed in: the name for the day's leaderboard. Blank gets a random tag.
+	let guestName = '';
+	const GUEST_NAME_MAX = 40;
+
+	// The dives this browser submitted as a guest, so the board can mark them as
+	// yours. Only a highlight: losing it (another browser, cleared storage) just
+	// means your row isn't marked.
+	const GUEST_DIVES_KEY = 'krillion.guestDives';
+	function guestDives(): number[] {
+		try {
+			const ids = JSON.parse(localStorage.getItem(GUEST_DIVES_KEY) ?? '[]');
+			return Array.isArray(ids) ? ids.filter((x) => Number.isInteger(x)) : [];
+		} catch {
+			return [];
+		}
+	}
+	function rememberGuestDive(id: number) {
+		try {
+			const ids = [id, ...guestDives().filter((x) => x !== id)].slice(0, 30);
+			localStorage.setItem(GUEST_DIVES_KEY, JSON.stringify(ids));
+		} catch {
+			/* no storage: the row just won't be marked */
+		}
+	}
 	let busy = false;
 	let error = '';
 	let result: Result | null = null;
@@ -156,13 +183,15 @@
 		setTimeout(() => (copied = false), 2000);
 	}
 
-	// Leaderboard: signed-in dives, totals only.
+	// Leaderboard, totals only: a day's board includes guests; all time is
+	// accounts only.
 	interface LeaderRow {
 		name: string;
 		gameScore: number | null;
 		updatedScore: number | null;
 		dives: number;
 		average: number | null;
+		guest: boolean;
 		isYou: boolean;
 	}
 	interface AllTimeRow {
@@ -184,7 +213,12 @@
 
 	async function loadBoard(dayNumber: number | null = boardDayNumber) {
 		try {
-			const qs = dayNumber ? `?day=${dayNumber}` : '';
+			const mine = me ? [] : guestDives();
+			const parts = [
+				dayNumber ? `day=${dayNumber}` : '',
+				mine.length ? `mine=${mine.join(',')}` : ''
+			].filter(Boolean);
+			const qs = parts.length ? `?${parts.join('&')}` : '';
 			const b = await fetch(`/krillion/api/leaderboard${qs}`).then((x) => x.json());
 			boardDate = b.date;
 			boardDay = b.day ?? [];
@@ -340,7 +374,8 @@
 					};
 				}),
 				notify,
-				email: me ? null : email.trim()
+				email: me ? null : email.trim(),
+				guestName: me ? null : guestName.trim()
 			};
 			const r = await fetch('/krillion/api/submit', {
 				method: 'POST',
@@ -378,8 +413,11 @@
 			if (me) {
 				const m = await fetch('/krillion/api/mine').then((x) => x.json());
 				myDives = m.dives ?? [];
-				loadBoard(boardDayNumber);
+			} else if (data.id) {
+				rememberGuestDive(Number(data.id));
 			}
+			// Guests are on the day's board too, so it refreshes either way.
+			loadBoard(boardDayNumber);
 		} catch (err) {
 			error = `Couldn't submit: ${err instanceof Error ? err.message : String(err)}`;
 		} finally {
@@ -575,6 +613,15 @@
 							Signed in as <b>{me}</b> — your final score is saved to your account either way.
 						</p>
 					{:else}
+						<label class="guest-name">
+							<span>Your name for today's leaderboard</span>
+							<input
+								bind:value={guestName}
+								maxlength={GUEST_NAME_MAX}
+								placeholder="Optional — left blank, you get a random tag"
+								autocomplete="nickname"
+							/>
+						</label>
 						<label class="check">
 							<input type="checkbox" bind:checked={notify} />
 							<span>Email me my final score once the dive closes ({SUBMIT_DEADLINE_TEXT})</span>
@@ -585,7 +632,7 @@
 						{/if}
 						<p class="sub">
 							<a href="{resolve('/account')}?redirect=/krillion">Sign in</a> to keep your scores on your
-							account.
+							account and count toward the all-time averages.
 						</p>
 					{/if}
 				</div>
@@ -615,6 +662,9 @@
 						You already submitted today. Here it is with the latest scores — change any answer above
 						and submit again to replace it.
 					</p>
+				{/if}
+				{#if result.guestName}
+					<p class="sub">You're on today's leaderboard as <b>{result.guestName}</b>.</p>
 				{/if}
 				{#if result.status === 'waiting'}
 					<p>
@@ -780,10 +830,11 @@
 				</div>
 			</div>
 			<p class="hint">
-				Everyone who submits while signed in, by rescored total. All time ranks average rescored
-				total, once you have {MIN_DIVES_FOR_AVERAGE} dives. Totals only — no answers, so it never spoils
-				the dive.{#if !me}
-					<a href="{resolve('/account')}?redirect=/krillion">Sign in</a> to be on it.{/if}
+				Everyone who submits, by rescored total — guests included on each day's board. All time
+				ranks average rescored total for signed-in players, once they have {MIN_DIVES_FOR_AVERAGE}
+				dives. Totals only — no answers, so it never spoils the dive. {#if !me}<a
+						href="{resolve('/account')}?redirect=/krillion">Sign in</a
+					> to count toward the averages.{/if}
 			</p>
 
 			{#if boardView === 'day'}
@@ -815,16 +866,19 @@
 								<tr class:you={r.isYou}>
 									<td>{r.updatedScore === null ? '—' : i + 1}</td>
 									<td
-										>{r.name}{#if r.isYou}<span class="you-flag">you</span>{/if}</td
+										>{r.name}{#if r.guest}<span class="guest-flag">guest</span
+											>{/if}{#if r.isYou}<span class="you-flag">you</span>{/if}</td
 									>
 									<td class="num">{r.gameScore ?? '—'}</td>
 									<td class="num"
 										><b>{r.updatedScore === null ? 'waiting' : r.updatedScore.toFixed(1)}</b></td
 									>
 									<td class="num sub"
-										>{r.dives >= MIN_DIVES_FOR_AVERAGE && r.average !== null
-											? r.average.toFixed(1)
-											: `${r.dives}/${MIN_DIVES_FOR_AVERAGE}`}</td
+										>{r.guest
+											? '—'
+											: r.dives >= MIN_DIVES_FOR_AVERAGE && r.average !== null
+												? r.average.toFixed(1)
+												: `${r.dives}/${MIN_DIVES_FOR_AVERAGE}`}</td
 									>
 								</tr>
 							{/each}
@@ -832,7 +886,7 @@
 					</table>
 				{:else}
 					<p class="sub">
-						Nobody signed in has submitted {boardDate ? `for ${boardDate}` : ''} yet.
+						Nobody has submitted {boardDate ? `for ${boardDate}` : ''} yet.
 					</p>
 				{/if}
 			{:else if boardAll.length}
@@ -1397,6 +1451,24 @@
 
 	tr.you td {
 		background: #f0f7ff;
+	}
+
+	.guest-name {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		max-width: 22rem;
+		margin-bottom: 0.75rem;
+		font-size: 0.9rem;
+	}
+
+	.guest-flag {
+		margin-left: 0.4rem;
+		padding: 0.05rem 0.4rem;
+		background: #eef0f3;
+		border-radius: 10px;
+		font-size: 0.7rem;
+		color: #52514e;
 	}
 
 	.you-flag {

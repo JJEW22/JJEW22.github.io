@@ -13,7 +13,9 @@
 // standings. They need the score histogram, which only comes from the game's
 // own "finished a game" POST, and we don't call that.
 
+import crypto from 'node:crypto';
 import { sql } from '$lib/server/db';
+import { checkName } from '$lib/names';
 import { sendEmail } from '$lib/server/email';
 import {
 	acceptedPoints,
@@ -567,6 +569,8 @@ export interface SubmitInput {
 	betterThan: number | null;
 	email: string | null;
 	notify: boolean;
+	// Guests only: the name for the day's leaderboard. Blank gets a random tag.
+	guestName: string | null;
 }
 
 export interface SubmitResult {
@@ -579,6 +583,26 @@ export interface SubmitResult {
 	updatedScore: number | null;
 	countsAsOf: string | null;
 	notify: boolean;
+	guestName: string | null; // the name a guest's dive went on the board under
+}
+
+// A guest who leaves the name blank still needs one on the board. Letters and
+// digits that can't be misread for each other (no 0/O, 1/I).
+const TAG_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randomGuestTag(): string {
+	const bytes = crypto.randomBytes(4);
+	return `Guest-${[...bytes].map((b) => TAG_CHARS[b % TAG_CHARS.length]).join('')}`;
+}
+
+export const GUEST_NAME_MAX = 40;
+
+function guestNameFor(raw: string | null): string {
+	const checked = checkName(raw);
+	if (!checked.ok) return randomGuestTag();
+	if (checked.value.length > GUEST_NAME_MAX) {
+		throw new KrillionError(`That name is too long (${GUEST_NAME_MAX} characters).`);
+	}
+	return checked.value;
 }
 
 function okTotal(v: unknown): number | null {
@@ -711,6 +735,7 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		if (!EMAIL_RE.test(email) || email.length > 254)
 			throw new KrillionError('That email address doesn’t look right.');
 	}
+	const guestName = userId ? null : guestNameFor(input.guestName);
 	const rounds = cleanRounds(input.rounds);
 	const scoring = await checkRounds(date, day, rounds);
 	// The game's total: the paste's own figure if it had one, else the rounds' sum.
@@ -731,9 +756,10 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		id = Number(row.id);
 	} else {
 		const [row] = await sql<{ id: string }[]>`
-			insert into krillion_submissions (date, day_number, email, notify, rounds, game_score, game_better_than)
+			insert into krillion_submissions
+				(date, day_number, email, notify, rounds, game_score, game_better_than, guest_name)
 			values (${date}, ${input.dayNumber}, ${email}, ${input.notify && Boolean(email)},
-				${sql.json(rounds as never)}, ${gameScore}, ${input.betterThan})
+				${sql.json(rounds as never)}, ${gameScore}, ${input.betterThan}, ${guestName})
 			returning id
 		`;
 		id = Number(row.id);
@@ -750,7 +776,8 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 			gameScore: gameScore ?? gameTotal(scored),
 			updatedScore: total,
 			countsAsOf: day.countsAsOf,
-			notify: input.notify
+			notify: input.notify,
+			guestName
 		};
 	}
 	await fileEarlyReviews(date, { id, user_id: userId }, rounds);
@@ -763,7 +790,8 @@ export async function submitDive(userId: number | null, input: SubmitInput): Pro
 		gameScore,
 		updatedScore: null,
 		countsAsOf: null,
-		notify: input.notify
+		notify: input.notify,
+		guestName
 	};
 }
 
@@ -908,9 +936,11 @@ export async function sendFinalEmailsIfDue(now = new Date()) {
 
 // ---------------- leaderboard ----------------
 //
-// Signed-in dives only, and totals only: no answers, so today's board can't
-// spoil today's dive. Names are the account name (users.real_name, set on
-// /account) with the username as the fallback.
+// Totals only: no answers, so today's board can't spoil today's dive. Names
+// are the account name (users.real_name, set on /account) with the username
+// as the fallback. A day's board includes guests, under the name they gave (or
+// their random tag); the all-time board, built on averages, is accounts only,
+// since a guest's dives can't be tied together.
 
 export const KRILLION_ADMIN_ROLE = 'krillion:admin';
 
@@ -918,18 +948,23 @@ export interface LeaderRow {
 	name: string;
 	gameScore: number | null;
 	updatedScore: number | null; // null while the day's counts aren't in
-	dives: number; // the player's scored dives, all time
-	average: number | null; // their all-time average rescored total
+	dives: number; // the player's scored dives, all time (0 for a guest)
+	average: number | null; // their all-time average rescored total (null for a guest)
+	guest: boolean;
 	isYou: boolean;
 }
 
+// `guestIds` are the dives this browser submitted as a guest, so a guest's own
+// row can be marked as theirs; they only ever highlight, never reveal anything.
 export async function leaderboardForDate(
 	date: string,
-	viewerId: number | null
+	viewerId: number | null,
+	guestIds: number[] = []
 ): Promise<LeaderRow[]> {
 	const rows = await sql<
 		{
-			user_id: string;
+			id: string;
+			user_id: string | null;
 			name: string;
 			game_score: number | null;
 			updated_score: number | null;
@@ -937,10 +972,10 @@ export async function leaderboardForDate(
 			average: number | null;
 		}[]
 	>`
-		select s.user_id, coalesce(u.real_name, u.username) as name, s.game_score, s.updated_score,
-			coalesce(a.dives, 0) as dives, a.average
+		select s.id, s.user_id, coalesce(u.real_name, u.username, s.guest_name, 'Guest') as name,
+			s.game_score, s.updated_score, coalesce(a.dives, 0) as dives, a.average
 		from krillion_submissions s
-		join users u on u.id = s.user_id
+		left join users u on u.id = s.user_id
 		left join (
 			select user_id, count(*)::int as dives, avg(updated_score)::float8 as average
 			from krillion_submissions where user_id is not null and updated_score is not null
@@ -948,16 +983,22 @@ export async function leaderboardForDate(
 		) a on a.user_id = s.user_id
 		where s.date = ${date}
 		order by s.updated_score desc nulls last, s.game_score desc nulls last,
-			lower(coalesce(u.real_name, u.username))
+			lower(coalesce(u.real_name, u.username, s.guest_name, 'Guest'))
 	`;
-	return rows.map((r) => ({
-		name: r.name,
-		gameScore: r.game_score,
-		updatedScore: r.updated_score,
-		dives: r.dives,
-		average: r.average,
-		isYou: viewerId !== null && Number(r.user_id) === viewerId
-	}));
+	return rows.map((r) => {
+		const guest = r.user_id === null;
+		return {
+			name: r.name,
+			gameScore: r.game_score,
+			updatedScore: r.updated_score,
+			dives: r.dives,
+			average: guest ? null : r.average,
+			guest,
+			isYou: guest
+				? viewerId === null && guestIds.includes(Number(r.id))
+				: viewerId !== null && Number(r.user_id) === viewerId
+		};
+	});
 }
 
 export interface AllTimeRow {
@@ -1053,7 +1094,7 @@ export async function assertAdminCanSee(userId: number, date: string): Promise<v
 
 export interface AdminSubmission {
 	id: number;
-	name: string; // account name, or "Guest"
+	name: string; // account name, a guest's own name or tag, or "Guest"
 	guest: boolean;
 	gameScore: number | null;
 	betterThan: number | null;
@@ -1074,6 +1115,7 @@ export async function adminSubmissions(userId: number, date: string): Promise<Ad
 		{
 			id: number;
 			name: string | null;
+			guest: boolean;
 			game_score: number | null;
 			game_better_than: number | null;
 			updated_score: number | null;
@@ -1084,7 +1126,8 @@ export async function adminSubmissions(userId: number, date: string): Promise<Ad
 			edited_at: Date | null;
 		}[]
 	>`
-		select s.id::int as id, coalesce(u.real_name, u.username) as name, s.game_score,
+		select s.id::int as id, coalesce(u.real_name, u.username, s.guest_name) as name,
+			s.user_id is null as guest, s.game_score,
 			s.game_better_than, s.updated_score, s.created_at, s.rounds, s.scored,
 			coalesce(e.real_name, e.username) as edited_by, s.edited_at
 		from krillion_submissions s left join users u on u.id = s.user_id
@@ -1095,7 +1138,7 @@ export async function adminSubmissions(userId: number, date: string): Promise<Ad
 	return rows.map((r) => ({
 		id: r.id,
 		name: r.name ?? 'Guest',
-		guest: r.name === null,
+		guest: r.guest,
 		gameScore: r.game_score,
 		betterThan: r.game_better_than,
 		updatedScore: r.updated_score,
@@ -1207,7 +1250,8 @@ export async function listReviews(
 		}[]
 	>`
 		(select r.id::int as id, to_char(r.date, 'YYYY-MM-DD') as date, d.day_number, r.prompt_id,
-			d.prompts, d.model, r.answer, r.status, coalesce(u.real_name, u.username) as asked_by,
+			d.prompts, d.model, r.answer, r.status,
+			coalesce(u.real_name, u.username, s.guest_name) as asked_by,
 			r.created_at, r.decided_at, coalesce(a.real_name, a.username) as decided_by,
 			s.rounds as asked_rounds
 		from krillion_word_reviews r
@@ -1412,7 +1456,8 @@ export async function adminDeleteDive(
 	id: number
 ): Promise<{ date: string; name: string }> {
 	const [row] = await sql<{ date: string; name: string | null }[]>`
-		select to_char(s.date, 'YYYY-MM-DD') as date, coalesce(u.real_name, u.username) as name
+		select to_char(s.date, 'YYYY-MM-DD') as date,
+			coalesce(u.real_name, u.username, s.guest_name) as name
 		from krillion_submissions s left join users u on u.id = s.user_id
 		where s.id = ${id}
 	`;
