@@ -8,6 +8,8 @@
 //                                on RentCast (when RENTCAST_API_KEY is set)
 //   PATCH  { id, ...fields }     edit details, notes, or saved assumptions
 //   PATCH  { id, eliminated }    eliminate (true) or restore (false) a house
+//   PATCH  { id, soldPrice }     mark it sold to someone else, for that much;
+//                                null puts it back on the list
 //   DELETE { id }                remove one
 //
 // Looking an existing house up again is ./lookup; rating one is ./rating.
@@ -19,6 +21,7 @@ import {
 	readFields,
 	refreshFromRentcast,
 	setEliminated,
+	setSold,
 	rentcastConfigured,
 	rentcastPausedMessage,
 	rentcastUsage,
@@ -63,6 +66,11 @@ export const PATCH: RequestHandler = async ({ url, locals, request }) => {
 		if (typeof body?.eliminated === 'boolean') {
 			await setEliminated(idOf(body), me, body.eliminated);
 			return body.eliminated ? 'Eliminated. It is off the list and won’t be synced.' : 'Restored.';
+		}
+		if (body && 'soldPrice' in body) {
+			const price = body.soldPrice === null ? null : Number(body.soldPrice);
+			await setSold(idOf(body), me, price);
+			return price === null ? 'Restored.' : 'Marked sold. It is off the list and won’t be synced.';
 		}
 		await updateHouse(idOf(body), readFields(body));
 	}, me);

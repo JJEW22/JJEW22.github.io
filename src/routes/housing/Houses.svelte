@@ -22,10 +22,9 @@
 		averageRating,
 		flagSummary,
 		formatDollars,
-		housePeople,
+		monthlyPerPerson,
 		myScore as scoreBy,
 		parseZillowUrl,
-		pricePerPerson,
 		pricePerSqft,
 		sortHouses,
 		type Assumptions,
@@ -135,33 +134,99 @@
 		return dir === 'asc' ? 'ascending' : 'descending';
 	}
 
-	function perPersonText(h: House): string {
-		const per = pricePerPerson(h);
-		const people = housePeople(h);
-		return per !== null && people ? `${formatDollars(per)} per person · ${people} splitting` : '';
+	// The rate is passed in, not read from the component, so the template re-runs
+	// this when it arrives.
+	function perPersonText(h: House, rate: number | null): string {
+		const m = monthlyPerPerson(h, rate);
+		return m ? `${formatDollars(m.perPerson)} / mo per person · ${m.people} splitting` : '';
+	}
+
+	// A table column for everyone who has rated a house on the list: you first
+	// (even before you've rated any, so "Not yet" shows what's left), then the
+	// others by name.
+	function ratersOf(list: House[], me: number | null): { userId: number; name: string }[] {
+		const byId: Record<number, string> = {};
+		for (const h of list) for (const r of h.ratings) byId[r.userId] = r.name;
+		const others = Object.entries(byId)
+			.map(([id, name]) => ({ userId: Number(id), name }))
+			.filter((p) => p.userId !== me)
+			.sort((a, b) => a.name.localeCompare(b.name));
+		return me !== null ? [{ userId: me, name: 'You' }, ...others] : others;
 	}
 
 	$: preview = url.trim() ? parseZillowUrl(url) : null;
 	$: selected = houses.find((h) => h.id === selectedId) ?? null;
 	// Eliminated houses leave the map and the main list; they're still here,
-	// behind "Show eliminated", and can be restored.
+	// behind "Show eliminated", and can be restored. Sold ones (to someone else)
+	// are the same, in a bucket of their own beside it.
 	$: activeHouses = sortHouses(
-		houses.filter((h) => !h.eliminatedAt),
+		houses.filter((h) => !h.eliminatedAt && !h.soldAt),
 		sortKey,
 		sortDir,
-		me
+		me,
+		marketRate
 	);
 	$: eliminatedHouses = sortHouses(
 		houses.filter((h) => h.eliminatedAt),
 		sortKey,
 		sortDir,
-		me
+		me,
+		marketRate
 	);
+	$: soldHouses = sortHouses(
+		houses.filter((h) => h.soldAt),
+		sortKey,
+		sortDir,
+		me,
+		marketRate
+	);
+	$: raters = ratersOf(activeHouses, me);
 	let showEliminated = false;
+	let showSold = false;
+	$: shelves = [
+		{ key: 'eliminated', list: eliminatedHouses, open: showEliminated },
+		{ key: 'sold', list: soldHouses, open: showSold }
+	].filter((b) => b.list.length);
+
+	function toggleShelf(key: string) {
+		if (key === 'sold') showSold = !showSold;
+		else showEliminated = !showEliminated;
+	}
 
 	async function setEliminated(h: House, eliminated: boolean) {
 		msg = '';
 		await send('PATCH', { id: h.id, eliminated });
+	}
+
+	// Why the selected house is frozen (off the list, ratings read-only), if it is.
+	$: frozen = selected?.soldAt ? 'sold' : selected?.eliminatedAt ? 'eliminated' : null;
+
+	// The sold form: open while the house is sold, or once "Sold" is ticked.
+	let soldOpen = false;
+	let soldDraft: number | null = null;
+
+	async function setSold(h: House, soldPrice: number | null) {
+		msg = '';
+		await send('PATCH', { id: h.id, soldPrice });
+	}
+
+	function toggleSold(h: House, on: boolean) {
+		if (on) {
+			soldOpen = true;
+			soldDraft = h.soldPrice ?? h.price;
+		} else if (h.soldAt) {
+			setSold(h, null);
+		} else {
+			soldOpen = false;
+		}
+	}
+
+	// "asked $1,195,000 · 4.2% over asking", for a sold house.
+	function soldVsAsking(h: House): string {
+		if (!h.soldPrice || !h.price) return '';
+		const pct = ((h.soldPrice - h.price) / h.price) * 100;
+		if (Math.abs(pct) < 0.05) return `asked ${formatDollars(h.price)} · at asking`;
+		return `asked ${formatDollars(h.price)} · ${Math.abs(pct).toFixed(1)}% ${pct > 0 ? 'over' : 'under'} asking`;
 	}
 	$: if (selected && selected.id !== editingFor) syncEdit(selected);
 
@@ -177,6 +242,8 @@
 		myScore = mine?.score ?? null;
 		myFlags = { wouldntBuy: mine?.wouldntBuy ?? false, wouldntRent: mine?.wouldntRent ?? false };
 		myComment = mine?.comment ?? '';
+		soldOpen = Boolean(h.soldAt);
+		soldDraft = h.soldPrice ?? h.price;
 	}
 
 	$: myRating = selected?.ratings.find((r) => r.userId === me) ?? null;
@@ -437,7 +504,7 @@
 						</th>
 						<th aria-sort={ariaSort('perPerson', sortKey, sortDir)}>
 							<button type="button" on:click={() => sortBy('perPerson')}
-								>Per person{arrow('perPerson', sortKey, sortDir)}</button
+								>Monthly / person{arrow('perPerson', sortKey, sortDir)}</button
 							>
 						</th>
 						<th>Beds</th>
@@ -457,10 +524,19 @@
 								>Rating{arrow('rating', sortKey, sortDir)}</button
 							>
 						</th>
-						<th>
-							<button type="button" on:click={() => sortBy('unrated')}>You</button>
-						</th>
-						<th>Flags</th>
+						{#each raters as p (p.userId)}
+							<th>
+								{#if p.userId === me}
+									<button
+										type="button"
+										on:click={() => sortBy('unrated')}
+										title="Houses you haven't rated first">You</button
+									>
+								{:else}
+									{p.name}
+								{/if}
+							</th>
+						{/each}
 						<th aria-sort={ariaSort('newest', sortKey, sortDir)}>
 							<button type="button" on:click={() => sortBy('newest')}
 								>Added{arrow('newest', sortKey, sortDir)}</button
@@ -472,7 +548,7 @@
 				<tbody>
 					{#each activeHouses as h (h.id)}
 						{@const avg = averageRating(h)}
-						{@const mine = scoreBy(h, me)}
+						{@const monthly = monthlyPerPerson(h, marketRate)}
 						<tr class:selected={h.id === selectedId}>
 							<td class="house-cell">
 								<button type="button" class="link" on:click={() => pick(h.id, true)}>
@@ -481,8 +557,8 @@
 							</td>
 							<td>{h.price !== null ? formatDollars(h.price) : '—'}</td>
 							<td>
-								{pricePerPerson(h) !== null ? formatDollars(pricePerPerson(h) ?? 0) : '—'}
-								{#if housePeople(h)}<span class="sub">÷ {housePeople(h)}</span>{/if}
+								{monthly ? formatDollars(monthly.perPerson) : '—'}
+								{#if monthly}<span class="sub">÷ {monthly.people}</span>{/if}
 							</td>
 							<td>{h.beds ?? '—'}</td>
 							<td>{h.baths ?? '—'}</td>
@@ -493,10 +569,14 @@
 										/{RATING_MAX} · {h.ratings.length}</span
 									>{:else}—{/if}
 							</td>
-							<td
-								>{#if mine !== null}{mine}{:else}<span class="todo">Not yet</span>{/if}</td
-							>
-							<td class="flags-cell">{flagSummary(h) || '—'}</td>
+							{#each raters as p (p.userId)}
+								{@const score = scoreBy(h, p.userId)}
+								<td
+									>{#if score !== null}{score}{:else if p.userId === me}<span class="todo"
+											>Not yet</span
+										>{:else}<span class="sub">—</span>{/if}</td
+								>
+							{/each}
 							<td>{new Date(h.createdAt).toLocaleDateString('en-US')}</td>
 							<td>
 								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
@@ -514,7 +594,9 @@
 					<button type="button" class="pick" on:click={() => pick(h.id, true)}>
 						<span class="name">{title(h)}</span>
 						<span class="price">{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span>
-						{#if perPersonText(h)}<span class="per-person">{perPersonText(h)}</span>{/if}
+						{#if perPersonText(h, marketRate)}<span class="per-person"
+								>{perPersonText(h, marketRate)}</span
+							>{/if}
 						{#if facts(h)}<span class="facts">{facts(h)}</span>{/if}
 						{#if averageRating(h) !== null}
 							{@const avg = averageRating(h) ?? 0}
@@ -539,24 +621,40 @@
 		</ul>
 	{/if}
 
-	{#if eliminatedHouses.length}
-		<button
-			type="button"
-			class="secondary show-eliminated"
-			aria-expanded={showEliminated}
-			on:click={() => (showEliminated = !showEliminated)}
-		>
-			{showEliminated ? 'Hide' : 'Show'} eliminated ({eliminatedHouses.length})
-		</button>
-		{#if showEliminated}
+	{#if shelves.length}
+		<div class="shelf-toggles">
+			{#each shelves as b (b.key)}
+				<button
+					type="button"
+					class="secondary"
+					aria-expanded={b.open}
+					on:click={() => toggleShelf(b.key)}
+				>
+					{b.open ? 'Hide' : 'Show'}
+					{b.key} ({b.list.length})
+				</button>
+			{/each}
+		</div>
+		{#each shelves.filter((b) => b.open) as b (b.key)}
+			<h3 class="shelf-title">{b.key === 'sold' ? 'Sold to someone else' : 'Eliminated'}</h3>
 			<ul class="houses eliminated">
-				{#each eliminatedHouses as h (h.id)}
+				{#each b.list as h (h.id)}
 					<li class:selected={h.id === selectedId}>
 						<button type="button" class="pick" on:click={() => pick(h.id, true)}>
 							<span class="name">{title(h)}</span>
-							<span class="price">{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span
-							>
-							{#if perPersonText(h)}<span class="per-person">{perPersonText(h)}</span>{/if}
+							{#if b.key === 'sold'}
+								<span class="price"
+									>{h.soldPrice !== null ? `Sold for ${formatDollars(h.soldPrice)}` : 'Sold'}</span
+								>
+								{#if soldVsAsking(h)}<span class="per-person">{soldVsAsking(h)}</span>{/if}
+							{:else}
+								<span class="price"
+									>{h.price !== null ? formatDollars(h.price) : 'No price yet'}</span
+								>
+								{#if perPersonText(h, marketRate)}<span class="per-person"
+										>{perPersonText(h, marketRate)}</span
+									>{/if}
+							{/if}
 							{#if facts(h)}<span class="facts">{facts(h)}</span>{/if}
 							{#if averageRating(h) !== null}
 								{@const avg = averageRating(h) ?? 0}
@@ -569,19 +667,25 @@
 								<span class="rating none">No one rated it</span>
 							{/if}
 							<span class="by">
-								Eliminated {new Date(h.eliminatedAt ?? '').toLocaleDateString(
-									'en-US'
-								)}{h.eliminatedBy ? ` by ${h.eliminatedBy}` : ''}
+								{#if b.key === 'sold'}
+									Marked sold {new Date(h.soldAt ?? '').toLocaleDateString('en-US')}{h.soldBy
+										? ` by ${h.soldBy}`
+										: ''}
+								{:else}
+									Eliminated {new Date(h.eliminatedAt ?? '').toLocaleDateString(
+										'en-US'
+									)}{h.eliminatedBy ? ` by ${h.eliminatedBy}` : ''}
+								{/if}
 							</span>
 						</button>
 						<div class="card-actions">
 							<button
 								type="button"
 								class="secondary mini"
-								on:click={() => setEliminated(h, false)}
+								on:click={() => (b.key === 'sold' ? setSold(h, null) : setEliminated(h, false))}
 								disabled={busy}
 							>
-								Restore
+								{b.key === 'sold' ? 'Not sold' : 'Restore'}
 							</button>
 							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL -->
 							<a href={h.url} target="_blank" rel="noopener noreferrer">Open on Zillow ↗</a>
@@ -589,14 +693,23 @@
 					</li>
 				{/each}
 			</ul>
-		{/if}
+		{/each}
 	{/if}
 {/if}
 
 {#if selected}
-	<section class="panel detail" class:is-eliminated={selected.eliminatedAt} bind:this={detailEl}>
+	<section class="panel detail" class:is-eliminated={frozen} bind:this={detailEl}>
 		<h2>{title(selected)}</h2>
-		{#if selected.eliminatedAt}
+		{#if selected.soldAt}
+			<p class="banner warn">
+				Sold{selected.soldPrice !== null
+					? ` for ${formatDollars(selected.soldPrice)}`
+					: ''}{soldVsAsking(selected) ? ` (${soldVsAsking(selected)})` : ''}. Marked sold {new Date(
+					selected.soldAt
+				).toLocaleDateString('en-US')}{selected.soldBy ? ` by ${selected.soldBy}` : ''}. It's off
+				the main list and the map, and RentCast won't sync it.
+			</p>
+		{:else if selected.eliminatedAt}
 			<p class="banner warn">
 				Eliminated {new Date(selected.eliminatedAt).toLocaleDateString(
 					'en-US'
@@ -640,6 +753,15 @@
 					/>
 					Eliminated
 				</label>
+				<label class="eliminate sold-toggle">
+					<input
+						type="checkbox"
+						checked={soldOpen}
+						disabled={busy}
+						on:change={(e) => selected && toggleSold(selected, e.currentTarget.checked)}
+					/>
+					Sold
+				</label>
 				<button
 					type="button"
 					class="danger"
@@ -651,19 +773,40 @@
 			</div>
 		</form>
 
+		{#if soldOpen}
+			<form
+				class="sold-form"
+				on:submit|preventDefault={() => selected && setSold(selected, soldDraft)}
+			>
+				<label>
+					<span>Sold for $</span>
+					<input type="number" min="0" step="1000" bind:value={soldDraft} />
+				</label>
+				<button type="submit" disabled={busy || !soldDraft || soldDraft === selected.soldPrice}>
+					{selected.soldAt ? 'Update sold price' : 'Mark sold'}
+				</button>
+				{#if !selected.soldAt}
+					<button type="button" class="secondary" on:click={() => (soldOpen = false)}>
+						Cancel
+					</button>
+					<span class="note">It moves off the list into “Sold”, with the price it went for.</span>
+				{/if}
+			</form>
+		{/if}
+
 		<div class="ratings">
 			<h3>How everyone feels</h3>
-			{#if selected.eliminatedAt}
-				<!-- Frozen as it stood when the house was eliminated: everyone's
-				     rating, yours included, as a list. Restoring it brings the
-				     controls back. -->
+			{#if frozen}
+				<!-- Frozen as it stood when the house was eliminated or sold:
+				     everyone's rating, yours included, as a list. Restoring it
+				     brings the controls back. -->
 				{#if selected.ratings.length}
 					{@const avg = averageRating(selected) ?? 0}
 					<p class="note">
 						Average {avg.toFixed(1)}/{RATING_MAX} from {selected.ratings.length}
 						{selected.ratings.length === 1 ? 'rating' : 'ratings'}{flagSummary(selected)
 							? ` · ${flagSummary(selected)}`
-							: ''}. Restore the house to change a rating.
+							: ''}. Put it back on the list to change a rating.
 					</p>
 					<ul class="others frozen">
 						{#each selected.ratings as r (r.userId)}
@@ -676,7 +819,7 @@
 						{/each}
 					</ul>
 				{:else}
-					<p class="note">No one rated this house before it was eliminated.</p>
+					<p class="note">No one rated this house before it was {frozen}.</p>
 				{/if}
 			{:else}
 				<div class="mine">
@@ -824,7 +967,7 @@
 				</p>
 			</div>
 		{/if}
-		{#if usage?.configured && selected.address && !selected.eliminatedAt}
+		{#if usage?.configured && selected.address && !frozen}
 			<button
 				type="button"
 				class="secondary"
@@ -1181,8 +1324,7 @@
 	}
 
 	.house-table th:first-child,
-	.house-table td:first-child,
-	.house-table .flags-cell {
+	.house-table td:first-child {
 		text-align: left;
 	}
 
@@ -1249,12 +1391,6 @@
 		color: #8a5a00;
 	}
 
-	.flags-cell {
-		color: #b42318;
-		white-space: normal;
-		min-width: 9rem;
-	}
-
 	.house-table a {
 		color: #0066cc;
 		text-decoration: none;
@@ -1295,8 +1431,43 @@
 		height: 1rem;
 	}
 
-	.show-eliminated {
+	/* Beside "Eliminated", which already took the push to the right. */
+	.sold-toggle {
+		margin-left: 0;
+	}
+
+	.sold-form {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: end;
+		gap: 0.75rem;
+		margin: 0.75rem 0 0;
+		padding: 0.75rem;
+		background: #fff;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+	}
+
+	.sold-form label {
+		width: 10rem;
+	}
+
+	.sold-form .note {
+		margin: 0;
+		align-self: center;
+	}
+
+	.shelf-toggles {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
 		margin-top: 1rem;
+	}
+
+	.shelf-title {
+		margin: 1.25rem 0 0;
+		font-size: 1rem;
+		color: #52514e;
 	}
 
 	.houses.eliminated {

@@ -57,6 +57,7 @@ export interface ZillowDataset {
 	key: 'zhvi' | 'zori';
 	label: string;
 	url: string;
+	cityUrl: string; // the same series by city, for Greater Boston
 }
 
 // Zillow Research's public metro-level CSVs. ZHVI is the smoothed, seasonally
@@ -66,17 +67,65 @@ export const ZILLOW_DATASETS: ZillowDataset[] = [
 	{
 		key: 'zhvi',
 		label: 'Typical home value (ZHVI)',
-		url: 'https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv'
+		url: 'https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv',
+		cityUrl:
+			'https://files.zillowstatic.com/research/public_csvs/zhvi/City_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv'
 	},
 	{
 		key: 'zori',
 		label: 'Typical rent (ZORI)',
-		url: 'https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori_uc_sfrcondomfr_sm_month.csv'
+		url: 'https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori_uc_sfrcondomfr_sm_month.csv',
+		cityUrl:
+			'https://files.zillowstatic.com/research/public_csvs/zori/City_zori_uc_sfrcondomfr_sm_month.csv'
 	}
 ];
 
-// Zillow's RegionID for the whole country, the page's default region.
+// Zillow's RegionID for the whole country.
 export const US_REGION_ID = '102001';
+
+// Greater Boston as this page means it: Boston, Cambridge, Somerville and
+// Brookline, nowhere else. No one publishes that area, so it is built from the
+// four cities' own series, and it is the page's default region.
+//
+// Typical value and rent are the four cities' figures weighted by how many
+// homes each has (2020 Census housing units, rounded; Brookline's is
+// approximate), so Boston counts for about 72%.
+export const GREATER_BOSTON_ID = 'greater-boston';
+export const GREATER_BOSTON_CITIES = [
+	{ name: 'Boston', housingUnits: 301_700 },
+	{ name: 'Cambridge', housingUnits: 53_900 },
+	{ name: 'Somerville', housingUnits: 36_200 },
+	{ name: 'Brookline', housingUnits: 26_900 }
+];
+
+// --- buyers and sellers ---
+//
+// Redfin's "Balance of Power": sellers are homes actively listed; buyers are
+// estimated from pending sales and how long buyers take to find a home.
+// Redfin publishes it for the US and the 50 biggest metros. For Greater Boston
+// it's estimated here with Redfin's own formula from the four cities' listings
+// (see syncRedfin in $lib/server/housing).
+
+export interface BalanceSeries {
+	id: string; // 'National', 'Boston, MA metro area', or GREATER_BOSTON_ID
+	name: string; // what the chart calls the area
+	estimated: boolean; // built here, not Redfin's own published figures
+	buyers: Point[];
+	sellers: Point[];
+}
+
+// Redfin's thresholds: more than 10% more sellers than buyers is a buyer's
+// market; more than 10% fewer, a seller's market.
+export function sellerBuyerGapPct(buyers: number, sellers: number): number {
+	return ((sellers - buyers) / buyers) * 100;
+}
+
+export function marketBalance(buyers: number, sellers: number): string {
+	const gap = sellerBuyerGapPct(buyers, sellers);
+	if (gap > 10) return "Buyer's market";
+	if (gap < -10) return "Seller's market";
+	return 'Balanced market';
+}
 
 // --- math ---
 
@@ -183,6 +232,11 @@ export interface House {
 	// by the weekly listing check, until restored.
 	eliminatedAt: string | null;
 	eliminatedBy: string | null;
+	// Set when it sold to someone else, with what it went for: the same as
+	// eliminated, in a bucket of its own.
+	soldAt: string | null;
+	soldBy: string | null;
+	soldPrice: number | null;
 	addedBy: string | null;
 	createdAt: string;
 }
@@ -225,17 +279,27 @@ export function flagSummary(h: House): string {
 
 // --- comparing houses ---
 
-// The people splitting a house: what its saved analysis says, or else one per
-// bedroom, the analysis's own default (see houseDefaults).
-export function housePeople(h: Pick<House, 'beds' | 'assumptions'>): number | null {
-	const saved = h.assumptions?.people;
-	if (typeof saved === 'number' && saved > 0) return Math.round(saved);
-	return h.beds !== null ? Math.max(1, Math.round(h.beds)) : null;
+// The assumptions a house's analysis runs on: the defaults, today's rate from
+// FRED, what the house's details say (houseDefaults), then whatever was saved.
+export function houseAssumptions(h: House, marketRate: number | null): Assumptions {
+	return {
+		...DEFAULT_ASSUMPTIONS,
+		...(marketRate !== null ? { ratePct: Number(marketRate.toFixed(2)) } : {}),
+		...houseDefaults(h),
+		...(h.assumptions ?? {})
+	};
 }
 
-export function pricePerPerson(h: House): number | null {
-	const people = housePeople(h);
-	return h.price !== null && people ? h.price / people : null;
+// Month one's cost per person, the analysis's "Monthly cost per person": every
+// cost line, less rent from the rooms left over, split between the people
+// splitting. Null without a price.
+export function monthlyPerPerson(
+	h: House,
+	marketRate: number | null
+): { perPerson: number; people: number } | null {
+	if (!h.price) return null;
+	const result = analyze(h.price, houseAssumptions(h, marketRate));
+	return { perPerson: result.totalMonthly / result.people, people: result.people };
 }
 
 export function pricePerSqft(h: House): number | null {
@@ -260,7 +324,7 @@ export type HouseSort =
 export const HOUSE_SORTS: { key: HouseSort; label: string; dir: 'asc' | 'desc' | null }[] = [
 	{ key: 'newest', label: 'Newest', dir: 'desc' },
 	{ key: 'price', label: 'Price', dir: 'asc' },
-	{ key: 'perPerson', label: 'Price per person', dir: 'asc' },
+	{ key: 'perPerson', label: 'Monthly per person', dir: 'asc' },
 	{ key: 'sqft', label: 'Square feet', dir: 'desc' },
 	{ key: 'perSqft', label: 'Price per sq ft', dir: 'asc' },
 	{ key: 'rating', label: 'Average rating', dir: 'desc' },
@@ -273,7 +337,8 @@ export function sortHouses(
 	list: House[],
 	key: HouseSort,
 	dir: 'asc' | 'desc',
-	me: number | null
+	me: number | null,
+	marketRate: number | null
 ): House[] {
 	const newest = (a: House, b: House) => b.createdAt.localeCompare(a.createdAt);
 	if (key === 'unrated') {
@@ -284,7 +349,7 @@ export function sortHouses(
 		newest: (h) => Date.parse(h.createdAt),
 		price: (h) => h.price,
 		sqft: (h) => h.sqft,
-		perPerson: pricePerPerson,
+		perPerson: (h) => monthlyPerPerson(h, marketRate)?.perPerson ?? null,
 		perSqft: pricePerSqft,
 		rating: averageRating
 	};

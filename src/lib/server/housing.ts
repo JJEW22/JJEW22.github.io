@@ -1,21 +1,27 @@
 // src/lib/server/housing.ts
-// Pulling the housing data from FRED and Zillow Research into the database, and
-// reading it back out for /housing.
+// Pulling the housing data from FRED, Zillow Research and Redfin into the
+// database, and reading it back out for /housing.
 //
-// Nothing is fetched on a page load. A refresh downloads ~6MB of Zillow CSVs
-// and a handful of FRED series, which is too slow to sit in front of a request,
-// so it only runs when an admin asks for one or the weekly workflow does.
+// Nothing is fetched on a page load. A refresh downloads Zillow's metro CSVs
+// (~6MB), streams its city files (~100MB) for Greater Boston, reads Redfin's
+// buyers and sellers, and streams the recent months of Redfin's city file
+// (all of it, ~1GB, the first time), which is far too slow to sit in front of
+// a request, so it only runs when an admin asks for one or the weekly
+// workflow does.
 
 import { env } from '$env/dynamic/private';
 import { sql } from '$lib/server/db';
 import {
 	DEFAULT_ASSUMPTIONS,
 	FRED_SERIES,
+	GREATER_BOSTON_CITIES,
+	GREATER_BOSTON_ID,
 	HISTORY_START,
 	US_REGION_ID,
 	ZILLOW_DATASETS,
 	parseZillowUrl,
 	type Assumptions,
+	type BalanceSeries,
 	type House,
 	RATING_MAX,
 	type Point,
@@ -26,8 +32,8 @@ import {
 // site:admin implies this one, via hasRole().
 export const HOUSING_ADMIN_ROLE = 'housing:admin';
 
-export type Source = 'fred' | 'zillow';
-export const SOURCES: Source[] = ['fred', 'zillow'];
+export type Source = 'fred' | 'zillow' | 'redfin';
+export const SOURCES: Source[] = ['fred', 'zillow', 'redfin'];
 
 interface SeriesRow {
 	source: Source;
@@ -131,6 +137,122 @@ export function parseCsv(text: string): string[][] {
 
 const ZILLOW_ID_COLUMNS = ['RegionID', 'SizeRank', 'RegionName', 'RegionType', 'StateName'];
 
+// Read a big CSV a line at a time, without holding it all. `onLine` returns
+// false to stop early, which also stops the download. Returns the bytes read.
+async function streamLines(url: string, onLine: (line: string) => boolean | void): Promise<number> {
+	const controller = new AbortController();
+	const res = await fetch(url, { signal: controller.signal });
+	if (!res.ok || !res.body) throw new Error(`${url}: ${res.status} ${res.statusText}`);
+	const reader = res.body.getReader();
+	const decoder = new TextDecoder();
+	let rest = '';
+	let bytes = 0;
+	try {
+		for (;;) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			bytes += value.byteLength;
+			const lines = (rest + decoder.decode(value, { stream: true })).split('\n');
+			rest = lines.pop() ?? '';
+			for (const line of lines) if (onLine(line.replace(/\r$/, '')) === false) return bytes;
+		}
+		rest += decoder.decode();
+		if (rest) onLine(rest);
+		return bytes;
+	} finally {
+		controller.abort();
+	}
+}
+
+// Greater Boston's series: the four cities' figures from Zillow's city file,
+// weighted by housing units. Only those four rows are parsed out of the ~100MB
+// file. Where a city's series hasn't started yet (Somerville's home values
+// begin in 2016), the months before are chained back from the others' month-
+// to-month changes, so the line doesn't jump when a city joins.
+async function greaterBostonZillow(key: string, url: string): Promise<SeriesRow> {
+	const wanted = new Map(GREATER_BOSTON_CITIES.map((c) => [c.name, c.housingUnits]));
+	const found = new Map<string, Map<string, number>>();
+	let dates: string[] = [];
+	let first = 0;
+	await streamLines(url, (line) => {
+		if (!dates.length) {
+			const [header] = parseCsv(line);
+			if (ZILLOW_ID_COLUMNS.some((c, i) => header[i] !== c)) {
+				throw new Error(
+					`Zillow ${key} cities: unexpected columns ${header.slice(0, 5).join(', ')}`
+				);
+			}
+			first = header.findIndex((h) => /^\d{4}-\d{2}-\d{2}$/.test(h));
+			dates = header.slice(first);
+			return;
+		}
+		// Cheap test first: most of the file is other states.
+		if (!line.includes(',city,MA,')) return;
+		const [cells] = parseCsv(line);
+		const name = cells[2];
+		if (cells[3] !== 'city' || cells[4] !== 'MA' || !wanted.has(name) || found.has(name)) return;
+		const byDate = new Map<string, number>();
+		dates.forEach((day, i) => {
+			const raw = cells[first + i];
+			if (raw) byDate.set(day, Number(raw));
+		});
+		found.set(name, byDate);
+		if (found.size === wanted.size) return false;
+	});
+	const missing = [...wanted.keys()].filter((n) => !found.has(n));
+	if (missing.length) throw new Error(`Zillow ${key} cities: no row for ${missing.join(', ')}`);
+
+	const value = (name: string, day: string) => {
+		const v = found.get(name)?.get(day);
+		return v !== undefined && Number.isFinite(v) ? v : null;
+	};
+	// The weighted mean of the cities that have both days, on each day.
+	const pair = (a: string, b: string) => {
+		let ta = 0;
+		let tb = 0;
+		for (const [name, units] of wanted) {
+			const va = value(name, a);
+			const vb = value(name, b);
+			if (va === null || vb === null) continue;
+			ta += va * units;
+			tb += vb * units;
+		}
+		return tb ? ta / tb : null;
+	};
+	const days = dates.filter((d) => d >= HISTORY_START);
+	const level = new Map<string, number>();
+	const full = days.findIndex((d) => [...wanted.keys()].every((n) => value(n, d) !== null));
+	if (full >= 0) {
+		const mean = (d: string) =>
+			[...wanted].reduce((t, [n, u]) => t + (value(n, d) ?? 0) * u, 0) /
+			[...wanted.values()].reduce((t, u) => t + u, 0);
+		for (let i = full; i < days.length; i++) {
+			const complete = [...wanted.keys()].every((n) => value(n, days[i]) !== null);
+			const step = i > full ? pair(days[i], days[i - 1]) : null;
+			const prev = level.get(days[i - 1]);
+			if (complete) level.set(days[i], mean(days[i]));
+			else if (step !== null && prev !== undefined) level.set(days[i], prev * step);
+		}
+		for (let i = full - 1; i >= 0; i--) {
+			const step = pair(days[i], days[i + 1]);
+			const next = level.get(days[i + 1]);
+			if (step === null || next === undefined) break;
+			level.set(days[i], next * step);
+		}
+	}
+	const points = days.filter((d) => level.has(d)).map((d): Point => [d, level.get(d) ?? 0]);
+	return {
+		source: 'zillow',
+		key,
+		region_id: GREATER_BOSTON_ID,
+		region_name: 'Greater Boston',
+		region_type: 'custom',
+		state_name: 'MA',
+		size_rank: -1, // first in the region list, ahead of the US
+		points
+	};
+}
+
 async function fetchZillowDataset(key: string, url: string): Promise<SeriesRow[]> {
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`Zillow ${key}: ${res.status} ${res.statusText}`);
@@ -167,11 +289,224 @@ async function syncZillow(): Promise<string> {
 	const counts: string[] = [];
 	for (const d of ZILLOW_DATASETS) {
 		const dataset = await fetchZillowDataset(d.key, d.url);
-		rows.push(...dataset);
-		counts.push(`${d.key}: ${dataset.length} regions`);
+		const boston = await greaterBostonZillow(d.key, d.cityUrl);
+		rows.push(...dataset, boston);
+		counts.push(`${d.key}: ${dataset.length} regions + Greater Boston`);
 	}
 	await replaceSource('zillow', rows);
 	return counts.join(', ');
+}
+
+// --- Redfin ---
+//
+// Redfin's Balance of Power files give buyers and sellers for the US and the 50
+// biggest metros. Greater Boston isn't one of them, so it's estimated with the
+// formula Redfin describes: sellers are active listings, and buyers are pending
+// sales divided by the buyer "hazard", the share of buyers who go under
+// contract in a month. Redfin's hazard comes from its own tour data, which
+// isn't public; the Boston metro's buyers per pending sale is that same
+// 1 / hazard, so the four cities' pending sales are scaled by it.
+//
+// The cities' listings are in Redfin's all-cities file, ~1GB, newest months
+// first. The first refresh reads it back to 2016; after that only the last
+// ~15 months are re-read (Redfin revises recent ones) before the download is
+// cut off. The city figures are 3-month rolling, so each Greater Boston point
+// is a 3-month window, dated by its last month. Redfin seasonally adjusts its
+// metro figures but not its city ones, so the estimate is adjusted here.
+
+const REDFIN = 'https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_data_center';
+const BOSTON_METRO = 'Boston, MA metro area';
+// Redfin's buyer estimates start in 2016; a window ending January 2016 begins
+// in November 2015.
+const REDFIN_CITY_START = '2015-11-01';
+const REDFIN_REVISED_MONTHS = 15;
+
+async function fetchRedfinCsv(path: string): Promise<Record<string, string>[]> {
+	const res = await fetch(`${REDFIN}/${path}`);
+	if (!res.ok) throw new Error(`Redfin ${path}: ${res.status} ${res.statusText}`);
+	const [header, ...lines] = parseCsv(await res.text());
+	return lines
+		.filter((cells) => cells.length === header.length)
+		.map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i]])));
+}
+
+const redfinNumber = (raw: string | undefined): number | null =>
+	raw === undefined || raw === '' || raw === 'NA' ? null : Number(raw);
+
+// Classical seasonal adjustment (ratio to a centred 12-month moving average):
+// each calendar month's typical ratio, the median over the years so one odd
+// spring doesn't set it, is divided back out. For the Greater Boston estimate,
+// whose city figures Redfin doesn't adjust the way it does its metro ones.
+// Needs three years of consecutive months; anything less comes back as is.
+function seasonallyAdjust(points: Point[]): Point[] {
+	if (points.length < 36) return points;
+	const month = (d: string) => Number(d.slice(5, 7)) - 1;
+	const ratios: number[][] = Array.from({ length: 12 }, () => []);
+	for (let i = 6; i < points.length - 6; i++) {
+		// A 2x12 centred average needs the 13 months around this one, unbroken.
+		if (addMonths(points[i - 6][0].slice(0, 7), 12) !== points[i + 6][0].slice(0, 7)) continue;
+		let total = (points[i - 6][1] + points[i + 6][1]) / 2;
+		for (let j = i - 5; j <= i + 5; j++) total += points[j][1];
+		ratios[month(points[i][0])].push(points[i][1] / (total / 12));
+	}
+	if (ratios.some((r) => !r.length)) return points;
+	const median = (xs: number[]) => {
+		const s = [...xs].sort((a, b) => a - b);
+		return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+	};
+	const raw = ratios.map(median);
+	const norm = raw.reduce((t, f) => t + f, 0) / 12;
+	return points.map(([d, v]): Point => [d, Math.round(v / (raw[month(d)] / norm))]);
+}
+
+// 'YYYY-MM' plus or minus whole months.
+function addMonths(month: string, n: number): string {
+	const d = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1));
+	return d.toISOString().slice(0, 7);
+}
+
+async function greaterBostonBalance(metroBuyers: Map<string, number>): Promise<{
+	buyers: Point[];
+	sellers: Point[];
+	raw: { buyers: Point[]; sellers: Point[] };
+	megabytes: number;
+}> {
+	const metroPending = new Map<string, number>();
+	for (const r of await fetchRedfinCsv('housing_market/monthly/top_50_metros.csv')) {
+		const v = redfinNumber(r['PENDING SALES']);
+		if (r['REGION NAME'] === BOSTON_METRO && v) metroPending.set(r['PERIOD BEGIN'].slice(0, 7), v);
+	}
+	if (!metroPending.size) throw new Error(`Redfin: no pending sales for ${BOSTON_METRO}`);
+
+	// What's stored already, so only the recent months need reading again. The
+	// unadjusted figures are kept for this, since the seasonal adjustment is
+	// redone over the whole series each time.
+	const stored = await sql<{ key: string; points: Point[] }[]>`
+		select key, points from housing_series
+		where source = 'redfin' and region_id = ${GREATER_BOSTON_ID}
+	`;
+	const kept = {
+		buyers: new Map(stored.find((r) => r.key === 'buyers_raw')?.points ?? []),
+		sellers: new Map(stored.find((r) => r.key === 'sellers_raw')?.points ?? [])
+	};
+	const lastStored = [...kept.sellers.keys()].sort().at(-1);
+	const from = lastStored
+		? `${addMonths(lastStored.slice(0, 7), -REDFIN_REVISED_MONTHS)}-01`
+		: REDFIN_CITY_START;
+
+	const names = GREATER_BOSTON_CITIES.map((c) => `${c.name}, MA`);
+	const needles = names.map((n) => `"City","${n}",`);
+	// window end 'YYYY-MM' -> city -> its active listings and pending sales
+	const windows = new Map<string, Map<string, { active: number; pending: number }>>();
+	let col: Record<string, number> | null = null;
+	const bytes = await streamLines(`${REDFIN}/housing_market/monthly/all_cities.csv`, (line) => {
+		if (!col) {
+			const [header] = parseCsv(line);
+			col = Object.fromEntries(header.map((h, i) => [h, i]));
+			for (const c of [
+				'PERIOD BEGIN',
+				'PERIOD END',
+				'REGION NAME',
+				'ACTIVE LISTINGS',
+				'PENDING SALES'
+			]) {
+				if (!(c in col)) throw new Error(`Redfin cities: no ${c} column`);
+			}
+			return;
+		}
+		// Newest periods first: past the cutoff, everything left is older.
+		const begin = /^"[^"]*","[^"]*","(\d{4}-\d{2}-\d{2})"/.exec(line)?.[1];
+		if (begin && begin < from) return false;
+		if (!needles.some((n) => line.includes(n))) return;
+		const [cells] = parseCsv(line);
+		const name = cells[col['REGION NAME']];
+		if (!names.includes(name)) return;
+		const active = redfinNumber(cells[col['ACTIVE LISTINGS']]);
+		const pending = redfinNumber(cells[col['PENDING SALES']]);
+		if (active === null || pending === null) return;
+		const end = cells[col['PERIOD END']].slice(0, 7);
+		if (!windows.has(end)) windows.set(end, new Map());
+		windows.get(end)?.set(name, { active, pending });
+	});
+
+	for (const [end, cities] of windows) {
+		// All four cities, and the metro's figures for each month of the window.
+		if (cities.size !== names.length) continue;
+		const months = [addMonths(end, -2), addMonths(end, -1), end];
+		if (months.some((m) => !metroBuyers.has(m) || !metroPending.has(m))) continue;
+		const buyersPerPending =
+			months.reduce((t, m) => t + (metroBuyers.get(m) ?? 0), 0) /
+			months.reduce((t, m) => t + (metroPending.get(m) ?? 0), 0);
+		let active = 0;
+		let pending = 0;
+		for (const c of cities.values()) {
+			active += c.active;
+			pending += c.pending;
+		}
+		kept.sellers.set(`${end}-01`, Math.round(active));
+		kept.buyers.set(`${end}-01`, Math.round(pending * buyersPerPending));
+	}
+	const sorted = (m: Map<string, number>): Point[] => [...m].sort(([a], [b]) => a.localeCompare(b));
+	const raw = { buyers: sorted(kept.buyers), sellers: sorted(kept.sellers) };
+	return {
+		buyers: seasonallyAdjust(raw.buyers),
+		sellers: seasonallyAdjust(raw.sellers),
+		raw,
+		megabytes: Math.round(bytes / 1e6)
+	};
+}
+
+async function syncRedfin(): Promise<string> {
+	const published = [
+		...(await fetchRedfinCsv('buyers_and_sellers/monthly/country.csv')),
+		...(await fetchRedfinCsv('buyers_and_sellers/monthly/top_50_metros.csv'))
+	].filter((r) => r['PROPERTY TYPE'] === 'All Residential');
+
+	const byRegion = new Map<string, { type: string; buyers: Point[]; sellers: Point[] }>();
+	for (const r of published) {
+		const name = r['REGION NAME'];
+		const buyers = redfinNumber(r['BUYERS']);
+		const sellers = redfinNumber(r['SELLERS']);
+		if (!byRegion.has(name)) {
+			byRegion.set(name, { type: r['REGION TYPE'].toLowerCase(), buyers: [], sellers: [] });
+		}
+		const region = byRegion.get(name);
+		if (buyers !== null) region?.buyers.push([r['PERIOD BEGIN'], buyers]);
+		if (sellers !== null) region?.sellers.push([r['PERIOD BEGIN'], sellers]);
+	}
+	const boston = byRegion.get(BOSTON_METRO);
+	if (!boston) throw new Error(`Redfin: no ${BOSTON_METRO} in the metro file`);
+	const metroBuyers = new Map(boston.buyers.map(([d, v]) => [d.slice(0, 7), v]));
+	const estimate = await greaterBostonBalance(metroBuyers);
+
+	const rows: SeriesRow[] = [];
+	const series = (
+		region_id: string,
+		region_type: string,
+		key: 'buyers' | 'sellers' | 'buyers_raw' | 'sellers_raw',
+		points: Point[]
+	): SeriesRow => ({
+		source: 'redfin',
+		key,
+		region_id,
+		region_name: region_id,
+		region_type,
+		state_name: null,
+		size_rank: null,
+		points: [...points].sort(([a], [b]) => a.localeCompare(b))
+	});
+	for (const [name, r] of byRegion) {
+		rows.push(series(name, r.type, 'buyers', r.buyers), series(name, r.type, 'sellers', r.sellers));
+	}
+	rows.push(
+		series(GREATER_BOSTON_ID, 'custom', 'buyers', estimate.buyers),
+		series(GREATER_BOSTON_ID, 'custom', 'sellers', estimate.sellers),
+		series(GREATER_BOSTON_ID, 'custom', 'buyers_raw', estimate.raw.buyers),
+		series(GREATER_BOSTON_ID, 'custom', 'sellers_raw', estimate.raw.sellers)
+	);
+	await replaceSource('redfin', rows);
+	const through = estimate.sellers.at(-1)?.[0].slice(0, 7) ?? 'nothing yet';
+	return `${byRegion.size} regions; Greater Boston estimated through ${through} (read ${estimate.megabytes}MB of city data)`;
 }
 
 // Swap in a source's freshly fetched series in one transaction, so the page
@@ -217,7 +552,12 @@ export async function refresh(sources: Source[] = SOURCES): Promise<SyncResult[]
 	for (const source of sources) {
 		let result: SyncResult;
 		try {
-			const detail = source === 'fred' ? await syncFred() : await syncZillow();
+			const detail =
+				source === 'fred'
+					? await syncFred()
+					: source === 'zillow'
+						? await syncZillow()
+						: await syncRedfin();
 			result = { source, ok: true, detail };
 		} catch (err) {
 			console.error(`Housing refresh of ${source} failed:`, err);
@@ -271,13 +611,34 @@ export interface HousingData {
 	regions: Region[];
 	region: Region | null;
 	zillow: { zhvi: Point[]; zori: Point[] };
+	// Buyers and sellers for the region, where Redfin covers it. Greater Boston
+	// gets its estimate and, to check it against, Redfin's Boston metro.
+	balance: BalanceSeries[];
 	fred: Record<string, Point[]>;
 	status: SyncStatus[];
 }
 
+// Which Redfin series go with a region. Redfin's metro names are Zillow's with
+// " metro area" on the end, though Redfin splits a few big metros into their
+// divisions, so the areas can differ; the chart names Redfin's.
+function balanceIdsFor(region: Region | null): { id: string; name: string; estimated: boolean }[] {
+	if (!region) return [];
+	if (region.id === GREATER_BOSTON_ID) {
+		return [
+			{ id: GREATER_BOSTON_ID, name: 'Greater Boston', estimated: true },
+			{ id: BOSTON_METRO, name: BOSTON_METRO, estimated: false }
+		];
+	}
+	if (region.id === US_REGION_ID)
+		return [{ id: 'National', name: 'United States', estimated: false }];
+	const id = `${region.name} metro area`;
+	return [{ id, name: id, estimated: false }];
+}
+
 // Everything the page renders for one region: that region's Zillow series, the
-// national FRED series, and the list of regions to choose from.
-export async function loadData(regionId = US_REGION_ID): Promise<HousingData> {
+// national FRED series, and the list of regions to choose from. An unknown
+// region (Greater Boston before its first refresh) falls back to the US.
+export async function loadData(regionId = GREATER_BOSTON_ID): Promise<HousingData> {
 	const regions = await sql<
 		{ region_id: string; region_name: string; state_name: string | null }[]
 	>`
@@ -286,22 +647,39 @@ export async function loadData(regionId = US_REGION_ID): Promise<HousingData> {
 		where source = 'zillow' and key = 'zhvi'
 		order by size_rank
 	`;
+	const list = regions.map((r) => ({ id: r.region_id, name: r.region_name, state: r.state_name }));
+	const region =
+		list.find((r) => r.id === regionId) ?? list.find((r) => r.id === US_REGION_ID) ?? null;
 	const zillowRows = await sql<{ key: 'zhvi' | 'zori'; points: Point[] }[]>`
 		select key, points from housing_series
-		where source = 'zillow' and region_id = ${regionId}
+		where source = 'zillow' and region_id = ${region?.id ?? regionId}
 	`;
+	const wanted = balanceIdsFor(region);
+	const balanceRows = wanted.length
+		? await sql<{ key: string; region_id: string; points: Point[] }[]>`
+				select key, region_id, points from housing_series
+				where source = 'redfin' and region_id in ${sql(wanted.map((w) => w.id))}
+			`
+		: [];
+	const balance = wanted
+		.map((w) => ({
+			...w,
+			buyers: balanceRows.find((r) => r.region_id === w.id && r.key === 'buyers')?.points ?? [],
+			sellers: balanceRows.find((r) => r.region_id === w.id && r.key === 'sellers')?.points ?? []
+		}))
+		.filter((b) => b.buyers.length && b.sellers.length);
 	const fredRows = await sql<{ key: string; points: Point[] }[]>`
 		select key, points from housing_series where source = 'fred'
 	`;
 
-	const list = regions.map((r) => ({ id: r.region_id, name: r.region_name, state: r.state_name }));
 	return {
 		regions: list,
-		region: list.find((r) => r.id === regionId) ?? null,
+		region,
 		zillow: {
 			zhvi: zillowRows.find((r) => r.key === 'zhvi')?.points ?? [],
 			zori: zillowRows.find((r) => r.key === 'zori')?.points ?? []
 		},
+		balance,
 		fred: Object.fromEntries(fredRows.map((r) => [r.key, r.points])),
 		status: await syncStatus()
 	};
@@ -334,6 +712,9 @@ interface HouseRow {
 	ratings: Rating[];
 	eliminated_at: Date | null;
 	eliminated_by_name: string | null;
+	sold_at: Date | null;
+	sold_by_name: string | null;
+	sold_price: string | null;
 	added_by_name: string | null;
 	created_at: Date;
 }
@@ -358,6 +739,9 @@ function toHouse(r: HouseRow): House {
 		ratings: r.ratings ?? [],
 		eliminatedAt: r.eliminated_at ? new Date(r.eliminated_at).toISOString() : null,
 		eliminatedBy: r.eliminated_by_name,
+		soldAt: r.sold_at ? new Date(r.sold_at).toISOString() : null,
+		soldBy: r.sold_by_name,
+		soldPrice: num(r.sold_price),
 		addedBy: r.added_by_name,
 		createdAt: new Date(r.created_at).toISOString()
 	};
@@ -382,11 +766,13 @@ export async function listHouses(): Promise<House[]> {
 		           where r.house_id = h.id
 		       ), '[]') as ratings,
 		       h.eliminated_at, coalesce(eu.real_name, eu.username) as eliminated_by_name,
+		       h.sold_at, coalesce(su.real_name, su.username) as sold_by_name, h.sold_price,
 		       coalesce(u.real_name, u.username) as added_by_name,
 		       h.created_at
 		from housing_houses h
 		left join users u on u.id = h.added_by
 		left join users eu on eu.id = h.eliminated_by
+		left join users su on su.id = h.sold_by
 		order by h.created_at desc
 	`;
 	return rows.map(toHouse);
@@ -654,13 +1040,13 @@ async function lookupRentcastWithCoords(
 // replaced. Returns a one-line summary for the page.
 export async function refreshFromRentcast(id: number, overwrite: boolean): Promise<string> {
 	const [house] = await sql<HouseRow[]>`
-		select id, address, price, beds, baths, sqft, lat, eliminated_at
+		select id, address, price, beds, baths, sqft, lat, eliminated_at, sold_at
 		from housing_houses where id = ${id}
 	`;
 	if (!house) throw new HouseError(`No house with id ${id}.`, 404);
-	if (house.eliminated_at) {
+	if (house.eliminated_at || house.sold_at) {
 		throw new HouseError(
-			'This house is eliminated, so it is not looked up. Restore it first.',
+			`This house is ${house.sold_at ? 'sold' : 'eliminated'}, so it is not looked up. Restore it first.`,
 			409
 		);
 	}
@@ -802,13 +1188,16 @@ export async function setRating(
 	flags: { wouldntBuy: boolean; wouldntRent: boolean },
 	comment: string
 ): Promise<void> {
-	// An eliminated house's ratings stay as they were when it went; the page
-	// shows them read-only, and this keeps them that way.
-	const [house] = await sql<{ eliminated_at: Date | null }[]>`
-		select eliminated_at from housing_houses where id = ${houseId}
+	// An eliminated or sold house's ratings stay as they were when it went; the
+	// page shows them read-only, and this keeps them that way.
+	const [house] = await sql<{ eliminated_at: Date | null; sold_at: Date | null }[]>`
+		select eliminated_at, sold_at from housing_houses where id = ${houseId}
 	`;
-	if (house?.eliminated_at) {
-		throw new HouseError('This house is eliminated. Restore it to change its ratings.', 409);
+	if (house?.eliminated_at || house?.sold_at) {
+		throw new HouseError(
+			`This house is ${house.sold_at ? 'sold' : 'eliminated'}. Restore it to change its ratings.`,
+			409
+		);
 	}
 	if (score === null) {
 		if (flags.wouldntBuy || flags.wouldntRent) {
@@ -957,7 +1346,7 @@ export async function checkListings(force = false): Promise<ListingCheckResult> 
 
 	const houses = await sql<HouseRow[]>`
 		select id, address, price, rentcast from housing_houses
-		where eliminated_at is null and address is not null
+		where eliminated_at is null and sold_at is null and address is not null
 	`;
 	const byZip = new Map<string, HouseRow[]>();
 	for (const h of houses) {
@@ -1081,13 +1470,40 @@ function emptyDetails(): RentcastDetails {
 	};
 }
 
-// --- eliminating ---
+// --- eliminating, and sold to someone else ---
+//
+// Two buckets off the main list, a house in one at most: putting it in either
+// takes it out of the other.
 
 export async function setEliminated(id: number, userId: number | null, eliminated: boolean) {
 	const rows = await sql`
 		update housing_houses
 		set eliminated_at = ${eliminated ? new Date() : null},
 		    eliminated_by = ${eliminated ? userId : null},
+		    sold_at = ${eliminated ? null : sql`sold_at`},
+		    sold_by = ${eliminated ? null : sql`sold_by`},
+		    sold_price = ${eliminated ? null : sql`sold_price`},
+		    updated_at = now()
+		where id = ${id}
+		returning id
+	`;
+	if (!rows.length) throw new HouseError(`No house with id ${id}.`, 404);
+}
+
+// `price` is what it sold for; null takes it back out of the sold bucket.
+// Changing the price of a house already marked sold keeps when, and by whom.
+export async function setSold(id: number, userId: number | null, price: number | null) {
+	if (price !== null && !(Number.isFinite(price) && price > 0 && price < 1e9)) {
+		throw new HouseError('Enter the price it sold for, in dollars.');
+	}
+	const sold = price !== null;
+	const rows = await sql`
+		update housing_houses
+		set sold_price = ${price !== null ? Math.round(price) : null},
+		    sold_at = ${sold ? sql`coalesce(sold_at, now())` : null},
+		    sold_by = ${sold ? sql`coalesce(sold_by, ${userId})` : null},
+		    eliminated_at = null,
+		    eliminated_by = null,
 		    updated_at = now()
 		where id = ${id}
 		returning id

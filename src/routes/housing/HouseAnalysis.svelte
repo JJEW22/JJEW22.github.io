@@ -19,6 +19,7 @@
 		analyze,
 		compact,
 		formatDollars,
+		houseAssumptions,
 		houseDefaults,
 		monthsFromNow,
 		taxJurisdiction,
@@ -102,26 +103,17 @@
 		}
 	];
 
-	let a: Assumptions = initial(house, marketRate);
+	let a: Assumptions = houseAssumptions(house, marketRate);
 	// A house and the figures its defaults came from (bedrooms, price, the
 	// RentCast lookup). Changing any of them re-seeds the inputs, so a corrected
 	// bedroom count or a fresh rent estimate shows up at once.
 	const keyOf = (h: House) => `${h.id}:${h.beds}:${h.price}:${h.rentcast?.lookedUpAt ?? ''}`;
 	let loadedFor = keyOf(house);
 
-	function initial(h: House, rate: number | null): Assumptions {
-		return {
-			...DEFAULT_ASSUMPTIONS,
-			...(rate !== null ? { ratePct: Number(rate.toFixed(2)) } : {}),
-			...houseDefaults(h),
-			...(h.assumptions ?? {})
-		};
-	}
-
 	// Switching houses swaps in that house's saved assumptions.
 	$: if (keyOf(house) !== loadedFor) {
 		loadedFor = keyOf(house);
-		a = initial(house, marketRate);
+		a = houseAssumptions(house, marketRate);
 	}
 
 	// An emptied input binds as null; fall back to the default so one blank
@@ -151,7 +143,7 @@
 		gross - (result.lines.find((l) => l.label === 'Mortgage principal')?.monthly ?? 0);
 	$: last = result.rows.at(-1);
 	$: yearly = result.rows.filter((r) => r.month % 12 === 0);
-	$: dirty = JSON.stringify(clean) !== JSON.stringify(initial(house, marketRate));
+	$: dirty = JSON.stringify(clean) !== JSON.stringify(houseAssumptions(house, marketRate));
 
 	// "Bedrooms, people splitting and tax rate": a list that reads as a sentence.
 	function sentenceList(labels: string[]): string {

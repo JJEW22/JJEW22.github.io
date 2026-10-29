@@ -843,7 +843,6 @@
 			// const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
 			// const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
 			// scrollProgress = (winScroll / height) * 100;
-
 			// // Show/hide back to top button
 			// showBackToTop = winScroll > 300;
 		};
@@ -2369,7 +2368,7 @@
 			{/if}
 
 			<p>
-				Boston's premier Crokinole league <b>JP Flicks is back for a season 2</b>! We will meet
+				Boston's premier Crokinole league <b>JP Flicks is back for a season 3</b>! We will meet
 				<b>Thursdays at 7pm</b>
 				and run till about 10pm. This seasons league is planned to go from late October to end of March
 				and will <b>feature 2 tournaments</b> that will have their own prizes. Because of the longer
@@ -2377,6 +2376,20 @@
 				to join no later than the 3rd session.
 				<b>Check League Format for a full breakdown</b> of session dates and tournament dates.
 			</p>
+			<section class="tldr" aria-labelledby="tldr-title">
+				<h2 id="tldr-title">TL;DR</h2>
+				<ul>
+					<li>Every game plays <b>all 4 rounds</b>, every time.</li>
+					<li>
+						Winning a round scores <b>1 point</b>. A drawn round is allowed: <b>½ point</b> to each team.
+					</li>
+					<li>Winning the game (more points over the 4 rounds) scores <b>1 more point</b>.</li>
+					<li>
+						Winning the series (both games against a team, points combined) scores <b>2 points</b>.
+					</li>
+					<li>This year has <b>2 tournaments</b>, each with league points and prizes.</li>
+				</ul>
+			</section>
 			<Collapsible
 				id="league-format"
 				title="League Format"
@@ -2386,7 +2399,7 @@
 				titleColor="#1a202c"
 				iconType="arrow"
 			>
-				<p>This seasons league will follow a similar format to the first with some changes.</p>
+				<p>This season's league will follow a similar format to last season's with some changes.</p>
 				<div class="subsection">
 					<h3>Similarities</h3>
 					<ul>
@@ -2395,18 +2408,17 @@
 							Each team will play each other up to 2 times (with the exception of you will never
 							play yourself).
 						</li>
-						<li>Each game awards <a href="#point-per-game">points</a> based on outcome</li>
 						<li>The winner of the league the team at the end with the most points!</li>
+						<li>2 <a href="#tournaments-section">Tournaments</a> that also award points</li>
+						<li>Prizes for winning the league and each of the tournaments</li>
 					</ul>
 					<h3>Differences</h3>
 					<ul>
 						<li>
-							More crokinole (8 more sessions to be exact)! Meaning more time to play, with a lower
-							requirement to be there each week
+							Every game plays all 4 rounds, and every round scores
+							<a href="#point-per-game">points</a>, on top of points for winning the game and the
+							series
 						</li>
-						<li>2 new <a href="#tournaments-section">Tournaments</a> that also award points</li>
-						<li>Prizes for winning the league and each of the tournaments</li>
-						<li>No longer an individual category</li>
 					</ul>
 					<h3>Schedule</h3>
 				</div>
@@ -2458,16 +2470,22 @@
 				<div class="subsection">
 					<h3 id="point-per-game">Points for games</h3>
 					<ul>
-						<li>Winning a game awards 2 points</li>
-						<li>Tieing a game awards 1 point</li>
-						<li>Losing a game awards 0 points</li>
+						<li>Every game is 4 rounds, and all 4 are always played</li>
+						<li>Winning a round awards 1 point</li>
+						<li>A drawn round awards 0.5 points to each team</li>
+						<li>Winning the game (the most points over the 4 rounds) awards 1 more point</li>
 						<li>
-							Winning a series (combined score of both games against a team) awards 1 bonus point
+							Winning a series (combined score of both games against a team) awards 2 bonus points
 						</li>
-						<li>In the event of a tie in a series each team is awarded 0.5 points</li>
 					</ul>
+					<p>
+						So a single game is worth up to 5 points: 4 for the rounds and 1 for the game, plus the
+						2 for the series once both games against that team are played.
+					</p>
 
-					<h3 id="tournaments-section"><a href={resolve('/jpFlicks/tournament')}>Tournaments</a></h3>
+					<h3 id="tournaments-section">
+						<a href={resolve('/jpFlicks/tournament')}>Tournaments</a>
+					</h3>
 					This year we have 2 tournaments! Anyone including (those not in the league) can compete so
 					if you can only come for 1 day these are the ones to do it! The exact format of the tournament
 					will depend on the number of players but it will follow a round robin + elimination set up.
@@ -2578,8 +2596,8 @@
 				iconType="arrow"
 			>
 				<ul>
-					<li>Each game consists of at least 2 rounds and at most 4</li>
-					<li>If after a round a team is winning by 100 points they win the game</li>
+					<li>Each game is 4 rounds, and all 4 are always played</li>
+					<li>Each round is won by whoever scores more that round; a drawn round is allowed</li>
 					<li>After 4 rounds the winner is the team with the most points. Ties are possible</li>
 					<li>
 						The standard crokinole rules can be found <a
@@ -3007,8 +3025,8 @@
 
 					{#if !viewer.username}
 						<p class="result-note">
-							<a href={resolve('/account')}>Sign in</a> to enter the scores for your games. An admin can enter any
-							result.
+							<a href={resolve('/account')}>Sign in</a> to enter the scores for your games. An admin
+							can enter any result.
 						</p>
 					{:else if !isCurrentSeason}
 						<p class="result-note">
@@ -4566,6 +4584,31 @@
 		background: #fff7e6;
 		border-color: #f0dcae;
 		color: #8a6a1f;
+	}
+
+	.tldr {
+		margin: 1.25rem 0 1.5rem;
+		padding: 1rem 1.25rem;
+		background: #fdf6ec;
+		border: 1px solid #e8d9c2;
+		border-radius: 8px;
+		color: #3d3226;
+	}
+
+	.tldr h2 {
+		margin: 0 0 0.5rem;
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: #1a202c;
+	}
+
+	.tldr ul {
+		margin: 0;
+		padding-left: 1.25rem;
+	}
+
+	.tldr li + li {
+		margin-top: 0.3rem;
 	}
 
 	.past-season-note {

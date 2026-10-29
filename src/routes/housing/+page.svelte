@@ -7,16 +7,21 @@
 	denied state; /housing/api/* is what requires housing:admin, so no data ever
 	reaches someone without it. Same pattern as /snow/admin.
 
-	Nothing is fetched from FRED or Zillow on a page load. The data is whatever
-	the last refresh stored: the button below, or the weekly workflow.
+	Nothing is fetched from FRED, Zillow or Redfin on a page load. The data is
+	whatever the last refresh stored: the button below, or the weekly workflow.
+	The region starts on Greater Boston (Boston, Cambridge, Somerville and
+	Brookline), led by its buyers and sellers.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import '../../app.css';
+	import BalanceChart from './BalanceChart.svelte';
 	import Houses from './Houses.svelte';
 	import LineChart from './LineChart.svelte';
 	import {
 		FRED_SERIES,
+		GREATER_BOSTON_CITIES,
+		GREATER_BOSTON_ID,
 		MORTGAGE_RATE_SERIES,
 		US_REGION_ID,
 		compact,
@@ -25,10 +30,13 @@
 		formatMonth,
 		formatValue,
 		lastYears,
+		marketBalance,
 		monthlyPayment,
 		paymentSeries,
 		priceToRent,
+		sellerBuyerGapPct,
 		yearOverYear,
+		type BalanceSeries,
 		type Point
 	} from '$lib/housing';
 
@@ -39,12 +47,12 @@
 	}
 
 	interface SyncStatus {
-		source: 'fred' | 'zillow';
+		source: 'fred' | 'zillow' | 'redfin';
 		lastAttempt: { ok: boolean; detail: string; at: string } | null;
 		lastSuccess: string | null;
 	}
 
-	const SOURCE_LABELS = { fred: 'FRED', zillow: 'Zillow Research' };
+	const SOURCE_LABELS = { fred: 'FRED', zillow: 'Zillow Research', redfin: 'Redfin' };
 	const RANGES = [
 		{ years: 5, label: '5Y' },
 		{ years: 10, label: '10Y' },
@@ -58,10 +66,11 @@
 	let refreshing = false;
 
 	let regions: Region[] = [];
-	let regionId = US_REGION_ID;
+	let regionId = GREATER_BOSTON_ID;
 	let region: Region | null = null;
 	let zhvi: Point[] = [];
 	let zori: Point[] = [];
+	let balance: BalanceSeries[] = [];
 	let fred: Record<string, Point[]> = {};
 	let syncs: SyncStatus[] = [];
 
@@ -94,6 +103,10 @@
 			const data = await res.json();
 			regions = data.regions ?? [];
 			region = data.region ?? null;
+			// The server falls back to the US for a region it doesn't have yet
+			// (Greater Boston before its first refresh); follow it.
+			if (region) regionId = region.id;
+			balance = data.balance ?? [];
 			zhvi = data.zillow?.zhvi ?? [];
 			zori = data.zillow?.zori ?? [];
 			fred = data.fred ?? {};
@@ -173,6 +186,27 @@
 	$: paymentVsRent = latestPayment && latestRent ? latestPayment / latestRent[1] : null;
 
 	$: place = region ? (region.id === US_REGION_ID ? 'the US' : region.name) : 'this region';
+	const cityList = GREATER_BOSTON_CITIES.map((c) => c.name).join(', ');
+
+	// The latest month both lines have, for the tile.
+	function latestBalance(b: BalanceSeries | undefined) {
+		if (!b) return null;
+		const sellers = new Map(b.sellers);
+		const last = b.buyers.findLast(([day]) => sellers.has(day));
+		return last ? { day: last[0], buyers: last[1], sellers: sellers.get(last[0]) ?? 0 } : null;
+	}
+	$: balanceNow = latestBalance(balance[0]);
+
+	function balanceSubtitle(b: BalanceSeries): string {
+		if (b.id === GREATER_BOSTON_ID) {
+			return (
+				`Estimated for ${cityList}. Sellers are their active listings; buyers are their ` +
+				"pending sales times the Boston metro's buyers per pending sale, Redfin's own " +
+				'formula. 3-month rolling, seasonally adjusted here.'
+			);
+		}
+		return `Redfin's estimate for the ${b.name}, seasonally adjusted. Sellers are active listings; buyers are inferred from pending sales and how long buyers search.`;
+	}
 	$: noData = !zhvi.length && !Object.keys(fred).length;
 </script>
 
@@ -259,6 +293,21 @@
 
 					<div class="tiles" class:stale={busy}>
 						<div class="tile">
+							<span class="label">Buyers vs sellers</span>
+							<span class="value"
+								>{balanceNow ? marketBalance(balanceNow.buyers, balanceNow.sellers) : '—'}</span
+							>
+							<span class="delta">
+								{#if balanceNow}
+									{@const gap = sellerBuyerGapPct(balanceNow.buyers, balanceNow.sellers)}
+									{Math.abs(gap).toFixed(0)}% {gap >= 0 ? 'more' : 'fewer'} sellers than buyers ·
+									{formatMonth(balanceNow.day)}
+								{:else}
+									Redfin covers the US and the 50 biggest metros
+								{/if}
+							</span>
+						</div>
+						<div class="tile">
 							<span class="label">Typical home value</span>
 							<span class="value">{latestValue ? formatDollars(latestValue[1]) : '—'}</span>
 							<span class="delta">{signed(yearOverYear(zhvi))}</span>
@@ -290,6 +339,29 @@
 					</div>
 
 					<h2>{place}</h2>
+					{#if region?.id === GREATER_BOSTON_ID}
+						<p class="note place-note">
+							{cityList} only. Home values and rents are the four cities' Zillow figures, weighted by
+							their number of homes.
+						</p>
+					{/if}
+					{#if balance.length}
+						<div class="charts balance" class:stale={busy}>
+							{#each balance as b (b.id)}
+								<BalanceChart
+									series={b}
+									{years}
+									title="Buyers vs sellers, {b.name}"
+									subtitle={balanceSubtitle(b)}
+								/>
+							{/each}
+						</div>
+					{:else}
+						<p class="note">
+							Buyers vs sellers: Redfin publishes these for the US and the 50 biggest metros, and
+							{region?.name ?? 'this region'} isn't one of them.
+						</p>
+					{/if}
 					<div class="charts" class:stale={busy}>
 						<LineChart
 							title="Typical home value"
@@ -363,9 +435,10 @@
 						{refreshing ? 'Refreshing… (this takes a little while)' : 'Force refresh'}
 					</button>
 					<p class="note attribution">
-						Home value and rent data provided by Zillow Research (zillow.com/research/data).
-						National series from FRED, Federal Reserve Bank of St. Louis. Copyrighted FRED series
-						(Case-Shiller, Freddie Mac rates) belong to their owners.
+						Home value and rent data provided by Zillow Research (zillow.com/research/data). Buyers
+						and sellers data from Redfin, a national real estate brokerage
+						(redfin.com/news/data-center). National series from FRED, Federal Reserve Bank of St.
+						Louis. Copyrighted FRED series (Case-Shiller, Freddie Mac rates) belong to their owners.
 					</p>
 				</section>
 			{/if}
@@ -541,6 +614,14 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
 		gap: 1rem;
+	}
+
+	.charts.balance {
+		margin-bottom: 1rem;
+	}
+
+	.place-note {
+		margin: -0.5rem 0 1rem;
 	}
 
 	.panel {

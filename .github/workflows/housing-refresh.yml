@@ -1,5 +1,5 @@
 # .github/workflows/housing-refresh.yml
-# Re-pulls the /housing data from FRED and Zillow Research once a week, then
+# Re-pulls the /housing data from FRED, Zillow Research and Redfin once a week, then
 # runs the weekly RentCast listing check (asking prices, still listed?) for the
 # houses being considered: one request per ZIP code, capped at 40 a month.
 # Thursday afternoon, after Freddie Mac publishes the weekly mortgage rate (noon
@@ -33,7 +33,7 @@ jobs:
             -H "x-sync-key: ${SYNC_SECRET}" \
             -H "content-type: application/json" \
             -d '{}' \
-            --max-time 300 \
+            --max-time 600 \
             -o response.json -w '%{http_code}' \
             "https://johnjackwilkins.com/housing/api/admin/refresh") || {
             echo "::error::could not reach the refresh endpoint"
