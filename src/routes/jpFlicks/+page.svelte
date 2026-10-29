@@ -7,6 +7,7 @@
 	import patternColorLogo from '$lib/assets/colorJPFlicksCollisionLogo-pattern.svg';
 	import patternBrownLogo from '$lib/assets/brownJPFlicksCollisionLogo-pattern.svg';
 	import '../../app.css';
+	import { ROUNDS_PER_GAME, roundStandings } from '$lib/jpFlicks';
 
 	// Data storage
 	let loading = true;
@@ -38,8 +39,11 @@
 	// Result entry
 	/** @type {number | null} the match whose form is showing */
 	let openMatchId = null;
-	let resultKind = 'margin'; // margin | forfeit
+	let resultKind = 'margin'; // margin | rounds | forfeit
 	let resultMargin = '';
+	/** @type {string[][]} [team_a, team_b] per round, as typed */
+	let resultRounds = blankRounds();
+	let resultShootout = ''; // team id, asked for only when the round totals are level
 	let resultWinner = '';
 	let resultForfeitBy = '';
 	let resultBusy = false;
@@ -48,6 +52,18 @@
 
 	$: teamNameById = new Map(teams.map((t) => [t.id, t.name]));
 	$: isCurrentSeason = Boolean(activeSeason && activeSeason.isCurrent);
+	// Season 3 on scores every round; seasons 1 and 2 keep their old table.
+	$: byRounds = activeSeason?.scoring === 'rounds';
+	// Draws only get a column of their own once one has happened.
+	$: seriesDraws = sortedTeams.some((t) => t.seriesD > 0);
+	$: roundTotals = resultRounds.reduce(
+		(sum, [a, b]) => [sum[0] + (Number(a) || 0), sum[1] + (Number(b) || 0)],
+		[0, 0]
+	);
+	// Every box filled and the totals equal: a 20s shootout decides it.
+	$: roundsLevel =
+		resultRounds.every((r) => r.every((v) => String(v).trim() !== '')) &&
+		roundTotals[0] === roundTotals[1];
 	// The games this viewer can actually do something about. Nobody wants to
 	// hunt for their own fixture in a 90-row grid, so these lead the panel.
 	$: myPending = matches.filter((m) => m.canApprove);
@@ -954,11 +970,19 @@
 
 	// --- entering results ---
 
+	function blankRounds() {
+		return Array.from({ length: ROUNDS_PER_GAME }, () => ['', '']);
+	}
+
 	/** @param {LiveMatch} match */
 	function openResultForm(match) {
 		openMatchId = match.id;
 		resultMsg = '';
 		resultError = '';
+		resultRounds = match.rounds
+			? match.rounds.map(([a, b]) => [String(a), String(b)])
+			: blankRounds();
+		resultShootout = match.shootoutWinner === null ? '' : String(match.shootoutWinner);
 		// Seeded from whatever is already there, so correcting a pending score
 		// does not mean retyping it.
 		if (match.forfeitBy !== null) {
@@ -977,6 +1001,7 @@
 			resultWinner = '';
 			resultForfeitBy = '';
 		}
+		if (activeSeason?.scoring === 'rounds' && resultKind === 'margin') resultKind = 'rounds';
 	}
 
 	function closeResultForm() {
@@ -1021,7 +1046,9 @@
 			kind: resultKind,
 			margin: resultMargin,
 			winner: resultWinner,
-			forfeitBy: resultForfeitBy
+			forfeitBy: resultForfeitBy,
+			rounds: resultRounds,
+			shootoutWinner: resultShootout
 		});
 		if (ok) {
 			resultMsg = viewer.isAdmin ? 'Result recorded.' : 'Sent to the other team to approve.';
@@ -1075,9 +1102,30 @@
 			return `${winner} by forfeit (${loser} forfeited)`;
 		}
 		const margin = m.margin === null ? 0 : m.margin;
+		if (m.rounds) return describeRounds(m);
 		if (margin === 0) return 'tied';
 		const winner = teamNameById.get(margin > 0 ? m.teamA : m.teamB) || '?';
 		return `${winner} by ${Math.abs(margin)}`;
+	}
+
+	// "Kalice 210-185, rounds 3-1", leader first. A level game names the
+	// shootout winner.
+	/** @param {LiveMatch} m */
+	function describeRounds(m) {
+		const rounds = m.rounds || [];
+		const a = rounds.reduce((sum, r) => sum + r[0], 0);
+		const b = rounds.reduce((sum, r) => sum + r[1], 0);
+		const wonA = rounds.filter(([x, y]) => x > y).length;
+		const wonB = rounds.filter(([x, y]) => y > x).length;
+		const drawn = rounds.length - wonA - wonB;
+		const flip = b > a;
+		const who = a === b ? 'Level' : teamNameById.get(flip ? m.teamB : m.teamA) || '?';
+		const [hi, lo, rHi, rLo] = flip ? [b, a, wonB, wonA] : [a, b, wonA, wonB];
+		const shootout =
+			a === b && m.shootoutWinner !== null
+				? `; ${teamNameById.get(m.shootoutWinner) || '?'} won the 20s shootout`
+				: '';
+		return `${who} ${hi}-${lo}, rounds ${rHi}-${rLo}${drawn ? ` (${drawn} drawn)` : ''}${shootout}`;
 	}
 
 	// Standings, rankings and the initial sort. Unchanged from the spreadsheet
@@ -1092,8 +1140,41 @@
 		console.log('TEAMS INFO!');
 		console.log(teams_info);
 
+		// Season 3 on: rounds, games and series each have a record, and the score
+		// comes from all three. Worked out from the match rows, which carry the
+		// round scores the matrices do not.
+		const idByName = new Map(teams.map((t) => [t.name.toLowerCase(), t.id]));
+		// Read off the season directly: this runs before the $: statements update.
+		const rounds =
+			activeSeason?.scoring === 'rounds'
+				? roundStandings(
+						teams.map((t) => t.id),
+						matches,
+						FORFEIT_POINT_DIFF
+					)
+				: null;
+
 		let teamsWithScores = teams_info.map((team) => {
 			const tourneyPts = getTournamentPoints(team.teamName);
+			const gamesPlayed = team.wins + team.ties + team.losses;
+			const r = rounds && rounds.get(idByName.get(team.teamName.toLowerCase()) ?? -1);
+			if (r) {
+				return {
+					...team,
+					tournamentPoints: tourneyPts,
+					score: r.points + tourneyPts,
+					gamesPlayed,
+					roundsW: r.rounds.w,
+					roundsD: r.rounds.d,
+					roundsL: r.rounds.l,
+					gamesW: r.games.w,
+					gamesD: r.games.d,
+					gamesL: r.games.l,
+					seriesW: r.series.w,
+					seriesD: r.series.d,
+					seriesL: r.series.l
+				};
+			}
 			return {
 				...team,
 				tournamentPoints: tourneyPts,
@@ -1102,7 +1183,7 @@
 					TIES_SCORE * team.ties +
 					SERIES_WIN_SCORE * team.seriesWins +
 					tourneyPts,
-				gamesPlayed: team.wins + team.ties + team.losses
+				gamesPlayed
 			};
 		});
 
@@ -2383,7 +2464,10 @@
 					<li>
 						Winning a round scores <b>1 point</b>. A drawn round is allowed: <b>½ point</b> to each team.
 					</li>
-					<li>Winning the game (more points over the 4 rounds) scores <b>1 more point</b>.</li>
+					<li>
+						Winning the game (more points over the 4 rounds) scores <b>1 more point</b>. A game
+						can't end level: a tie goes to a <b>20s shootout</b>, and its winner wins the game.
+					</li>
 					<li>
 						Winning the series (both games against a team, points combined) scores <b>2 points</b>.
 					</li>
@@ -2474,6 +2558,10 @@
 						<li>Winning a round awards 1 point</li>
 						<li>A drawn round awards 0.5 points to each team</li>
 						<li>Winning the game (the most points over the 4 rounds) awards 1 more point</li>
+						<li>
+							A game can't be drawn: if it's level after 4 rounds, a 20s shootout decides it and the
+							winner gets the point for the game
+						</li>
 						<li>
 							Winning a series (combined score of both games against a team) awards 2 bonus points
 						</li>
@@ -2598,7 +2686,10 @@
 				<ul>
 					<li>Each game is 4 rounds, and all 4 are always played</li>
 					<li>Each round is won by whoever scores more that round; a drawn round is allowed</li>
-					<li>After 4 rounds the winner is the team with the most points. Ties are possible</li>
+					<li>
+						After 4 rounds the winner is the team with the most points. A tie is settled by a 20s
+						shootout
+					</li>
 					<li>
 						The standard crokinole rules can be found <a
 							href="https://www.worldcrokinole.com/thegame.html">here</a
@@ -3190,7 +3281,11 @@
 
 							<div class="kind-toggle">
 								<label>
-									<input type="radio" bind:group={resultKind} value="margin" />
+									<input
+										type="radio"
+										bind:group={resultKind}
+										value={byRounds ? 'rounds' : 'margin'}
+									/>
 									<span>Played</span>
 								</label>
 								<label>
@@ -3199,7 +3294,65 @@
 								</label>
 							</div>
 
-							{#if resultKind === 'margin'}
+							{#if resultKind === 'rounds'}
+								<table class="rounds-entry">
+									<thead>
+										<tr>
+											<th scope="col">Round</th>
+											<th scope="col">{teamNameById.get(openMatch.teamA)}</th>
+											<th scope="col">{teamNameById.get(openMatch.teamB)}</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each resultRounds as round, i (i)}
+											<tr>
+												<th scope="row">{i + 1}</th>
+												<td>
+													<input
+														bind:value={round[0]}
+														inputmode="numeric"
+														aria-label="Round {i + 1}, {teamNameById.get(openMatch.teamA)}"
+													/>
+												</td>
+												<td>
+													<input
+														bind:value={round[1]}
+														inputmode="numeric"
+														aria-label="Round {i + 1}, {teamNameById.get(openMatch.teamB)}"
+													/>
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+									<tfoot>
+										<tr>
+											<th scope="row">Total</th>
+											<td>{roundTotals[0]}</td>
+											<td>{roundTotals[1]}</td>
+										</tr>
+									</tfoot>
+								</table>
+								{#if roundsLevel}
+									<div class="form-row shootout">
+										<label>
+											<span>Level on points. Who won the 20s shootout?</span>
+											<select bind:value={resultShootout}>
+												<option value="">— pick a team —</option>
+												<option value={String(openMatch.teamA)}>
+													{teamNameById.get(openMatch.teamA)}
+												</option>
+												<option value={String(openMatch.teamB)}>
+													{teamNameById.get(openMatch.teamB)}
+												</option>
+											</select>
+										</label>
+									</div>
+								{/if}
+								<p class="result-note small">
+									Each team's points in each of the {ROUNDS_PER_GAME} rounds. A level round is a draw;
+									a level game goes to a 20s shootout.
+								</p>
+							{:else if resultKind === 'margin'}
 								<div class="form-row">
 									<label>
 										<span>Winner</span>
@@ -3266,115 +3419,225 @@
 					<h2>League Standings</h2>
 
 					<div class="table-wrapper">
-						<table class="standings-table">
-							<thead>
-								<tr>
-									<th> # </th>
-									<th> Team </th>
-									<th class="sortable numeric" on:click={() => sortTable('gamesPlayed')}>
-										GP {getSortIndicator('gamesPlayed')}
-									</th>
-									<th class="sortable numeric" on:click={() => sortTable('seriesWins')}>
-										Series {getSortIndicator('seriesWins')}
-									</th>
-									<th class="sortable numeric" on:click={() => sortTable('tournamentPoints')}>
-										TP {getSortIndicator('tournamentPoints')}
-									</th>
-									<th class="sortable numeric wdl-split" on:click={() => sortTable('wins')}>
-										W {getSortIndicator('wins')}
-									</th>
-									<th class="sortable numeric wdl-split" on:click={() => sortTable('ties')}>
-										D {getSortIndicator('ties')}
-									</th>
-									<th class="sortable numeric wdl-split" on:click={() => sortTable('losses')}>
-										L {getSortIndicator('losses')}
-									</th>
-									<!--
+						{#if byRounds}
+							<table class="standings-table">
+								<thead>
+									<tr>
+										<th> # </th>
+										<th> Team </th>
+										<th class="sortable numeric" on:click={() => sortTable('gamesPlayed')}>
+											GP {getSortIndicator('gamesPlayed')}
+										</th>
+										<th
+											class="sortable numeric"
+											title="Rounds won-drawn-lost"
+											on:click={() => sortTable('roundsW')}
+										>
+											Rounds {getSortIndicator('roundsW')}
+										</th>
+										<th
+											class="sortable numeric"
+											title="Games won-lost"
+											on:click={() => sortTable('gamesW')}
+										>
+											Games {getSortIndicator('gamesW')}
+										</th>
+										<th
+											class="sortable numeric"
+											title={seriesDraws ? 'Series won-drawn-lost' : 'Series won-lost'}
+											on:click={() => sortTable('seriesW')}
+										>
+											Series {getSortIndicator('seriesW')}
+										</th>
+										<th class="sortable numeric" on:click={() => sortTable('tournamentPoints')}>
+											TP {getSortIndicator('tournamentPoints')}
+										</th>
+										<th
+											class="sortable numeric highlight"
+											title="Score"
+											on:click={() => sortTable('ranking')}
+										>
+											<span class="th-long">Score</span><span class="th-short">S</span>
+											{getSortIndicator('ranking')}
+										</th>
+										<th class="sortable numeric" on:click={() => sortTable('forfeitLosses')}>
+											FF {getSortIndicator('forfeitLosses')}
+										</th>
+										<th class="sortable numeric" on:click={() => sortTable('pointDiff')}>
+											+/- {getSortIndicator('pointDiff')}
+										</th>
+										<th title="Player 1">
+											<span class="th-long">Player 1</span><span class="th-short">P1</span>
+										</th>
+										<th title="Player 2">
+											<span class="th-long">Player 2</span><span class="th-short">P2</span>
+										</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each sortedTeams as team, index (index)}
+										<tr>
+											<td class="position-column">
+												{#if team.ranking === 1}
+													<span class="medal gold">🥇</span>
+												{:else if team.ranking === 2}
+													<span class="medal silver">🥈</span>
+												{:else if team.ranking === 3}
+													<span class="medal bronze">🥉</span>
+												{:else}
+													{team.ranking}
+												{/if}
+											</td>
+											<td class="team-name">{team.teamName}</td>
+											<td class="numeric">{team.gamesPlayed}</td>
+											<td class="numeric record">{team.roundsW}-{team.roundsD}-{team.roundsL}</td>
+											<td class="numeric record">
+												{team.gamesW}-{team.gamesL}
+											</td>
+											<td class="numeric record">
+												{team.seriesW}-{#if seriesDraws}{team.seriesD}-{/if}{team.seriesL}
+											</td>
+											<td class="numeric">{team.tournamentPoints}</td>
+											<td class="numeric highlight">{team.score}</td>
+											<td class="numeric {team.forfeitLosses > 0 ? 'negative' : ''}"
+												>{team.forfeitLosses}</td
+											>
+											<td class="numeric {team.pointDiff >= 0 ? 'positive' : 'negative'}">
+												{team.pointDiff > 0 ? '+' : ''}{team.pointDiff}
+											</td>
+											<td>{team.player1}</td>
+											<td>{team.player2}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						{:else}
+							<table class="standings-table">
+								<thead>
+									<tr>
+										<th> # </th>
+										<th> Team </th>
+										<th class="sortable numeric" on:click={() => sortTable('gamesPlayed')}>
+											GP {getSortIndicator('gamesPlayed')}
+										</th>
+										<th class="sortable numeric" on:click={() => sortTable('seriesWins')}>
+											Series {getSortIndicator('seriesWins')}
+										</th>
+										<th class="sortable numeric" on:click={() => sortTable('tournamentPoints')}>
+											TP {getSortIndicator('tournamentPoints')}
+										</th>
+										<th class="sortable numeric wdl-split" on:click={() => sortTable('wins')}>
+											W {getSortIndicator('wins')}
+										</th>
+										<th class="sortable numeric wdl-split" on:click={() => sortTable('ties')}>
+											D {getSortIndicator('ties')}
+										</th>
+										<th class="sortable numeric wdl-split" on:click={() => sortTable('losses')}>
+											L {getSortIndicator('losses')}
+										</th>
+										<!--
 										The same three numbers in one column, for phones. Only one of
 										the two ever shows; see .wdl-split / .wdl-joined below. Sorting
 										it sorts by wins, which is what the first number is.
 									-->
-									<th
-										class="sortable numeric wdl-joined"
-										title="Wins-Draws-Losses"
-										on:click={() => sortTable('wins')}
-									>
-										W-D-L {getSortIndicator('wins')}
-									</th>
-									<th
-										class="sortable numeric highlight"
-										title="Score"
-										on:click={() => sortTable('ranking')}
-									>
-										<span class="th-long">Score</span><span class="th-short">S</span>
-										{getSortIndicator('ranking')}
-									</th>
-									<th class="sortable numeric" on:click={() => sortTable('forfeitLosses')}>
-										FF {getSortIndicator('forfeitLosses')}
-									</th>
-									<th class="sortable numeric" on:click={() => sortTable('pointDiff')}>
-										+/- {getSortIndicator('pointDiff')}
-									</th>
-									<th title="Player 1">
-										<span class="th-long">Player 1</span><span class="th-short">P1</span>
-									</th>
-									<th title="Player 2">
-										<span class="th-long">Player 2</span><span class="th-short">P2</span>
-									</th>
-								</tr>
-							</thead>
-
-							<!-- Update tbody to use sortedTeams instead of rankedTeams -->
-							<tbody>
-								{#each sortedTeams as team, index (index)}
-									<tr
-										class:top-three={sortColumn === 'score' &&
-											sortDirection === 'desc' &&
-											index < 3}
-									>
-										<td class="position-column">
-											{#if team.ranking === 1}
-												<span class="medal gold">🥇</span>
-											{:else if team.ranking === 2}
-												<span class="medal silver">🥈</span>
-											{:else if team.ranking === 3}
-												<span class="medal bronze">🥉</span>
-											{:else}
-												{team.ranking}
-											{/if}
-										</td>
-										<td class="team-name">{team.teamName}</td>
-										<td class="numeric">{team.gamesPlayed}</td>
-										<td class="numeric">{team.seriesWins}-{team.seriesLosses}</td>
-										<td class="numeric">{team.tournamentPoints}</td>
-										<td class="numeric wdl-split">{team.wins}</td>
-										<td class="numeric wdl-split">{team.ties}</td>
-										<td class="numeric wdl-split">{team.losses}</td>
-										<td class="numeric wdl-joined">
-											{team.wins}-{team.ties}-{team.losses}
-										</td>
-										<td class="numeric highlight">{team.score}</td>
-										<td class="numeric {team.forfeitLosses > 0 ? 'negative' : ''}"
-											>{team.forfeitLosses}</td
+										<th
+											class="sortable numeric wdl-joined"
+											title="Wins-Draws-Losses"
+											on:click={() => sortTable('wins')}
 										>
-										<td class="numeric {team.pointDiff >= 0 ? 'positive' : 'negative'}">
-											{team.pointDiff > 0 ? '+' : ''}{team.pointDiff}
-										</td>
-										<td>{team.player1}</td>
-										<td>{team.player2}</td>
+											W-D-L {getSortIndicator('wins')}
+										</th>
+										<th
+											class="sortable numeric highlight"
+											title="Score"
+											on:click={() => sortTable('ranking')}
+										>
+											<span class="th-long">Score</span><span class="th-short">S</span>
+											{getSortIndicator('ranking')}
+										</th>
+										<th class="sortable numeric" on:click={() => sortTable('forfeitLosses')}>
+											FF {getSortIndicator('forfeitLosses')}
+										</th>
+										<th class="sortable numeric" on:click={() => sortTable('pointDiff')}>
+											+/- {getSortIndicator('pointDiff')}
+										</th>
+										<th title="Player 1">
+											<span class="th-long">Player 1</span><span class="th-short">P1</span>
+										</th>
+										<th title="Player 2">
+											<span class="th-long">Player 2</span><span class="th-short">P2</span>
+										</th>
 									</tr>
-								{/each}
-							</tbody>
-						</table>
+								</thead>
+
+								<!-- Update tbody to use sortedTeams instead of rankedTeams -->
+								<tbody>
+									{#each sortedTeams as team, index (index)}
+										<tr
+											class:top-three={sortColumn === 'score' &&
+												sortDirection === 'desc' &&
+												index < 3}
+										>
+											<td class="position-column">
+												{#if team.ranking === 1}
+													<span class="medal gold">🥇</span>
+												{:else if team.ranking === 2}
+													<span class="medal silver">🥈</span>
+												{:else if team.ranking === 3}
+													<span class="medal bronze">🥉</span>
+												{:else}
+													{team.ranking}
+												{/if}
+											</td>
+											<td class="team-name">{team.teamName}</td>
+											<td class="numeric">{team.gamesPlayed}</td>
+											<td class="numeric">{team.seriesWins}-{team.seriesLosses}</td>
+											<td class="numeric">{team.tournamentPoints}</td>
+											<td class="numeric wdl-split">{team.wins}</td>
+											<td class="numeric wdl-split">{team.ties}</td>
+											<td class="numeric wdl-split">{team.losses}</td>
+											<td class="numeric wdl-joined">
+												{team.wins}-{team.ties}-{team.losses}
+											</td>
+											<td class="numeric highlight">{team.score}</td>
+											<td class="numeric {team.forfeitLosses > 0 ? 'negative' : ''}"
+												>{team.forfeitLosses}</td
+											>
+											<td class="numeric {team.pointDiff >= 0 ? 'positive' : 'negative'}">
+												{team.pointDiff > 0 ? '+' : ''}{team.pointDiff}
+											</td>
+											<td>{team.player1}</td>
+											<td>{team.player2}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						{/if}
 					</div>
 
 					<div class="table-legend">
-						<p>
-							<strong>#:</strong> ranking | <strong>GP:</strong> Games Played | <strong>TP:</strong>
-							Tournament Points | <strong>W:</strong> Wins | <strong>D:</strong> Draws |
-							<strong>L:</strong>
-							Losses | <strong>FF:</strong> Forfeit Losses | <strong>+/-:</strong> Point Differential
-						</p>
+						{#if byRounds}
+							<p>
+								<strong>#:</strong> ranking | <strong>GP:</strong> Games Played |
+								<strong>Rounds:</strong> won-drawn-lost | <strong>Games:</strong> won-lost |
+								<strong>Series:</strong>
+								{seriesDraws ? 'won-drawn-lost' : 'won-lost'} |
+								<strong>TP:</strong> Tournament Points |
+								<strong>FF:</strong> Forfeit Losses | <strong>+/-:</strong> Point Differential
+							</p>
+							<p>
+								<strong>Score:</strong> 1 per round won (½ drawn), 1 per game won, 2 per series won (1
+								drawn), plus tournament points. A game level on points goes to whoever won the 20s shootout.
+							</p>
+						{:else}
+							<p>
+								<strong>#:</strong> ranking | <strong>GP:</strong> Games Played |
+								<strong>TP:</strong>
+								Tournament Points | <strong>W:</strong> Wins | <strong>D:</strong> Draws |
+								<strong>L:</strong>
+								Losses | <strong>FF:</strong> Forfeit Losses | <strong>+/-:</strong> Point Differential
+							</p>
+						{/if}
 					</div>
 					<HallOfFame />
 				</div>
@@ -4814,6 +5077,72 @@
 		display: flex;
 		gap: 0.5rem;
 		margin-top: 1rem;
+	}
+
+	.rounds-entry {
+		border-collapse: collapse;
+		width: 100%;
+		max-width: 26rem;
+		table-layout: fixed;
+	}
+
+	/* Undo the page-wide th/td look, which is the standings table's. */
+	.rounds-entry th,
+	.rounds-entry td {
+		padding: 0.25rem 0.35rem;
+		background: none;
+		border-bottom: none;
+		color: #4a3a2a;
+		text-align: center;
+		text-transform: none;
+		letter-spacing: normal;
+		white-space: normal;
+	}
+
+	.rounds-entry tbody tr:hover {
+		background: none;
+	}
+
+	.rounds-entry thead th {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #8a7a68;
+		overflow-wrap: anywhere;
+	}
+
+	.rounds-entry th[scope='row'] {
+		width: 4.5rem;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: #4a3a2a;
+		text-align: left;
+	}
+
+	.rounds-entry input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 0.4rem 0.55rem;
+		background: #fff;
+		border: 1px solid #d9cdbf;
+		border-radius: 6px;
+		font: inherit;
+		font-size: 0.9rem;
+		text-align: center;
+	}
+
+	.rounds-entry tfoot td {
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		border-top: 1px solid #e8dfd3;
+	}
+
+	.form-row.shootout {
+		margin-top: 0.75rem;
+	}
+
+	.standings-table .record {
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.result-form .primary {

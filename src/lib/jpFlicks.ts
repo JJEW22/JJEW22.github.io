@@ -19,6 +19,11 @@ export const SHEET_TEAM_INFO = 'TeamInfo';
 
 export type Venue = 'home' | 'away';
 export type MatchStatus = 'unplayed' | 'disallowed' | 'pending' | 'final';
+// How a season is scored. 'games' is seasons 1 and 2: a result is a margin and
+// only the game counts. 'rounds' is season 3 on: every round counts too.
+export type Scoring = 'games' | 'rounds';
+// One round's scores, [team_a, team_b], the same point of view as margin.
+export type Round = [number, number];
 
 export interface Player {
 	id: number;
@@ -45,6 +50,12 @@ export interface Match {
 	// Always from team_a's point of view. 0 is a tie, so nothing may test this
 	// for truthiness.
 	margin: number | null;
+	// Round-by-round scores on a 'rounds' season; margin is their difference.
+	// Null on a forfeit and on every result from a 'games' season.
+	rounds: Round[] | null;
+	// Who won the 20s shootout that settles a game level on points. Null unless
+	// the round totals are equal.
+	shootoutWinner: number | null;
 	forfeitBy: number | null;
 	submittedBy: number | null;
 	submittedByName: string | null;
@@ -63,6 +74,7 @@ export interface Season {
 	// out of the default landing season for everyone but an admin, but it still
 	// answers on its own URL. It is not a permission — see sql/023.
 	isPublished: boolean;
+	scoring: Scoring;
 	homeVenue: string;
 	awayVenue: string;
 }
@@ -209,4 +221,152 @@ export function checkResult(input: {
 	}
 	// Stored from team_a's point of view.
 	return { ok: true, value: { margin: winner === input.teamA ? size : -size, forfeitBy: null } };
+}
+
+// --- round scoring (season 3 on) ---
+//
+// Every game plays all 4 rounds. A round win is 1 point, winning the game (the
+// higher total over the 4 rounds) is 1 more, and winning the series (both games
+// against a team, totals combined) is 2. Rounds and series can be drawn, at half
+// a win to each side. A game cannot: level on points, it goes to a 20s shootout
+// and the shootout's winner wins the game. The rules copy on the page states
+// these numbers.
+
+export const ROUNDS_PER_GAME = 4;
+export const ROUND_WIN_POINTS = 1;
+export const GAME_WIN_POINTS = 1;
+export const SERIES_WIN_POINTS = 2;
+const MAX_ROUND_SCORE = 500;
+
+// The four rounds as the form sends them: [[a, b], ...] in team_a's view, plus
+// the shootout winner, which is asked for only when the totals are level.
+export function checkRounds(
+	input: unknown,
+	shootout: unknown,
+	teamA: number,
+	teamB: number
+): Checked<{ rounds: Round[]; margin: number; shootoutWinner: number | null }> {
+	if (!Array.isArray(input) || input.length !== ROUNDS_PER_GAME) {
+		return { ok: false, error: `Enter the score for all ${ROUNDS_PER_GAME} rounds.` };
+	}
+	const rounds: Round[] = [];
+	for (const [i, pair] of input.entries()) {
+		if (!Array.isArray(pair) || pair.length !== 2) {
+			return { ok: false, error: `Round ${i + 1} needs a score for both teams.` };
+		}
+		const [a, b] = pair.map((v) => Number(String(v ?? '').trim()));
+		if (pair.some((v) => String(v ?? '').trim() === '')) {
+			return { ok: false, error: `Round ${i + 1} needs a score for both teams.` };
+		}
+		if (![a, b].every((n) => Number.isInteger(n) && n >= 0)) {
+			return { ok: false, error: `Round ${i + 1}: scores are whole numbers, 0 or more.` };
+		}
+		if (a > MAX_ROUND_SCORE || b > MAX_ROUND_SCORE) {
+			return {
+				ok: false,
+				error: `Round ${i + 1}: that score looks wrong (over ${MAX_ROUND_SCORE}).`
+			};
+		}
+		rounds.push([a, b]);
+	}
+	const margin = rounds.reduce((sum, [a, b]) => sum + a - b, 0);
+	if (margin !== 0) return { ok: true, value: { rounds, margin, shootoutWinner: null } };
+
+	const winner = Number(shootout);
+	if (winner !== teamA && winner !== teamB) {
+		return { ok: false, error: "It's level on points. Say who won the 20s shootout." };
+	}
+	return { ok: true, value: { rounds, margin, shootoutWinner: winner } };
+}
+
+export interface Record3 {
+	w: number;
+	d: number;
+	l: number;
+}
+
+export interface RoundStanding {
+	rounds: Record3;
+	games: Record3;
+	series: Record3;
+	points: number;
+}
+
+const tally = (r: Record3, diff: number, count = 1) => {
+	if (diff > 0) r.w += count;
+	else if (diff < 0) r.l += count;
+	else r.d += count;
+};
+
+// The rounds, games and series records for each team, keyed by team id, and
+// the league points they earn (tournament points not included).
+//
+// Only agreed results count, as everywhere else. A forfeit is all 4 rounds and
+// the game to the side that turned up, and counts towards the series as a win
+// by `forfeitMargin`, the same figure the point differential uses.
+export function roundStandings(
+	teamIds: number[],
+	matches: Match[],
+	forfeitMargin: number
+): Map<number, RoundStanding> {
+	const out = new Map<number, RoundStanding>();
+	const blank = () => ({ w: 0, d: 0, l: 0 });
+	for (const id of teamIds) {
+		out.set(id, { rounds: blank(), games: blank(), series: blank(), points: 0 });
+	}
+
+	// Combined margin per pairing, in team_a's view, once both games are in.
+	const pairs = new Map<string, { a: number; b: number; margin: number; games: number }>();
+
+	for (const m of matches) {
+		if (m.status !== 'final') continue;
+		const a = out.get(m.teamA);
+		const b = out.get(m.teamB);
+		if (!a || !b) continue;
+
+		let margin: number;
+		if (m.forfeitBy !== null) {
+			margin = m.forfeitBy === m.teamB ? forfeitMargin : -forfeitMargin;
+			tally(a.rounds, margin, ROUNDS_PER_GAME);
+			tally(b.rounds, -margin, ROUNDS_PER_GAME);
+		} else {
+			margin = m.margin ?? 0;
+			for (const [ra, rb] of m.rounds ?? []) {
+				tally(a.rounds, ra - rb);
+				tally(b.rounds, rb - ra);
+			}
+		}
+		// Level on points means the shootout decided it.
+		const decided =
+			margin !== 0
+				? margin
+				: m.shootoutWinner === m.teamA
+					? 1
+					: m.shootoutWinner === m.teamB
+						? -1
+						: 0;
+		tally(a.games, decided);
+		tally(b.games, -decided);
+
+		const key = `${m.teamA}:${m.teamB}`;
+		const pair = pairs.get(key) ?? { a: m.teamA, b: m.teamB, margin: 0, games: 0 };
+		pair.margin += margin;
+		pair.games += 1;
+		pairs.set(key, pair);
+	}
+
+	for (const p of pairs.values()) {
+		if (p.games < 2) continue;
+		tally(out.get(p.a)!.series, p.margin);
+		tally(out.get(p.b)!.series, -p.margin);
+	}
+
+	const worth = (r: Record3, win: number) => win * r.w + (win / 2) * r.d;
+	for (const s of out.values()) {
+		s.points =
+			worth(s.rounds, ROUND_WIN_POINTS) +
+			worth(s.games, GAME_WIN_POINTS) +
+			worth(s.series, SERIES_WIN_POINTS);
+	}
+	return out;
 }

@@ -22,6 +22,7 @@ import {
 	canSubmit,
 	cellFor,
 	type Match,
+	type Round,
 	type Season,
 	type Team,
 	type Venue,
@@ -51,6 +52,7 @@ interface SeasonRow {
 	season_number: number;
 	is_current: boolean;
 	is_published: boolean;
+	scoring: Season['scoring'];
 	home_venue: string;
 	away_venue: string;
 }
@@ -61,7 +63,7 @@ interface SeasonRow {
 // environment, and SvelteKit's analyse step imports this module during the
 // build -- which is exactly how that broke the Render deploy.
 const seasonColumns = () => sql`
-	id, slug, label, season_number, is_current, is_published, home_venue, away_venue
+	id, slug, label, season_number, is_current, is_published, scoring, home_venue, away_venue
 `;
 
 const toSeason = (r: SeasonRow): Season => ({
@@ -70,6 +72,7 @@ const toSeason = (r: SeasonRow): Season => ({
 	seasonNumber: r.season_number,
 	isCurrent: r.is_current,
 	isPublished: r.is_published,
+	scoring: r.scoring,
 	homeVenue: r.home_venue,
 	awayVenue: r.away_venue
 });
@@ -168,6 +171,8 @@ async function loadMatches(seasonId: number): Promise<Match[]> {
 			team_b: string | number;
 			status: Match['status'];
 			margin: number | null;
+			rounds: Round[] | null;
+			shootout_winner: string | number | null;
 			forfeit_by: string | number | null;
 			submitted_by: string | number | null;
 			submitted_team: string | number | null;
@@ -175,7 +180,8 @@ async function loadMatches(seasonId: number): Promise<Match[]> {
 			submitter: string | null;
 		}[]
 	>`
-		select m.id, m.venue, m.team_a, m.team_b, m.status, m.margin, m.forfeit_by,
+		select m.id, m.venue, m.team_a, m.team_b, m.status, m.margin, m.rounds, m.shootout_winner,
+		       m.forfeit_by,
 		       m.submitted_by, m.submitted_team, m.approved_by, u.username as submitter
 		from jpflicks_matches m
 		left join users u on u.id = m.submitted_by
@@ -189,6 +195,8 @@ async function loadMatches(seasonId: number): Promise<Match[]> {
 		teamB: Number(r.team_b),
 		status: r.status,
 		margin: r.margin,
+		rounds: r.rounds,
+		shootoutWinner: num(r.shootout_winner),
 		forfeitBy: num(r.forfeit_by),
 		submittedBy: num(r.submitted_by),
 		submittedByName: r.submitter,
@@ -364,7 +372,12 @@ export async function submitResult(
 	user: SessionUser,
 	slug: string,
 	matchId: number,
-	result: { margin: number | null; forfeitBy: number | null }
+	result: {
+		margin: number | null;
+		rounds: Round[] | null;
+		shootoutWinner: number | null;
+		forfeitBy: number | null;
+	}
 ): Promise<void> {
 	const { match, viewer, season } = await context(user, slug, matchId);
 
@@ -381,6 +394,8 @@ export async function submitResult(
 		update jpflicks_matches set
 			status = ${final ? 'final' : 'pending'},
 			margin = ${result.margin},
+			rounds = ${result.rounds === null ? null : sql.json(result.rounds)},
+			shootout_winner = ${result.shootoutWinner},
 			forfeit_by = ${result.forfeitBy},
 			submitted_by = ${user.id},
 			submitted_team = ${myTeam},
@@ -443,7 +458,7 @@ export async function rejectResult(
 	}
 	await sql`
 		update jpflicks_matches set
-			status = 'unplayed', margin = null, forfeit_by = null,
+			status = 'unplayed', margin = null, rounds = null, shootout_winner = null, forfeit_by = null,
 			submitted_by = null, submitted_team = null, submitted_at = null,
 			approved_by = null, approved_at = null
 		where id = ${matchId} and status = 'pending'`;
@@ -467,7 +482,7 @@ export async function clearResult(user: SessionUser, slug: string, matchId: numb
 	await requireMatch(slug, matchId);
 	await sql`
 		update jpflicks_matches set
-			status = 'unplayed', margin = null, forfeit_by = null,
+			status = 'unplayed', margin = null, rounds = null, shootout_winner = null, forfeit_by = null,
 			submitted_by = null, submitted_team = null, submitted_at = null,
 			approved_by = null, approved_at = null
 		where id = ${matchId} and status <> 'disallowed'`;
@@ -484,7 +499,7 @@ export async function setDisallowed(
 	await sql`
 		update jpflicks_matches set
 			status = ${disallowed ? 'disallowed' : 'unplayed'},
-			margin = null, forfeit_by = null, submitted_by = null, submitted_team = null,
+			margin = null, rounds = null, shootout_winner = null, forfeit_by = null, submitted_by = null, submitted_team = null,
 			submitted_at = null, approved_by = null, approved_at = null
 		where id = ${matchId}`;
 }

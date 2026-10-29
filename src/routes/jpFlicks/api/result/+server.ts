@@ -10,7 +10,7 @@
 // entered the score, all decided by the predicates in $lib/jpFlicks so the page
 // and the endpoint cannot disagree about who sees a button.
 import { json } from '@sveltejs/kit';
-import { checkResult } from '$lib/jpFlicks';
+import { checkResult, checkRounds } from '$lib/jpFlicks';
 import {
 	FlicksError,
 	approveResult,
@@ -59,6 +59,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const match = state.matches.find((m) => m.id === matchId);
 		if (!match) throw new FlicksError(`No match ${matchId} in ${slug}.`, 404);
 
+		// From season 3 a played game is its four round scores, and the margin is
+		// worked out from them rather than typed in.
+		const byRounds = state.season?.scoring === 'rounds';
+		if (byRounds && body?.kind !== 'forfeit') {
+			const rounds = checkRounds(body?.rounds, body?.shootoutWinner, match.teamA, match.teamB);
+			if (!rounds.ok) return json({ ok: false, error: rounds.error }, { status: 400 });
+			await submitResult(locals.user, slug, matchId, { ...rounds.value, forfeitBy: null });
+			return statePayload(locals, slug);
+		}
+
 		const checked = checkResult({
 			kind: body?.kind,
 			margin: body?.margin,
@@ -69,7 +79,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 		if (!checked.ok) return json({ ok: false, error: checked.error }, { status: 400 });
 
-		await submitResult(locals.user, slug, matchId, checked.value);
+		await submitResult(locals.user, slug, matchId, {
+			...checked.value,
+			rounds: null,
+			shootoutWinner: null
+		});
 		return statePayload(locals, slug);
 	} catch (err) {
 		return fail(err);
