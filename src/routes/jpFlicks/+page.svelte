@@ -129,7 +129,70 @@
 	const WONT_PLAY_STRING = 'XXX';
 	const FORFEIT_WIN_STRING = 'F';
 	const FORFEIT_LOSS_STRING = '-F';
-	const SESSION_COUNT = 1;
+
+	// This season's calendar. The League Format table is drawn from it, and the
+	// league nights are worked out from it: every Thursday from the first day to
+	// the last, except the nights marked off or given to a tournament.
+	// Dates are 'YYYY-MM-DD', read as local dates.
+	const SCHEDULE = [
+		{ date: '2026-10-22', event: 'Session 0', kind: 'info' },
+		{ date: '2026-10-29', event: 'First day of league', kind: 'start' },
+		{ date: '2026-11-26', event: 'Off for Thanksgiving', kind: 'off' },
+		{ date: '2026-12-10', event: 'Winter Tournament', kind: 'tournament' },
+		{ date: '2026-12-24', event: 'Winter break (no games)', kind: 'off' },
+		{ date: '2026-12-31', event: 'Winter break (no games)', kind: 'off' },
+		{ date: '2027-01-07', event: 'Games resume', kind: 'info' },
+		{ date: '2027-03-11', event: 'Spring break (no games)', kind: 'off' },
+		{ date: '2027-04-08', event: 'Spring Tournament', kind: 'tournament' },
+		{ date: '2027-04-15', event: 'Last day of league', kind: 'end' }
+	];
+
+	/** @param {string} iso 'YYYY-MM-DD' */
+	function localDate(iso) {
+		const [y, m, d] = iso.split('-').map(Number);
+		return new Date(y, m - 1, d);
+	}
+
+	/** @param {string} iso 'October 22nd' */
+	function scheduleDate(iso) {
+		const date = localDate(iso);
+		const d = date.getDate();
+		const suffix =
+			d % 10 === 1 && d !== 11
+				? 'st'
+				: d % 10 === 2 && d !== 12
+					? 'nd'
+					: d % 10 === 3 && d !== 13
+						? 'rd'
+						: 'th';
+		return `${date.toLocaleDateString('en-US', { month: 'long' })} ${d}${suffix}`;
+	}
+
+	// Every league night, as 'YYYY-MM-DD'.
+	const LEAGUE_NIGHTS = (() => {
+		const iso = (/** @type {Date} */ d) =>
+			`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		const start = SCHEDULE.find((e) => e.kind === 'start')?.date ?? '';
+		const end = SCHEDULE.find((e) => e.kind === 'end')?.date ?? '';
+		const skipped = new Set(
+			SCHEDULE.filter((e) => e.kind === 'off' || e.kind === 'tournament').map((e) => e.date)
+		);
+		const nights = [];
+		for (let d = localDate(start); iso(d) <= end; d.setDate(d.getDate() + 7)) {
+			if (!skipped.has(iso(d))) nights.push(iso(d));
+		}
+		return nights;
+	})();
+
+	// League nights still to come, counting today's if today is one. The weekly
+	// game counts and the forfeit maths divide the games left by this, so it is
+	// never less than 1: after the last night, whatever is left is due at once.
+	const SESSIONS_LEFT = (() => {
+		const now = new Date();
+		const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+		return LEAGUE_NIGHTS.filter((d) => d >= today).length;
+	})();
+	const SESSION_COUNT = Math.max(1, SESSIONS_LEFT);
 
 	const HOME_GAME_STRING = 'Council';
 	const AWAY_GAME_STRING = 'Anish';
@@ -2495,7 +2558,7 @@
 			<p>
 				Boston's premier Crokinole league <b>JP Flicks is back for a season 3</b>! We will meet
 				<b>Thursdays at 7pm</b>
-				and run till about 10pm. This seasons league is planned to go from late October to end of March
+				and run till about 10pm. This seasons league is planned to go from late October to mid April
 				and will <b>feature 2 tournaments</b> that will have their own prizes. Because of the longer
 				format we only request that you believe you could make it to half the sessions and request
 				to join no later than the 3rd session.
@@ -2560,41 +2623,29 @@
 							</tr>
 						</thead>
 						<tbody>
-							<tr>
-								<td>Session 0</td>
-								<td>October 23rd</td>
-							</tr>
-							<tr>
-								<td>First Day of League</td>
-								<td>October 30th</td>
-							</tr>
-							<tr>
-								<td>Off for Thanksgiving</td>
-								<td>November 27th</td>
-							</tr>
-							<tr>
-								<td><b>Winter Tournament</b></td>
-								<td>December 11th</td>
-							</tr>
-							<tr>
-								<td>Beginning of holiday</td>
-								<td>December 17th</td>
-							</tr>
-							<tr>
-								<td>Games Resume</td>
-								<td>January 8th</td>
-							</tr>
-							<tr>
-								<td><b>Final Tournament</b></td>
-								<td>April 2th</td>
-							</tr>
-							<tr>
-								<td><b>Final Day Of League</b></td>
-								<td>April 9th</td>
-							</tr>
+							{#each SCHEDULE as e (e.date)}
+								<tr>
+									<td>
+										{#if e.kind === 'tournament' || e.kind === 'end'}<b>{e.event}</b
+											>{:else}{e.event}{/if}
+									</td>
+									<td>{scheduleDate(e.date)}</td>
+								</tr>
+							{/each}
 						</tbody>
 					</table>
 				</div>
+				<p class="schedule-note">
+					That's <b>{LEAGUE_NIGHTS.length} league nights</b>, every Thursday from {scheduleDate(
+						LEAGUE_NIGHTS[0]
+					)} to {scheduleDate(LEAGUE_NIGHTS[LEAGUE_NIGHTS.length - 1])} apart from the breaks and the
+					tournament nights.
+					{#if SESSIONS_LEFT > 0}
+						<b>{SESSIONS_LEFT}</b>
+						{SESSIONS_LEFT === 1 ? 'is' : 'are'} still to come, and the Games Finder spreads each team's
+						remaining games across them.
+					{/if}
+				</p>
 				<div class="subsection">
 					<h3 id="point-per-game">Points for games</h3>
 					<ul>
@@ -2891,7 +2942,9 @@
 											Object.values(teamGameCounts).reduce((accumulator, currentValue) => {
 												return accumulator + currentValue;
 											}, 0) / SESSION_COUNT
-										).toFixed(2)} games per session to complete all your games by the end of the season.
+										).toFixed(2)} games per session over the {SESSION_COUNT} league
+										{SESSION_COUNT === 1 ? 'night' : 'nights'} left to complete all your games by the
+										end of the season.
 									{/if}
 									{#if hiddenTeams.size > 0 && shownGames === 0}
 										<span class="filtered-warning"> (All games filtered out)</span>
@@ -3697,6 +3750,11 @@
 				10px 100%;
 			background-attachment: local, local, scroll, scroll;
 		}
+	}
+
+	.schedule-note {
+		margin: 0.75rem 0 0;
+		font-size: 0.95rem;
 	}
 
 	/* Ensure minimum table width */
