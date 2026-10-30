@@ -7,7 +7,7 @@
 	import patternColorLogo from '$lib/assets/colorJPFlicksCollisionLogo-pattern.svg';
 	import patternBrownLogo from '$lib/assets/brownJPFlicksCollisionLogo-pattern.svg';
 	import '../../app.css';
-	import { roundEntered, roundStandings } from '$lib/jpFlicks';
+	import { GAME_DIFF_CAP, cappedDiff, roundEntered, roundStandings } from '$lib/jpFlicks';
 	import ResultForm from './ResultForm.svelte';
 
 	// Data storage
@@ -1293,7 +1293,8 @@
 		} else {
 			team_info.ties += 1;
 		}
-		team_info.pointDiff += score;
+		// From season 3 a game counts for at most GAME_DIFF_CAP in the +/-.
+		team_info.pointDiff += activeSeason?.scoring === 'rounds' ? cappedDiff(score) : score;
 	}
 
 	function update_series(team_info, home_score, away_score) {
@@ -2045,20 +2046,25 @@
 		const gamesByTeam = {};
 
 		function makeResultObj(playerResult, gameIsForfeit) {
-			const forfeitSuffix = gameIsForfeit ? ' (F)' : '';
+			// The +/- shown is what the game adds to the standings' +/-.
+			// The series is still won on the real scores, so numericDiff stays raw.
+			const raw = playerResult;
+			const capped = byRounds && Math.abs(playerResult) > GAME_DIFF_CAP;
+			if (capped) playerResult = cappedDiff(playerResult);
+			const forfeitSuffix = gameIsForfeit ? ' (F)' : capped ? ' (cap)' : '';
 			if (playerResult > 0) {
 				return {
 					text: 'W',
 					class: 'win',
 					diff: `+${playerResult}${forfeitSuffix}`,
-					numericDiff: playerResult
+					numericDiff: raw
 				};
 			} else if (playerResult < 0) {
 				return {
 					text: 'L',
 					class: 'loss',
 					diff: `${playerResult}${forfeitSuffix}`,
-					numericDiff: playerResult
+					numericDiff: raw
 				};
 			} else {
 				return { text: 'D', class: 'draw', diff: `0${forfeitSuffix}`, numericDiff: 0 };
@@ -2602,6 +2608,10 @@
 						</li>
 						<li>
 							Winning a series (combined score of both games against a team) awards 2 bonus points
+						</li>
+						<li>
+							In the point differential (+/-) a single game counts for at most {GAME_DIFF_CAP} either
+							way. The game and series are still decided on the real scores
 						</li>
 					</ul>
 					<p>
@@ -3617,7 +3627,9 @@
 								<strong>Series:</strong>
 								{seriesDraws ? 'won-drawn-lost' : 'won-lost'} |
 								<strong>TP:</strong> Tournament Points |
-								<strong>FF:</strong> Forfeit Losses | <strong>+/-:</strong> Point Differential
+								<strong>FF:</strong> Forfeit Losses | <strong>+/-:</strong> Point Differential, at
+								most
+								{GAME_DIFF_CAP} per game
 							</p>
 							<p>
 								<strong>Score:</strong> 1 per round won (½ drawn), 2 per game won, 2 per series won (1

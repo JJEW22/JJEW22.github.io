@@ -6,7 +6,7 @@
 	// does not mean retyping it. Each open is a fresh instance, so the seeding
 	// happens once. A game saved part-way through reopens where it was left.
 	import { createEventDispatcher, tick } from 'svelte';
-	import { ROUNDS_PER_GAME, roundEntered } from '$lib/jpFlicks';
+	import { ROUNDS_PER_GAME, SCORE_STEP, roundEntered } from '$lib/jpFlicks';
 
 	/** @type {import('$lib/jpFlicks').Match} */
 	export let match;
@@ -63,6 +63,13 @@
 		return s === '' ? null : Number(s);
 	}
 
+	// Flagged as it is typed; the server is what refuses it.
+	/** @param {string} v */
+	function offStep(v) {
+		const n = box(v);
+		return n !== null && (!Number.isInteger(n) || n < 0 || n % SCORE_STEP !== 0);
+	}
+
 	/** @param {boolean} partial save the rounds so far rather than send the result */
 	function submit(partial) {
 		sent = true;
@@ -110,6 +117,7 @@
 						<td>
 							<input
 								bind:value={round[0]}
+								class:off-step={offStep(round[0])}
 								inputmode="numeric"
 								aria-label="Round {i + 1}, {nameA}"
 							/>
@@ -117,6 +125,7 @@
 						<td>
 							<input
 								bind:value={round[1]}
+								class:off-step={offStep(round[1])}
 								inputmode="numeric"
 								aria-label="Round {i + 1}, {nameB}"
 							/>
@@ -146,8 +155,8 @@
 		{/if}
 		<p class="result-note small">
 			Each team's points in each of the {ROUNDS_PER_GAME} rounds. When only one team scores, the other's
-			box can stay blank; a 0-0 round needs 0 in both. A level round is a draw; a level game goes to
-			a 20s shootout. Mid-game? Save progress and finish it later.
+			box can stay blank; a 0-0 round needs 0 in both. Scores go up in {SCORE_STEP}s. A level round
+			is a draw; a level game goes to a 20s shootout. Mid-game? Save progress and finish it later.
 		</p>
 	{:else if kind === 'margin'}
 		<div class="form-row">
@@ -182,7 +191,7 @@
 		<button type="button" class="primary" disabled={busy} on:click={() => submit(false)}>
 			{isAdmin ? 'Record it' : 'Send for approval'}
 		</button>
-		{#if kind === 'rounds'}
+		{#if kind === 'rounds' && match.status !== 'final'}
 			<button type="button" disabled={busy} on:click={() => submit(true)}>Save progress</button>
 		{/if}
 		<button type="button" disabled={busy} on:click={() => dispatch('cancel')}>Cancel</button>
@@ -346,6 +355,11 @@
 		font: inherit;
 		font-size: 0.9rem;
 		text-align: center;
+	}
+
+	.rounds-entry input.off-step {
+		border-color: #c0392b;
+		background: #fdeeee;
 	}
 
 	.rounds-entry tfoot td {

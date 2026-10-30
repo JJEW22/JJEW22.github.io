@@ -419,6 +419,11 @@ export async function saveProgress(
 	if (!canSubmit(season, viewer, match)) {
 		throw new FlicksError(reasonCannotSubmit(match, viewer, season), 403);
 	}
+	// Saving progress would quietly take an agreed result back out of the
+	// standings. Correcting one means entering the whole game, or clearing it.
+	if (match.status === 'final') {
+		throw new FlicksError('That result is already agreed. Change the whole game, or clear it.');
+	}
 	const myTeam = viewer.teamIds.find((t) => t === match.teamA || t === match.teamB) ?? null;
 	const saved = rounds !== null;
 

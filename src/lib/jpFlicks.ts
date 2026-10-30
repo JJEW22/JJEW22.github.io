@@ -137,8 +137,11 @@ export function teamOf(viewer: Viewer, match: Match): number | null {
 
 // Entering a score. Either side of the match may be the one to do it.
 export function canSubmit(season: Season, viewer: Viewer, match: Match): boolean {
-	if (match.status === 'disallowed' || match.status === 'final') return false;
+	if (match.status === 'disallowed') return false;
+	// An agreed result is settled for the players, but an admin can still
+	// correct it: that is what the admin Change buttons are for.
 	if (viewer.isAdmin) return true;
+	if (match.status === 'final') return false;
 	if (!canPlayersAct(season)) return false;
 	if (!playsIn(viewer, match)) return false;
 	// While a result is pending, only the side that entered it may change it;
@@ -242,6 +245,16 @@ export const ROUND_WIN_POINTS = 1;
 export const GAME_WIN_POINTS = 2;
 export const SERIES_WIN_POINTS = 2;
 const MAX_ROUND_SCORE = 500;
+// Discs score 5, 10, 15 or 20, so every round score is a multiple of 5.
+export const SCORE_STEP = 5;
+// One lopsided game shouldn't swamp the point differential, so a game counts
+// for at most this much either way in the +/-. The game and series results
+// still use the real scores.
+export const GAME_DIFF_CAP = 100;
+
+export function cappedDiff(margin: number): number {
+	return Math.max(-GAME_DIFF_CAP, Math.min(GAME_DIFF_CAP, margin));
+}
 
 // The round grid as the form sends it, [[a, b], ...] in team_a's view, read
 // box by box: null for a blank box, an error for anything that isn't a score.
@@ -262,6 +275,12 @@ function readRounds(input: unknown): Checked<PartialRound[]> {
 			if (n === null) continue;
 			if (!Number.isInteger(n) || n < 0) {
 				return { ok: false, error: `Round ${i + 1}: scores are whole numbers, 0 or more.` };
+			}
+			if (n % SCORE_STEP !== 0) {
+				return {
+					ok: false,
+					error: `Round ${i + 1}: scores go up in ${SCORE_STEP}s, so ${n} can't be right.`
+				};
 			}
 			if (n > MAX_ROUND_SCORE) {
 				return {
