@@ -1,7 +1,8 @@
 // src/routes/jpFlicks/api/result/+server.ts
 // Entering a score, and agreeing to one.
 //
-// POST   submit a result       (a player's is pending; an admin's is final)
+// POST   submit a result       (a player's is pending; an admin's is final),
+//        or { partial: true } to save a game's rounds so far
 // PATCH  { action: approve | reject }
 // DELETE clear a result back to unplayed (admin only)
 //
@@ -10,13 +11,14 @@
 // entered the score, all decided by the predicates in $lib/jpFlicks so the page
 // and the endpoint cannot disagree about who sees a button.
 import { json } from '@sveltejs/kit';
-import { checkResult, checkRounds } from '$lib/jpFlicks';
+import { checkProgress, checkResult, checkRounds } from '$lib/jpFlicks';
 import {
 	FlicksError,
 	approveResult,
 	clearResult,
 	loadState,
 	rejectResult,
+	saveProgress,
 	submitResult
 } from '$lib/server/jpFlicks';
 import type { RequestHandler } from './$types';
@@ -62,6 +64,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// From season 3 a played game is its four round scores, and the margin is
 		// worked out from them rather than typed in.
 		const byRounds = state.season?.scoring === 'rounds';
+		if (byRounds && body?.partial === true) {
+			const progress = checkProgress(body?.rounds);
+			if (!progress.ok) return json({ ok: false, error: progress.error }, { status: 400 });
+			await saveProgress(locals.user, slug, matchId, progress.value.rounds);
+			return statePayload(locals, slug);
+		}
 		if (byRounds && body?.kind !== 'forfeit') {
 			const rounds = checkRounds(body?.rounds, body?.shootoutWinner, match.teamA, match.teamB);
 			if (!rounds.ok) return json({ ok: false, error: rounds.error }, { status: 400 });

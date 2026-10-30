@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import Collapsible from '$lib/Collapsible.svelte';
 	import HallOfFame from '$lib/HallOfFame.svelte';
@@ -7,7 +7,8 @@
 	import patternColorLogo from '$lib/assets/colorJPFlicksCollisionLogo-pattern.svg';
 	import patternBrownLogo from '$lib/assets/brownJPFlicksCollisionLogo-pattern.svg';
 	import '../../app.css';
-	import { ROUNDS_PER_GAME, roundStandings } from '$lib/jpFlicks';
+	import { roundEntered, roundStandings } from '$lib/jpFlicks';
+	import ResultForm from './ResultForm.svelte';
 
 	// Data storage
 	let loading = true;
@@ -36,19 +37,15 @@
 	/** @type {Viewer} */
 	let viewer = { userId: null, username: null, isAdmin: false, teamIds: [] };
 
-	// Result entry
+	// Result entry, which lives in the Games Finder: each game there carries its
+	// own Enter score / Approve buttons, and its form opens under it.
 	/** @type {number | null} the match whose form is showing */
 	let openMatchId = null;
-	let resultKind = 'margin'; // margin | rounds | forfeit
-	let resultMargin = '';
-	/** @type {string[][]} [team_a, team_b] per round, as typed */
-	let resultRounds = blankRounds();
-	let resultShootout = ''; // team id, asked for only when the round totals are level
-	let resultWinner = '';
-	let resultForfeitBy = '';
 	let resultBusy = false;
 	let resultMsg = '';
 	let resultError = '';
+	/** @type {HTMLElement | undefined} the error banner for a failed approve, reject or clear */
+	let resultErrorBanner;
 
 	$: teamNameById = new Map(teams.map((t) => [t.id, t.name]));
 	$: isCurrentSeason = Boolean(activeSeason && activeSeason.isCurrent);
@@ -56,23 +53,54 @@
 	$: byRounds = activeSeason?.scoring === 'rounds';
 	// Draws only get a column of their own once one has happened.
 	$: seriesDraws = sortedTeams.some((t) => t.seriesD > 0);
-	$: roundTotals = resultRounds.reduce(
-		(sum, [a, b]) => [sum[0] + (Number(a) || 0), sum[1] + (Number(b) || 0)],
-		[0, 0]
-	);
-	// Every box filled and the totals equal: a 20s shootout decides it.
-	$: roundsLevel =
-		resultRounds.every((r) => r.every((v) => String(v).trim() !== '')) &&
-		roundTotals[0] === roundTotals[1];
-	// The games this viewer can actually do something about. Nobody wants to
-	// hunt for their own fixture in a 90-row grid, so these lead the panel.
+	// Scores waiting on this viewer to agree to. They lead the Games Finder, and
+	// open it, because nothing else counts until somebody does.
 	$: myPending = matches.filter((m) => m.canApprove);
-	$: myToPlay = matches.filter((m) => m.canSubmit && m.status === 'unplayed' && playsInMatch(m));
-	$: awaitingOthers = matches.filter(
-		(m) => m.status === 'pending' && !m.canApprove && playsInMatch(m)
-	);
 	$: pendingCount = matches.filter((m) => m.status === 'pending').length;
-	$: openMatch = matches.find((m) => m.id === openMatchId) || null;
+
+	// The Games Finder's games are built from the matrices and know only team
+	// names and a board; this finds the fixture row behind one, which is what
+	// carries the result and the viewer's permissions.
+	$: matchByGame = new Map(
+		matches.map((m) => [
+			`${m.venue}:${teamNameById.get(m.teamA)?.toLowerCase()}:${teamNameById.get(m.teamB)?.toLowerCase()}`,
+			m
+		])
+	);
+	/**
+	 * @param {{team1: string, team2: string, isHome: boolean}} game
+	 * @param {Map<string, LiveMatch>} index passed in so the template re-runs when it changes
+	 * @returns {LiveMatch | null}
+	 */
+	function matchFor(game, index) {
+		const venue = game.isHome ? 'home' : 'away';
+		const a = game.team1.toLowerCase();
+		const b = game.team2.toLowerCase();
+		return index.get(`${venue}:${a}:${b}`) || index.get(`${venue}:${b}:${a}`) || null;
+	}
+
+	// Open the finder, once, when something is waiting on this viewer.
+	let finderOpen = false;
+	let openedForPending = false;
+	$: if (myPending.length && !openedForPending) {
+		openedForPending = true;
+		finderOpen = true;
+	}
+
+	// A signed-in player starts with their own games showing. Only once, so
+	// clearing the box sticks.
+	let prefilled = false;
+	$: if (dataReady && allGames.length && !prefilled) {
+		prefilled = true;
+		const me = teams
+			.filter((t) => viewer.teamIds.includes(t.id))
+			.flatMap((t) => t.players)
+			.find((pl) => pl.userId !== null && pl.userId === viewer.userId);
+		if (me && !playerName) {
+			playerName = me.name;
+			filterGamesByPlayer();
+		}
+	}
 
 	// The admin fixture list. 90 rows is too many to scroll, and the ones that
 	// need attention are the pending ones, so that is the default.
@@ -81,11 +109,6 @@
 		.filter((m) => m.status !== 'disallowed')
 		.filter((m) => fixtureFilter === 'all' || m.status === fixtureFilter)
 		.sort((a, b) => describeMatch(a).localeCompare(describeMatch(b)));
-
-	/** @param {LiveMatch} m */
-	function playsInMatch(m) {
-		return viewer.teamIds.includes(m.teamA) || viewer.teamIds.includes(m.teamB);
-	}
 
 	// Page background element
 	let pageBackground;
@@ -970,38 +993,11 @@
 
 	// --- entering results ---
 
-	function blankRounds() {
-		return Array.from({ length: ROUNDS_PER_GAME }, () => ['', '']);
-	}
-
 	/** @param {LiveMatch} match */
 	function openResultForm(match) {
 		openMatchId = match.id;
 		resultMsg = '';
 		resultError = '';
-		resultRounds = match.rounds
-			? match.rounds.map(([a, b]) => [String(a), String(b)])
-			: blankRounds();
-		resultShootout = match.shootoutWinner === null ? '' : String(match.shootoutWinner);
-		// Seeded from whatever is already there, so correcting a pending score
-		// does not mean retyping it.
-		if (match.forfeitBy !== null) {
-			resultKind = 'forfeit';
-			resultForfeitBy = String(match.forfeitBy);
-			resultMargin = '';
-			resultWinner = '';
-		} else if (match.margin !== null) {
-			resultKind = 'margin';
-			resultMargin = String(Math.abs(match.margin));
-			resultWinner = String(match.margin >= 0 ? match.teamA : match.teamB);
-			resultForfeitBy = '';
-		} else {
-			resultKind = 'margin';
-			resultMargin = '';
-			resultWinner = '';
-			resultForfeitBy = '';
-		}
-		if (activeSeason?.scoring === 'rounds' && resultKind === 'margin') resultKind = 'rounds';
 	}
 
 	function closeResultForm() {
@@ -1026,32 +1022,43 @@
 			const data = await response.json().catch(() => null);
 			if (!response.ok) {
 				resultError = (data && data.error) || `That did not work (${response.status}).`;
+				showResultError();
 				return false;
 			}
 			applyState(data);
 			recomputeStandings();
+			// The finder's games are built from the matrices once, on load, so
+			// they are rebuilt here for the new result to show in them.
+			allGames = generateGamesData();
+			filterGamesByPlayer();
 			return true;
 		} catch (err) {
 			resultError = err.message;
+			showResultError();
 			return false;
 		} finally {
 			resultBusy = false;
 		}
 	}
 
-	/** @param {LiveMatch} match */
-	async function submitResult(match) {
-		const ok = await sendResult('/jpFlicks/api/result', 'POST', {
-			matchId: match.id,
-			kind: resultKind,
-			margin: resultMargin,
-			winner: resultWinner,
-			forfeitBy: resultForfeitBy,
-			rounds: resultRounds,
-			shootoutWinner: resultShootout
-		});
+	// The banner sits at the top of the Games Finder, which can be a long way
+	// from the button that failed. An open form shows its own error and
+	// scrolls to it itself.
+	async function showResultError() {
+		if (openMatchId !== null) return;
+		await tick();
+		resultErrorBanner?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}
+
+	/** @param {CustomEvent<Record<string, unknown>>} event the form's fields */
+	async function submitResult(event) {
+		const ok = await sendResult('/jpFlicks/api/result', 'POST', event.detail);
 		if (ok) {
-			resultMsg = viewer.isAdmin ? 'Result recorded.' : 'Sent to the other team to approve.';
+			resultMsg = event.detail.partial
+				? 'Saved. Pick it up again from the Games Finder when the next round is done.'
+				: viewer.isAdmin
+					? 'Result recorded.'
+					: 'Sent to the other team to approve.';
 			openMatchId = null;
 		}
 	}
@@ -1094,6 +1101,7 @@
 
 	/** @param {LiveMatch} m */
 	function describeScore(m) {
+		if (m.status === 'unplayed' && m.rounds) return describeProgress(m);
 		if (m.status === 'unplayed') return 'not played';
 		if (m.status === 'disallowed') return 'shared player';
 		if (m.forfeitBy !== null) {
@@ -1126,6 +1134,19 @@
 				? `; ${teamNameById.get(m.shootoutWinner) || '?'} won the 20s shootout`
 				: '';
 		return `${who} ${hi}-${lo}, rounds ${rHi}-${rLo}${drawn ? ` (${drawn} drawn)` : ''}${shootout}`;
+	}
+
+	// A game saved part-way: "In progress: Kalice 120-40 after 2 of 4 rounds".
+	/** @param {LiveMatch} m */
+	function describeProgress(m) {
+		const rounds = m.rounds || [];
+		const a = rounds.reduce((sum, r) => sum + (r[0] ?? 0), 0);
+		const b = rounds.reduce((sum, r) => sum + (r[1] ?? 0), 0);
+		const done = rounds.filter((r) => roundEntered(r)).length;
+		const flip = b > a;
+		const who = a === b ? 'level' : teamNameById.get(flip ? m.teamB : m.teamA) || '?';
+		const [hi, lo] = flip ? [b, a] : [a, b];
+		return `In progress: ${who} ${hi}-${lo} after ${done} of ${rounds.length} rounds`;
 	}
 
 	// Standings, rankings and the initial sort. Unchanged from the spreadsheet
@@ -2045,6 +2066,21 @@
 		}
 
 		playedGames.forEach((game) => {
+			const match = matchFor(game, matchByGame);
+			// A 20s shootout settles a game level on points. It decides W or L but
+			// leaves the +/- at 0.
+			const shootout =
+				match && match.shootoutWinner !== null && game.result === 0
+					? teamNameById.get(match.shootoutWinner)
+					: null;
+			/** @param {string} team */
+			const resultFor = (team, diff) => {
+				const r = makeResultObj(diff, game.isForfeit);
+				if (!shootout) return r;
+				return team === shootout
+					? { ...r, text: 'W', class: 'win', diff: '0 (SO)' }
+					: { ...r, text: 'L', class: 'loss', diff: '0 (SO)' };
+			};
 			const playerInTeam1 =
 				game[PLAYER1_TEAM1].toLowerCase().includes(searchName) ||
 				game[PLAYER2_TEAM1].toLowerCase().includes(searchName);
@@ -2057,8 +2093,9 @@
 				if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
 				gamesByTeam[playerTeam].push({
 					opponentTeam: game.team2,
-					result: makeResultObj(game.result, game.isForfeit),
-					board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
+					result: resultFor(game.team1, game.result),
+					board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING,
+					match
 				});
 			}
 
@@ -2067,8 +2104,9 @@
 				if (!gamesByTeam[playerTeam]) gamesByTeam[playerTeam] = [];
 				gamesByTeam[playerTeam].push({
 					opponentTeam: game.team1,
-					result: makeResultObj(-game.result, game.isForfeit),
-					board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING
+					result: resultFor(game.team2, -game.result),
+					board: game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING,
+					match
 				});
 			}
 		});
@@ -2465,7 +2503,7 @@
 						Winning a round scores <b>1 point</b>. A drawn round is allowed: <b>½ point</b> to each team.
 					</li>
 					<li>
-						Winning the game (more points over the 4 rounds) scores <b>1 more point</b>. A game
+						Winning the game (more points over the 4 rounds) scores <b>2 more points</b>. A game
 						can't end level: a tie goes to a <b>20s shootout</b>, and its winner wins the game.
 					</li>
 					<li>
@@ -2557,10 +2595,10 @@
 						<li>Every game is 4 rounds, and all 4 are always played</li>
 						<li>Winning a round awards 1 point</li>
 						<li>A drawn round awards 0.5 points to each team</li>
-						<li>Winning the game (the most points over the 4 rounds) awards 1 more point</li>
+						<li>Winning the game (the most points over the 4 rounds) awards 2 more points</li>
 						<li>
 							A game can't be drawn: if it's level after 4 rounds, a 20s shootout decides it and the
-							winner gets the point for the game
+							winner gets the 2 points for the game
 						</li>
 						<li>
 							Winning a series (combined score of both games against a team) awards 2 bonus points
@@ -2717,6 +2755,7 @@
 			</Collapsible>
 			<Collapsible
 				id="games-finder"
+				bind:open={finderOpen}
 				title="Games Finder"
 				variant="minimal"
 				titleSize="1.75rem"
@@ -2726,9 +2765,75 @@
 			>
 				<div class="games-finder-container">
 					<p class="intro-text">
-						Find all the games you need to play across your teams. Type your name below to see your
-						remaining matches.
+						Find all the games you need to play across your teams, and enter their scores. Type your
+						name below to see your remaining matches.
 					</p>
+
+					<!--
+						Results. A score entered by a player waits for the other team to
+						agree before it counts; an admin's counts at once. Until it is
+						approved the match still reads as unplayed everywhere else on
+						this page, so an unconfirmed score never moves the standings.
+					-->
+					<div class="finder-results" id="results">
+						{#if resultMsg}<p class="result-banner ok">{resultMsg}</p>{/if}
+						{#if resultError && openMatchId === null}
+							<p class="result-banner bad" bind:this={resultErrorBanner}>{resultError}</p>
+						{/if}
+
+						{#if !viewer.username}
+							<p class="result-note">
+								<a href={resolve('/account')}>Sign in</a> to enter the scores for your games. An admin
+								can enter any result.
+							</p>
+						{:else if activeSeason && !isCurrentSeason}
+							<p class="result-note">
+								{activeSeason.label} is finished.{#if viewer.isAdmin}
+									As an admin you can still correct a result from the fixture list below.
+								{/if}
+							</p>
+						{:else if !viewer.teamIds.length && !viewer.isAdmin}
+							<p class="result-note">
+								You're signed in as <b>{viewer.username}</b>, but no team this season is linked to
+								that account. If you're playing, ask an admin to link you.
+							</p>
+						{/if}
+
+						{#if myPending.length}
+							<h3 class="needs-you">Waiting on you to approve</h3>
+							<ul class="match-list">
+								{#each myPending as m (m.id)}
+									<li class="match awaiting">
+										<div class="match-main">
+											<span class="match-teams">{describeMatch(m)}</span>
+											<span class="match-score">{describeScore(m)}</span>
+											{#if m.submittedByName}
+												<span class="match-by">entered by {m.submittedByName}</span>
+											{/if}
+										</div>
+										<div class="match-actions">
+											<button
+												type="button"
+												class="approve"
+												disabled={resultBusy}
+												on:click={() => approveResult(m)}
+											>
+												Approve
+											</button>
+											<button
+												type="button"
+												class="reject"
+												disabled={resultBusy}
+												on:click={() => rejectResult(m)}
+											>
+												Reject
+											</button>
+										</div>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
 
 					<!-- The rest of the games finder component code goes here -->
 					<!-- (Copy from the first artifact) -->
@@ -2864,6 +2969,7 @@
 												<th>Opponent 1</th>
 												<th>Opponent 2</th>
 												<th>Board</th>
+												<th>Score</th>
 											</tr>
 										</thead>
 										<tbody>
@@ -2873,6 +2979,7 @@
 												{@const isTeam1 = playerTeam === game.team1}
 												{@const suggested = isGameSuggested(game)}
 												{@const rebalanced = isGameRebalanced(game)}
+												{@const match = matchFor(game, matchByGame)}
 												<tr
 													class:suggested-game={suggested && !rebalanced}
 													class:rebalanced-game={rebalanced}
@@ -2945,7 +3052,75 @@
 														class:rebalanced-cell={rebalanced}
 														>{game.isHome ? HOME_GAME_STRING : AWAY_GAME_STRING}</td
 													>
+													<td
+														data-label="Score"
+														class="score-cell"
+														class:suggested-cell={suggested && !rebalanced}
+														class:rebalanced-cell={rebalanced}
+													>
+														{#if match && match.status === 'pending'}
+															<span class="score-status">
+																{describeScore(match)}, awaiting approval
+															</span>
+														{:else if match && match.rounds}
+															<span class="score-status">
+																{describeScore(match)}{#if match.submittedByName}, saved by
+																	{match.submittedByName}{/if}
+															</span>
+														{/if}
+														{#if match}
+															<span class="score-actions">
+																{#if match.canApprove}
+																	<button
+																		type="button"
+																		class="approve"
+																		disabled={resultBusy}
+																		on:click={() => approveResult(match)}
+																	>
+																		Approve
+																	</button>
+																	<button
+																		type="button"
+																		class="reject"
+																		disabled={resultBusy}
+																		on:click={() => rejectResult(match)}
+																	>
+																		Reject
+																	</button>
+																{/if}
+																{#if match.canSubmit}
+																	<button
+																		type="button"
+																		disabled={resultBusy || openMatchId === match.id}
+																		on:click={() => openResultForm(match)}
+																	>
+																		{match.status === 'pending'
+																			? 'Change'
+																			: match.rounds
+																				? 'Continue'
+																				: 'Enter score'}
+																	</button>
+																{/if}
+															</span>
+														{/if}
+													</td>
 												</tr>
+												{#if match && openMatchId === match.id}
+													<tr class="form-tr">
+														<td colspan="8">
+															<ResultForm
+																{match}
+																{teamNameById}
+																{byRounds}
+																isAdmin={viewer.isAdmin}
+																busy={resultBusy}
+																error={resultError}
+																on:submit={submitResult}
+																on:cancel={closeResultForm}
+															/>
+														</td>
+													</tr>
+												{/if}
 											{/each}
 										</tbody>
 									</table>
@@ -3028,6 +3203,87 @@
 							</div>
 						{/if}
 
+						{#if viewer.isAdmin}
+							<div class="finder-results">
+								<h3>
+									Every fixture
+									{#if pendingCount}
+										<span class="pending-count">{pendingCount} awaiting approval</span>
+									{/if}
+								</h3>
+								<label class="filter">
+									<span>Show</span>
+									<select bind:value={fixtureFilter}>
+										<option value="pending">Awaiting approval</option>
+										<option value="unplayed">Not played</option>
+										<option value="final">Recorded</option>
+										<option value="all">Everything</option>
+									</select>
+								</label>
+								<ul class="match-list">
+									{#each shownFixtures as m (m.id)}
+										<li class="match" class:awaiting={m.status === 'pending'}>
+											<div class="match-main">
+												<span class="match-teams">{describeMatch(m)}</span>
+												<span class="match-score">{describeScore(m)}</span>
+												{#if m.status === 'pending' && m.submittedByName}
+													<span class="match-by">
+														entered by {m.submittedByName}, not yet approved
+													</span>
+												{/if}
+											</div>
+											<div class="match-actions">
+												{#if m.canApprove}
+													<button
+														type="button"
+														class="approve"
+														disabled={resultBusy}
+														on:click={() => approveResult(m)}
+													>
+														Approve
+													</button>
+												{/if}
+												<button
+													type="button"
+													disabled={resultBusy || openMatchId === m.id}
+													on:click={() => openResultForm(m)}
+												>
+													{m.status === 'final' ? 'Change' : m.rounds ? 'Continue' : 'Enter'}
+												</button>
+												{#if m.status === 'final' || m.status === 'pending' || m.rounds}
+													<button
+														type="button"
+														class="reject"
+														disabled={resultBusy}
+														on:click={() => clearResult(m)}
+													>
+														Clear
+													</button>
+												{/if}
+											</div>
+										</li>
+										{#if openMatchId === m.id}
+											<li class="match-form">
+												<ResultForm
+													match={m}
+													{teamNameById}
+													{byRounds}
+													isAdmin={viewer.isAdmin}
+													busy={resultBusy}
+													error={resultError}
+													on:submit={submitResult}
+													on:cancel={closeResultForm}
+												/>
+											</li>
+										{/if}
+									{/each}
+								</ul>
+								{#if !shownFixtures.length}
+									<p class="result-note">Nothing matches that filter.</p>
+								{/if}
+							</div>
+						{/if}
+
 						<!-- Played Games Section -->
 						{#if playerName && playedGames.length > 0}
 							<div class="played-games-section">
@@ -3048,6 +3304,7 @@
 														<th>+/-</th>
 														<th>Board</th>
 														<th>Series</th>
+														{#if byRounds || viewer.isAdmin}<th>Score</th>{/if}
 													</tr>
 												</thead>
 												<tbody>
@@ -3079,7 +3336,53 @@
 																		<span class="series-diff">{series.seriesResult.diff}</span>
 																	</td>
 																{/if}
+																{#if byRounds || viewer.isAdmin}
+																	<td data-label="Score" class="score-cell">
+																		{#if byRounds && game.match}
+																			<span class="score-status">{describeScore(game.match)}</span>
+																		{/if}
+																		{#if viewer.isAdmin && game.match}
+																			<span class="score-actions">
+																				<button
+																					type="button"
+																					disabled={resultBusy || openMatchId === game.match.id}
+																					on:click={() => openResultForm(game.match)}
+																				>
+																					Change
+																				</button>
+																				<button
+																					type="button"
+																					class="reject"
+																					disabled={resultBusy}
+																					on:click={() => clearResult(game.match)}
+																				>
+																					Clear
+																				</button>
+																			</span>
+																		{/if}
+																	</td>
+																{/if}
 															</tr>
+														{/each}
+														<!-- After the series' rows, so the Series cell's rowspan is not split. -->
+														{#each series.games as game, gameIdx (gameIdx)}
+															{#if game.match && openMatchId === game.match.id}
+																<tr class="form-tr">
+																	<td colspan="8">
+																		<ResultForm
+																			match={game.match}
+																			title={describeMatch(game.match)}
+																			{teamNameById}
+																			{byRounds}
+																			isAdmin={viewer.isAdmin}
+																			busy={resultBusy}
+																			error={resultError}
+																			on:submit={submitResult}
+																			on:cancel={closeResultForm}
+																		/>
+																	</td>
+																</tr>
+															{/if}
 														{/each}
 													{/each}
 												</tbody>
@@ -3102,315 +3405,6 @@
 			{:else if dataReady}
 				<p></p>
 
-				<!--
-                Results. A score entered by a player waits for the other team to
-                agree before it counts; an admin's counts at once. Until it is
-                approved the match still reads as unplayed everywhere else on
-                this page, so an unconfirmed score never moves the standings.
-            -->
-				<div class="results-panel" id="results">
-					<h2>Results</h2>
-
-					{#if resultMsg}<p class="result-banner ok">{resultMsg}</p>{/if}
-					{#if resultError}<p class="result-banner bad">{resultError}</p>{/if}
-
-					{#if !viewer.username}
-						<p class="result-note">
-							<a href={resolve('/account')}>Sign in</a> to enter the scores for your games. An admin
-							can enter any result.
-						</p>
-					{:else if !isCurrentSeason}
-						<p class="result-note">
-							{activeSeason?.label} is finished.{#if viewer.isAdmin}
-								As an admin you can still correct a result below.
-							{/if}
-						</p>
-					{:else if !viewer.teamIds.length && !viewer.isAdmin}
-						<p class="result-note">
-							You're signed in as <b>{viewer.username}</b>, but no team this season is linked to
-							that account. If you're playing, ask an admin to link you.
-						</p>
-					{/if}
-
-					{#if myPending.length}
-						<h3 class="needs-you">Waiting on you to approve</h3>
-						<ul class="match-list">
-							{#each myPending as m (m.id)}
-								<li class="match awaiting">
-									<div class="match-main">
-										<span class="match-teams">{describeMatch(m)}</span>
-										<span class="match-score">{describeScore(m)}</span>
-										{#if m.submittedByName}
-											<span class="match-by">entered by {m.submittedByName}</span>
-										{/if}
-									</div>
-									<div class="match-actions">
-										<button
-											type="button"
-											class="approve"
-											disabled={resultBusy}
-											on:click={() => approveResult(m)}
-										>
-											Approve
-										</button>
-										<button
-											type="button"
-											class="reject"
-											disabled={resultBusy}
-											on:click={() => rejectResult(m)}
-										>
-											Reject
-										</button>
-									</div>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-
-					{#if awaitingOthers.length}
-						<h3>Waiting on the other team</h3>
-						<ul class="match-list">
-							{#each awaitingOthers as m (m.id)}
-								<li class="match">
-									<div class="match-main">
-										<span class="match-teams">{describeMatch(m)}</span>
-										<span class="match-score">{describeScore(m)}</span>
-									</div>
-									<div class="match-actions">
-										{#if m.canSubmit}
-											<button
-												type="button"
-												disabled={resultBusy}
-												on:click={() => openResultForm(m)}
-											>
-												Change
-											</button>
-										{:else}
-											<span class="match-by">sent</span>
-										{/if}
-									</div>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-
-					{#if myToPlay.length}
-						<h3>Your games still to record</h3>
-						<ul class="match-list">
-							{#each myToPlay as m (m.id)}
-								<li class="match">
-									<div class="match-main">
-										<span class="match-teams">{describeMatch(m)}</span>
-									</div>
-									<div class="match-actions">
-										<button type="button" disabled={resultBusy} on:click={() => openResultForm(m)}>
-											Enter score
-										</button>
-									</div>
-								</li>
-							{/each}
-						</ul>
-					{:else if viewer.teamIds.length && isCurrentSeason && !myPending.length}
-						<p class="result-note">Nothing of yours left to record. Well played.</p>
-					{/if}
-
-					{#if viewer.isAdmin}
-						<h3>
-							Every fixture
-							{#if pendingCount}
-								<span class="pending-count">{pendingCount} awaiting approval</span>
-							{/if}
-						</h3>
-						<label class="filter">
-							<span>Show</span>
-							<select bind:value={fixtureFilter}>
-								<option value="pending">Awaiting approval</option>
-								<option value="unplayed">Not played</option>
-								<option value="final">Recorded</option>
-								<option value="all">Everything</option>
-							</select>
-						</label>
-						<ul class="match-list">
-							{#each shownFixtures as m (m.id)}
-								<li class="match" class:awaiting={m.status === 'pending'}>
-									<div class="match-main">
-										<span class="match-teams">{describeMatch(m)}</span>
-										<span class="match-score">{describeScore(m)}</span>
-										{#if m.status === 'pending' && m.submittedByName}
-											<span class="match-by">
-												entered by {m.submittedByName}, not yet approved
-											</span>
-										{/if}
-									</div>
-									<div class="match-actions">
-										{#if m.canApprove}
-											<button
-												type="button"
-												class="approve"
-												disabled={resultBusy}
-												on:click={() => approveResult(m)}
-											>
-												Approve
-											</button>
-										{/if}
-										<button type="button" disabled={resultBusy} on:click={() => openResultForm(m)}>
-											{m.status === 'final' ? 'Change' : 'Enter'}
-										</button>
-										{#if m.status === 'final' || m.status === 'pending'}
-											<button
-												type="button"
-												class="reject"
-												disabled={resultBusy}
-												on:click={() => clearResult(m)}
-											>
-												Clear
-											</button>
-										{/if}
-									</div>
-								</li>
-							{/each}
-						</ul>
-						{#if !shownFixtures.length}
-							<p class="result-note">Nothing matches that filter.</p>
-						{/if}
-					{/if}
-
-					{#if openMatch}
-						<div class="result-form">
-							<h3>{describeMatch(openMatch)}</h3>
-
-							<div class="kind-toggle">
-								<label>
-									<input
-										type="radio"
-										bind:group={resultKind}
-										value={byRounds ? 'rounds' : 'margin'}
-									/>
-									<span>Played</span>
-								</label>
-								<label>
-									<input type="radio" bind:group={resultKind} value="forfeit" />
-									<span>Forfeit</span>
-								</label>
-							</div>
-
-							{#if resultKind === 'rounds'}
-								<table class="rounds-entry">
-									<thead>
-										<tr>
-											<th scope="col">Round</th>
-											<th scope="col">{teamNameById.get(openMatch.teamA)}</th>
-											<th scope="col">{teamNameById.get(openMatch.teamB)}</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each resultRounds as round, i (i)}
-											<tr>
-												<th scope="row">{i + 1}</th>
-												<td>
-													<input
-														bind:value={round[0]}
-														inputmode="numeric"
-														aria-label="Round {i + 1}, {teamNameById.get(openMatch.teamA)}"
-													/>
-												</td>
-												<td>
-													<input
-														bind:value={round[1]}
-														inputmode="numeric"
-														aria-label="Round {i + 1}, {teamNameById.get(openMatch.teamB)}"
-													/>
-												</td>
-											</tr>
-										{/each}
-									</tbody>
-									<tfoot>
-										<tr>
-											<th scope="row">Total</th>
-											<td>{roundTotals[0]}</td>
-											<td>{roundTotals[1]}</td>
-										</tr>
-									</tfoot>
-								</table>
-								{#if roundsLevel}
-									<div class="form-row shootout">
-										<label>
-											<span>Level on points. Who won the 20s shootout?</span>
-											<select bind:value={resultShootout}>
-												<option value="">— pick a team —</option>
-												<option value={String(openMatch.teamA)}>
-													{teamNameById.get(openMatch.teamA)}
-												</option>
-												<option value={String(openMatch.teamB)}>
-													{teamNameById.get(openMatch.teamB)}
-												</option>
-											</select>
-										</label>
-									</div>
-								{/if}
-								<p class="result-note small">
-									Each team's points in each of the {ROUNDS_PER_GAME} rounds. A level round is a draw;
-									a level game goes to a 20s shootout.
-								</p>
-							{:else if resultKind === 'margin'}
-								<div class="form-row">
-									<label>
-										<span>Winner</span>
-										<select bind:value={resultWinner}>
-											<option value="">— tie —</option>
-											<option value={String(openMatch.teamA)}>
-												{teamNameById.get(openMatch.teamA)}
-											</option>
-											<option value={String(openMatch.teamB)}>
-												{teamNameById.get(openMatch.teamB)}
-											</option>
-										</select>
-									</label>
-									<label>
-										<span>Won by</span>
-										<input bind:value={resultMargin} inputmode="numeric" placeholder="55" />
-									</label>
-								</div>
-								<p class="result-note small">The margin, not the total — enter 0 for a tie.</p>
-							{:else}
-								<div class="form-row">
-									<label>
-										<span>Who forfeited</span>
-										<select bind:value={resultForfeitBy}>
-											<option value="">— pick a team —</option>
-											<option value={String(openMatch.teamA)}>
-												{teamNameById.get(openMatch.teamA)}
-											</option>
-											<option value={String(openMatch.teamB)}>
-												{teamNameById.get(openMatch.teamB)}
-											</option>
-										</select>
-									</label>
-								</div>
-							{/if}
-
-							<div class="form-actions">
-								<button
-									type="button"
-									class="primary"
-									disabled={resultBusy}
-									on:click={() => submitResult(openMatch)}
-								>
-									{viewer.isAdmin ? 'Record it' : 'Send for approval'}
-								</button>
-								<button type="button" disabled={resultBusy} on:click={closeResultForm}>
-									Cancel
-								</button>
-							</div>
-
-							{#if !viewer.isAdmin}
-								<p class="result-note small">
-									This goes to the other team to confirm before it counts.
-								</p>
-							{/if}
-						</div>
-					{/if}
-				</div>
 				<!-- <div class="status success">
                 Data loaded successfully! Sheets available: {Object.keys(excelData).join(', ')}
             </div> -->
@@ -3626,7 +3620,7 @@
 								<strong>FF:</strong> Forfeit Losses | <strong>+/-:</strong> Point Differential
 							</p>
 							<p>
-								<strong>Score:</strong> 1 per round won (½ drawn), 1 per game won, 2 per series won (1
+								<strong>Score:</strong> 1 per round won (½ drawn), 2 per game won, 2 per series won (1
 								drawn), plus tournament points. A game level on points goes to whoever won the 20s shootout.
 							</p>
 						{:else}
@@ -4885,19 +4879,11 @@
 
 	/* --- results --- */
 
-	.results-panel {
-		margin: 2rem 0;
-		padding: 1.5rem;
-		background: #fff;
-		border: 1px solid #e8dfd3;
-		border-radius: 12px;
+	.finder-results {
+		margin: 1rem 0;
 	}
 
-	.results-panel h2 {
-		margin-top: 0;
-	}
-
-	.results-panel h3 {
+	.finder-results h3 {
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
@@ -4906,7 +4892,7 @@
 		color: #4a3a2a;
 	}
 
-	.results-panel h3.needs-you {
+	.finder-results h3.needs-you {
 		color: #9a5b1f;
 	}
 
@@ -4934,6 +4920,35 @@
 		border: 1px solid #efe7db;
 		border-radius: 8px;
 		margin-bottom: 0.4rem;
+	}
+
+	.match-form {
+		margin-bottom: 0.6rem;
+	}
+
+	.score-cell {
+		white-space: normal;
+	}
+
+	.score-status {
+		display: block;
+		font-size: 0.8rem;
+		color: #6b5844;
+	}
+
+	.score-actions {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+
+	.score-status + .score-actions {
+		margin-top: 0.3rem;
+	}
+
+	.games-table .form-tr td {
+		padding: 0.5rem 0.25rem 1rem;
+		background: none;
 	}
 
 	.match.awaiting {
@@ -4970,8 +4985,8 @@
 	}
 
 	.match-actions button,
-	.result-form button,
-	.results-panel .filter select {
+	.score-actions button,
+	.finder-results .filter select {
 		padding: 0.3rem 0.7rem;
 		background: #fff;
 		border: 1px solid #d9cdbf;
@@ -4983,32 +4998,35 @@
 	}
 
 	.match-actions button:hover:not(:disabled),
-	.result-form button:hover:not(:disabled) {
+	.score-actions button:hover:not(:disabled) {
 		border-color: #8a6a4a;
 	}
 
 	.match-actions button:disabled,
-	.result-form button:disabled {
+	.score-actions button:disabled {
 		opacity: 0.5;
 		cursor: default;
 	}
 
-	.match-actions .approve {
+	.match-actions .approve,
+	.score-actions .approve {
 		background: #2f7d4f;
 		border-color: #2f7d4f;
 		color: #fff;
 	}
 
-	.match-actions .approve:hover:not(:disabled) {
+	.match-actions .approve:hover:not(:disabled),
+	.score-actions .approve:hover:not(:disabled) {
 		background: #25663f;
 	}
 
-	.match-actions .reject:hover:not(:disabled) {
+	.match-actions .reject:hover:not(:disabled),
+	.score-actions .reject:hover:not(:disabled) {
 		border-color: #c0392b;
 		color: #c0392b;
 	}
 
-	.results-panel .filter {
+	.finder-results .filter {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
@@ -5017,142 +5035,9 @@
 		color: #6b5844;
 	}
 
-	.result-form {
-		margin-top: 1.25rem;
-		padding: 1.1rem;
-		background: #fdfaf5;
-		border: 1px solid #e8dfd3;
-		border-radius: 10px;
-	}
-
-	.result-form h3 {
-		margin-top: 0;
-	}
-
-	.kind-toggle {
-		display: flex;
-		gap: 1rem;
-		margin-bottom: 0.9rem;
-	}
-
-	.kind-toggle label {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.9rem;
-		color: #4a3a2a;
-		cursor: pointer;
-	}
-
-	.form-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.9rem;
-	}
-
-	.form-row label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		min-width: 0;
-	}
-
-	.form-row label span {
-		font-size: 0.8rem;
-		color: #8a7a68;
-	}
-
-	.form-row input,
-	.form-row select {
-		padding: 0.4rem 0.55rem;
-		background: #fff;
-		border: 1px solid #d9cdbf;
-		border-radius: 6px;
-		font: inherit;
-		font-size: 0.9rem;
-		min-width: 0;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 0.5rem;
-		margin-top: 1rem;
-	}
-
-	.rounds-entry {
-		border-collapse: collapse;
-		width: 100%;
-		max-width: 26rem;
-		table-layout: fixed;
-	}
-
-	/* Undo the page-wide th/td look, which is the standings table's. */
-	.rounds-entry th,
-	.rounds-entry td {
-		padding: 0.25rem 0.35rem;
-		background: none;
-		border-bottom: none;
-		color: #4a3a2a;
-		text-align: center;
-		text-transform: none;
-		letter-spacing: normal;
-		white-space: normal;
-	}
-
-	.rounds-entry tbody tr:hover {
-		background: none;
-	}
-
-	.rounds-entry thead th {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: #8a7a68;
-		overflow-wrap: anywhere;
-	}
-
-	.rounds-entry th[scope='row'] {
-		width: 4.5rem;
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: #4a3a2a;
-		text-align: left;
-	}
-
-	.rounds-entry input {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 0.4rem 0.55rem;
-		background: #fff;
-		border: 1px solid #d9cdbf;
-		border-radius: 6px;
-		font: inherit;
-		font-size: 0.9rem;
-		text-align: center;
-	}
-
-	.rounds-entry tfoot td {
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		border-top: 1px solid #e8dfd3;
-	}
-
-	.form-row.shootout {
-		margin-top: 0.75rem;
-	}
-
 	.standings-table .record {
 		white-space: nowrap;
 		font-variant-numeric: tabular-nums;
-	}
-
-	.result-form .primary {
-		background: #6b5844;
-		border-color: #6b5844;
-		color: #fff;
-	}
-
-	.result-form .primary:hover:not(:disabled) {
-		background: #4a3a2a;
 	}
 
 	.result-banner {
@@ -5190,10 +5075,6 @@
 		}
 
 		.match-actions {
-			width: 100%;
-		}
-
-		.form-row label {
 			width: 100%;
 		}
 	}
@@ -5325,6 +5206,31 @@
 		.games-table tbody td[data-label='Series'],
 		.games-table tbody td[data-label='Source'] {
 			order: 6;
+		}
+
+		.games-table tbody td[data-label='Score'] {
+			order: 7;
+			flex-wrap: wrap;
+		}
+
+		.games-table tbody td[data-label='Score'] .score-status {
+			text-align: right;
+		}
+
+		.games-table tbody tr.form-tr {
+			padding: 0;
+			border: none;
+			background: none;
+		}
+
+		.games-table tbody tr.form-tr td {
+			display: block;
+			padding: 0;
+			text-align: left;
+		}
+
+		.games-table tbody tr.form-tr td::before {
+			content: none;
 		}
 
 		/*

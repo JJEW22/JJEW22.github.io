@@ -24,6 +24,9 @@ export type MatchStatus = 'unplayed' | 'disallowed' | 'pending' | 'final';
 export type Scoring = 'games' | 'rounds';
 // One round's scores, [team_a, team_b], the same point of view as margin.
 export type Round = [number, number];
+// A round in a game that is still being entered: a box nobody has filled in
+// yet is null.
+export type PartialRound = [number | null, number | null];
 
 export interface Player {
 	id: number;
@@ -51,8 +54,10 @@ export interface Match {
 	// for truthiness.
 	margin: number | null;
 	// Round-by-round scores on a 'rounds' season; margin is their difference.
-	// Null on a forfeit and on every result from a 'games' season.
-	rounds: Round[] | null;
+	// Null on a forfeit and on every result from a 'games' season. On an
+	// unplayed match it is a game saved part-way through, which counts for
+	// nothing until it is finished and sent.
+	rounds: Round[] | PartialRound[] | null;
 	// Who won the 20s shootout that settles a game level on points. Null unless
 	// the round totals are equal.
 	shootoutWinner: number | null;
@@ -226,7 +231,7 @@ export function checkResult(input: {
 // --- round scoring (season 3 on) ---
 //
 // Every game plays all 4 rounds. A round win is 1 point, winning the game (the
-// higher total over the 4 rounds) is 1 more, and winning the series (both games
+// higher total over the 4 rounds) is 2 more, and winning the series (both games
 // against a team, totals combined) is 2. Rounds and series can be drawn, at half
 // a win to each side. A game cannot: level on points, it goes to a 20s shootout
 // and the shootout's winner wins the game. The rules copy on the page states
@@ -234,40 +239,80 @@ export function checkResult(input: {
 
 export const ROUNDS_PER_GAME = 4;
 export const ROUND_WIN_POINTS = 1;
-export const GAME_WIN_POINTS = 1;
+export const GAME_WIN_POINTS = 2;
 export const SERIES_WIN_POINTS = 2;
 const MAX_ROUND_SCORE = 500;
 
-// The four rounds as the form sends them: [[a, b], ...] in team_a's view, plus
-// the shootout winner, which is asked for only when the totals are level.
+// The round grid as the form sends it, [[a, b], ...] in team_a's view, read
+// box by box: null for a blank box, an error for anything that isn't a score.
+function readRounds(input: unknown): Checked<PartialRound[]> {
+	if (!Array.isArray(input) || input.length !== ROUNDS_PER_GAME) {
+		return { ok: false, error: `Enter the score for all ${ROUNDS_PER_GAME} rounds.` };
+	}
+	const rounds: PartialRound[] = [];
+	for (const [i, pair] of input.entries()) {
+		if (!Array.isArray(pair) || pair.length !== 2) {
+			return { ok: false, error: `Round ${i + 1} needs a score for both teams.` };
+		}
+		const [a, b] = pair.map((v) => {
+			const s = String(v ?? '').trim();
+			return s === '' ? null : Number(s);
+		});
+		for (const n of [a, b]) {
+			if (n === null) continue;
+			if (!Number.isInteger(n) || n < 0) {
+				return { ok: false, error: `Round ${i + 1}: scores are whole numbers, 0 or more.` };
+			}
+			if (n > MAX_ROUND_SCORE) {
+				return {
+					ok: false,
+					error: `Round ${i + 1}: that score looks wrong (over ${MAX_ROUND_SCORE}).`
+				};
+			}
+		}
+		rounds.push([a, b]);
+	}
+	return { ok: true, value: rounds };
+}
+
+// Whether a round has a score. Usually only one side scores in a round, so
+// with one team on points the other's blank box is 0. A 0-0 round needs both
+// 0s typed, so a round that was simply skipped can't pass for one.
+export function roundEntered([a, b]: PartialRound): boolean {
+	if (a !== null && b !== null) return true;
+	const only = a ?? b;
+	return only !== null && only > 0;
+}
+
+// A game saved part-way through, to finish later. Any rounds may be filled in
+// or not; an all-blank grid clears the saved game.
+export function checkProgress(input: unknown): Checked<{ rounds: PartialRound[] | null }> {
+	const read = readRounds(input);
+	if (!read.ok) return read;
+	const empty = read.value.every(([a, b]) => a === null && b === null);
+	return { ok: true, value: { rounds: empty ? null : read.value } };
+}
+
+// A finished game: all four rounds, plus the shootout winner, which is asked
+// for only when the totals are level.
 export function checkRounds(
 	input: unknown,
 	shootout: unknown,
 	teamA: number,
 	teamB: number
 ): Checked<{ rounds: Round[]; margin: number; shootoutWinner: number | null }> {
-	if (!Array.isArray(input) || input.length !== ROUNDS_PER_GAME) {
-		return { ok: false, error: `Enter the score for all ${ROUNDS_PER_GAME} rounds.` };
-	}
+	const read = readRounds(input);
+	if (!read.ok) return read;
 	const rounds: Round[] = [];
-	for (const [i, pair] of input.entries()) {
-		if (!Array.isArray(pair) || pair.length !== 2) {
-			return { ok: false, error: `Round ${i + 1} needs a score for both teams.` };
+	for (const [i, round] of read.value.entries()) {
+		if (!roundEntered(round)) {
+			const error =
+				round[0] === null && round[1] === null
+					? `Round ${i + 1} has no score. For a 0-0 round, enter 0 for both teams.`
+					: `Round ${i + 1}: for a 0-0 round, enter 0 for both teams.`;
+			return { ok: false, error };
 		}
-		const [a, b] = pair.map((v) => Number(String(v ?? '').trim()));
-		if (pair.some((v) => String(v ?? '').trim() === '')) {
-			return { ok: false, error: `Round ${i + 1} needs a score for both teams.` };
-		}
-		if (![a, b].every((n) => Number.isInteger(n) && n >= 0)) {
-			return { ok: false, error: `Round ${i + 1}: scores are whole numbers, 0 or more.` };
-		}
-		if (a > MAX_ROUND_SCORE || b > MAX_ROUND_SCORE) {
-			return {
-				ok: false,
-				error: `Round ${i + 1}: that score looks wrong (over ${MAX_ROUND_SCORE}).`
-			};
-		}
-		rounds.push([a, b]);
+		rounds.push([round[0] ?? 0, round[1] ?? 0]);
 	}
 	const margin = rounds.reduce((sum, [a, b]) => sum + a - b, 0);
 	if (margin !== 0) return { ok: true, value: { rounds, margin, shootoutWinner: null } };
@@ -331,7 +376,7 @@ export function roundStandings(
 			tally(b.rounds, -margin, ROUNDS_PER_GAME);
 		} else {
 			margin = m.margin ?? 0;
-			for (const [ra, rb] of m.rounds ?? []) {
+			for (const [ra, rb] of (m.rounds ?? []) as Round[]) {
 				tally(a.rounds, ra - rb);
 				tally(b.rounds, rb - ra);
 			}

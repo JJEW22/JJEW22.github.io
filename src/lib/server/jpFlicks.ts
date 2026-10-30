@@ -22,6 +22,7 @@ import {
 	canSubmit,
 	cellFor,
 	type Match,
+	type PartialRound,
 	type Round,
 	type Season,
 	type Team,
@@ -171,7 +172,7 @@ async function loadMatches(seasonId: number): Promise<Match[]> {
 			team_b: string | number;
 			status: Match['status'];
 			margin: number | null;
-			rounds: Round[] | null;
+			rounds: Round[] | PartialRound[] | null;
 			shootout_winner: string | number | null;
 			forfeit_by: string | number | null;
 			submitted_by: string | number | null;
@@ -402,6 +403,34 @@ export async function submitResult(
 			submitted_at = now(),
 			approved_by = ${final ? user.id : null},
 			approved_at = ${final ? new Date() : null}
+		where id = ${matchId}`;
+}
+
+// Save a game part-way through, so the scores can go in round by round as it
+// is played. It stays unplayed -- nothing counts and nobody is asked to
+// approve -- and either team, or an admin, can carry on with it.
+export async function saveProgress(
+	user: SessionUser,
+	slug: string,
+	matchId: number,
+	rounds: PartialRound[] | null
+): Promise<void> {
+	const { match, viewer, season } = await context(user, slug, matchId);
+	if (!canSubmit(season, viewer, match)) {
+		throw new FlicksError(reasonCannotSubmit(match, viewer, season), 403);
+	}
+	const myTeam = viewer.teamIds.find((t) => t === match.teamA || t === match.teamB) ?? null;
+	const saved = rounds !== null;
+
+	await sql`
+		update jpflicks_matches set
+			status = 'unplayed', margin = null,
+			rounds = ${saved ? sql.json(rounds) : null},
+			shootout_winner = null, forfeit_by = null,
+			submitted_by = ${saved ? user.id : null},
+			submitted_team = ${saved ? myTeam : null},
+			submitted_at = ${saved ? new Date() : null},
+			approved_by = null, approved_at = null
 		where id = ${matchId}`;
 }
 
