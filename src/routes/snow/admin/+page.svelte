@@ -5,7 +5,7 @@
 	Every page in this app is prerendered (see src/routes/+layout.js), so there is
 	no server load to gate on: the page renders for anyone and shows a denied
 	state, while /snow/api/admin/* is what enforces the role. Same pattern as
-	/admin, /pizzaBracket/admin and /meSoup/admin.
+	/admin and /pizzaBracket/admin.
 
 	Two things this page cannot do, and both are refused by the server as well as
 	hidden here: enter anyone's prediction before the admin's own is in, and touch

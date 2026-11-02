@@ -221,7 +221,7 @@
 	<nav class="breadcrumb">
 		<a href={resolve('/me')}>← Back to Me</a>
 		{#if me}
-			<a class="admin-link" href={resolve('/meSoup/admin')}>Edit my spots</a>
+			<a class="admin-link" href={resolve('/meSoup/spots')}>My spots</a>
 		{:else if !loading}
 			<a class="admin-link" href="{resolve('/account')}?redirect=/meSoup">Sign in</a>
 		{/if}
@@ -316,6 +316,22 @@
 			</label>
 		{/if}
 
+		<!-- Whatever map is showing, the way to put your own swims on it is right
+		     here. Signed out, it goes through sign-in and lands on the form. -->
+		{#if !loading}
+			{#if me}
+				<a class="add-cta" href={resolve('/meSoup/spots')}>
+					<span><b>Swum somewhere?</b> Add your own spots to your map.</span>
+					<span class="add-cta-go">Add a spot →</span>
+				</a>
+			{:else}
+				<a class="add-cta" href="{resolve('/account')}?redirect=/meSoup/spots">
+					<span><b>Swum somewhere?</b> Sign in to add your own spots.</span>
+					<span class="add-cta-go">Sign in →</span>
+				</a>
+			{/if}
+		{/if}
+
 		<section class="stats" aria-label="Totals">
 			<div class="stat"><span class="n">{summary.spots}</span><span class="l">spots</span></div>
 			{#if summary.swims > summary.spots}
@@ -367,7 +383,7 @@
 		{:else if !spots.length}
 			<p class="note">
 				No spots yet.{#if me && !anonymous && !person}
-					<a href={resolve('/meSoup/admin')}>Add your first one.</a>
+					<a href={resolve('/meSoup/spots')}>Add your first one.</a>
 				{/if}
 			</p>
 		{:else if !anonymous}
@@ -425,6 +441,34 @@
 
 	.breadcrumb a:hover {
 		color: #0066cc;
+	}
+
+	.add-cta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		margin: 0 0 1.25rem;
+		padding: 0.85rem 1.1rem;
+		background: #eef6fb;
+		border: 1px solid #cfe3f0;
+		border-radius: 10px;
+		color: #1f3a4d;
+		text-decoration: none;
+	}
+
+	.add-cta:hover {
+		border-color: #0b62a4;
+	}
+
+	.add-cta-go {
+		padding: 0.35rem 0.85rem;
+		background: #0b62a4;
+		border-radius: 20px;
+		color: #fff;
+		font-weight: 600;
+		white-space: nowrap;
 	}
 
 	.admin-link {

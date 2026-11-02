@@ -1,7 +1,7 @@
-// src/routes/meSoup/api/admin/spots/+server.ts
+// src/routes/meSoup/api/mine/+server.ts
 // Add, edit and remove YOUR swim spots. Anyone signed in may keep a map, and
 // every query below is scoped to the signed-in user, so nobody can touch
-// anyone else's. /meSoup/admin is prerendered like every other page here, so
+// anyone else's. /meSoup/spots is prerendered like every other page here, so
 // this is where that is actually enforced -- the page only decides what to draw.
 import { error, json } from '@sveltejs/kit';
 import {

@@ -1,11 +1,13 @@
-<!-- src/routes/meSoup/admin/+page.svelte -->
+<!-- src/routes/meSoup/spots/+page.svelte -->
 <!--
 	Add and edit your own swim spots. Anyone signed in gets a map of their own;
-	nobody sees or edits anyone else's here.
+	nobody sees or edits anyone else's here. It isn't under /meSoup/admin because
+	no role is needed: /<project>/admin is kept for pages only a project's admins
+	can use.
 
 	Every page in this app is prerendered (see src/routes/+layout.js), so there is
 	no server load to gate on: the page renders for anyone and shows a signed-out
-	state, while /meSoup/api/admin/spots is what actually scopes every read and
+	state, while /meSoup/api/mine is what actually scopes every read and
 	write to the signed-in user.
 
 	The draft is validated with normalizeSpot() from $lib/swimSpots — the same
@@ -33,13 +35,13 @@
 	} from '$lib/swimSpots';
 	import type { SwimSpot, WaterTypeMeta, Dms } from '$lib/swimSpots';
 
-	const API = '/meSoup/api/admin/spots';
+	const API = '/meSoup/api/mine';
 	// The draft dot needs an id the map can key on that no real row can collide
 	// with; ids come from an identity column, so nothing is ever negative.
 	const DRAFT_ID = -1;
 	const DMS_PREF_KEY = 'mesoup:admin:dms';
 	// /account sends you back here once you've signed in.
-	const SIGN_IN_URL = '/account?redirect=/meSoup/admin';
+	const SIGN_IN_URL = '/account?redirect=/meSoup/spots';
 
 	let status = 'loading'; // loading | denied | ready
 	let username = '';
@@ -77,6 +79,88 @@
 			// Usernames of the other people who were there. No limit.
 			tagged: [] as string[]
 		};
+	}
+
+	// --- filling in from a Google Maps link ---
+
+	let mapsLink = '';
+	let linkBusy = false;
+	let linkNote = '';
+	let linkError = '';
+
+	// Coordinates, country and region follow the link, since a new link means a
+	// new place. The name and water type are only filled in when still blank,
+	// so they never overwrite something you chose.
+	async function fillFromLink() {
+		const link = mapsLink.trim();
+		if (!link || linkBusy) return;
+		linkBusy = true;
+		linkNote = '';
+		linkError = '';
+		try {
+			const r = await fetch('/meSoup/api/place', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ link })
+			});
+			const data = await r.json().catch(() => null);
+			if (!r.ok || !data?.place) {
+				linkError = data?.error || data?.message || `Couldn't read that link (${r.status}).`;
+				return;
+			}
+			const place = data.place;
+			const filled = ['coordinates'];
+			draft.lat = String(place.lat);
+			draft.lon = String(place.lon);
+			if (useDms) fillDms(draft.lat, draft.lon);
+			if (place.name && !draft.name.trim()) {
+				draft.name = place.name;
+				filled.push('name');
+			}
+			if (place.country) {
+				draft.country = place.country;
+				filled.push('country');
+			}
+			if (place.region) {
+				draft.region = place.region;
+				filled.push('region');
+			}
+			if (
+				place.waterType &&
+				draft.waterType === DEFAULT_WATER_TYPE &&
+				!draft.otherLabel.trim() &&
+				waterTypes.some((t) => t.id === place.waterType)
+			) {
+				draft.waterType = place.waterType;
+				filled.push('water type');
+			}
+			const list =
+				filled.length > 1
+					? `${filled.slice(0, -1).join(', ')} and ${filled[filled.length - 1]}`
+					: filled[0];
+			linkNote =
+				`Filled in the ${list}.` +
+				(place.approximate
+					? " The link only named the place, so the dot is OpenStreetMap's best guess. Check it on the map."
+					: ' Check the dot on the map before saving.');
+			mapsLink = '';
+		} catch (err) {
+			linkError = `Couldn't read that link: ${err instanceof Error ? err.message : String(err)}`;
+		} finally {
+			linkBusy = false;
+		}
+	}
+
+	// Pasting is the whole gesture, so it fills in straight away.
+	function linkPasted() {
+		setTimeout(fillFromLink, 0);
+	}
+
+	function linkKey(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			fillFromLink();
+		}
 	}
 
 	// --- dates ---
@@ -360,6 +444,9 @@
 		tagInput = '';
 		latDms = blankDms(latDms.hemi);
 		lonDms = blankDms(lonDms.hemi);
+		mapsLink = '';
+		linkNote = '';
+		linkError = '';
 	}
 
 	function cancelEdit() {
@@ -442,7 +529,7 @@
 </script>
 
 <svelte:head>
-	<title>meSoup admin</title>
+	<title>My spots - meSoup</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
@@ -465,7 +552,8 @@
 		{:else if status === 'denied'}
 			<h1>Sign in first</h1>
 			<p class="note">
-				Taking you to <a href="{resolve('/account')}?redirect=/meSoup/admin">sign in</a> — your spots are tied to your account.
+				Taking you to <a href="{resolve('/account')}?redirect=/meSoup/spots">sign in</a> — your spots
+				are tied to your account.
 			</p>
 		{:else}
 			<h1>My spots</h1>
@@ -493,6 +581,34 @@
 						<input type="checkbox" bind:checked={useDms} on:change={toggleDms} />
 						<span>Degrees, minutes, seconds</span>
 					</label>
+				</div>
+
+				<div class="maps-link">
+					<label for="maps-link"><span>Google Maps link</span></label>
+					<div class="date-add">
+						<input
+							id="maps-link"
+							bind:value={mapsLink}
+							on:paste={linkPasted}
+							on:keydown={linkKey}
+							inputmode="url"
+							placeholder="Paste a link from Share in Google Maps"
+							disabled={linkBusy}
+						/>
+						<button type="button" on:click={fillFromLink} disabled={!mapsLink.trim() || linkBusy}>
+							{linkBusy ? 'Looking up…' : 'Fill in'}
+						</button>
+					</div>
+					{#if linkError}
+						<p class="link-note bad">{linkError}</p>
+					{:else if linkNote}
+						<p class="link-note">{linkNote}</p>
+					{:else}
+						<p class="link-note">
+							Fills in the coordinates, country and region, plus the name and water type if they're
+							blank.
+						</p>
+					{/if}
 				</div>
 
 				<div class="grid">
@@ -901,6 +1017,22 @@
 
 	.date-add input {
 		flex: 1;
+	}
+
+	.maps-link {
+		display: grid;
+		gap: 0.35rem;
+		margin-bottom: 1rem;
+	}
+
+	.link-note {
+		margin: 0;
+		font-size: 0.85rem;
+		color: #6b6f76;
+	}
+
+	.link-note.bad {
+		color: #b3261e;
 	}
 
 	.date-list {

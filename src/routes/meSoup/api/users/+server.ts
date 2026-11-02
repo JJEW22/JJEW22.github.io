@@ -1,5 +1,5 @@
 // src/routes/meSoup/api/users/+server.ts
-// Username suggestions for the tag box on /meSoup/admin. Signed-in only, prefix
+// Username suggestions for the tag box on /meSoup/spots. Signed-in only, prefix
 // matches only, eight at most: enough to finish a name you half remember, not a
 // way to list every account on the site.
 import { error, json } from '@sveltejs/kit';
