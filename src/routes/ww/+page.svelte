@@ -4,9 +4,10 @@
 	and the design notes. Hidden: nothing links here, and it asks not to be
 	indexed.
 
-	The rules are the 2023 rule book with the 0.2.1 planned fixes applied, gaps
-	filled from the older overview doc. Anything still undecided is marked with
-	an "Open" tag so it reads as unfinished rather than as a rule.
+	The rules are the 2023 rule book, updated with the decisions in the notes
+	review: fate replaces the per-spell roll, a Splendor-style tiered market,
+	5 silver to a gold. Anything still undecided is marked with an "Open" tag so
+	it reads as unfinished rather than as a rule.
 
 	notes.txt is the brainstorm file as written, rendered as-is on the Notes tab.
 -->
@@ -120,13 +121,14 @@
 				<nav class="toc" aria-label="Rules contents">
 					<a href="#ww-story">The story</a>
 					<a href="#ww-money">Money</a>
+					<a href="#ww-fate">Fate</a>
 					<a href="#ww-setup">Setting up the city</a>
 					<a href="#ww-start">Your starting deck</a>
 					<a href="#ww-words">Words to know</a>
 					<a href="#ww-passives">Passives</a>
 					<a href="#ww-turn">Your turn</a>
 					<a href="#ww-land">Land tiles</a>
-					<a href="#ww-health">Health & respawning</a>
+					<a href="#ww-health">Health & dying</a>
 					<a href="#ww-keywords">Keywords</a>
 					<a href="#ww-heroes">Heroes</a>
 					<a href="#ww-end">Ending & scoring</a>
@@ -161,7 +163,7 @@
 							<p>
 								The money of men. It won't do you as much good with wizards or in the City of Gold,
 								but having some is never a bad idea, because you can exchange it for gold: in the
-								city, <b>3 silver merges into 1 gold</b>.
+								city, <b>5 silver merges into 1 gold</b>.
 							</p>
 						</div>
 						<div class="card gold">
@@ -172,8 +174,8 @@
 								cast new spells, blueprints for buildings, and magical artifacts.
 							</p>
 							<p>
-								You can also <b>extract</b> gold: return it to the city and squeeze out
-								<b>3 ME</b> (with some added knowledge, even more).
+								You can also <b>extract</b> gold: return it to the city and squeeze out either
+								<b>2 mana</b> or <b>1 ME</b>.
 							</p>
 						</div>
 					</div>
@@ -181,9 +183,41 @@
 					<p>
 						Silver and gold are cards in your deck. Whenever you draw one, it goes into your
 						<b>wealth</b> instead of staying in your hand. Your wealth is the money you have
-						available to spend. The <b>first time each turn</b> you add a silver to your wealth, draw
-						a card.
+						available to spend. Whenever you add a <b>gold</b> to your wealth, draw a card.
 					</p>
+				</section>
+
+				<section id="ww-fate">
+					<h2>Fate</h2>
+					<p>
+						Every wizard has a <b>fate</b>: a number that says how much luck is on their side. It
+						starts at <b>0</b> (some heroes start elsewhere) and only changes permanently.
+					</p>
+					<ul>
+						<li>
+							<b>Roll for your turn.</b> At the start of your turn, roll the d20 and add your fate. That
+							total is the fate you have to spend this turn.
+						</li>
+						<li>
+							<b>Spend it on spells.</b> A spell's <b>chance</b> is how much fate it costs to get its
+							effect. Some spells have tiers: spend more for a bigger effect.
+						</li>
+						<li>
+							<b>Tempting fate.</b> You may spend up to 3 more fate than you have, but it lowers your
+							fate by 1 for the rest of the game.
+						</li>
+						<li>
+							<b>Saving it.</b> End your turn with 5 or more fate left over and your fate goes up by
+							1 for good.
+						</li>
+						<li>
+							<b>Bad luck.</b> If your roll plus your fate comes out below 0, you skip your turn.
+						</li>
+						<li>
+							Dying lowers your fate by 1. Healing yourself above your maximum health raises it by
+							1. Some cards and tiles raise or lower it too.
+						</li>
+					</ul>
 				</section>
 
 				<section id="ww-setup">
@@ -199,8 +233,6 @@
 									<th>Players</th>
 									<th>City's starting gold</th>
 									<th>Board</th>
-									<th>Spells & buildings</th>
-									<th>Artifacts</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -208,73 +240,54 @@
 									<td>3</td>
 									<td>40</td>
 									<td>Shape A <span class="open">Open</span></td>
-									<td>2 fewer copies of each spell, 1 fewer of each building</td>
-									<td>2 from each tier, plus 1 more</td>
 								</tr>
 								<tr>
 									<td>4</td>
 									<td>50</td>
 									<td>Shape A</td>
-									<td>Full set</td>
-									<td>2 from each tier, plus 2 more</td>
 								</tr>
 								<tr>
 									<td>5</td>
 									<td>60</td>
 									<td>Shape B</td>
-									<td>2 fewer copies of each spell, 1 fewer of each building</td>
-									<td>3 from each tier, plus 1 more</td>
 								</tr>
 								<tr>
 									<td>6</td>
 									<td>70</td>
 									<td>Shape B</td>
-									<td>Full set</td>
-									<td>3 from each tier, plus 2 more</td>
 								</tr>
 							</tbody>
 						</table>
 					</div>
 					<p class="aside">
-						<span class="open">Open</span> The board shapes still need names and layouts, and the "how
-						many different spells and buildings" counts aren't set yet.
+						<span class="open">Open</span> The board shapes still need names and layouts.
 					</p>
 
-					<h3>Choosing what's in the city</h3>
+					<h3>The market</h3>
 					<p>
-						For a first game there is a suggested set of spells, buildings and artifacts (the
-						alliteration spells), and suggested heroes. <span class="open">Open</span> The suggested
-						lists aren't written yet. After your first game or two, everything around the city is random:
+						Everything the city sells (spells, building blueprints and artifacts) comes in three
+						<b>tiers</b>. Shuffle each tier into its own deck and lay cards from it face up. Those
+						face-up cards are what can be bought. Whenever one is bought, flip a new card from that
+						tier's deck to replace it.
 					</p>
-					<ul>
-						<li>
-							<b>Spells:</b> shuffle the spell randomizer deck (one copy of each spell, with a different
-							card back) and pull the number of spells you need.
-						</li>
-						<li>
-							<b>Buildings:</b> shuffle the whole building stack and pull cards until you have the number
-							of different buildings you need, then find their remaining copies. Return copies now if
-							your player count needs fewer.
-						</li>
-						<li>
-							<b>Artifacts:</b> sort them by tier (each tier has its own token). Randomly take the number
-							you need from each tier, shuffle all the leftovers together, then take the extra ones from
-							that pile.
-						</li>
-					</ul>
+					<p class="aside">
+						<span class="open">Open</span> How many cards are face up in each tier, and whether that
+						changes with the number of players. For a first game there will also be a suggested set of
+						cards (the alliteration spells).
+					</p>
 
 					<h3>Choosing heroes</h3>
 					<p>
-						Heroes are the only part that isn't random. For your first few games, everyone picks the
-						hero whose name sounds the most interesting.
+						For your first few games, everyone picks the hero whose name sounds the most
+						interesting.
 						<span class="open">Open</span> A short list of heroes to avoid in a first game still needs
 						writing.
 					</p>
 					<p>
-						Once you've played as or with every hero, there is a draft. It happens after the spells,
-						buildings and artifacts are chosen. Everyone rolls the die; whoever rolls
-						<b>lowest</b> picks first, and the draft goes <b>counter-clockwise</b> from them. The
-						player who picked last takes the first turn, and play then goes <b>clockwise</b>.
+						Once you've played as or with every hero, there is a draft. Everyone rolls the die;
+						whoever rolls <b>lowest</b> picks first, and the draft goes <b>counter-clockwise</b>
+						from them. The player who picked last takes the first turn, and play then goes
+						<b>clockwise</b>.
 					</p>
 					<p class="aside">
 						Mixing new apprentices with old wizards (by games played, not age)? Let the apprentices
@@ -286,18 +299,21 @@
 					<h2>Your starting deck</h2>
 					<p>
 						Even as a starting wizard you have a few tricks up your sleeve. You brought 5 silver in
-						with you, and finding the City of Gold granted you 2 gold. Shuffle these together with 2
-						copies of each starting spell to make your draw pile.
+						with you, and finding the City of Gold granted you 2 gold. Shuffle these together with
+						the starting spells to make your draw pile.
 					</p>
 					<ul class="checklist">
 						<li><b>5</b> Silver</li>
 						<li><b>2</b> Gold</li>
 						<li><b>2</b> Fireball</li>
-						<li><b>2</b> Heal</li>
+						<li><b>1</b> Heal</li>
 						<li><b>2</b> Magic Mine <span class="muted">(makes you more money)</span></li>
 						<li>Your hero's own cards</li>
 					</ul>
-					<p>Every wizard starts the game in their castle, with 5 health.</p>
+					<p>
+						Every wizard starts the game in their castle with 5 health and 0 fate, then draws 4
+						cards.
+					</p>
 				</section>
 
 				<section id="ww-words">
@@ -305,36 +321,28 @@
 					<dl>
 						<dt>Mana</dt>
 						<dd>
-							What you spend to cast spells. Every wizard gets 2 a turn.
-							<span class="open">Open</span> Does unspent mana carry over?
+							What you spend to cast spells. Every wizard gets 2 a turn, and extracting a gold gives
+							2 more. <span class="open">Open</span> Does unspent mana carry over?
 						</dd>
 						<dt>Magic Essence (ME)</dt>
 						<dd>
 							The building block of everything in the universe. You get it by extracting gold, and
 							spend it to build and upgrade buildings.
 						</dd>
-						<dt>Chance</dt>
-						<dd>
-							How likely a spell is to work. Each spell has a chance from 1 to 20, or ∞. Roll the
-							d20 when you cast it: roll <b>under</b> the spell's chance and it works. Any + or − chance
-							you have is added to the number on the card.
-						</dd>
 						<dt>Fate</dt>
 						<dd>
-							Your standing with luck itself. Some spells and tiles raise or lower it, and healing
-							yourself above your maximum health raises it by 1. If your fate plus your roll ever
-							comes out below zero, you must spend mana to try to get back up.
-							<span class="open">Open</span> What fate starts at and what it does.
+							Your luck. Your fate plus your start-of-turn roll is what you spend to cast spells.
+							See <a href="#ww-fate">Fate</a>.
 						</dd>
-						<dt>Notoriety</dt>
+						<dt>Chance</dt>
 						<dd>
-							How famous a wizard you are. You gain it by defeating other wizards.
-							<span class="open">Open</span> Starting value.
+							How much fate a spell costs. A "+1 chance" bonus makes spells cost 1 less fate, and
+							"−1 chance" makes them cost 1 more.
 						</dd>
 						<dt>Tiers</dt>
 						<dd>
-							Spells, buildings and artifacts come in tiers (I, II, III). Higher tiers cost more and
-							do more.
+							Spells, buildings and artifacts come in tiers I, II and III. Higher tiers cost more,
+							pay more tax and do more.
 						</dd>
 					</dl>
 				</section>
@@ -347,13 +355,13 @@
 							<h3>Every wizard</h3>
 							<ul>
 								<li><b>+2</b> mana</li>
-								<li><b>+5</b> draw (you draw 5 at the end of your turn)</li>
+								<li><b>+4</b> draw (at the end of your turn)</li>
 								<li><b>+2</b> move</li>
 							</ul>
 						</div>
 						<div class="card">
 							<h3>Your castle</h3>
-							<p class="small">Upgrade your castle with ME, like any building.</p>
+							<p class="small">Each tier costs 2 ME to upgrade to, and adds to the one before.</p>
 							<ul>
 								<li>Tier I: <b>+1</b> silver, <b>+1</b> ME</li>
 								<li>Tier II: also <b>+1</b> chance</li>
@@ -366,7 +374,7 @@
 						</div>
 					</div>
 					<p>
-						Your hero, your artifacts, your buildings and the tile you stand on can all give you
+						Your hero, your artifact, your buildings and the tile you stand on can all give you
 						more.
 					</p>
 				</section>
@@ -376,9 +384,9 @@
 					<h3>1. Start of turn</h3>
 					<ul>
 						<li>
-							<b>Roll:</b> roll the d20 to see what your buildings give you. Skip it if you have no buildings
-							or don't want anything from them. Draw effects happen as soon as you roll, not at the end
-							of your turn.
+							<b>Roll:</b> roll the d20 and add your fate. That's your fate to spend this turn (if it's
+							below 0, your turn is skipped). The same roll decides what your buildings give you. Draw
+							effects from buildings happen as soon as you roll.
 						</li>
 						<li>
 							<b>Take your start-of-turn bonuses</b> from your castle and the tile you're standing on.
@@ -390,17 +398,21 @@
 						<h4>Empty your wealth (buy)</h4>
 						<ol>
 							<li>
-								<b>Choose what to buy.</b> Buy as many cards from the city as you can afford.
+								<b>Choose what to buy</b> from the face-up cards in the market. Buy as many as you can
+								afford.
 							</li>
 							<li>
-								<b>Merge your silver.</b> Every 3 silver in your wealth can merge into 1 gold to spend.
+								<b>Merge your silver.</b> Every 5 silver in your wealth can merge into 1 gold to spend.
 								If a card costs silver, pay that silver to the city first and merge the rest.
 							</li>
-							<li><b>Take the cards.</b> Bought cards go straight into your <b>hand</b>.</li>
 							<li>
-								<b>Pay taxes.</b> The city has no government, but it does have taxes. Every time you
-								empty your wealth you pay <b>1 gold</b>, plus <b>1 gold for every 4 gold</b> the cards
-								you bought cost.
+								<b>Take the cards.</b> Bought cards go straight into your <b>hand</b>, unless they
+								say otherwise. Flip new cards into the market to replace them.
+							</li>
+							<li>
+								<b>Pay taxes.</b> The city has no government, but it does have taxes: each card
+								costs
+								<b>1 extra gold per tier</b> (1 for tier I, 2 for tier II, 3 for tier III).
 							</li>
 							<li>
 								<b>Keep the rest.</b> Silver you didn't merge and gold you didn't spend go to your discard
@@ -419,8 +431,8 @@
 					<div class="action">
 						<h4>Cast a spell</h4>
 						<p>
-							Play a spell from your hand if you can pay its mana, gold and ME. Roll the d20 for its
-							chance. Gold spent on casting doesn't send the rest of your wealth to your discard.
+							Play a spell from your hand by paying its mana, any gold or ME it asks for, and its
+							chance in fate. There's no roll: if you can pay, it works.
 						</p>
 					</div>
 					<div class="action">
@@ -434,40 +446,44 @@
 						<h4>Build</h4>
 						<p>
 							Build a blueprint from your hand on the tile you're standing on, if you can pay its ME
-							and it can go on that kind of tile. Only one copy of each building can be out at a
-							time.
+							and it can go on that kind of tile.
 						</p>
 					</div>
 					<div class="action">
 						<h4>Upgrade</h4>
-						<p>Standing on a building you own, spend the ME it needs to move it up a tier.</p>
+						<p>
+							Standing on a building you own (your castle included), spend the ME it needs to move
+							it up a tier.
+						</p>
 					</div>
 					<div class="action">
-						<h4>Extract essence</h4>
+						<h4>Extract gold</h4>
 						<p>
-							Return 1 gold from your wealth to the city and gain <b>3 ME</b>. This doesn't send the
-							rest of your wealth to your discard.
+							Return 1 gold from your wealth to the city and gain <b>2 mana</b> or <b>1 ME</b>. This
+							doesn't send the rest of your wealth to your discard.
 						</p>
 					</div>
 					<div class="action">
 						<h4>Equip an artifact</h4>
 						<p>
-							Artifacts stay in play instead of going through your deck. You can only replace an
-							artifact with one of a higher tier.
-							<span class="open">Open</span> How many artifacts a wizard can hold, and which tier they
-							start at.
+							Artifacts stay in play instead of going through your deck. You can only have
+							<b>one</b> at a time, and can only replace it with one of a higher tier.
 						</p>
 					</div>
 
 					<h3>3. End of turn</h3>
 					<ul>
 						<li>
-							<b>Discard</b> every card in your hand. If you emptied your wealth, it goes to your discard
-							too.
+							<b>Keep your hand.</b> You don't discard the cards you didn't play. Cards you did play,
+							and your wealth if you emptied it, are already in your discard.
 						</li>
 						<li>
-							<b>Draw</b> 5 cards, plus any extra draws from your castle, buildings, hero and artifacts.
-							When your draw pile runs out, shuffle your discard to make a new one.
+							<b>Draw 4</b> cards, plus any extra draws from your buildings, hero and artifact. When
+							your draw pile runs out, shuffle your discard to make a new one.
+							<span class="open">Open</span> Is there a hand limit?
+						</li>
+						<li>
+							<b>Check your fate:</b> 5 or more left over raises your fate by 1.
 						</li>
 					</ul>
 				</section>
@@ -493,14 +509,14 @@
 								<tr>
 									<td><b>Mountain of minerals</b></td>
 									<td>+1 silver</td>
-									<td>Merging needs one less silver</td>
+									<td>Merging needs one less silver (4 for a gold)</td>
 									<td>All resource cards get +2 chance</td>
 								</tr>
 								<tr>
 									<td><b>Lake</b></td>
 									<td>
-										+1 move, and recycle 1 card of each type in the city (you get first pick of the
-										new ones)
+										+1 move, and recycle 1 face-up card of each tier in the market (you get first
+										pick of the new ones)
 									</td>
 									<td>Nothing</td>
 									<td>+1 draw, but it costs 3 more to build</td>
@@ -541,30 +557,24 @@
 				</section>
 
 				<section id="ww-health">
-					<h2>Health & respawning</h2>
+					<h2>Health & dying</h2>
 					<p>
-						Every wizard starts with 5 health, which is also the most you can have. Heal above it
-						and you gain 1 fate instead. When you drop to 0 health you respawn, as all magic does:
+						Every wizard has 5 health, and that maximum never changes. Heal above it and you gain 1
+						fate instead. When you drop to 0 health you respawn, as all magic does:
 					</p>
 					<ol>
 						<li>Take your piece off the board.</li>
+						<li>Lose 1 fate for the rest of the game.</li>
+						<li>Discard 1 card from your hand and 1 card from your wealth.</li>
 						<li>
-							Wait until your turn, then:
-							<ul>
-								<li>return 2 money from your wealth to your discard</li>
-								<li>discard 2 cards</li>
-								<li>lose 1 ME</li>
-							</ul>
-						</li>
-						<li>
-							The player who killed you gains 1 notoriety, plus money equal to your notoriety in its
-							densest form (gold first, then silver).
+							The player who killed you adds money to their wealth equal to your fate, ignoring the
+							minus sign (a wizard at −3 fate is worth 3).
+							<span class="open">Open</span> Paid in silver, gold, or from the city?
 						</li>
 					</ol>
 					<p>
-						If your own misused magic kills you on your turn, your turn ends, you lose 1 notoriety,
-						and you don't respawn until your next turn.
-						<span class="open">Open</span> Where you respawn: your castle?
+						If your own magic kills you on your turn, your turn ends.
+						<span class="open">Open</span> When and where you come back: your castle, on your next turn?
 					</p>
 				</section>
 
@@ -572,14 +582,7 @@
 					<h2>Keywords</h2>
 					<dl>
 						<dt>Cast</dt>
-						<dd>Every time you successfully cast a spell, trigger this effect.</dd>
-						<dt>Miscast</dt>
-						<dd>Every time you fail to cast a spell, trigger this effect.</dd>
-						<dt>Half-cast</dt>
-						<dd>
-							Every time you cast a spell and roll in the lower half of the chance you needed
-							(rounded down), trigger this effect. For ∞, or a chance above 20, treat it as 20.
-						</dd>
+						<dd>Every time you cast a spell, trigger this effect.</dd>
 						<dt>Occupied</dt>
 						<dd>
 							If you start your turn standing on one of your buildings with this keyword, trigger
@@ -591,6 +594,11 @@
 							reward you for playing them.
 						</dd>
 					</dl>
+					<p class="aside">
+						<span class="open">Open</span> The rule book also had <b>Miscast</b> (when a spell
+						fails) and <b>Half-cast</b> (when you roll low). Spells no longer roll, so they need a new
+						meaning or to go.
+					</p>
 				</section>
 
 				<section id="ww-heroes">
@@ -604,16 +612,19 @@
 						<div class="card">
 							<h3>Bobby Business</h3>
 							<p>
-								Gets 1 less mana each turn, but can discard a silver to make mana. Draws a card the
-								first <b>two</b> times each turn he adds a silver to his wealth.
+								Starts the game at <b>−1 fate</b>. Has a card that draws 3 cards; discard any of
+								them that aren't silver.
 							</p>
 						</div>
 						<div class="card">
 							<h3>Bex</h3>
-							<p>
-								Study session: reserve cards so nobody else can buy them. A card that's already
-								reserved costs 1 less tax.
-							</p>
+							<ul>
+								<li>The first spell she gets in each tier costs less.</li>
+								<li>
+									Study session: reserve cards so nobody else can buy them. A card that's already
+									reserved costs 1 less tax.
+								</li>
+							</ul>
 						</div>
 						<div class="card">
 							<h3>The Noble</h3>
@@ -637,13 +648,13 @@
 						gets quicker as people learn it.
 					</p>
 					<ul>
-						<li><b>1 VP</b> for each gold you own: in your wealth, your deck and your discard.</li>
+						<li>
+							<b>1 VP</b> for each gold you own: in your wealth, your hand, your deck and your discard
+						</li>
+						<li><b>1 VP</b> for each building you have on the board</li>
+						<li><b>1 VP</b> for each point of fate (fate below 0 costs you points)</li>
+						<li><b>1 VP</b> for each different spell you own</li>
 					</ul>
-					<p class="aside">
-						<span class="open">Open</span> The older doc also gave points for buildings (2 per tile,
-						1 per max-tier building) and 1 per different spell you know. The rule book only counts gold.
-						Ties may be broken by fate.
-					</p>
 				</section>
 			</article>
 		{:else if tab === 'saga'}
