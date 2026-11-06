@@ -227,7 +227,7 @@
 		const data = await send({ action: 'fixtures' });
 		if (data?.report) {
 			const r = data.report;
-			msg = `${r.created} new fixtures, ${r.kept} left alone, ${r.disallowed} blocked by a shared player.`;
+			msg = `${r.created} new fixtures, ${r.kept} left alone, ${r.disallowed} won't be played.`;
 		}
 	}
 
@@ -461,7 +461,7 @@
 					<div><span class="n">{matches.length}</span><span class="l">fixtures</span></div>
 					<div><span class="n">{playedCount}</span><span class="l">recorded</span></div>
 					<div><span class="n">{pendingCount}</span><span class="l">awaiting approval</span></div>
-					<div><span class="n">{disallowedCount}</span><span class="l">shared player</span></div>
+					<div><span class="n">{disallowedCount}</span><span class="l">won't play</span></div>
 				</div>
 
 				{#if teams.length > 1 && fixturesMissing > 0}

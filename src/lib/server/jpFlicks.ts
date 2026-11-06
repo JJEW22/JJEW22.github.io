@@ -668,7 +668,8 @@ export interface GenerateReport {
 //
 // Existing fixtures are left alone — a season part-way through must not lose
 // its results because a team was added. Only genuinely new pairings are
-// created, and only ones with no result are re-marked as disallowed.
+// created, and ones with no result are marked disallowed when the two teams
+// share a player. A disallowed pairing stays disallowed.
 export async function generateFixtures(slug: string): Promise<GenerateReport> {
 	const seasonId = await seasonIdOf(slug);
 	const teams = await loadTeams(seasonId);
@@ -708,11 +709,13 @@ export async function generateFixtures(slug: string): Promise<GenerateReport> {
 						kept++;
 						continue;
 					}
-					const want = blocked ? 'disallowed' : 'unplayed';
-					if (current && current.status !== want) {
-						await tx`update jpflicks_matches set status = ${want} where id = ${current.id}`;
+					// Only ever block here, never unblock: an admin also marks pairs
+					// that don't share a player as won't-play, to even out how many
+					// games each team has, and regenerating must not bring those back.
+					if (current && blocked && current.status !== 'disallowed') {
+						await tx`update jpflicks_matches set status = 'disallowed' where id = ${current.id}`;
 					}
-					if (blocked) disallowed++;
+					if (blocked || current?.status === 'disallowed') disallowed++;
 					kept++;
 				}
 			}
