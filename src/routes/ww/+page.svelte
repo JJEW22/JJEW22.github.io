@@ -174,8 +174,8 @@
 								cast new spells, blueprints for buildings, and magical artifacts.
 							</p>
 							<p>
-								You can also <b>extract</b> gold: return it to the city and squeeze out either
-								<b>2 mana</b> or <b>1 ME</b>.
+								You can also <b>extract</b> gold: squeeze either <b>2 mana</b> or <b>1 ME</b> out of
+								it, and put it in your discard pile. It comes round again.
 							</p>
 						</div>
 					</div>
@@ -238,22 +238,22 @@
 							<tbody>
 								<tr>
 									<td>3</td>
-									<td>40</td>
+									<td>35</td>
 									<td>Shape A <span class="open">Open</span></td>
 								</tr>
 								<tr>
 									<td>4</td>
-									<td>50</td>
+									<td>45</td>
 									<td>Shape A</td>
 								</tr>
 								<tr>
 									<td>5</td>
-									<td>60</td>
+									<td>55</td>
 									<td>Shape B</td>
 								</tr>
 								<tr>
 									<td>6</td>
-									<td>70</td>
+									<td>65</td>
 									<td>Shape B</td>
 								</tr>
 							</tbody>
@@ -410,13 +410,13 @@
 								say otherwise. Flip new cards into the market to replace them.
 							</li>
 							<li>
-								<b>Pay taxes.</b> The city has no government, but it does have taxes: each card
-								costs
-								<b>1 extra gold per tier</b> (1 for tier I, 2 for tier II, 3 for tier III).
+								<b>Pay taxes.</b> The city has no government, but it does have taxes. The gold you
+								spend comes back to you, except for <b>1 gold per tier</b> of each card you bought (1
+								for tier I, 2 for tier II, 3 for tier III), which goes back to the city.
 							</li>
 							<li>
-								<b>Keep the rest.</b> Silver you didn't merge and gold you didn't spend go to your discard
-								pile.
+								<b>Keep the rest.</b> Everything else in your wealth goes to your discard pile: the gold
+								you spent but didn't pay in tax, gold you didn't spend, and silver you didn't merge.
 							</li>
 						</ol>
 						<p class="aside">
@@ -459,8 +459,8 @@
 					<div class="action">
 						<h4>Extract gold</h4>
 						<p>
-							Return 1 gold from your wealth to the city and gain <b>2 mana</b> or <b>1 ME</b>. This
-							doesn't send the rest of your wealth to your discard.
+							Move 1 gold from your wealth to your discard pile and gain <b>2 mana</b> or
+							<b>1 ME</b>. This doesn't send the rest of your wealth to your discard.
 						</p>
 					</div>
 					<div class="action">
@@ -493,13 +493,15 @@
 					<p>
 						The board is a grid of hexagon tiles, each a different part of the city. Every tile has
 						three effects: one for <b>starting</b> your turn on it, a <b>passive</b> that's always
-						on, and one for <b>building</b> on it.
+						on, and one for <b>building</b> on it. The board is built from Catan tiles; the second column
+						says which is which.
 					</p>
 					<div class="table-wrap">
 						<table class="land">
 							<thead>
 								<tr>
 									<th>Tile</th>
+									<th>Catan tile</th>
 									<th>Start your turn here</th>
 									<th>Passive</th>
 									<th>Build here</th>
@@ -508,12 +510,14 @@
 							<tbody>
 								<tr>
 									<td><b>Mountain of minerals</b></td>
+									<td>2 mountains, stacked</td>
 									<td>+1 silver</td>
 									<td>Merging needs one less silver (4 for a gold)</td>
 									<td>All resource cards get +2 chance</td>
 								</tr>
 								<tr>
 									<td><b>Lake</b></td>
+									<td>Any tile, blue back up</td>
 									<td>
 										+1 move, and recycle 1 face-up card of each tier in the market (you get first
 										pick of the new ones)
@@ -523,30 +527,35 @@
 								</tr>
 								<tr>
 									<td><b>Enchanted forest</b></td>
+									<td>Forest (trees)</td>
 									<td>+1 mana</td>
 									<td>+1 chance to nature spells within 1 hex. Clear it for 2 ME</td>
 									<td>+1 mana, but it costs 2 more ME</td>
 								</tr>
 								<tr>
 									<td><b>Rock bed</b></td>
+									<td>Mountain</td>
 									<td><span class="open">Open</span></td>
 									<td>+1 chance to all resource spells</td>
 									<td>Costs 1 less</td>
 								</tr>
 								<tr>
 									<td><b>Field</b></td>
+									<td>Wheat</td>
 									<td>Draw 1</td>
 									<td>Nothing</td>
 									<td>Nothing</td>
 								</tr>
 								<tr>
 									<td><b>Corrupted land</b></td>
+									<td>Desert</td>
 									<td>Take 1 damage, and cast the top tier I spell for free</td>
 									<td>+2 chance to dark spells, −1 chance to all others</td>
 									<td>−1 fate</td>
 								</tr>
 								<tr>
 									<td><b>Bricks</b></td>
+									<td>Bricks</td>
 									<td>Nothing</td>
 									<td>Nothing</td>
 									<td>Nothing</td>
@@ -563,7 +572,7 @@
 						fate instead. When you drop to 0 health you respawn, as all magic does:
 					</p>
 					<ol>
-						<li>Take your piece off the board.</li>
+						<li>Move your piece back to your castle.</li>
 						<li>Lose 1 fate for the rest of the game.</li>
 						<li>Discard 1 card from your hand and 1 card from your wealth.</li>
 						<li>
@@ -572,10 +581,7 @@
 							<span class="open">Open</span> Paid in silver, gold, or from the city?
 						</li>
 					</ol>
-					<p>
-						If your own magic kills you on your turn, your turn ends.
-						<span class="open">Open</span> When and where you come back: your castle, on your next turn?
-					</p>
+					<p>If your own magic kills you on your turn, your turn ends.</p>
 				</section>
 
 				<section id="ww-keywords">
