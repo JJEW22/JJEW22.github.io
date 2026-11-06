@@ -1,0 +1,994 @@
+Union games ideas:
+
+Wealthless wizards: a discussion of who we hurt along the way. Want you to feel like the villain
+
+Wealthy wizards: a discussion of how we take till there is no more - a discussion of what we value as a society
+
+The third: the culminations in a leftover land, and understand who is left
+
+
+In wealthy wizards: could modify so luck is rolled once at the beginning of your turn (rebrand fate?) and each card can drain some amount of fate for some effect (or cost fate to have a positive effect). Dying decreases your roll by 1 for the rest of the game. Ending a turn with more than 10 (ish) left permanently increases fate. You may spend up to 3 over but you perm decreases fate by 1. Chance now decreases the cost of effects. Perma death If you tempt fate too much (if your roll on with < 0 fate) - or skip turn. Gold could also be sacrificed to permanently increase your fate toll by 1.
+
+Nobel could truly never die -> is somehow immortal and as such does not have to return to his castle (just leave others) or suffer the penalties of death. His opponents still receive the reward however.
+
+Conjure spell when units are in play - summons a unit through a spell.
+
+Fate bonus could become a tie breaker
+
+Founders pack should be Fred the founder and a set of cards based on designs submitted by those who initially played it.
+
+Could use splendors 3 tier system (this simplifies set up, and simplifies tax system, and allows more flexibility in cost and tax) (tax could also be rebranded as magic cost to learning) bex’s passive ability could decrease the cost for the first spell gathered in each tier.
+
+Could add Ryan’s drafting mechanic into the game to essentially skip the first few turns (this would serve as a nerf to Fran).
+
+Bex’s study session could allow her to reserve cards so other people cant purchase them. If a card is already reserved then it could make it so there is 1 less tax on the card. Could also make it easier to upgrade cards.
+
+Spell that draws you a card per chance spent.
+
+Spell that gives you +1 mana and discard a silver.
+
+There could be synergies for cards with alliteration in the title. They could also be more powerful versions of other cards.
+
+You could also upgrade to the more powerful version of it is in the shop and you have the other in your hand (remove a gold, trash the card, maybe swap in place).
+
+The dark spells could also grow more powerful as fate has turned more against you (more negative fate).
+
+Potential wizard that finds a way to incorporate both positive faith and darkness (idea being on a good path but using darkness)
+
+Then make it such that gold is free to draw (silver is not - potential Bobby business bonus). Then your draw 3 cards a turn instead. The wealth mechanic makes it so this is more possible in this deck cycler than others. Mechanically I think the idea of value is quite interesting. However needs to be handled well because top decking in hearthstone is not ideal. Maybe make a punishment (positionally or resources wise that allows you to draw cards).
+
+Maybe exhaust could be implemented to fix this (draw 3 gain a dead card)
+
+Bobby - once per turn draw a silver for free. Franchise card produces decreases fate and increases silver.
+
+Fran - hand or wealth gets a card added when they are empty.
+
+Holy - type of cards the focus on mutual benefit and equality (can bring up fate and get it to side with you) (but equality can be bringing people down to your level) (think paladin)
+
+Nature - focus on map interaction and control (right now it doesn’t feel as if I have just discovered a city)
+
+Fire - focus on damage and destruction. And forging.
+
+Dark - focus on chaos, anti fate, stolen power.
+
+Make gold feel more valuable (I need to want to want it) (gold is a free draw, gold can be discarded to be spent as mana - means it won’t be there to help learn) (make it so there is less of it)
+
+Upgrades make it so there is more continuation of strat but could limit possibilities.
+
+
+◦ Cataclysmic curse: 1 mana, come up with nature based curse.
+
+◦ Armor up - reveal and discard from hand to take 1 less dmg.
+
+◦ harvester (unit) - provides start of turn and passive effects.
+
+◦ Lumberjack (unit) - 1 ability card, swing axe - gain a ME per forest in 1 hex (max 3) or deal 1 dmg.
+
+◦ Demon (unit).
+
+◦ Catalyst (neutral) - 1 mana, 3 chance, next fire spell this turn does +1 dmg to all targets.
+
+◦ PyroBLAST - 4 mana, tier 3, roll a D10 deal 1 dmg to whoever it ends on (starting with the person to your left as 0). Repeat until someone dies or the total dmg exceeds your chance. At the end spend dmg equal to opponents damaged
+
+◦ Long shot - 2 mana deal 2 dmg. (C3: 0 tiles, C6: 1 tile, C9: 2 tiles)
+
+✓ Gold rush - draw cards equal to the amount of gold in your wealth.
+
+✓ Mysterious mine - roll a single die and gain that much silver.
+
+✓ Avatar wand (artifact) - whenever you cast a spell of a different school than the last it cost 1 less. +1 chance. +1 mana.
+
+✓ Branch of life (artifact) - +2 mana, +2 chance to all nature spells. Spend 2 mana to create a forest.
+
+✓ Remote detonator (artifact) - cast any spell as if you were anywhere within 1 tile. +2 mana.
+
+✓ Cooked book (artifact, discard from hand) - pay 1 less tax on all purchases. -1 fate when purchased. -1 chance.
+
+✓ Anti-magic - discard from hand to counter a spell (also discard treasure cards up to the mana cost) (or counter up to 3 mana).
+
+✓ Poetry book (artifact): draw a card and gain a silver when you play a card with alliteration. Same letter in a row gain 1 mana and 1 chance.
+
+✓ Upgrade field of flames - decreased chance tiers, may destroy the forest you are standing on to deal 1 more dmg to others.
+
+✓ Proper extraction (fire). 0 mana. 3 chance. Discard a gold, gain a ME.
+
+✓ Arson (fire) - dmg a building.
+
+✓ Molten mine (fire) - ignite 3 of an opponents silver. They take 1 dmg for each they don’t give you.
+
+✓ Economic exorcism (holy) - deal 1 dmg, steal 1 silver, Increase fate by 1.
+
+✓ Holy mine - gain a silver for each faith (upgrade can also just be cards with the same word - then there are not upgraded alliterations)
+
+✓ Exercise (holy) - spell that goes into opponents. Only goes to player with least faith - deal 1 dmg, Increase faith by 1.
+
+✓ Holy spell - Heal someone else to increase your fate by 1.
+
+✓ Judgment (holy) - harm or heal someone equal to how much fate is on their side. (Do this to you and someone else? Idea being it’s good if you are holy)
+
+✓ Torrential rain - deal 1 dmg to enemies on rivers, and move them all 1 space. (Also maybe dmg building on river) (could make it so the move happens first if this need a buff).
+
+✓ Leaping lightning - 5 chance: deal 3 dmg to an enemy. Repeatable (no additional mana but more chance) for 1 less dmg within 1 tile.
+
+✓ Lightning bolt - 7 chance 2 mana: deal 2 dmg.
+
+✓ Neutral spell - Play an alliteration card for free.
+
+✓ Silver seeds (nature) - curse card: 1 mana, draw 3-4, double and silver drawn. (Or alternatively discard any number and add that much silver to your wealth)
+
+✓ Sharp seeds (nature) - curse card: 1 mana, draw 3-4, discard any number of them and deal 1 dmg per.
+
+✓ Seeds (nature) - curse card: 1 mana, draw 2 cards, 10 put at the bottom of your draw pile instead
+
+✓ Sudden growth - turn a field into a forest
+
+✓ Vine swarm - deal 1 dmg to all enemies in a forest.
+
+✓ Constant curse: 1 mana, decrease fate by 1 (is never returned to the owner)
+
+✓ Dark spell - corrupt a piece of land removing its bonus.
+
+✓ Curse (dark) : 1 mana, decrease fate by 1
+
+✓ _____ curse: 1 mana, decrease fate by 3
+
+✓ Life exchange - deal 1. Heal 1 (dark)
+
+✓ Corrupt coinage- -1 fate. Add 1 silver to your wealth for how much fate is against you. (Dark)
+
+Album of the apocalypse (idea for a combo) - each spell you cast in the same turn triggers an additional time.
+
+◦ Despair (dark): 1 mana, 4 chance - all players discard a card. Draw 1 card.
+
+✓ Greed (neutral): 2 mana, 4 chance - your next purchase cost 1 less gold. (Collect all remaining gold if you cast all 6)
+
+✓ The mountain (neutral/resource): 1 mana, 4 chance - Add a silver to your wealth.
+
+✓ Abundance (Holy): 1 mana, 4 chance - +1 mana, +1 chance, +1 health.
+
+✓ The Earth (Nature): 1 mana, 4 chance - gain start of turn and build effects.
+
+✓ Fire: 1 mana, 4 chance - deal 1 dmg within 0 hexes.
+
+End of album
+
+✓ Rain fire (fire) (could be related to torrential downpour, or field of flames) - deal 2 dmg to everyone in any row of tiles.
+
+✓ Sound of nature (nature) - the next alliteration spell you play is free.
+
+✓ Dibs! - you may discard this from hand and then buy a card that was just revealed (can be done out of turn).
+
+✓ Hiking journal (artifact) - receive double from land bonuses (alternative, now receive the land bonuses of everything within 1 tile)
+
+✓ Proper merge (fire) - merge silver in your wealth into gold at a rate 1 better than usual.
+
+✓ Everyone Cast the lowest cost spell from hand (can buff these such that only other people with positive faith).
+
+✓ Tithe - everyone trashes a silver. The next holy spell purchased that silver is used in the purchase.
+
+✓ Blacksmith (building) - you may trash any card and Gain +1 ME.
+
+✓ Hot hand - ignite an opponents hand. All cards played within 3 turns deal 1 dmg to the player. (Find better way to word) (another option is they discard any card not played).
+
+✓ Thought steal - choose an opponent to discard a spell. You may cast its effect.
+
+✓ Cooperative cast (dark) - all players draw a card. Lose a fate for each spell drawn then cast them for free.
+
+✓ Chaotic cast (dark) - cast the spell on the top of the tier 1 draw pile. (+1 mana, +4 chance to go up).
+
+✓ Everyone Draw until they have X cards in wealth.
+
+✓ The trading post allows you to actually trade with other people.
+
+◦ Yoink! - tier 2, take a random card from your opponents hand. Add this to their discard.
+
+
+Wealthy wizards 0.2.1
+
+
+Notes from last play:
+
+Didn’t bother explaining extraction or mana gain. Unused chance boost to fate or the go negative harm to fate.
+
+There wasn’t much passion behind each of the actions.
+
+
+
+Planned Fixes:
+
+When a card is purchased add it to your hand instead (this provides some immediate return on the Benefit of a card making it feel not as bad to draw a card)
+
+Draw a card the first time you add a silver to your wealth in a turn (Bobby business gets to do this bonus twice) (this increases the rate at which players draw cards, allowing for more frequent purchases)
+
+An artifact can only be replaced by one of a higher tier (2-3 start I, 1-2 start at II). (No 2 of a spell/ building are allowed to be out at once)
+
+Castle. Tier 1: +1 silver, +1 ME. If an opponent is standing here they get instead. Tier 2: +1 chance, Tier 3: + 1 Mana.
+
+Starting in a lake recycles 1 of each type of card. (Gets the decks moving a bit more, small bonus to the person there because they get first dibs on each of the newly flipped cards).
+
+To fit the theme of the prequel. Bobby business revives -1 mana. But can discard a silver to generate mana.
+
+
+Possible fixes:
+
+Silver that is used towards tax requires 1 less silver to merge (keep 5->1 ratio). (Make cards in general cost a little less).
+
+Overheal - if you ever heal yourself above your maximum health gain +1 fate.
+
+
+Land tiles:
+
+
+Mountain of minerals - mining is better here.
+
+Passive: Merging requires one less silver.
+
+Build: all resource cards have +2 chance.
+
+Start: +1 silver.
+
+
+Lake:
+
+Start: +1 move
+
+Build: +1 draw, cost 3 more to build.
+
+Passive: nothing
+
+
+Enchanted forest - clear able 1M for 2 ME. Passive: +1 chance to nature within 1 hex.
+
+Build: +1 mana, cost 2 more ME.
+
+Start: +1 mana
+
+
+Rock bed:
+
+Build: costs 1 less
+
+Passive: +1 chance to all resource spells.
+
+Start:
+
+
+Field -
+
+Passive: does nothing,
+
+Build: does nothing
+
+Start: draw 1
+
+
+Corrupted land -
+
+Passive: +2 chance to dark, -1 chance to all others.
+
+Build: -1 fate. If you dmg your fate is decreased.
+
+Start: (take 1 dmg, cast a top deck tier 1 spell for free)
+
+
+Bricks:
+
+Do nothing (hide one under the mountain) (and exclude 1)
+
+
+
+
+
+Mechanics:
+
+Could introduce a card draft mechanic to speed up the game (everyone drafts a tier zero card - in reverse order of play) that will be in your starting hand.
+
+Every location will have a start turn, passive, and build on.
+
+If you ever roll such that your fate + the roll less than zero. You must spend mana to try and get back up.
+
+Overheal (mechanic) - whenever you heal over max gain +1 fate.
+
+
+
+
+
+
+
+Dunegeon run:
+
+Mix of civ and dungeon run and Oregon trail.
+
+The goal is to make the individual feel like they are exploring a vast “new world”.
+
+Units in front provide protection to those further back (lobbed attack ignores - example bow), range for attacks limit placement and who can be reached
+
+Gold provides mana bonus to party that is holding it. Can be used to permanently upgrade a single spell (artifact as well?)
+
+General grants more xp to units (assuming they grow in strength) and armies suffer less movement penalties.
+
+Wyllas initial choice (example of compass choice of others) explores the vastness of witchcraft (satanism, spiritual, etc.) (possible expansion used to fund research in the field)
+
+Resources aren’t global (instead are held by an outpost or a party and must be transported: trader can be used to do this and will generate silver in the process)
+
+Resource exploitation from tiles that contain values (silver, ME, food, gold?)
+
+Two types of aoe attacks (lobbed universal and barreling - lobbed ignores front armor decreasing effects)
+
+Spell classes for added synergies (fire, ice, water, divine, holy, dark, arcane, etc) (certain characters can have increased synergies with some classes - Pylion with fire, bex with arcane)
+
+There will be class cards, neutral cards, and unit stuff. Where each wizard/unit has a personal mana amount and then there is also neutral mana.
+
+Class cards are meant to be designed in a way to provide very unique play experiences that can also the neutral cards.
+
+Turns are divided into days (morning, afternoon, evening, night?) where night is when your bases can be attacked and the rest is for player explorations. Different times of day certain units will be stronger or certain areas will have different movement (example dessert at noon spells worse news)
+
+Bring feeling of being the wizards instead of wizards being part of your army (only can see what is around your wizards - can loose sight of outposts if not in range)
+
+Need an explanation for why the wizards don’t start out totally decked out in the board game (make it so what the wizards actually start with it very good, somehow in the process of finding the city of gold all is forgot - city of gold has magic that makes those coming in to forget much about their past, also explains why if the city of gold the rest of the world does not know because they do not return)
+
+Different possible final bosses guarding the city of gold. New ones Could also come in during expansions (Wylass expansion adds new boss of the devil)
+
+Telephone/ and other communication items that allows wizards to keep site on outpost (outposts can also hold artifacts)
+
+Each wizard has an armor screen? (Hat, hand, chest, lower, off hand?) (hand, off-hand, clothes
+
+Thrill of the kill (after killing an enemy grants a moral bonus to the killer, at the end of a successful battle everyone’s moral is boosted) when a friendly unit dies everyones moral changes (dependent on how good of friends they were - or if they despised each other) (one of the neesh benefits of your two wizards hating each other - in general better if they like each other)
+
+Could consider time units per section of day instead of basis of how much a player is allowed to move - this allows more flexibility of options (could spend time playing cards to boost moral, continue exploring (how much would then be determined by character speed), resting) how to handle the dsync of groups of units. Instead of time think of it as actions.
+
+Multiplayer: cooperative game for 2 where each controls a wizard - or parties can be extended to even more (parties of 4 wizards). Against - could be dropped into a world of exploration against others, could be WW original digital adaptation as the multiplayer for the game where the wizards available to you are those that you have gotten to reach the city of gold - might be tedious
+
+Length of run 1-3 hours (longer than other STSpire type games but shorter than games like civ) (length should depend on play style too)
+
+Characters stats: max of each. strength (carrying capacity, physical based dmg), speed (dodge rate, spaces to be moved on board), knowledge (spell success rate, learning rate), charisma (how much boosts moral of other they are with/ how much they loose/better pricing).
+
+Physical and mental - more physical mean more food, more mental means more rest (could also do ratio between)
+
+Characters can also gain temporary traits (scavenger - food related to traveling and killing animals similar to game example deer, dessert tummy - increase in max food)
+
+Expansion of custom wizard - set stats and get random mix of two other wizards class sets and one of their traits
+
+Able to spend time of day working the land you are on
+
+Sierra de pa plata (mountain of silver)
+
+Camelot
+
+Mount meru
+
+Muspelheim (fire monsters or location) (and partner niflehiem (there should also be a frozen biom
+
+Norumbega (a city of riches)
+
+Piatiti (another city of riches)
+
+Ryugu-jo (undersea palace of Japanese dragon)
+
+Knowledge (research) and moral as resources on map?
+
+Ender chest, endless book, scrolls (one time use boost of knowledge or spell learning)
+
+Library of Alexandria - produces knowledge and research when worked by a librarian
+
+The ancient - has access to old magic since they can speak and read forgotten language (don’t know what the old magic would be)
+
+Trait adaptive learning - the first spell you cast each turn cost 1 less until you rest.
+
+Different units can have different amounts of specialty slots (or no limit on slot but can only be one profession)
+
+Phantom cards will not get put back into the deck. Another type of card is automatically discarded at end of turn.
+
+Fountain of youth also makes it so units can work continuously? People heal faster around it.
+
+Fame level and good levels added for each wizard
+
+Explorer upgrade (suffers no movement penalties, suffer no penalty crossing/embarking on rivers)
+
+Explorer upgrade - scavenger (increased food from hunting and gathering)
+
+Explorer upgrade (plus vision)
+
+Explorer upgrade (fleeing from combat is easier) (looter, thief)
+
+Get rid of teacher profession then provide bonus based on amount they know in subject category when working at school. (Maybe product of this with their knowledge)
+
+Womping willow based monster.
+
+Seasons exist in the game? (Could be take a step further and then days and years also exist)
+
+Buildings decrease the spawn rate of monsters in the area.
+
+Spot light (upgrade archer tower). Requires 1ME (maybe light source) every night increases vision range, decreases likelihood of attacks, and provides bonus if attacked (maybe require user to set direction)
+
+New possible resource light source (candles, wood, lightbulbs, etc) that provides bonuses at night, (could also have a heat resource that would be useful for promoting seasons, clothes and shelter would provide heat resources per turn)
+
+Scholomance can provide additional bonus to character that all dark/devil spells cost -1 less to learn for each day segment spent there, unique battle to fight the devil? Would possibly conflict with witch expansion.
+
+Learning spells of a class make it more likely to find rarer spells of that class
+
+Hotels could totally exist to provide housing at night for cost (located at permanent cities)
+
+If units require the 4 base body resources then money could be a way to make sure their moral is high.
+
+Fur tradesmen could travel and take pelts from slain animals
+
+Bobby business receives interest on the money he is holding (his way of fakly making funds)
+
+Santa’s workshop location of legend (produces toys - money, moral, get an elf, Santa’s sack)
+
+Bean stalk (chance to grow magic super stalk after planting beans near something magical) if able to climb then climb it.
+
+Artifacts that are legendary but have no way to appear (location didn’t spawn on map) can be found from traveling salesmen)
+
+Horses can function as a worker (like at a farm)
+
+Principle for game updates: something fixed, something updated(balanced), something new (only made aware the fix and balance if you have discovered it).
+
+Idea of reputation that is earned from a run (notoriety, and goodness persist between runs, as reputation increases you can unlock new reward and receive better starting funding)
+
+Notoriety decreases overtime? Events can trigger someone else’s (example finding someone else’s journal would make them more famous)
+
+Vision is a function of a single value. Revealing tiles requires vision in a ring fashion ( tiles of equal ring and cost are selected randomly)
+
+The castle doesn’t just take up 1 space so it allows for more buildings around it to be connected.
+
+The legend tag can be earned by getting a player to max notoriety (notoriety can be a function similar to civ 6 passive religion in game) (affects a units notoriety)
+
+The myth tag can be unlocked by generating a myth (effect currently unknown)
+
+Also create tags for reaching the highest goodness and the worst of badness
+
+A love letter that improves moral (the letter is reigning truth)
+
+For the gambler a card that acts a scroll of wonder (casting random spell - could be increasing in cost each time it is drawn)
+
+Could exist a survival mode where the objective is to not find the city but instead settle the best you can (before you get swarmed)(maybe not another mode but can be done in the base game)
+
+Siege weapons where they contain negative movement points.
+
+Able to build 1 ring around an outpost
+
+Explore idea of individuals moving to the city that are not under your control (taxes could then be imposed)
+
+Unlike the civlopedia not all information is initially there, details only appear once they are discovered (done to keep theme of exploration)
+
+Magic mine: out of combat spell that can be used next to a mountain to produce - stone, silver, gold, or minable resource (reveals resource if it is there)
+
+Grapes, fermentation can be a building.
+
+Debate having an order system (like old world) that works for units not close to a wizard (cell phones alleviate this distance)
+
+Specially trained units wouldn’t require orders for what it is they are trained in.
+
+Orders could be made as a long distance communication by spell so it takes up a portion of time for turn
+
+Weapons cans have deck synergy - this allows units to pair better with your wizards
+
+Movement penalty when revealing new terain (fearless trait could remove this penalty, or reduce it for a group - then doesn’t allow the character to flee - or have to wait longer to flee).
+
+The range you can communicate for free could be extended over time (by items and such), the cost to cast the spell could also reduce over time
+
+Gaining traits can increase chance of rarer similar traits/ similar traits (could be done through a characteristics system where every trait you take modified your characteristics)
+
+Could show up on a boat and have the option to sail around for landing spot (emphasis new world idea).
+
+Rarity of spell classes could be based of characteristics as well (such as some spells schools could be evilly oriented so it is more likely for those to appear for someone with high infamy)
+
+Locations of legends/ the land themselves could upgrade after success expeditions that find them. (Tails of their riches grow) and it slightly does upgrade their riches. Could also be phrased as more as understanding of it grows then more use can be extracted from the wonders.
+
+Maximus or Thomas have a mulligan available to them (Thomas could have draw the cards played last turn)
+
+Access to resource should modify amount of supply and cost (supply and demand) this also would help set up trading units by sending them to higher demand locations (exchanging time for money payout) (possibility of a screen that display information about the density of resources) (for economy break down into: taps, inventory, drain, converter, and trader)
+
+The closer you get to the city of gold the less densely populated the area is.
+
+Being friendly with the locals can provide bonus like suggestions to nearby locations or direction to city of gold or better prices on things.
+
+When making a trade with a city you are not adjacent to, they could send someone or request that you send someone
+
+Goal is to sprinkle in complexity of new mechanics as game difficulty increases (should the complexity even break down to resources not existing at the beginning then they do - only resource that would exist is food and types don’t exist) (complexity could be finite number of decisions - need explanation for this - explanation is that communication has been made harder and so it requires some of the units energy for a turn to send an order)
+
+Think of ways to incorporate an advising character (pop up while doing dumb) or way to shorten feedback cycle for beginning learning (maybe find a way to make initial difficulties shorter)
+
+Want the game to be enjoyable at new skill levels but have the skill a player can option be ridiculous to max out the difficulty and efficiency
+
+Don’t be afraid to get testy in beta tests (finish products aren’t required but a relationship of being tested is needed)
+
+Information is intended to be a resource in this game (fog of war hides information, some resources build this up: a computer allows for more “computations” to be made. So more information is available to the user in an easy to digest way)
+
+Slay the spire rewards players for making it to first boss - encouraging not restarting over and over. An investment system could support this here where someone is investing in this voyage so if you just leave then negative effects can head your way - encourage attempts.
+
+Game designers often time lie about percentages (make them lower then they are) because people often have a bias in how they should work.
+
+Make the choice to steal more of an action - increasing the immoral feeling of it. Make every choice and decision compounding finding creative ways to comment on decisions that don’t seem to matter but definitely could (if another city requests your help but you are slow to get there make it so it is harder to safe them when you arrive or impossible) (this is the measurable idea because fame, infamy, and goodness in the game.
+
+The game is intended to be a rough like where there aren’t persistent upgrades but instead persistent changes, new choices, with maybe slight bonus to help struggling players (that comes from fame, example increased starting funds, but these aren’t permanent)
+
+Possibility mech: being able to find other characters while out exploring for the city of gold. Way of modifying player relationships (could also be part of how you can initially add them to your party)
+
+Heath can be slowly regenerate overtime (very slow) but the real way to quickly up it is through health potions, healing spells, or maybe even through healing aids (like a crutch with increase passive healing rate) resting provides an increased passive rate. Proportional to amount of rest
+
+Exhaustion from combat can be accounted for deck cycles and or mana spent by a character. When in combat can also get a weighed down card (1 mana draw a card) an effective do nothing card that tires you out or penalizes you with 1 less card. The card is added to your deck when the party is over weight (could add more and more depending on the weight) (this makes it more exhaustive and punishing for 1 person to go into combat over weight)
+
+Some mechanics could be unlocked through account leveling - while others could be unlocked through completion
+
+One of the general’s items can help him command large numbers of units (whistle decreases required energy to issue an order and increases range). Another could be something that decreases units cost.
+
+Need to figure out how multiple grouped unit fights will work (reinforcements), could have topographical view, could have the same view and ability to switch between groups. Mine of wyllas options could be a recycling item (if doesn’t go down witch path - those could just be synergies) that allows all items to be used for everything at a worse rate. (Each choice of witch could come with an alignment and an item)
+
+The game is desired to feel systemic (like the world is - gives feel of exploring a world that exists)
+
+The current system of morality (a bar swaying from good to bad with increasing odds feels lack luster from what is capable) try and think of consequences from actions that are immeasurable (not a bar) but visible - decreasing morality for repeated offenses, players that feel crushed or that take up negative traits, immediate hatred by other players or cities. Rewards for your arrest - evil is a feeling after all.
+
+Behind the scenes there should be two bars that store values of good and evil (good does not mask evil) instead you can contribute a lot of both - chaotic neutral
+
+The first place you land in the world creates a dock (it comes from an attachment to the boat) the dock acts a a storage location where items there can be traded (with homeland or locals) the trades can either require you to send your boat (time lost where you boat could be doing other things) or a boat can be sent over.
+
+The goal of the game should be overarching (find the city of gold), to encourage creativity and exploration “surprise rewards” are known ways of doing this. Surprise risk could limit this creativity.
+
+Alcohol could exist that boosts moral but slowly rate of learning
+
+The game should provide positive feedback to the player or developing in a round and doing cool things then returning without dying.
+
+The progressive game mechanics are also there to serve as a way to keep the player engaged, new mechanics provides new challenges, that with the randomness of the game bring variability throughout. The new starting pieces for a player also allow for this.
+
+Generally bad to restrict undesired behavior, better to reward gameplay that fits your desired behavior (example for this is want to challenge players to take risks and explore different areas due new tasks (example labyrinth) so legendary unique rewards and titles exist for this sort of behavior.
+
+A unit doing construction could provide a bonus to resource amount and or time. When building at an outpost resources could come from what is generated (slower but allows builder to provide more of a bonuses to resources) we not at an outpost could require the resources outright to do construction
+
+Could consider a possibility where the map does not reset during runs (make it a bit more rougelite) (the labyrinth could interact with this by shifting things around)
+
+Obligation mechanic: a way to trade favors, receive immediate reward but are faced with a challenge that you must complete.
+
+A way to blindly help players that are struggling is to decrease the amount required (failed a lot) to go up in player level
+
+Could create a system such that each wizard gets a guaranteed draw at the beginning of the turn
+
+The general had a card that says “each unit draws a card”
+
+Each player and unit could have a draw rate up to a decimal value, could be affected by speed
+
+The general could provide a bonus of neutral mana (assists others in combat), could also increase draw rate of all other friendly, could also reduce their fatigue
+
+
+Like the rumors of locations: from “at the gates”. In the fog of the map there can be rumors of locations - could make it something acquired where you can be told of rumors of something but it is not guaranteed to be there, could be near there, or not actually exist. Appears as spot on map
+
+Certain spells can have dual effects (applications both in combat and out) (example healing could be done at either point) (fireball could be use to kill or warm something up)
+
+Can have a system of different things being unidentified (plants, stones) that could then be identified.
+
+To avoid save scum want to make mistakes small, unpredictable, and overcome able. Avoid rewards for absolute perfect play and punishment for any errors. Maybe have a bit oppose like civ 6s heroic era system.- could also have a save system that doesn’t allow for rewinding at all (can still allow for quick save features however) (but think undo buttons are important)
+
+Conversation is something hard to master in games but the goal is always to test social capabilities and see what has happened (how observant/ Inuitive can you be about the character) in dialogue with a city can you remember what it is the want in placing a bribe? Or just remember that they were wanting?
+
+The generals last base thing could be something that provides a bonus to the learning rate of units in non-magical combat (sword, bow, whatever else). (This is however very similars to bexs ability and notably worse if 1 to 1)
+
+Characters with magic flowing through them receive +0.5 draws per turn. Mostly is just a different between draw of wizard and unit (with exceptions for Bobby and units that get wizard trail that could be first upgrade)
+
+
+Would be ideal if each character had their own mechanic/keyword that was unique to them (similar to hearthstone classes) or (other enrage like mechanics). Could potentially be challenging to pull off
+
+The intelligence of a character could also contribute to draw rate (this could be in place of the default 0.5 added for wizards instead it add intelligence too)
+
+Could set it up so research points can be spent on society wide updated (unable to spend past your level - requires a higher level before some things could be gotten) (if this was the case the rate points could be gathered should be slightly increased)
+
+Could make some characters better at recognizing information about a piece of land (maybe all the can be seen is that it has fruit or something) (could have a cultivation study mech)
+
+Heras merry bonus could provide a permanent bonus (that can only be done 1 for a character - until they get divorced) (persisting between rounds).
+
+Basic resources should be easy to understand so the complexities of the game can always be evaluated with those - how does each thing help me with survival and exploration.
+
+If this isn’t already explicit one of the founder abilities could be to reveal all basic resources on a tile. (Other wizards when then have a surveying spell for basic resources and numbers)
+
+Each character could have a unique way for them to gain knowledge (founder: surveying cool tiles, general: leading units in combat, bex: teaching units something)
+
+Too feel more magical could create spells that allow for the manipulation of terrain (example: raise/lower terrain by one)
+
+Need to think more about how to handle spread out enemies (also make it so players can move during combat between hexes) (summoning spells could also summon in different directions)
+
+Don’t make removing a card from the deck impossible instead make there rewards for larger decks eb and flow(example more deck cycles mean more energy used means more tired from combat)
+
+Get the title “the remembered” if you beat it with a wizard dying (the other wizard is remembered) need to decide on what the remembered does.
+
+Tutors could also be used to target the learning of specific cards (instead of the random pulling that is available in the shop) (could target a legendary) (could literally target any card you would like in their repo) (cost both gold and knowledge)
+
+Greed trait: gets a moral boost for gaining money with ddeminishing returns, if a threshold is not met has opposite effect (Bobby business could start with this trait)
+
+Custom wizard: if a unit/units beat the boss/ discover the city of gold unlock the ability to create a custom wizard (require them to be a wizard?)
+
+When you play cards (including those that were generated) it cost less to then learn them (maybe like 1 per play) (does not persist between runs) (con: hard to track and current doesn’t provide much benefit to generated spells) (like civ eurica)
+
+Consider some design by subtraction after/in development to ensure the game is about exploration
+
+The game is also about exploring the people around you as well which could come out by discovering new facts (character has a passion that allows them learn in a unique way) about them that may not even remain obvious (maybe only marked if you have a journal)
+
+To explore and feel unique in the runs a story should be created and built by the player through synergies and more importantly interactions (look to the nemesis system as inspiration)
+
+There could possibly exist neutral cards in the deck that anyone could play (then a generic 1 card per turn is drawn + whatever bonuses to each player) (would need to think of a way these could be added to the deck)
+
+Could instead of just having the basic start that everyone starts will could start in a at home shop that allows you to spend some starting money on whatever resources you would like (units, food, artifacts, etc.) it acts a little like the starting decision in slay the spire
+
+Could use a scoring system to determine if an expedition was “successful”. If so functions like getting passed act 1 in slay the spire (bonuses) and provides bonus to leveling and notoriety.
+
+Want mountains and features to feel huge (many tiles)
+
+Allow for a trailblazing style of exploring that is slower but makes it so future navigation through the area is less expensive
+
+Could be a cursed sort of forest that is prone to make you walk in circles.
+
+Should thirst bring a nexhanic? Maybe a difficulty level
+
+Sid mire decisions: trade offs (must have trade offs to a choice), situational (should depend on my current state), personal (also depends on person preference) , persistence (the duration of the decision should affect the amount of information available) https://youtu.be/WggIdtrqgKg
+
+The first 15 mins should be fun and act like a foreshadowing for later into the game (Sid mire suggestions), should make the player always feel as though they are above average and give them something to work for https://youtu.be/MtzCLd93SyU
+
+Did their research in the children’s section (based it off things everyone knows) not weird obscure facts for civ
+
+Obelisk: give +1 to all combat within 1 hex
+
+Archer tower: start of combat add X 0 cost dmg spells that draw a card (or start of each turn at one to hand with exhaust)
+
+Fortifications: start of combat give 1 perma armor to each unit.
+
+Wings allow you to attack uphill
+
+Muddy or marshy terrain can cause a slow effect (decreased draw rate, or decreased mana, or pay mana to draw)
+
+Could be cards the remove exhaust/fatigue cards from your deck. Or ones that synergies with them (e.g. deal dmg equal to num exaust/repeat for…)
+
+Potential sid the sly passive: the first time your deck cycles ignore the exhaust/fatigue card
+
+Could be a mechanic on some cards such that each time it is played it decreases its cost by one
+
+If cards end up costing less knowledge for playing them without having them or something. Then bex study session could be add x random spells to you hand they cost y less
+
+The amount of alliteration found could be a way to show overall exploration progress in the game (finding them all could yield a title the alliterate)
+
+The upgrade to every card could be its alliterated form
+
+Neutral mana could potentially not drain rest, or could drain less of it (how would that work with units?) (units don’t have neutral mana).
+
+Exhaust cards serve has a way to thin your deck but you would also then because more tired from them (name kinda fitting) (they could also potentially drain some amount of rest in combat)
+
+Speed could be how many movement points you get per unit of time (50 -> 5.0 m/time)
+
+Bex’s study session could be an example of a dual purpose spell. Out of combat it could be a spell that uses a book more effectively
+
+Gaining multiple copies of a spell used out of combat could make the spell cheaper to cast or allow you to use that spell multiple times a day (or turn)
+
+Your weapon could modify a certain type of spell (keyword) with effects unique to the weapon. Bonus dmg, mana discount or cost, bonus effect. Or also have a cast effect like in the board game (whenever you cast a spell gain an effect). In addition to this the weapon could add some # of copies of these as part of its unique effect
+
+Trait foodie: gain some moral from eating food - this bonus is doubled when eating with spices
+
+Trait chef: everyone in their group gains some moral from eating food (less than that of foodie) - the bonus is double when eating with spices
+
+The library of Alexandria: when worked can also provide money via trading of books
+
+The trader could have specific events (pop ups of someone who came across) that allow you to make certain trades
+
+What the game to feel like an arena run at the beginning then at the end a solo adventure. (Maybe could add a bit of a draft component to the starting deck)
+
+Heavy sleeper: trait, if resting at night will not be awoken by attack but rest is x% more effective
+
+Traits can vary their percentages to determine how good they are (allows for a trait to be considered both good or bad depending on what amount was given) randomly decided how scaled it is.
+
+Weapon (weaker ish): swift dagger, low bonus dmg, draws a card, decrease its cost
+
+Certain materials could be foreign goods: high resale but hard to find
+
+Could be a passive or trait or something: after your run through your deck gain +1 mana (maybe some draw too) for the rest of the battle
+
+Larger forces can be seen from a greater distance than smaller ones.
+
+In the event of a combat that allow moving between tiles in it. Movement could drain your speed (such that you would not draw or something) (2 bars of speed excess speed becomes draws)
+
+Trait: sluggish/ slothish, start each combat with an exhaustion
+
+Cards could both be upgraded with knowledge (cost goes down as it is cast) and gold
+
+Bows could require arrows - or some amount of them (specialty arrows could also exist)
+
+Spending your mana on different types of cards could require different energy amount (physical < magic < exhaustion card)
+
+Want a class of cards that are a balance of greed (when should I play when Should I hold) maybe cards with effects in hand
+
+Mulligans could be scalable (you can mulligan x cards or something like that) q
+
+
+Loyalty could be a factor that affects outposts and units. In units it can be in replacement of moral. And our outposts have high loyalty units there or amount of loyalty will dictate the amount of resources going to you.
+
+Bex can be a combo and spell dmg focused class
+
+Field of flames deals extra dmg to those in a forest and has a chance of destroying the Forrest
+
+Online mode could be a HS style duel where cards are gathered by learning spells out in the main game. This system could also allow for starting deck construction.
+
+Spells could be drawn at a rate based on intelligence and abilities (like attacks or rolls) drawn at a rate based on speed. (Making these separate ish decks).
+
+Rally cry (general) - 2 mana: generate 1 neutral mana and remove an exhaust from a deck. Upgrade version also draws a card.
+
+Schools can also earn money by teaching people who aren’t your units.
+
+Casting a spell. Decreases: upgrade cost, learning that spells costs, and spell school costs.
+
+Resources can be shared between things that are one tile away with minimal “labor cost” (production rate could be higher if someone doesn’t have to go father resources). Otherwise someone needs to be walking resources back and forth.
+
+Roanoke colony random disappearance can be part of it.
+
+5% bonus to all yields of buildings designed by Archie. (Candices could cost 5% less to build) (Candice also could assist in the construction of buildings for others. Buildings assisted cost %5 less and Candice gains %5 of the materials)
+
+Consider multiple selectable ways to have someone work for you or work on your land (example allow stewardry which means you get the resources but you must pay them money) or (you get money - rent - and they get all resources) or (freely exchange amongst themselves and take a portion - essentially sales tax)
+
+If a seasons system is added could restrict so certain crops can grow in a season.
+
+The funder of the expedition may also have demands or want payment that can be set to either accelerate the game or slow it. The amount of funding can change the rate of these demands, and Bobby can partly fund himself so more initial with less demands (easier for long term).
+
+Certain characters can lean towards faster (frank the founder) or slower (Archie) play styles. With variations that can be leaned in in both directions.
+
+Can use resources to teleport other resources to you (so you can set up and leave behind to still explore - encourage exploring)
+
+The kings ship takes a 5 day journey but doesn’t have teleport negativities. So if you pay kings ransom 5 days in advance it is cheaper.
+
+The kings ship can also bring additional settlers (wizard groups) that could be your friends or your enemy
+
+Cities can upgrade themselves by producing things of use ( spend wood increase storage sort of stuff with direct recipes)
+
+The kings demands could also be phrased as enjoyment (happier provides less demands monetarily) (and each king could have different things such as one likes lots of settlements, one likes jewels) (do well enough he may even fund you more)
+
+Might be too much micromanage but could have you decide what card a played will draw next (combat, or regular) then each round a player is always drawing some amount of cards
+
+Not sleeping adds a fatigue to your deck
+
+Faith is done at the individual level. Pressure is on people not cities but cities can affect people. To become a religion leader a person must can some amount of faith for that religion.
+
+Gates of hell could take you tell hell for a potential alternate ending (that isn’t necessarily a violent ending)
+
+Wyla could have a unique mechanic where she can spend faith in combat. And could have unique ways of generating faith based on her type of witchcraft.
+
+To show an industrialized journey of greed wonders can have versions of themselves that are less ideal. Example fountain of youth one a nice pool and now is instead blocked off and bottled and sold for a high price. The bottle would boost moral or could be added to potions to make them stronger. These can become industrialized once you have discovered them and do so faster if you began building something around it or how much you used it.
+
+Teleportation can require ME on the receiver side and a smaller proportion of it gets traversed as ME on the sending side.
+
+Edge of the world location of legend - can make finding the edge of the map a bit of a benefit (instead of just a con as in most games)
+
+Could have a quest system that helps you to boost relations with certain groups.
+
+Could have enemies of legend as well that are essentially mini boss fights (e.g. Minotaur, kraken) and they function like elite fights in slay the spire.
+
+Slaying them could affect relations with near by settlements as well (positive - kraken was terrorizing; negative - was worshiped or something)
+
+The final boss battles could be with legendary guardians. Like Cerberus or Shazam fear dragon etc.
+
+whenever you fortify and aren’t attacked then you draw an additional attack card.
+
+Could choose different kings that you are sailing from (different demands, different bonuses, different desires (gold, knowledge, etc.).
+
+Example could be a Viking centric one. That provides sailing bonuses.
+
+Fate and faith will be closely tied together. And religions can have affiliations with different spell schools.
+
+Could make shops or spell learning upgradable - like bobs tavern. The cost to upgrade it could go down by your research level and then it could provide you with more option or card as well as affect the odds of finding rarer card.
+
+Cards that are normally upgraded within combat (decreased cost, dmg, etc.). Are in effect until that player rests.
+
+Tom riddles diary could be a pick up like all the other journals that spawns a basilisk.
+
+Could create a chat based AI to help facilitate reminders and other assistant tools.
+
+To give people more individuality could give them desires that boost moral if they get them - or lower otherwise.
+
+Card (Bobby): investment banking 2 mana - gain 1 mana for the next 3 turns. (Upgrades makes it 4 turns). (Flip side - 0 mana spend 50 silver gain 25 silver for the next three turns.
+
+Prepared (passive) - once per day you may transform a flip card w/o spending mana.
+
+Wizards can generate influence. This influence is what allows you to promote effects on players (convince to do something). Players with good relationships cost less influence to make do that task, having more influence could make it cost less money.
+
+For religions there can be multiple types, poly, mono. Poly provide lots of small little bonus relating to each god they can have and the popularity of different gods provide different bonuses. Mono is more like civ 6 style. Both could generate special characters (Proffitt or demigod)
+
+
+As John company 2e takes you through a point of colonialism (it gets you politically speaking). I want everything about wealthless wizards to do the same - the core of this game is human greed, and even a world of endless fortune couldn’t change that. I want this game to end in a ball of flames. Wars between countries, none left surviving, wasteland spawning, where a game that looks as if it is a rouge like is actually a rouge lite the marches the world to where we will be in the future (no matter if magic even existed). A rouge like that is actually a story. Once you get to the game it gives you stats (how many people, animals, you killed. How much became ruin) (much to be considered related to the realm of is another game about colonialism)
+
+The appeal of a tile you are standing on affect how much your moral chances turn by turn (pretty makes it decrease by less, ugly makes it decrease by more)
+
+Everyone has a interest vector that is originally hidden to you. You learn more information as they are more friendly to you (most, list, how much etc.). Dramatic effects can change a persons interest and the interest is a measurement of how quickly someone will learn a task and how much joy (moral) they will get out of it.
+
+Could earn the title of the captain for climbing El Capitan for the first time.
+
+Religions could be spawned over time by certain events and could change over time as well. In polytheistic religions new gods and Demi gods could be added that are wizards or characters met.
+
+Would be cool if like the final ascension level somehow locked in everything that had happened before, the map, the wizards, the religions, etc.
+
+would be cool if the map was essentially 1 super map (maybe unknown to the user), where the type of location (islands, continent, etc.) changes where you might spawn within that super map.
+
+A unit could be promoted to a leader or general (this promotion would make it easier to send commands to the group they are in)
+
+Fore thought - give a slight bonus to learning e.g. 5% but now like 25% of your total knowledge generated goes towards discounting not the next but the one after. Could also provide a boost to research level.
+
+Instead of 2 equally powerful wizards could have a wizard and an apprentice.
+
+Could instead of each turn being a fraction of a day they could be a full day. Also adding in moon cycles as part of the mechanics could be interesting since a lot of witchcraft and the occult deals with moon cycles.
+
+Could have dmg also be on a roll system. Fate should certainly be a system and it’s a combination of who you are traveling with.
+
+Spells could be situational as well, e.g. forceful wind could be cast on a ship to have it move faster. Slow an enemy ship/ or army down (maybe help tire them out).
+
+If turns end up being longer as a portion of time then battles could be in quicker rounds (like battles in pathfinder or humankind).
+
+Could bring about sustainable practices (going in a cutting down trees removes them, farming constantly reduces field fertility)
+
+The nomads harvest ability could be boosted to either yield more on harvest or not completely remove the resource. (Possibility, get half as much but have a 2/3 chance of not removing the resources)
+
+The Lorax or similar could attack you only if you start to harvest a forest, etc.
+
+What if the game generates one very large map consisting of both “old world” and “new world” and prioritizing loading and updates in locations that you are at. This results in your ability to explore the new world, ocean or even the old world. However in this scenario it takes you a while to research cartography which maybe is when the world actually begins to take fixed shape. (Cartography could also be gotten at the time you complete the game element introduction levels - X happens and you may begin your hunt for the city of gold)
+
+The ordering could be.
+
+1. Unlocked at beginning. Merlin and Knick (the knight)
+
+2. Building materials (introduces Candice)
+
+3. Food rotting and different food types including water (introduces frank the founder)
+
+4. temperature/weather (introduce pylion)
+
+5. Passage of time/moon cycles/ season change (introduces witch? Introduces Thomas?)
+
+6. Memory (recognize you, hostility increase, character fame; introduce character around fame)
+
+7. cartography (the map locks in. You unlock all character? And/or custom character?)
+
+Some wizards can be found along the way. Examples: The general can be gotten after recruiting some number of units from the armory. The founder can be found somewhere on the map after finding cartography and once befriended joins. A king could want to join after so much has been accomplished. Or maybe a unit gets promoted to king when you find the legend of the 4 Irish islands or something like that.
+
+
+Faith I think should be like civ where it can be used for tasks (e.g. spend it for divine healing, witnesses to acts of faith spread believers, believers generate faith).
+
+You could pick both properties of your deity (destructive maybe fireballs) and your beliefs (tithing etc.).
+
+People could embrace or be wary of your religion - those that are more evil focused may be wary and hunts could happen.
+
+Having diversity of food could be a bonus. If eating all 4 types (fruit, vegetable, protein, and carb) then it counts as if you ate more and maybe gives a X percent boost to each of the individual effects of these foods. 3/4 maybe gives a fraction of these bonuses. Also have to decide if when you gather food if it will be broken down into these components or if each food has some amount of these components and a water amount (e.g. cucumber is watery, meat takes water to digest).
+
+Could have a cantrip style slot where there are some spells you can cast without having to draw the card, could also do this for weapons. 1 cantrip slot could be unique to the character - like hearthstone hero power.
+
+Shurikan - thrown (out of deck till picked up), -1 mana to play if no other weapon equipped. Or First 1 cost 1 more, rest cost 1 less til you attack again, draws another shurikan. Or Throwing 2+ in a turn is cheaper.
+
+There could be a spell to retrieve all items around you (including thrown weapons).
+
+Have a pirate subquest. Involving cursed treasure?, the kraken?, ends up with the tag the pirate. That makes you a better sailor and allows stealing from kings trade (but receive no trade). +2 happiness to you and +1 to crew while sailing. Happy from drinking
+
+Speed is what is used to draw military cards. Out of combat cards are drawn with something else.
+
+Fortifying in addition to providing a defensive bonus also preps for combat. Gaining additional mana/actions in combat as well as drawing additional cards at the start (0.5 cards per turn of fortification, an additional mana per turn of fortification (both capped at 4 turns)).
+
+Can form corps (where a group of units all move together in any shape). Some effects only trigger if in the corps provide defect to speed but bonus to stamina. The knight could provide a defensive bonus to anyone in the corps. If we have a fixed number of commands commanding a corps could also be easier. Defending within a corps could work by you can move up to 1 square to defend a now adjacent attack (I.e an attack from the complete opposite side of someone is undefendable, if you can’t move into the square you can’t defend - could maybe allow for a swap), say you need to movement to make the block happen. Also if orders become a thing then orders could be saved by only having order unit in the corps to move the whole thing. Orders could be more expensive as the distance between the units is greater and the unit likes you less. -> orders and gold become the things that limit your for having a massive army.
+
+The items that aid in communication could increase visibility to far away units and decrease the number of orders required.
+
+Some units could receive promotions to be commanders, these character would then be able to send out a small number of orders within just their corps.
+
+Consider adding in the legend of bordur from Iceland. Iceland has many cool legends on how different land masses formed as well as mystical creatures.
+
+Could also have a corp movement mode that is like following the leader. Where they form a semi line. The leader could have the trail blazer promotion to make it so the rest travel faster and if the leader is commander trained then could maybe save on orders.
+
+The golden circle is another possible location of legend (or at least may have more surrounding it) (also check photos for an image of mythical creatures of Iceland) (also check photos about the hanging of sorceroes).
+
+Rainbows and pots of gold
+
+Thorrabjor (Icelandic winter god, they only have winter a spring)
+
+Bobby business instead of generating interest produces a counterfeit currency. The amount is a percentage of the current amount of real currency (so non compounding). Paying with the fake currency is always possible but the more you use the more likely the person is to dislike you later.
+
+His unique building could then be a trading hub. when they sell product it is then able to launder some of the money (turn fake into real) something to consider is if fake money should disappear after a while or disappear after traded.
+
+Shields are an object that can be held, when fortifying can choose a direction to fortify against - each shield then has a unique pattern where it will provide some bonus.
+
+
+In combat (the divide by 10 value)
+
+◦ Speed - how often you attack (how many actions you have)
+
+◦ Strength - how hard you hit (additive bonus to attacks)
+
+◦ Intelligence - how well you cast spells (additive chance bonus)
+
+◦ swagger- how damaging you spells are (additive dmg bonus)
+
+◦ Fortitude - your defensive ability (how much less damage you take from physical sources? All?)
+
+◦ Endurance - (how much draw counter decreases per turn both in and out of combat)
+
+◦ Magic ability - (percent multiplier on generation of mana)
+
+Out of combat (the full value)
+
+◦ Speed - how quickly you move (literal speed)
+
+◦ Strength - how much you can carry (max carry weight)
+
+◦ Intelligence - how quickly you learn intelligence spells, learns other skills. (percentage multiplier to point generation e.g. 80 -> 80% * points)
+
+◦ Swagger - how quickly you learn swagger spells. Bonus to relationships and trading, learns acrobatic skills (percentage multiplier to point generation e.g. 80 -> 80% * points)
+
+◦ Fortitude - your ability to withstand effects to moral (maximum moral value)
+
+◦ Endurance - how long your energy bar lasts (size of your energy bar)
+
+◦ Magic ability - (percent multiplier on generation of mana)
+
+Characters stats
+
+◦ Knick - fortitude, strength, endurance (low speed)
+
+◦ Merlin - magic ability, swagger, intelligence (low fortitude)
+
+◦ Bobby - swagger, strength, fortitude (low magic ability)
+
+◦ Bex - intelligence, magic ability, (low strength)
+
+◦ Founder - endurance, speed, swagger (nothing low, already slightly known)
+
+The first fatigue card costs 0 and each additional 1 costs 1 more (max at 10)
+
+Each card could list 3 values (cost to cast - actions or mana; dmg bonus - usually strength; chance bonus - usually intelligence).
+
+All fatigue could be cleared, fatigue counter reset, new hand drawn, whenever the energy bar is refilled.
+
+The energy bar could be expended to draw cards (maybe the amount of energy required to draw a card decreases by the speed each turn from 10 to 0).
+
+Amount of mana generated is equal to the average of all stats divided by 10? Maybe 1 last stat?
+
+Both mana and actions roll over between turns. There is designed to be no maximum to cost but in combat items are designed to be lower cost and actions are intended to be lower cost. (What prevents a player from being able to over prepare?)
+
+A character looses 10*percent of the energy they spent in a turn. Meaning a low level character working full speed will tire out in 2-3 days. Could also have subtractive factor. 10(x-10)
+
+Weapon ish: cupids arrow, is able to be shot in combat and is exhausted when done so - reappears after recall effects. Can also be used out of combat to boost the relationship of two people.
+
+In addition to armor and shielding there is also flanking bonuses that cause attacks to do more damage - partly overcoming armor.
+
+Some things (magical items) like Thomas ability to move time (via the stone) could cost mana to activate and could channel some magic themselves each turn (decreasing the mana cost of next play) this item could add the fast forward and rewind cards to his deck and the ability.
+
+Some magic items mana cost could increase each turn they are not played (interesting dynamic of do I use it each turn?)
+
+Mana could be transferable to actions (neutral mana -> mana -> neutral action -> action)
+
+Knight chivalry never dies - whenever you block dmg for someone else increase the relationship of the two units.
+
+Mana could also be used within cities ( e.g. magically enhanced farming) and leaving gold in a city will provide mana to the city. Also some wonders could provide mana as well like the fountain of youth.
+
+Hogwarts, aids in learning, choose a house that provides a bonus, and a tree that helps protect it.
+
+The aerie (could act as a tribute that spawns on the top of a pleatue, cool if you can figure out how to get to it).
+
+Spell idea refresh: reshuffle your deck without adding an exhaust or draining energy.
+
+Maybe make the amount of energy you lose when reshuffling proportional to the amount of cards.
+
+Peppers could also be used to discount the cost of casting fire spell (in addition to food) or/and make you feel 1 temperature stage warmer.
+
+Food could be eatten by slotting it to each type (vegetable, fruit, etc.) and a misc category when in the misc it triggers its bonus effects like peppers and discounts the total food cost when all are filled. Otherwise it triggers the vegetable bonus. A food could be consumed as multiple types of food (e.g. milk as protein or fat) with different conversion ratios.
+
+The cornucopia item from early could be slotted in one of these locations and apply for free. In the misc maybe gives you a choice of options or just scaled up all the other options further. Could have the UI option to just pick your best ratio for each category or eat whatever you have the most of.
+
+Salt would be a misc that causes the others to not decay.
+
+Coconut can be all types of food and also provide water.
+
+Natural wonders passive abilities could fade overtime as their active ability is abused (e.g. bottling fountain of youth water too much results in less passive effects to surrounding tiles) (idea no water to bathe in)
+
+Candice the contractor. If blueprints are a card that is placed in the deck and drawn (some maybe just played once’s others played multiple times) then she could have an ability to”draw plans” that draws her a blueprint.
+
+Worth pointing out that an actual globe could be made like a soccer ball.
+
+Research level upgrades the actual character. So in addition to higher level spells. It can also upgrade their starting artifacts.
+
+Unit spawning could be really interesting because of flanking and support bonuses.
+
+When a character dies they permanently lose 1 fate. If they reach a certain lvl they permanently gain 1 fate (2 if they are behind).
+
+Bex chaos - could have an adaptive random spell each turn (like random spell in your shop). This could help you learn new spells faster.
+
+Sustain/endurance/whatever determines how quickly you recover from ailments. Like poison ticks down by X more per turn.
+
+The discount for casting of a spell apply just to the next purchase. Casting the exact spell is a % discount (larger that way)
