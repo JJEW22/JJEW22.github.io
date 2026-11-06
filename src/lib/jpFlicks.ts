@@ -233,14 +233,18 @@ export function checkResult(input: {
 
 // --- round scoring (season 3 on) ---
 //
-// Every game plays all 4 rounds. A round win is 1 point, winning the game (the
-// higher total over the 4 rounds) is 2 more, and winning the series (both games
+// Every game plays all 4 rounds. Playing a game is 1 point, a round win is 1
+// point, winning the game (the higher total over the 4 rounds) is 2 more, and
+// winning the series (both games
 // against a team, totals combined) is 2. Rounds and series can be drawn, at half
 // a win to each side. A game cannot: level on points, it goes to a 20s shootout
 // and the shootout's winner wins the game. The rules copy on the page states
 // these numbers.
 
 export const ROUNDS_PER_GAME = 4;
+// For turning up: both teams in a played game, only the side that turned up in
+// a forfeit.
+export const GAME_PLAYED_POINTS = 1;
 export const ROUND_WIN_POINTS = 1;
 export const GAME_WIN_POINTS = 2;
 export const SERIES_WIN_POINTS = 2;
@@ -350,6 +354,7 @@ export interface Record3 {
 }
 
 export interface RoundStanding {
+	played: number;
 	rounds: Record3;
 	games: Record3;
 	series: Record3;
@@ -376,7 +381,7 @@ export function roundStandings(
 	const out = new Map<number, RoundStanding>();
 	const blank = () => ({ w: 0, d: 0, l: 0 });
 	for (const id of teamIds) {
-		out.set(id, { rounds: blank(), games: blank(), series: blank(), points: 0 });
+		out.set(id, { played: 0, rounds: blank(), games: blank(), series: blank(), points: 0 });
 	}
 
 	// Combined margin per pairing, in team_a's view, once both games are in.
@@ -391,10 +396,13 @@ export function roundStandings(
 		let margin: number;
 		if (m.forfeitBy !== null) {
 			margin = m.forfeitBy === m.teamB ? forfeitMargin : -forfeitMargin;
+			(m.forfeitBy === m.teamB ? a : b).played += 1;
 			tally(a.rounds, margin, ROUNDS_PER_GAME);
 			tally(b.rounds, -margin, ROUNDS_PER_GAME);
 		} else {
 			margin = m.margin ?? 0;
+			a.played += 1;
+			b.played += 1;
 			for (const [ra, rb] of (m.rounds ?? []) as Round[]) {
 				tally(a.rounds, ra - rb);
 				tally(b.rounds, rb - ra);
@@ -428,6 +436,7 @@ export function roundStandings(
 	const worth = (r: Record3, win: number) => win * r.w + (win / 2) * r.d;
 	for (const s of out.values()) {
 		s.points =
+			GAME_PLAYED_POINTS * s.played +
 			worth(s.rounds, ROUND_WIN_POINTS) +
 			worth(s.games, GAME_WIN_POINTS) +
 			worth(s.series, SERIES_WIN_POINTS);

@@ -2568,6 +2568,7 @@
 				<h2 id="tldr-title">TL;DR</h2>
 				<ul>
 					<li>Every game plays <b>all 4 rounds</b>, every time.</li>
+					<li>Every game you play scores <b>1 point</b>, win or lose.</li>
 					<li>
 						Winning a round scores <b>1 point</b>. A drawn round is allowed: <b>½ point</b> to each team.
 					</li>
@@ -2650,6 +2651,10 @@
 					<h3 id="point-per-game">Points for games</h3>
 					<ul>
 						<li>Every game is 4 rounds, and all 4 are always played</li>
+						<li>
+							Playing a game awards 1 point, win or lose (a forfeit only gives it to the team that
+							showed up)
+						</li>
 						<li>Winning a round awards 1 point</li>
 						<li>A drawn round awards 0.5 points to each team</li>
 						<li>Winning the game (the most points over the 4 rounds) awards 2 more points</li>
@@ -3685,8 +3690,9 @@
 								{GAME_DIFF_CAP} per game
 							</p>
 							<p>
-								<strong>Score:</strong> 1 per round won (½ drawn), 2 per game won, 2 per series won (1
-								drawn), plus tournament points. A game level on points goes to whoever won the 20s shootout.
+								<strong>Score:</strong> 1 per game played, 1 per round won (½ drawn), 2 per game won,
+								2 per series won (1 drawn), plus tournament points. A game level on points goes to whoever
+								won the 20s shootout.
 							</p>
 						{:else}
 							<p>
