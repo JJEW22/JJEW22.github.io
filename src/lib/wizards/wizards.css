@@ -1,0 +1,438 @@
+/* src/lib/wizards/wizards.css */
+/*
+	Shared look for /WealthyWizards and /WealthlessWizards. Everything is nested
+	under .wizards so it can't leak into other pages once it has loaded.
+*/
+
+body:has(.wizards) {
+	background: #f4efe4;
+}
+
+.wizards {
+	.container {
+		max-width: 920px;
+		margin: 0 auto;
+		padding: 2rem;
+	}
+
+	main {
+		background: #fffdf8;
+		border: 1px solid #e8dcc3;
+		border-radius: 12px;
+		padding: 2.5rem;
+		box-shadow: 0 4px 6px -1px rgba(60, 40, 0, 0.08);
+		color: #2b2418;
+		line-height: 1.6;
+	}
+
+	.hero {
+		margin-bottom: 1.5rem;
+		padding-bottom: 1.25rem;
+		border-bottom: 2px solid #e8c766;
+	}
+
+	.eyebrow {
+		margin: 0;
+		font-size: 0.8rem;
+		font-weight: 600;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: #9a7414;
+	}
+
+	h1 {
+		margin: 0.15rem 0 0.35rem;
+		font-family: Georgia, 'Times New Roman', serif;
+		font-size: 2.4rem;
+		color: #3b2a07;
+	}
+
+	.tagline {
+		margin: 0;
+		color: #6b5a3a;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+		font-family: Georgia, 'Times New Roman', serif;
+		font-size: 1.5rem;
+		color: #3b2a07;
+	}
+
+	h3 {
+		margin: 1.5rem 0 0.5rem;
+		font-size: 1.05rem;
+		color: #4a3810;
+	}
+
+	h4 {
+		margin: 0 0 0.3rem;
+		font-size: 1rem;
+		color: #4a3810;
+	}
+
+	p {
+		margin: 0 0 0.75rem;
+	}
+
+	ul,
+	ol {
+		margin: 0 0 0.75rem;
+		padding-left: 1.3rem;
+	}
+
+	li {
+		margin-bottom: 0.3rem;
+	}
+
+	.tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin-bottom: 1.75rem;
+	}
+
+	.tab {
+		padding: 0.4rem 1rem;
+		background: #fff;
+		border: 1px solid #e0d2b4;
+		border-radius: 20px;
+		font: inherit;
+		font-size: 0.92rem;
+		color: #5c4a26;
+		cursor: pointer;
+	}
+
+	.tab:hover {
+		border-color: #b8901f;
+		color: #8a6510;
+	}
+
+	.tab.active {
+		background: #b8901f;
+		border-color: #b8901f;
+		color: #fff;
+	}
+
+	section {
+		margin-bottom: 2.25rem;
+		scroll-margin-top: 1rem;
+	}
+
+	.toc {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.5rem;
+		margin-bottom: 2rem;
+		padding: 0.85rem 1rem;
+		background: #faf4e6;
+		border-radius: 10px;
+	}
+
+	.toc a {
+		font-size: 0.88rem;
+		color: #8a6510;
+		text-decoration: none;
+	}
+
+	.toc a:not(:last-child)::after {
+		content: '·';
+		margin-left: 0.5rem;
+		color: #c9b58a;
+	}
+
+	.toc a:hover {
+		text-decoration: underline;
+	}
+
+	.lore {
+		font-family: Georgia, 'Times New Roman', serif;
+		font-style: italic;
+		color: #4a3d25;
+	}
+
+	.cards-2 {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 0.85rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.card {
+		padding: 1rem 1.1rem;
+		background: #fff;
+		border: 1px solid #ece2cc;
+		border-radius: 10px;
+	}
+
+	.card h3 {
+		margin-top: 0;
+	}
+
+	.card p:last-child,
+	.card ul:last-child {
+		margin-bottom: 0;
+	}
+
+	.card.gold {
+		border-top: 4px solid #d4a72c;
+	}
+
+	.card.silver {
+		border-top: 4px solid #a9b1b8;
+	}
+
+	.small {
+		font-size: 0.88rem;
+		color: #6b5a3a;
+	}
+
+	.aside {
+		font-size: 0.9rem;
+		color: #6b5a3a;
+	}
+
+	.muted {
+		color: #8a7b5c;
+	}
+
+	.open {
+		display: inline-block;
+		padding: 0 0.45rem;
+		background: #fdecc8;
+		border: 1px solid #ecc76b;
+		border-radius: 4px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		font-style: normal;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: #7a5500;
+		vertical-align: 0.1em;
+	}
+
+	.table-wrap {
+		overflow-x: auto;
+		margin-bottom: 0.75rem;
+	}
+
+	table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.92rem;
+	}
+
+	th,
+	td {
+		padding: 0.55rem 0.7rem;
+		border-bottom: 1px solid #ece2cc;
+		text-align: left;
+		vertical-align: top;
+	}
+
+	th {
+		background: #faf4e6;
+		font-weight: 600;
+		color: #4a3810;
+	}
+
+	tr.total td {
+		border-top: 2px solid #e0d2b4;
+	}
+
+	table.land td:first-child {
+		white-space: nowrap;
+	}
+
+	.checklist {
+		columns: 2;
+		list-style: none;
+		padding-left: 0;
+	}
+
+	dl {
+		margin: 0;
+	}
+
+	dt {
+		margin-top: 0.85rem;
+		font-weight: 700;
+		color: #4a3810;
+	}
+
+	dd {
+		margin: 0.15rem 0 0;
+	}
+
+	.action {
+		margin-bottom: 0.65rem;
+		padding: 0.8rem 1rem;
+		background: #fff;
+		border-left: 3px solid #d4a72c;
+		border-radius: 0 8px 8px 0;
+	}
+
+	.action p:last-child,
+	.action ol:last-child {
+		margin-bottom: 0;
+	}
+
+	a {
+		color: #8a6510;
+	}
+
+	.options {
+		margin: 0.5rem 0 0.75rem;
+		padding: 0.85rem 1rem 0.25rem;
+		background: #faf4e6;
+		border: 1px dashed #d9c48f;
+		border-radius: 10px;
+	}
+
+	.current-card {
+		background: #fdf6e3;
+		border-color: #e8c766;
+	}
+
+	.intro {
+		font-size: 1.05rem;
+		color: #4a3d25;
+	}
+
+	.chapter {
+		padding: 1.5rem 1.5rem 0.75rem;
+		background: #fff;
+		border: 1px solid #ece2cc;
+		border-radius: 12px;
+	}
+
+	.chapter.current {
+		background: #fdf6e3;
+		border-color: #e8c766;
+	}
+
+	.chapter-num {
+		margin: 0;
+		font-size: 0.78rem;
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: #9a7414;
+	}
+
+	.chapter h2 {
+		margin-bottom: 0.2rem;
+	}
+
+	.chapter-sub {
+		font-family: Georgia, 'Times New Roman', serif;
+		font-style: italic;
+		color: #6b5a3a;
+	}
+
+	.unlocks li::marker {
+		font-weight: 700;
+		color: #9a7414;
+	}
+
+	button.link {
+		padding: 0;
+		background: none;
+		border: none;
+		font: inherit;
+		color: #8a6510;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.search {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.search input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.55rem 0.8rem;
+		border: 1px solid #e0d2b4;
+		border-radius: 8px;
+		font: inherit;
+		background: #fff;
+	}
+
+	.count {
+		font-size: 0.88rem;
+		color: #6b5a3a;
+		white-space: nowrap;
+	}
+
+	.notes h3 {
+		margin-top: 1.75rem;
+		padding-bottom: 0.25rem;
+		border-bottom: 1px solid #ece2cc;
+	}
+
+	.notes p {
+		font-size: 0.95rem;
+	}
+
+	.idea-list {
+		list-style: none;
+		padding-left: 0;
+		font-size: 0.95rem;
+	}
+
+	.idea-list li {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.mark {
+		flex: none;
+		width: 1rem;
+		color: #b3a17a;
+	}
+
+	.idea-list li.done .mark,
+	.done-key {
+		color: #3d7a2e;
+		font-weight: 700;
+	}
+
+	.todo-key {
+		color: #b3a17a;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+
+	@media (max-width: 768px) {
+		main {
+			padding: 1.25rem 1rem 1.5rem;
+		}
+
+		h1 {
+			font-size: 2rem;
+		}
+
+		.chapter {
+			padding: 1.1rem 1rem 0.5rem;
+		}
+
+		.checklist {
+			columns: 1;
+		}
+
+		table.land td:first-child {
+			white-space: normal;
+		}
+	}
+}
