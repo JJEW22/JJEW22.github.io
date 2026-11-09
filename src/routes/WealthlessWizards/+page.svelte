@@ -153,7 +153,7 @@
 							</li>
 							<li>
 								<b>Reward, don't restrict.</b> Reward the behavior you want, like taking risks and exploring,
-								with legendary rewards and titles, rather than blocking what you don't.
+								with legendary rewards and epithets, rather than blocking what you don't.
 							</li>
 							<li>
 								<b>Easy to start, hard to master.</b> Fun at a new player's level, with a ridiculous
@@ -203,6 +203,7 @@
 						<a href="#wl-faith">Faith & fate</a>
 						<a href="#wl-fame">Fame & morality</a>
 						<a href="#wl-progress">Progression</a>
+						<a href="#wl-epithets">Epithets</a>
 					</nav>
 
 					<section id="wl-run">
@@ -850,21 +851,148 @@
 							ascension level could lock in everything that came before: the map, the wizards, the
 							religions.
 						</p>
-						<h3>Titles</h3>
-						<ul>
-							<li><b>The Remembered:</b> win with one wizard dead. The other remembers them.</li>
-							<li><b>The Legend:</b> get a character to max notoriety.</li>
-							<li><b>The Myth:</b> create a myth.</li>
-							<li><b>The Alliterate:</b> find every alliteration.</li>
-							<li><b>The Captain:</b> climb El Capitan for the first time.</li>
-							<li><b>The Pirate:</b> finish the pirate quest.</li>
-							<li>Titles for the highest goodness and the worst badness.</li>
-						</ul>
 						<h3>Custom wizards</h3>
 						<p>
 							Get units (not just wizards) to the City of Gold to unlock custom wizards: set their
 							stats, and get a random mix of two other wizards' card sets and one of their traits.
 						</p>
+					</section>
+
+					<section id="wl-epithets">
+						<h2>Epithets</h2>
+						<p>
+							Epithets are achievements that fill in the blank in "Merlin the ___". Once one is
+							unlocked, any later character can take it, and each one has its own effect.
+						</p>
+						<h3>Character epithets</h3>
+						<p>
+							Every wizard has an epithet of their own, unlocked when that wizard survives all the
+							way to the City of Gold.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead>
+									<tr>
+										<th>Epithet</th>
+										<th>How to unlock</th>
+										<th>Effect</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr>
+										<td><b>the Knight</b></td>
+										<td>Get Knick to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Founder</b></td>
+										<td>Get Frank to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Contractor</b></td>
+										<td>Get Candice to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the General</b></td>
+										<td>Get the General to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Witch</b></td>
+										<td>Get Wyla to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Sly</b></td>
+										<td>Get Sid to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>Not named yet</b></td>
+										<td
+											>Merlin, Bobby, Bex, Archie, Pylion, Thomas, Maximus and Hera, the same way</td
+										>
+										<td><span class="open">Open</span></td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+						<h3>Achievement epithets</h3>
+						<p>Earned by doing something notable on a run.</p>
+						<div class="table-wrap">
+							<table>
+								<thead>
+									<tr>
+										<th>Epithet</th>
+										<th>How to unlock</th>
+										<th>Effect</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr>
+										<td><b>the Remembered</b></td>
+										<td>Win a run with one wizard dead. The other remembers them</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Legend</b></td>
+										<td>Get a character to max notoriety</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Myth</b></td>
+										<td>Create a myth</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Alliterate</b></td>
+										<td>Find every alliteration</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Captain</b></td>
+										<td>Climb El Capitan for the first time</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Pirate</b></td>
+										<td>Finish the pirate quest</td>
+										<td
+											>Sail better and raid the king's trade, but receive none. +2 happiness to you
+											and +1 to your crew while sailing</td
+										>
+									</tr>
+									<tr>
+										<td><b>the Ancient</b></td>
+										<td><span class="open">Open</span></td>
+										<td>Read and speak forgotten languages, which opens up old magic</td>
+									</tr>
+									<tr>
+										<td><b>the Nomad</b></td>
+										<td><span class="open">Open</span></td>
+										<td
+											>Harvest more, or harvest half as much with a 2 in 3 chance of not using up
+											the resource</td
+										>
+									</tr>
+									<tr>
+										<td><b>the Gambler</b></td>
+										<td><span class="open">Open</span></td>
+										<td
+											>A scroll of wonder card that casts a random spell, maybe costing more each
+											time it is drawn</td
+										>
+									</tr>
+									<tr>
+										<td><b>Not named yet</b></td>
+										<td>The highest goodness, and the worst badness</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
 					</section>
 				</article>
 			{:else if tab === 'wizards'}
@@ -970,9 +1098,6 @@
 								<li><b>Maximus:</b> has a mulligan.</li>
 								<li><b>Sid the Sly:</b> ignores the first fatigue card when his deck cycles.</li>
 								<li><b>Hera:</b> marrying gives a permanent bonus, once, until divorce.</li>
-								<li><b>The Ancient:</b> reads forgotten languages, so has old magic.</li>
-								<li><b>The Nomad:</b> harvests more, or without using up the resource.</li>
-								<li><b>The Gambler:</b> a scroll of wonder that casts a random spell.</li>
 								<li><b>A king</b> who joins once you've done enough.</li>
 							</ul>
 						</div>
@@ -1112,7 +1237,7 @@
 							</li>
 							<li><b>A love letter</b> that improves morale.</li>
 							<li>
-								<b>The pirate quest:</b> cursed treasure, maybe the Kraken, and the Pirate title. Pirates
+								<b>The pirate quest:</b> cursed treasure, maybe the Kraken, and the Pirate epithet. Pirates
 								sail better and can raid the king's trade, at the cost of receiving none.
 							</li>
 							<li>
