@@ -462,7 +462,7 @@
 						<div class="action">
 							<h4>Move</h4>
 							<p>
-								Move your wizard to a neighbouring tile for 1 move. Moving into another player's
+								Move your wizard to a neighboring tile for 1 move. Moving into another player's
 								castle costs 2.
 							</p>
 						</div>

@@ -152,7 +152,7 @@
 								or too late, to save them.
 							</li>
 							<li>
-								<b>Reward, don't restrict.</b> Reward the behaviour you want, like taking risks and exploring,
+								<b>Reward, don't restrict.</b> Reward the behavior you want, like taking risks and exploring,
 								with legendary rewards and titles, rather than blocking what you don't.
 							</li>
 							<li>
@@ -256,7 +256,7 @@
 							The goal is always to find the City of Gold, guarded by a legendary boss. A scoring
 							system decides whether an expedition counts as a <b>success</b> even if you don't get there.
 							A success works like beating Slay the Spire's first act: you get bonuses, plus progress
-							towards levelling and notoriety.
+							towards leveling and notoriety.
 						</p>
 						<p class="aside">
 							There could also be a survival mode: instead of finding the city, settle as well as
@@ -278,7 +278,7 @@
 								a Civilopedia, but details only appear once you've discovered them.
 							</li>
 							<li>
-								<b>Rumours.</b> Locations appear in the fog as rumours, like in At the Gates. A rumoured
+								<b>Rumors.</b> Locations appear in the fog as rumors, like in At the Gates. A rumored
 								place may be there, nearby, or not exist at all.
 							</li>
 							<li>
@@ -392,13 +392,14 @@
 					<section id="wl-stats">
 						<h2>Stats</h2>
 						<p>
-							Every character has seven stats. In combat they count at a tenth of their value; out
-							of combat they count in full.
+							Every character has seven stats: four physical and three mental. In combat they count
+							at a tenth of their value; out of combat they count in full.
 						</p>
 						<div class="table-wrap">
 							<table>
 								<thead>
 									<tr>
+										<th>Type</th>
 										<th>Stat</th>
 										<th>In combat (÷10)</th>
 										<th>Out of combat</th>
@@ -406,6 +407,7 @@
 								</thead>
 								<tbody>
 									<tr>
+										<td rowspan="4"><b>Physical</b></td>
 										<td><b>Speed</b></td>
 										<td>How many actions you get. Draws your attack cards</td>
 										<td>How fast you move (50 → 5.0 per unit of time)</td>
@@ -416,6 +418,17 @@
 										<td>How much you can carry</td>
 									</tr>
 									<tr>
+										<td><b>Fortitude</b></td>
+										<td>Damage you shrug off</td>
+										<td>Your maximum morale</td>
+									</tr>
+									<tr>
+										<td><b>Endurance</b></td>
+										<td>How fast your draw counter goes down</td>
+										<td>The size of your energy bar</td>
+									</tr>
+									<tr>
+										<td rowspan="3"><b>Mental</b></td>
 										<td><b>Intelligence</b></td>
 										<td>Added to your spells' chance. Draws your spell cards</td>
 										<td
@@ -429,16 +442,6 @@
 											How fast you learn swagger spells and acrobatics. Helps relationships and
 											trading
 										</td>
-									</tr>
-									<tr>
-										<td><b>Fortitude</b></td>
-										<td>Damage you shrug off</td>
-										<td>Your maximum morale</td>
-									</tr>
-									<tr>
-										<td><b>Endurance</b></td>
-										<td>How fast your draw counter goes down</td>
-										<td>The size of your energy bar</td>
 									</tr>
 									<tr>
 										<td><b>Magic ability</b></td>
@@ -478,9 +481,9 @@
 							</li>
 							<li>
 								There are two kinds of area attack: <b>lobbed</b> attacks (like a bow) ignore the
-								front line, and <b>barrelling</b> attacks hit it.
+								front line, and <b>barreling</b> attacks hit it.
 							</li>
-							<li>Flanking makes attacks hit harder, partly getting past armour.</li>
+							<li>Flanking makes attacks hit harder, partly getting past armor.</li>
 							<li>
 								You can move between hexes during a fight, which costs speed (and so draws). Summons
 								can come in from different directions. <span class="open">Open</span> How to handle enemies
@@ -498,9 +501,9 @@
 								intelligence, attacks at a rate based on speed.
 							</li>
 							<li>
-								Mana and actions both roll over between turns. Mana can turn into actions (neutral
-								mana → mana → neutral action → action). <span class="open">Open</span> What stops you
-								over-preparing?
+								Each character can carry unspent mana over to their next turn, up to a maximum: 1 by
+								default, and items can raise it. The cap is what stops you over-preparing. Mana can
+								turn into actions (neutral mana → mana → neutral action → action).
 							</li>
 							<li>
 								A <b>cantrip slot</b>: a few spells or weapon attacks you can use without drawing
@@ -513,7 +516,7 @@
 							</li>
 							<li>In-combat upgrades (lower cost, more damage) last until that character rests.</li>
 						</ul>
-						<h3>Weapons and armour</h3>
+						<h3>Weapons and armor</h3>
 						<ul>
 							<li>
 								A weapon changes one kind of spell or keyword: extra damage, a mana discount, a
@@ -544,7 +547,7 @@
 								card. It can be upgraded to a <b>spotlight</b>, which costs light each night but
 								sees further and makes attacks less likely.
 							</li>
-							<li><b>Fortifications:</b> every unit starts combat with 1 permanent armour.</li>
+							<li><b>Fortifications:</b> every unit starts combat with 1 permanent armor.</li>
 						</ul>
 					</section>
 
@@ -725,8 +728,8 @@
 							</li>
 							<li>
 								<b>Interests.</b> Everyone has a hidden interest vector. You learn more of it (their
-								favourite, their least favourite, how much) as they warm to you. It decides how fast
-								they learn a task and how much they enjoy it, and big events can change it.
+								favorite, their least favorite, how much) as they warm to you. It decides how fast they
+								learn a task and how much they enjoy it, and big events can change it.
 							</li>
 							<li>
 								<b>Desires</b> boost morale when met and lower it when they aren't.
@@ -779,7 +782,7 @@
 							</li>
 							<li>
 								<b>Fate</b> is closely tied to faith, and could be a roll that depends on who you're
-								travelling with. Damage could be rolled too.
+								traveling with. Damage could be rolled too.
 							</li>
 							<li>
 								When a character dies they lose 1 fate permanently. Reaching a certain level gains 1
@@ -810,7 +813,7 @@
 								to the city, and better prices.
 							</li>
 							<li>
-								<b>Obligations.</b> Trade favours: an immediate reward now, a challenge you must complete
+								<b>Obligations.</b> Trade favors: an immediate reward now, a challenge you must complete
 								later. Quests raise your standing with groups.
 							</li>
 							<li>
@@ -928,7 +931,7 @@
 									mana and remove a fatigue; upgraded, it also draws.
 								</li>
 								<li>"Each unit draws a card." Gives neutral mana to the party.</li>
-								<li>Joins after you recruit enough units from the armoury.</li>
+								<li>Joins after you recruit enough units from the armory.</li>
 							</ul>
 						</div>
 						<div class="card">
@@ -980,7 +983,7 @@
 					<section>
 						<h2>Locations of legend</h2>
 						<p>
-							Places from myth and history, hidden in the fog as rumours. Finding one makes its
+							Places from myth and history, hidden in the fog as rumors. Finding one makes its
 							stories grow, and it gets richer for later expeditions.
 						</p>
 						<div class="table-wrap">
@@ -1072,7 +1075,7 @@
 							</table>
 						</div>
 						<p class="aside">
-							Legendary artifacts whose location didn't spawn can still turn up with travelling
+							Legendary artifacts whose location didn't spawn can still turn up with traveling
 							salesmen.
 						</p>
 					</section>
