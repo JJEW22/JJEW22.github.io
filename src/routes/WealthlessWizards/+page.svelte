@@ -5,6 +5,10 @@
 	notes. Hidden: nothing links here except /WealthyWizards, and it asks not to
 	be indexed.
 
+	Some details come from the older (2021–22) prequel design docs. Where those
+	disagree with the notes, the notes win and the older version is shown as an
+	"Earlier draft" option.
+
 	Almost all of this is still ideas, not decisions. Where the notes give more
 	than one option they're listed side by side as "Options", and anything with
 	no answer yet is tagged "Open".
@@ -20,12 +24,13 @@
 	import NotesView from '$lib/wizards/NotesView.svelte';
 	import { wealthlessNotes } from '$lib/wizards/notes';
 
-	// overview | rules | wizards | world | notes. Kept in the URL hash so a reload
+	// overview | rules | wizards | items | world | notes. Kept in the URL hash so a reload
 	// stays on the same tab.
 	const TABS = [
 		{ id: 'overview', label: 'Overview' },
 		{ id: 'rules', label: 'Rules draft' },
 		{ id: 'wizards', label: 'Wizards' },
+		{ id: 'items', label: 'Items' },
 		{ id: 'world', label: 'World & legends' },
 		{ id: 'notes', label: 'Notes' }
 	];
@@ -185,7 +190,8 @@
 					<p class="intro">
 						A first draft, gathered from the notes. Most of this is ideas still being explored, not
 						decisions. Where the notes give more than one way to do something, the options are
-						listed side by side.
+						listed side by side. Some details come from the older prequel design docs; where those
+						disagree with the newer notes, the older version is marked "Earlier draft".
 					</p>
 
 					<nav class="toc" aria-label="Rules contents">
@@ -193,11 +199,15 @@
 						<a href="#wl-map">The map</a>
 						<a href="#wl-time">Time</a>
 						<a href="#wl-party">Your party</a>
+						<a href="#wl-units">Units</a>
 						<a href="#wl-stats">Stats</a>
 						<a href="#wl-combat">Combat</a>
 						<a href="#wl-energy">Energy & fatigue</a>
 						<a href="#wl-cards">Learning spells</a>
+						<a href="#wl-research">Knowledge & research</a>
+						<a href="#wl-shops">Shops & rewards</a>
 						<a href="#wl-resources">Resources</a>
+						<a href="#wl-buildings">Buildings</a>
 						<a href="#wl-food">Food & needs</a>
 						<a href="#wl-morale">Morale & traits</a>
 						<a href="#wl-faith">Faith & fate</a>
@@ -300,6 +310,57 @@
 								<b>Unidentified things.</b> Plants and stones you find can start unidentified.
 							</li>
 						</ul>
+						<h3>Biomes</h3>
+						<p>
+							Biomes spawn with some randomness and decide how many resources an area has. The harsh
+							ones sit closer to the City of Gold.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Biome</th><th>What it's like</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Plains</b></td><td
+											>Good for food and large game, and easy to move through</td
+										></tr
+									>
+									<tr
+										><td><b>Forest</b></td><td
+											>Good for production and smaller game, and harder to move through</td
+										></tr
+									>
+									<tr
+										><td><b>Rivers</b></td><td
+											>Can run through any biome, give bonuses, and are a cheap way to travel
+											downstream</td
+										></tr
+									>
+									<tr
+										><td><b>Enchanted forest</b></td><td
+											>Near the city. A better forest: gold turns up more, and its animals are
+											stronger</td
+										></tr
+									>
+									<tr
+										><td><b>Lava flow range</b></td><td
+											>Near the city. No food, heavy production, and bigger than most. Lava can't be
+											crossed, so you have to wind around it</td
+										></tr
+									>
+									<tr
+										><td><b>Ice arctic</b></td><td
+											>Near the city. No food, bigger than most, with blizzards and ice monsters
+											from Inuit legend, and yetis</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<p>
+							Tiles can also hold resources beyond their base yield: iron deposits (iron can stand
+							in for ME at a blacksmith, or become steel), wood from forests, cloth from cotton and
+							sheep, gold and gems in the mountains, oil in deserts and tundra, and salt and spice.
+						</p>
 						<div class="options">
 							<h4>Options: how big the world is</h4>
 							<ul>
@@ -331,7 +392,8 @@
 							</li>
 							<li>
 								<b>Seasons, years and moon cycles</b> could all exist. A lot of witchcraft and the occult
-								follows the moon. Some crops only grow in some seasons.
+								follows the moon. Some crops only grow in some seasons. A run could start in any season,
+								each with its own bonuses: in winter ice spells are stronger and food is scarce.
 							</li>
 						</ul>
 						<p class="aside">
@@ -387,6 +449,161 @@
 									main game.
 								</li>
 							</ul>
+						</div>
+					</section>
+
+					<section id="wl-units">
+						<h2>Units</h2>
+						<p>
+							Human units are lesser wizards. They work tiles, build and upgrade, carry weapons, and
+							have their own stats, movement and carrying capacity. Each costs food, and silver too
+							if they're hired or need supplying.
+						</p>
+						<ul>
+							<li>
+								<b>Getting units.</b> Buy them (once), hire them (ongoing pay), lure them (they move
+								to one of your outposts) or find them (some events give you one).
+							</li>
+							<li>
+								<b>Knowledge bias.</b> Every unit has a bias from 0 to 100 for each specialty, and learns
+								it at a bonus of (bias − 50). Some events nudge a bias, like finding a location of legend.
+							</li>
+							<li>
+								<b>Learning a specialty.</b> Units learn by doing the job without the specialty (farming
+								makes a farmer, a bow makes an archer). It's faster at a school, slower from sharing
+								a tile with someone who has it, or you can pay someone you meet to teach it. A unit gets
+								one specialty, maybe two, maybe more, and each grows along a tree.
+							</li>
+							<li>
+								<b>Civilian or military.</b> Civilian units never start a fight: they only defend when
+								they must, or join an attack someone else started. Military specialties let a unit start
+								combat and defend places.
+							</li>
+							<li>
+								<b>Inhuman units</b> like a dragon, a dog or a bird (which can fly out and scout) can't
+								specialize or learn, but start stronger or with unique abilities.
+							</li>
+						</ul>
+						<h3>Specialties</h3>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Specialty</th><th>Kind</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Farmer</b></td><td>Civilian</td><td>+1 food while working a farm</td
+										></tr
+									>
+									<tr
+										><td><b>Teacher</b></td><td>Civilian</td><td
+											>+1 knowledge to everyone studying at their school. Might be dropped so that
+											any unit can teach</td
+										></tr
+									>
+									<tr><td><b>Builder</b></td><td>Civilian</td><td>Construction goes faster</td></tr>
+									<tr><td><b>Miner</b></td><td>Civilian</td><td>+1 ME while working a mine</td></tr>
+									<tr
+										><td><b>Craftsman</b></td><td>Civilian</td><td
+											>Exchanges goods, like at a blacksmith. <span class="open">Open</span> Its exact
+											effect</td
+										></tr
+									>
+									<tr
+										><td><b>Explorer</b></td><td>Civilian</td><td
+											>+10 movement. Wanders the map and looks after itself, with some military uses</td
+										></tr
+									>
+									<tr
+										><td><b>Archer</b></td><td>Military</td><td
+											>+1 range and +10% chance on ranged attacks</td
+										></tr
+									>
+									<tr><td><b>Swordsman</b></td><td>Military</td><td>+1 melee damage</td></tr>
+									<tr
+										><td><b>Spellcaster</b></td><td>Military</td><td
+											>Units can't cast at all without it. Gets a bolt spell</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<h3>Specialty upgrades</h3>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Upgrade</th><th>From</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Horticulture</b></td><td>Farmer</td><td
+											>Spend farming knowledge to make a resource type give +1 silver, ME or food
+											everywhere</td
+										></tr
+									>
+									<tr
+										><td><b>Planter</b></td><td>Farmer</td><td
+											>A chance to collect seed from a farmed resource and plant it somewhere new</td
+										></tr
+									>
+									<tr
+										><td><b>Programmer</b></td><td>Farmer and craftsman</td><td
+											>Production carries on at night. Maybe counts as two workers</td
+										></tr
+									>
+									<tr
+										><td><b>Architect</b></td><td>Builder</td><td
+											>Can start constructions and discover blueprints</td
+										></tr
+									>
+									<tr
+										><td><b>Rapid fire</b></td><td>Archer</td><td
+											>Fires faster: +1 copy of their weapon and +1 draw</td
+										></tr
+									>
+									<tr
+										><td><b>Expanded learning</b></td><td>Teacher</td><td
+											>Their school reaches 1 more tile</td
+										></tr
+									>
+									<tr
+										><td><b>Classroom experience</b></td><td>Teacher</td><td
+											>Teaches 1 more student at a time</td
+										></tr
+									>
+									<tr
+										><td><b>Religious leader</b></td><td>Spellcaster</td><td
+											>Can build holy sites: better outposts that help morale and healing, maybe
+											with miracles</td
+										></tr
+									>
+									<tr
+										><td><b>Religious advancement</b></td><td>Religious leader</td><td
+											>Can set up beliefs</td
+										></tr
+									>
+									<tr
+										><td><b>Elementalist</b></td><td>Spellcaster</td><td
+											>Upgrades each element separately</td
+										></tr
+									>
+									<tr
+										><td><b>Witch</b></td><td>Spellcaster</td><td>Comes with the witch expansion</td
+										></tr
+									>
+									<tr
+										><td><b>Survivalist</b></td><td>Explorer</td><td>Needs 1 less food a turn</td
+										></tr
+									>
+									<tr
+										><td><b>Climber</b></td><td>Explorer</td><td
+											>Uphill costs only 2, and can climb cliffs at twice the uphill cost</td
+										></tr
+									>
+									<tr
+										><td><b>Trader</b></td><td>Craftsman</td><td
+											>Runs trade between places in range: moves resources between yours, or sells
+											what you don't want in another city. Earns on the road, but can be attacked</td
+										></tr
+									>
+								</tbody>
+							</table>
 						</div>
 					</section>
 
@@ -463,9 +680,20 @@
 							</li>
 							<li>
 								Characters can lean physical (more food) or mental (more rest), or somewhere in
-								between.
+								between. Hunger drops faster the higher your physical stats, and rest drops faster
+								the higher your mental ones.
 							</li>
 						</ul>
+						<div class="options">
+							<h4>Earlier draft</h4>
+							<p>
+								Four stats from 10 to 100, growing linearly (maybe past 100). Mental:
+								<b>knowledge</b> (casting chance and how fast you learn) and <b>charisma</b> (others
+								like being around you, which helps their morale; in combat, maybe a bonus to
+								whoever's next to you). Physical: <b>strength</b> (carrying and physical damage) and
+								<b>speed</b> (dodging and movement).
+							</p>
+						</div>
 					</section>
 
 					<section id="wl-combat">
@@ -483,6 +711,9 @@
 							<li>
 								There are two kinds of area attack: <b>lobbed</b> attacks (like a bow) ignore the
 								front line, and <b>barreling</b> attacks hit it.
+							</li>
+							<li>
+								Being shielded takes at least 1 off a hit, but every hit still does at least 1.
 							</li>
 							<li>Flanking makes attacks hit harder, partly getting past armor.</li>
 							<li>
@@ -516,6 +747,34 @@
 								to warm something up, a forceful wind to speed your ship or slow theirs.
 							</li>
 							<li>In-combat upgrades (lower cost, more damage) last until that character rests.</li>
+						</ul>
+						<div class="options">
+							<h4>Earlier draft</h4>
+							<p>
+								Everyone in the fight shares one combined deck. Draw 2 cards per wizard and 1 per
+								unit. Each wizard has their own mana, plus a party pool anyone can spend.
+							</p>
+						</div>
+						<h3>Day and night</h3>
+						<ul>
+							<li>By day, whoever starts a fight attacks, and it opens in attack mode.</li>
+							<li>
+								At night your units and buildings can be attacked. The chance grows with how much
+								unexplored land is nearby and how dangerous it is.
+							</li>
+							<li>
+								Defenders get a bonus from the building they're in. Units woken up by an attack are
+								<b>startled</b>, a debuff.
+							</li>
+						</ul>
+						<h3>Spell schools</h3>
+						<ul>
+							<li><b>Physical:</b> weak on its own, and grows with strength.</li>
+							<li><b>Fire:</b> damage.</li>
+							<li><b>Ice:</b> protection and slowing.</li>
+							<li><b>Dark:</b> high power, at a cost other than mana.</li>
+							<li><b>Arcane:</b> all-round.</li>
+							<li><b>Divine:</b> <span class="open">Open</span></li>
 						</ul>
 						<h3>Weapons and armor</h3>
 						<ul>
@@ -603,6 +862,12 @@
 								are better with some schools (Pylion with fire, Bex with arcane).
 							</li>
 							<li>
+								<b>Civilian and military spells.</b> Civilian spells are what a wizard does out in the
+								world: Heal (which works in combat too), Blessing of the farm, Pickpocket (Sid: steal
+								silver from a building or person, with a chance of getting caught), Franchise (Bobby:
+								a building starts working for his company). Military spells go in your combat deck.
+							</li>
+							<li>
 								<b>Knowledge and gold</b> pay for new spells. Casting a spell makes it cheaper to learn,
 								cheaper to upgrade, and makes its school cheaper. Casting that exact spell gives a bigger,
 								percentage discount. The discount only applies to your next purchase.
@@ -635,6 +900,56 @@
 							<span class="open">Open</span> Each character having their own keyword or mechanic, like
 							Hearthstone classes. Ideal, but hard to pull off.
 						</p>
+					</section>
+
+					<section id="wl-research">
+						<h2>Knowledge & research</h2>
+						<p>
+							Wizards spend <b>knowledge</b> in a shop that offers 4 spells, 3 buildings
+							(blueprints) and 2 traits. A <b>research project</b> refreshes the shop and boosts your
+							research bar.
+						</p>
+						<p>
+							The <b>research bar</b> runs from 0 to 10. The higher it is, the rarer what turns up, and
+							each level gives 1 wisdom. An average run should reach level 4, a solid one 6, and it takes
+							an insane run to hit 10.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Research level</th><th>Unlocks</th></tr></thead>
+								<tbody>
+									<tr><td><b>2</b></td><td>A 5th spell in the shop</td></tr>
+									<tr><td><b>4</b></td><td>A 4th building in the shop</td></tr>
+									<tr><td><b>6</b></td><td>A 3rd trait in the shop</td></tr>
+								</tbody>
+							</table>
+						</div>
+						<p>
+							The bar fills with a tenth of the knowledge you gain, plus extra from universities,
+							books, scrolls and research projects.
+						</p>
+					</section>
+
+					<section id="wl-shops">
+						<h2>Shops & rewards</h2>
+						<ul>
+							<li>
+								<b>Shops</b> take silver for artifacts, units to hire, temporary blueprints, potions,
+								food and gold.
+							</li>
+							<li>
+								<b>Traveling salesmen</b> are more likely to carry rare artifacts and blueprints, but
+								move on once you've visited and take longer to restock.
+							</li>
+							<li>
+								<b>Cities</b> are permanent. They stock more than salesmen, and sell food, but charge
+								5% more.
+							</li>
+							<li>
+								<b>Winning a battle</b> gives wizards knowledge and units combat experience. Enemies
+								drop artifacts and silver; animals drop food.
+							</li>
+						</ul>
 					</section>
 
 					<section id="wl-resources">
@@ -686,6 +1001,111 @@
 						</ul>
 					</section>
 
+					<section id="wl-buildings">
+						<h2>Buildings</h2>
+						<p>
+							Blueprints come in five rarities, and a higher research level makes the rarer ones
+							more likely. A rare roll (a 0.1% legendary) gets a small discount, worked out from its
+							base odds, so rarer buildings get cheaper over time. Upgrades need the base building
+							first, and show up as blueprints of their own.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Building</th><th>Rarity</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Wood walls</b></td><td>Filler</td><td
+											>Add to any building. A fortification bonus when attacking or defending from
+											it</td
+										></tr
+									>
+									<tr
+										><td><b>Farm</b></td><td>Filler</td><td
+											>Takes all the food from its tile. Needs a worker</td
+										></tr
+									>
+									<tr
+										><td><b>Mine</b></td><td>Filler</td><td
+											>Takes all the ME from its tile. Needs a worker</td
+										></tr
+									>
+									<tr
+										><td><b>Silo</b></td><td>Filler</td><td
+											>Upgrades a farm (or mine). Stores more food, which doesn't rot. Wood, stone
+											or steel: 50, 100 or 150</td
+										></tr
+									>
+									<tr
+										><td><b>Outpost</b></td><td>Common (~20%)</td><td
+											>Takes all the resources on its tile, like a city in other games. Buildings
+											next to it are cheaper, and it attracts units</td
+										></tr
+									>
+									<tr
+										><td><b>School</b></td><td>Common</td><td
+											>Teaches units (+1 a part of day, at lower levels). Wizards within 1 tile gain
+											knowledge faster</td
+										></tr
+									>
+									<tr
+										><td><b>Blacksmith</b></td><td>Common</td><td
+											>Turns silver and ME into artifacts</td
+										></tr
+									>
+									<tr
+										><td><b>Water wheel</b></td><td>Common</td><td
+											>Add to a building next to a river. 1 ME a turn</td
+										></tr
+									>
+									<tr
+										><td><b>Stone walls</b></td><td>Common</td><td
+											>Add to any building. More fortification than wood</td
+										></tr
+									>
+									<tr><td><b>Brewery</b></td><td>Rare (~5%)</td><td>Turns ME into potions</td></tr>
+									<tr
+										><td><b>Archer tower</b></td><td>Rare</td><td
+											>Worked by a unit with a ranged weapon, it attacks and defends any building
+											within 2 tiles, with a 2-height advantage</td
+										></tr
+									>
+									<tr
+										><td><b>Military academy</b></td><td>Rare</td><td
+											>Upgrades a school or university. Draws in units with more strength, speed and
+											fighting bias. +1 learning for archers and swordsmen</td
+										></tr
+									>
+									<tr
+										><td><b>Wizard academy</b></td><td>Rare</td><td
+											>Upgrades a school or university. Draws in units with spellcaster bias and
+											some knowledge. +1 learning for spellcasters</td
+										></tr
+									>
+									<tr
+										><td><b>Pop-up castle</b></td><td>Epic (~1%)</td><td
+											>A much stronger outpost that comes with walls and a farm</td
+										></tr
+									>
+									<tr
+										><td><b>University</b></td><td>Epic</td><td
+											>Upgrades a school. +3 a part of day at every level, and boosts wizards'
+											knowledge and research</td
+										></tr
+									>
+									<tr
+										><td><b>Moving structure</b></td><td>Legendary (~0.1%)</td><td
+											>Add to any building, which then moves like a unit (1 tile a part of day).
+											From time spent in the labyrinth, or maybe Baba Yaga's house</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<p class="aside">
+							Only one of each legendary can exist in a game, and most are found in some unique way.
+						</p>
+					</section>
+
 					<section id="wl-food">
 						<h2>Food & needs</h2>
 						<ul>
@@ -699,7 +1119,14 @@
 								Some foods count as more than one type (milk as protein or fat). Salt stops the rest
 								from rotting. A coconut counts as every type and gives water.
 							</li>
-							<li>Food rots over time.</li>
+							<li>
+								Food rots over time. Salt halves how fast; spice adds a morale bonus. Both can go
+								into potions too.
+							</li>
+							<li>
+								Animals are food on the hoof: cattle give twice the meat, and a horse can be ridden
+								until it dies.
+							</li>
 							<li>
 								The cornucopia can go in any slot for free. A button can eat your best mix
 								automatically.
@@ -707,6 +1134,58 @@
 							<li>
 								Characters need food and rest. If units need all four basics, money can keep their
 								morale up.
+							</li>
+						</ul>
+						<div class="options">
+							<h4>Earlier draft</h4>
+							<p>
+								Four food types: <b>grain</b> (wheat, corn, rice; eaten 1 to 1), <b>protein</b>
+								(beans, fish, hunted meat; eaten 2 at a time, with a small chance to raise strength or
+								speed), <b>fruit</b> (bananas from the rainforest, berries picked while exploring;
+								eaten 3 at a time, and heals a little) and <b>vegetables</b> (eaten 2 at a time). Corn
+								counts as grain and vegetable. Rivers and oceans might be endless fishing.
+							</p>
+						</div>
+						<h3>The four bars</h3>
+						<div class="table-wrap">
+							<table>
+								<thead
+									><tr><th>Bar</th><th>At zero</th><th>Goes up</th><th>Goes down</th></tr></thead
+								>
+								<tbody>
+									<tr
+										><td><b>Health</b></td><td>The wizard is lost</td><td
+											>Over time, while fed and rested</td
+										><td>In combat</td></tr
+									>
+									<tr
+										><td><b>Morale</b></td><td>The wizard is lost</td><td>Winning fights</td><td
+											>Over time, faster when hungry or tired</td
+										></tr
+									>
+									<tr
+										><td><b>Hunger</b></td><td>Takes from health, and a starving penalty</td><td
+											>Eating</td
+										><td>Over time, faster with high physical stats</td></tr
+									>
+									<tr
+										><td><b>Rest</b></td><td>Takes from morale, and a tired penalty</td><td
+											>Sleeping, napping, relaxing</td
+										><td>Over time, faster with high mental stats</td></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<ul>
+							<li>
+								<b>Sleeping</b> is night only and the best rest, but you can be attacked in the night.
+							</li>
+							<li>
+								<b>Napping</b> is sleep during the day: less than sleeping, more than relaxing.
+							</li>
+							<li>
+								<b>Relaxing</b> is daytime and the least rest, but boosts morale, and units who relax
+								together get on better.
 							</li>
 						</ul>
 						<p class="aside">
@@ -851,6 +1330,38 @@
 							ascension level could lock in everything that came before: the map, the wizards, the
 							religions.
 						</p>
+						<h3>Difficulty levels</h3>
+						<p>
+							Ten levels, each unlocked by beating the one before. Every level adds 2 tiles to the
+							edge of the map (more to explore, so runs go longer while monsters scale up), raises
+							all costs by 1%, and makes enemies grow 5% faster (up to 50%). Each level also adds
+							one twist, and they stack:
+						</p>
+						<ul>
+							<li>Each wizard starts with a curse (a negative trait).</li>
+							<li>Food decays, 2% a turn.</li>
+							<li>Low funding: 25% less of every starting resource.</li>
+							<li>
+								<b>Origin flag:</b> a wizard must carry it at all times and bring it to the City of Gold.
+								It weighs 10 and is a useless card in combat. It could be a random mystery object, or
+								a task for each wizard.
+							</li>
+							<li>
+								<b>Fighting forest:</b> monsters are 10% more aggressive, and fewer passive animals.
+							</li>
+							<li><b>Mother's guidance:</b> monsters start working together.</li>
+							<li><b>Multiple protectors:</b> a second boss, and 5% more monsters.</li>
+							<li>
+								<b>Desolate waste:</b> resources are 25% less likely to spawn and give 25% less.
+							</li>
+						</ul>
+						<p class="aside">
+							Other twists to consider: body temperature (too hot tires you, too cold hurts you),
+							resources that make building cost 10% more, and needing water (the lava land has
+							none).
+							<span class="open">Open</span> How this fits with unlocking the world, which also brings
+							in rotting food and water.
+						</p>
 						<h3>Custom wizards</h3>
 						<p>
 							Get units (not just wizards) to the City of Gold to unlock custom wizards: set their
@@ -867,7 +1378,8 @@
 						<h3>Character epithets</h3>
 						<p>
 							Every wizard has an epithet of their own, unlocked when that wizard survives all the
-							way to the City of Gold.
+							way to the City of Gold. (In the earlier draft, only if they get there without an
+							epithet already.)
 						</p>
 						<div class="table-wrap">
 							<table>
@@ -887,12 +1399,12 @@
 									<tr>
 										<td><b>the Knight</b></td>
 										<td>Get Knick to the City of Gold alive</td>
-										<td><span class="open">Open</span></td>
+										<td>+1 armor and +3 charisma</td>
 									</tr>
 									<tr>
 										<td><b>the Bright</b></td>
 										<td>Get Bex to the City of Gold alive</td>
-										<td><span class="open">Open</span></td>
+										<td>+3 wisdom, and start at research level 1</td>
 									</tr>
 									<tr>
 										<td><b>the Founder</b></td>
@@ -907,7 +1419,7 @@
 									<tr>
 										<td><b>the Architect</b></td>
 										<td>Get Archie to the City of Gold alive</td>
-										<td><span class="open">Open</span></td>
+										<td>Blueprints cost 5% less, and rarer blueprints are 5% more likely</td>
 									</tr>
 									<tr>
 										<td><b>the Pyromancer</b></td>
@@ -931,12 +1443,20 @@
 									</tr>
 									<tr>
 										<td><b>the Mad</b></td>
-										<td>Get Max to the City of Gold alive</td>
+										<td>Get Maximus to the City of Gold alive</td>
 										<td><span class="open">Open</span></td>
 									</tr>
 									<tr>
-										<td><b>Not named yet</b></td>
-										<td>Bobby, the General and Hera, the same way</td>
+										<td><b>Business</b></td>
+										<td>Get Bobby to the City of Gold alive. It's the one epithet without "the"</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the General</b></td>
+										<td>
+											Get Gladys to the City of Gold alive. Once she has it, nobody calls her by her
+											real name again
+										</td>
 										<td><span class="open">Open</span></td>
 									</tr>
 								</tbody>
@@ -993,20 +1513,14 @@
 										<td>Read and speak forgotten languages, which opens up old magic</td>
 									</tr>
 									<tr>
-										<td><b>the Nomad</b></td>
+										<td><b>the Lost</b></td>
+										<td>Lose a run inside the labyrinth</td>
 										<td><span class="open">Open</span></td>
-										<td
-											>Harvest more, or harvest half as much with a 2 in 3 chance of not using up
-											the resource</td
-										>
 									</tr>
 									<tr>
-										<td><b>the Gambler</b></td>
+										<td><b>Not named yet</b></td>
+										<td>Escape the labyrinth</td>
 										<td><span class="open">Open</span></td>
-										<td
-											>A scroll of wonder card that casts a random spell, maybe costing more each
-											time it is drawn</td
-										>
 									</tr>
 									<tr>
 										<td><b>Not named yet</b></td>
@@ -1024,11 +1538,17 @@
 						The characters so far. Each should have their own way of earning knowledge and, ideally,
 						their own mechanic. Some can be found out in the world instead of picked at the start.
 					</p>
+					<p>
+						Each wizard also has three <b>treasures</b>: one they start with, one unlocked at a
+						certain level, and one discovered out on the map. Their epithet comes once they reach
+						the City of Gold.
+					</p>
 					<div class="cards-2">
 						<div class="card">
 							<h3>Merlin the Magnificent</h3>
 							<p class="small">Magic ability, swagger, intelligence · low fortitude</p>
 							<p>One of the two wizards you start with.</p>
+							<p>All-round spells. <b>Established wizard:</b> starts at research level 1.</p>
 						</div>
 						<div class="card">
 							<h3>Knick the Knight</h3>
@@ -1037,6 +1557,18 @@
 								Gives a defensive bonus to everyone in his corps. Chivalry never dies: blocking
 								damage for someone else improves their relationship.
 							</p>
+							<ul>
+								<li><b>Ol' Trusty</b> (start): a weapon that gives about +5 strength.</li>
+								<li>
+									<b>Squire</b> (unlocked): a starting unit who must stay with Knick until they become
+									a knight. Can have two specialties, and starts as a swordsman with a sword.
+								</li>
+								<li>
+									<b>Horse</b> (found wandering the plains): +10 carrying and +5 speed, and eats 1 food
+									a turn.
+								</li>
+							</ul>
+							<p class="small">Called "Knoble" in the earlier draft, and tank-themed.</p>
 						</div>
 						<div class="card">
 							<h3>Bobby Business</h3>
@@ -1053,6 +1585,19 @@
 									silver to gain 25 a turn for 3 turns.
 								</li>
 							</ul>
+							<p class="small">Earlier draft: money and corruption</p>
+							<ul>
+								<li><b>Well funded:</b> your party starts with twice the silver.</li>
+								<li>
+									<b>Salesman:</b> 25% more silver when he sells, and everything that costs silver is
+									10% cheaper.
+								</li>
+								<li><b>Magicless:</b> 5% worse spell chance, spell prices and spell rarity.</li>
+								<li>
+									<b>Franchising:</b> make a building part of Bobby's business. Outposts within 5 tiles
+									draw 5% more units and turn 25% of what they make into silver, plus 1 silver.
+								</li>
+							</ul>
 						</div>
 						<div class="card">
 							<h3>Bex the Bright</h3>
@@ -1061,6 +1606,17 @@
 								<li>Combo and spell damage, and good with arcane.</li>
 								<li>Learns by teaching units, and her study session works out of combat too.</li>
 								<li>Chaos: an adaptive random spell each turn, which helps her learn faster.</li>
+							</ul>
+							<ul>
+								<li>
+									<b>Endless book</b> (start): a book that never runs out, but gives less than a normal
+									one.
+								</li>
+								<li>
+									<b>Elbow pads</b> (unlocked): everyone within 2 hexes of Bex gets +1 knowledge a part
+									of day.
+								</li>
+								<li>(discovered) <span class="open">Open</span></li>
 							</ul>
 						</div>
 						<div class="card">
@@ -1071,11 +1627,23 @@
 								surveying interesting tiles. Leans towards fast play. Found on the map after
 								cartography, and joins once befriended.
 							</p>
+							<ul>
+								<li><b>Super compass</b> (start): see 3 extra tiles.</li>
+								<li>
+									<b>Nomad trait</b> (discovered, by learning the lifestyle from traders and salesmen):
+									he can't start or help with buildings, but pitches a tent wherever he sleeps, for protection
+									and better sleep, and farms that tile overnight. It could be boosted to harvest more,
+									or half as much with a 2 in 3 chance of leaving the resource.
+								</li>
+							</ul>
 						</div>
 						<div class="card">
-							<h3>The General</h3>
+							<h3>Gladys, the General</h3>
+							<p class="small">
+								Goes by Gladys until she earns her epithet; after that, only "the General"
+							</p>
 							<ul>
-								<li>Units with him gain more XP, and armies are slowed less.</li>
+								<li>Units with her gain more XP, and armies are slowed less.</li>
 								<li>Learns by leading units in combat.</li>
 								<li>
 									A whistle makes orders cheaper and longer range. Rally cry (2 mana): 1 neutral
@@ -1095,6 +1663,12 @@
 						<div class="card">
 							<h3>Archie the Architect</h3>
 							<p>Buildings he designs yield 5% more. Leans towards slow play.</p>
+							<ul>
+								<li>
+									<b>Battery</b> (start): stored at a building, it makes 1 ME a part of day for 5 days,
+									and gets lighter as it's used.
+								</li>
+							</ul>
 						</div>
 						<div class="card">
 							<h3>Pylion the Pyromancer</h3>
@@ -1118,19 +1692,295 @@
 						<div class="card">
 							<h3>Sid the Sly</h3>
 							<p>The first time his deck cycles, he ignores the fatigue card.</p>
+							<ul>
+								<li>
+									<b>Stolen chest</b> (discovered, by stealing it from a city): Sid has to spend time
+									picking it open (an active rest, 15% × 1.5^tries). Inside are two random artifacts
+									and 100 knowledge.
+								</li>
+								<li><b>Escape artist:</b> gets out of combat more easily.</li>
+								<li>
+									<b>Escape hatch:</b> drains 75% of his current rest (at least 15% of his max) to teleport
+									him to your nearest outpost.
+								</li>
+							</ul>
 						</div>
 						<div class="card">
-							<h3>Max the Mad</h3>
+							<h3>Maximus the Mad</h3>
 							<p>Has a mulligan.</p>
+							<p class="small">Chaos, randomness and rigging chance</p>
+							<ul>
+								<li><b>Rabbit's foot</b> (start): more luck all round.</li>
+								<li>
+									<b>Wild card</b> (unlocked): when drawn, casts random spells that add up to a cost
+									of X, where X is how many times it's been drawn this game. Then draw a card.
+								</li>
+							</ul>
 						</div>
 						<div class="card">
 							<h3>And more</h3>
 							<ul>
-								<li><b>Hera:</b> marrying gives a permanent bonus, once, until divorce.</li>
 								<li><b>A king</b> who joins once you've done enough.</li>
 							</ul>
 						</div>
 					</div>
+				</article>
+			{:else if tab === 'items'}
+				<article>
+					<section>
+						<h2>Artifacts</h2>
+						<p>
+							Found, bought, made at a blacksmith or dropped by enemies. Legendary ones whose home
+							didn't spawn can still turn up with traveling salesmen.
+						</p>
+						<h3>Weapons</h3>
+						<p>Each unit and wizard can have one weapon equipped.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Weapon</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Elemental sword</b></td><td
+											>Takes on the school of the last spell cast. Fire: +1 damage. Holy: heal every
+											friendly unit 1. Ice: 1 armor this turn</td
+										></tr
+									>
+									<tr
+										><td><b>Silver rod</b></td><td
+											>Gain a silver every time this character casts a spell</td
+										></tr
+									>
+									<tr
+										><td><b>Pickaxe</b></td><td
+											>A weak weapon, but mining costs 10% less energy even when it isn't equipped</td
+										></tr
+									>
+									<tr
+										><td><b>Axe</b></td><td
+											>A better weapon than the pickaxe, and more wood from working a forest</td
+										></tr
+									>
+									<tr><td><b>Ballista</b></td><td>Good against cities. Heavy</td></tr>
+									<tr
+										><td><b>The First Wand (legendary)</b></td><td
+											>In combat your spells never miss, +2 mana and +1 draw</td
+										></tr
+									>
+									<tr
+										><td><b>Golden Rod (legendary)</b></td><td
+											>The first spell you cast each battle permanently becomes its golden version,
+											and you find gold more often. Heavier than most</td
+										></tr
+									>
+									<tr
+										><td><b>Wand++ (legendary)</b></td><td
+											>Every number in combat is 1 higher. Might be hard to build</td
+										></tr
+									>
+									<tr
+										><td><b>Wand of Light (legendary)</b></td><td><span class="open">Open</span></td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<h3>Wearables</h3>
+						<p>
+							Each unit and wizard can wear one or two. They give armor (knight's armor: +1), a
+							unique ability (sticky gloves) or a passive (more mana, more damage of a type, cheaper
+							spells, more speed).
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Wearable</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Swift boots</b></td><td>+2 speed, +3 movement and +1 draw in combat</td
+										></tr
+									>
+									<tr
+										><td><b>Wings</b></td><td
+											>+3 speed. Going downhill is free, and you can go down cliffs</td
+										></tr
+									>
+									<tr><td><b>Nerd frames</b></td><td>+8 wisdom, −2 speed, −2 strength</td></tr>
+									<tr
+										><td><b>Wizard's hat</b></td><td
+											>+1 mana in combat, and civilian spells cost 10% less</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<h3>Collectables</h3>
+						<p>Carry as many as your carrying capacity allows.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Collectable</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Journal</b></td><td
+											>Quietly stores 5–50% of its holder's knowledge and research, up to about 5–40
+											parts of day's worth. Passing it to the other wizard drains it and uses a
+											charge (1–10, or unlimited). Lose a run with a full journal and it can be
+											found later</td
+										></tr
+									>
+									<tr
+										><td><b>Scroll</b></td><td>Read instantly for knowledge, research or a spell</td
+										></tr
+									>
+									<tr
+										><td><b>Book</b></td><td
+											>Read over time (an active rest) for knowledge, research or spells. 1–5
+											charges, more than a scroll, with a better chance of rare spells and of
+											teaching traits</td
+										></tr
+									>
+									<tr
+										><td><b>Daedalus' Journal (legendary)</b></td><td
+											>Only found in the labyrinth. A book that hugely boosts knowledge and gives
+											the moving-building upgrade</td
+										></tr
+									>
+									<tr><td><b>Pillow</b></td><td>A small boost to sleep and naps. Light</td></tr>
+									<tr
+										><td><b>Mattress</b></td><td
+											>A bigger boost to sleep and naps. Heavy, and can be left at a building</td
+										></tr
+									>
+									<tr><td><b>Energy drink</b></td><td>Drink it to raise your rest</td></tr>
+									<tr
+										><td><b>Lyre</b></td><td
+											>An active rest that boosts the whole party's morale while taking up only one
+											character</td
+										></tr
+									>
+									<tr
+										><td><b>Phone</b></td><td
+											>While a wizard holds it, every place you've found that has a phone is visible</td
+										></tr
+									>
+									<tr
+										><td><b>Ender chest</b></td><td
+											>Holds 150, shared between every chest. The first comes as a pair, like
+											phones; single ones turn up later</td
+										></tr
+									>
+									<tr><td><b>Backpack</b></td><td>+25 carrying capacity</td></tr>
+									<tr><td><b>Plow</b></td><td>Working for food costs 15% less energy</td></tr>
+									<tr><td><b>Hammer</b></td><td>+25% while working on a construction</td></tr>
+									<tr
+										><td><b>Computer</b></td><td
+											>Left at a workplace, it works like a worker. Held in combat, it shows more
+											information. <span class="open">Open</span> Which: expected damage, odds, a suggested
+											move, your deck</td
+										></tr
+									>
+									<tr
+										><td><b>Aimbot</b></td><td>+10% chance to land spells and critical hits</td></tr
+									>
+									<tr
+										><td><b>Cauldron</b></td><td
+											>Lets its carrier brew. At a brewery, brewing costs 10% less</td
+										></tr
+									>
+									<tr><td><b>Perpetual machine (epic)</b></td><td>An endless battery</td></tr>
+									<tr
+										><td><b>Coupon book (legendary)</b></td><td
+											>A sale every time you walk into a shop?</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Potions</h2>
+						<p>
+							One-use bottles, some for combat and some for outside it. Brewed from ME (better at a
+							brewery), bought, or found.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Potion</th><th>Rarity</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Bomb (or FrF)</b></td><td>Common</td><td
+											>10 damage to one enemy and 5 to those next to it</td
+										></tr
+									>
+									<tr
+										><td><b>Poison</b></td><td>Common / epic</td><td
+											>Minor (common): 1 damage over 5 turns. Major (epic): 3 damage a turn until
+											the enemy dies</td
+										></tr
+									>
+									<tr
+										><td><b>Carrot juice</b></td><td>Common</td><td
+											>Permanently see 1 tile further</td
+										></tr
+									>
+									<tr
+										><td><b>Invisibility</b></td><td>Rare</td><td
+											>Invisible to enemies for a day (4 parts of day)</td
+										></tr
+									>
+									<tr
+										><td><b>Bottle of roids</b></td><td>Rare</td><td>+1 strength, permanently</td
+										></tr
+									>
+									<tr
+										><td><b>Love potion</b></td><td>Rare</td><td
+											>Instantly improves how two friendly characters get on, or how a city or
+											trader sees your team</td
+										></tr
+									>
+									<tr
+										><td><b>Teleportation</b></td><td>Rare</td><td
+											>Go anywhere you've already found</td
+										></tr
+									>
+									<tr
+										><td><b>Flight</b></td><td>Rare–epic</td><td
+											>Five random common potion effects</td
+										></tr
+									>
+									<tr
+										><td><b>1UP</b></td><td>Epic</td><td>Revives a character the moment they die</td
+										></tr
+									>
+									<tr
+										><td><b>Lightning in a bottle</b></td><td>Epic</td><td
+											>25 damage to one enemy</td
+										></tr
+									>
+									<tr
+										><td><b>Oracle juice</b></td><td>Legendary</td><td
+											>Reveals the City of Gold and every tile around it</td
+										></tr
+									>
+									<tr
+										><td><b>The Big Kahuna</b></td><td>Legendary</td><td
+											>Wipe out a city, or 50 damage to every enemy in a fight</td
+										></tr
+									>
+									<tr
+										><td><b>Mirror dimension</b></td><td>Legendary</td><td
+											>Sends your whole group to the mirror dimension? <span class="open">Open</span
+											></td
+										></tr
+									>
+									<tr
+										><td><b>Liquid luck</b></td><td><span class="open">Open</span></td><td
+											>Everything this character does for a day has the best outcome</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
 				</article>
 			{:else if tab === 'world'}
 				<article>
@@ -1152,7 +2002,7 @@
 										<td>Cities of riches</td>
 									</tr>
 									<tr>
-										<td><b>Camelot, Mount Meru</b></td>
+										<td><b>Camelot, Mount Meru, Atlantis</b></td>
 										<td>Still to be worked out</td>
 									</tr>
 									<tr>
@@ -1166,15 +2016,58 @@
 									<tr>
 										<td><b>Library of Alexandria</b></td>
 										<td
-											>Makes knowledge and research when a librarian works it, and money from
-											trading books</td
+											>Found in deserts, more often near rivers. Holds 5 random books or scrolls
+											(room for 10), and keeps what you leave. A unit working it makes a book or
+											scroll every 8 parts of day (6 for a researcher, and 10% better). A wizard who
+											can see it gets 1 research a turn. A librarian also makes money trading books</td
 										>
 									</tr>
 									<tr>
 										<td><b>Fountain of Youth</b></td>
 										<td
-											>People heal faster nearby. Units may work non-stop. Can be bottled and sold</td
+											>People heal faster nearby, and units within 3 tiles get 3 rest a part of day.
+											Units may work non-stop. Can be bottled and sold</td
 										>
+									</tr>
+									<tr>
+										<td><b>Mount Olympus</b></td>
+										<td
+											>For real. A mountain that, the first time you summit it, gives one of your
+											party a demigod trait (see below)</td
+										>
+									</tr>
+									<tr>
+										<td><b>The Labyrinth</b></td>
+										<td
+											>Anywhere. A constantly shifting maze with the Minotaur and lesser beasts
+											inside, so getting out isn't easy. Kill the Minotaur for its horn. Escape for
+											an epithet, or lose the run inside and become the Lost. Spend long enough in
+											it to find Daedalus' Journal and the moving-building blueprint</td
+										>
+									</tr>
+									<tr>
+										<td><b>Garden of Eden</b></td>
+										<td
+											>Any green area. Makes 5 food, gives +1 food to every tile around it, and
+											can't be built on. Each time a wizard comes within 3 tiles it gains a
+											temptation (the wizard gains 3 knowledge, maybe 1 research). At 15, both
+											wizards become sinners: +3 wisdom, and a penalty</td
+										>
+									</tr>
+									<tr>
+										<td><b>Baba Yaga's house</b></td>
+										<td>Wanders around a forest. Meeting it can go well or badly</td>
+									</tr>
+									<tr>
+										<td><b>Fortress of Solitude</b></td>
+										<td
+											>In frozen biomes. Nobody there can be attacked. The first wizard to arrive
+											gets the "super" trait: +3 strength and speed during the day</td
+										>
+									</tr>
+									<tr>
+										<td><b>The Four Treasures</b></td>
+										<td>Four cities from Irish legend, each with a treasure (see below)</td>
 									</tr>
 									<tr>
 										<td><b>Scholomance</b></td>
@@ -1231,6 +2124,106 @@
 						<p class="aside">
 							Legendary artifacts whose location didn't spawn can still turn up with traveling
 							salesmen.
+						</p>
+						<h3>Olympus</h3>
+						<p>Pick who in your party receives the gift, then choose from 3 of the 12 gods.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>God</th><th>Gift</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Zeus</b></td><td>Learn a lightning spell: a powerful lobbed attack</td
+										></tr
+									>
+									<tr
+										><td><b>Hera</b></td><td
+											>Marries your two wizards: their relationship goes to max, they lose 5% less
+											morale while together, and either can cast the other's spells in combat</td
+										></tr
+									>
+									<tr
+										><td><b>Poseidon</b></td><td
+											>Learn tsunami: a crashing wave that weakens the further back it goes</td
+										></tr
+									>
+									<tr
+										><td><b>Demeter</b></td><td
+											>A farm blessing that permanently gives +1 food, and 4 more food when this
+											character works a tile</td
+										></tr
+									>
+									<tr
+										><td><b>Athena</b></td><td>+10 wisdom, and 5% more knowledge from combat</td
+										></tr
+									>
+									<tr><td><b>Apollo</b></td><td>A bonus during the day</td></tr>
+									<tr
+										><td><b>Artemis</b></td><td
+											>A bonus at night, more food from hunting, and two quick shots</td
+										></tr
+									>
+									<tr
+										><td><b>Ares</b></td><td
+											>+5 strength, and every unit within 2 tiles gets +1 to all military traits</td
+										></tr
+									>
+									<tr
+										><td><b>Hephaestus</b></td><td
+											>+1 armor, and craftsmen need 10% fewer resources</td
+										></tr
+									>
+									<tr><td><b>Aphrodite</b></td><td>+10 charisma</td></tr>
+									<tr><td><b>Hermes</b></td><td>+10 speed</td></tr>
+									<tr
+										><td><b>Dionysus</b></td><td
+											>+3 charisma, and an endless wine bottle to throw a party while resting:
+											morale, hunger and a little rest</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<h3>The Four Treasures of the Tuatha Dé Danann</h3>
+						<p>
+							Four cities, each holding a unique artifact. Each spawns in a set direction from the
+							City of Gold, so finding one hints at where it is.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead
+									><tr><th>City</th><th>Direction</th><th>Treasure</th><th>Effect</th></tr></thead
+								>
+								<tbody>
+									<tr
+										><td><b>Falias</b></td><td>North</td><td>Stone of Fál (Lia Fáil)</td><td
+											>Stays put. It can cry out for one of your wizards, making them a king who can
+											found a nation. The Hill of Tara spawns next to it</td
+										></tr
+									>
+									<tr
+										><td><b>Gorias</b></td><td>East</td><td>Spear of Lugh</td><td
+											>A weapon. All its holder's attacks count as lobbed and ignore armor, and it
+											adds a unique spell to the deck</td
+										></tr
+									>
+									<tr
+										><td><b>Findias</b></td><td>South</td><td>Sword of Light (Núada's)</td><td
+											>A weapon. In legend no one escaped it once drawn, and no one could resist it. <span
+												class="open">Open</span
+											></td
+										></tr
+									>
+									<tr
+										><td><b>Murias</b></td><td>West</td><td>Cauldron of the Dagda</td><td
+											>Its holder no longer needs food</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<p class="aside">
+							Unlike the legend, gathering all four does nothing special, besides making you very
+							strong.
 						</p>
 					</section>
 
