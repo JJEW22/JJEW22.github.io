@@ -880,8 +880,18 @@
 								</thead>
 								<tbody>
 									<tr>
+										<td><b>the Magnificent</b></td>
+										<td>Get Merlin to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
 										<td><b>the Knight</b></td>
 										<td>Get Knick to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Bright</b></td>
+										<td>Get Bex to the City of Gold alive</td>
 										<td><span class="open">Open</span></td>
 									</tr>
 									<tr>
@@ -895,8 +905,18 @@
 										<td><span class="open">Open</span></td>
 									</tr>
 									<tr>
-										<td><b>the General</b></td>
-										<td>Get the General to the City of Gold alive</td>
+										<td><b>the Architect</b></td>
+										<td>Get Archie to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Pyromancer</b></td>
+										<td>Get Pylion to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
+										<td><b>the Timeturner</b></td>
+										<td>Get Thomas to the City of Gold alive</td>
 										<td><span class="open">Open</span></td>
 									</tr>
 									<tr>
@@ -910,10 +930,13 @@
 										<td><span class="open">Open</span></td>
 									</tr>
 									<tr>
+										<td><b>the Mad</b></td>
+										<td>Get Max to the City of Gold alive</td>
+										<td><span class="open">Open</span></td>
+									</tr>
+									<tr>
 										<td><b>Not named yet</b></td>
-										<td
-											>Merlin, Bobby, Bex, Archie, Pylion, Thomas, Maximus and Hera, the same way</td
-										>
+										<td>Bobby, the General and Hera, the same way</td>
 										<td><span class="open">Open</span></td>
 									</tr>
 								</tbody>
@@ -1003,7 +1026,7 @@
 					</p>
 					<div class="cards-2">
 						<div class="card">
-							<h3>Merlin</h3>
+							<h3>Merlin the Magnificent</h3>
 							<p class="small">Magic ability, swagger, intelligence · low fortitude</p>
 							<p>One of the two wizards you start with.</p>
 						</div>
@@ -1032,7 +1055,7 @@
 							</ul>
 						</div>
 						<div class="card">
-							<h3>Bex</h3>
+							<h3>Bex the Bright</h3>
 							<p class="small">Intelligence, magic ability · low strength</p>
 							<ul>
 								<li>Combo and spell damage, and good with arcane.</li>
@@ -1070,15 +1093,15 @@
 							</p>
 						</div>
 						<div class="card">
-							<h3>Archie</h3>
+							<h3>Archie the Architect</h3>
 							<p>Buildings he designs yield 5% more. Leans towards slow play.</p>
 						</div>
 						<div class="card">
-							<h3>Pylion</h3>
+							<h3>Pylion the Pyromancer</h3>
 							<p>Fire. Arrives with temperature and weather.</p>
 						</div>
 						<div class="card">
-							<h3>Thomas</h3>
+							<h3>Thomas the Timeturner</h3>
 							<p>
 								A time stone that costs mana to use and builds up its own magic each turn, adding
 								fast-forward and rewind cards. Has a mulligan, or draws the cards played last turn.
@@ -1093,10 +1116,16 @@
 							</p>
 						</div>
 						<div class="card">
+							<h3>Sid the Sly</h3>
+							<p>The first time his deck cycles, he ignores the fatigue card.</p>
+						</div>
+						<div class="card">
+							<h3>Max the Mad</h3>
+							<p>Has a mulligan.</p>
+						</div>
+						<div class="card">
 							<h3>And more</h3>
 							<ul>
-								<li><b>Maximus:</b> has a mulligan.</li>
-								<li><b>Sid the Sly:</b> ignores the first fatigue card when his deck cycles.</li>
 								<li><b>Hera:</b> marrying gives a permanent bonus, once, until divorce.</li>
 								<li><b>A king</b> who joins once you've done enough.</li>
 							</ul>
