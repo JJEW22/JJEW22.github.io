@@ -24,12 +24,13 @@
 	import NotesView from '$lib/wizards/NotesView.svelte';
 	import { wealthlessNotes } from '$lib/wizards/notes';
 
-	// overview | rules | wizards | items | world | notes. Kept in the URL hash so a reload
+	// overview | rules | wizards | epithets | items | world | notes. Kept in the URL hash so a reload
 	// stays on the same tab.
 	const TABS = [
 		{ id: 'overview', label: 'Overview' },
 		{ id: 'rules', label: 'Rules draft' },
 		{ id: 'wizards', label: 'Wizards' },
+		{ id: 'epithets', label: 'Epithets' },
 		{ id: 'items', label: 'Items' },
 		{ id: 'world', label: 'World & legends' },
 		{ id: 'notes', label: 'Notes' }
@@ -688,7 +689,7 @@
 							<h4>Earlier draft</h4>
 							<p>
 								Four stats from 10 to 100, growing linearly (maybe past 100). Mental:
-								<b>knowledge</b> (casting chance and how fast you learn) and <b>charisma</b> (others
+								<b>knowledge</b> (casting chance and how fast you learn) and <b>swagger</b> (others
 								like being around you, which helps their morale; in combat, maybe a bonus to
 								whoever's next to you). Physical: <b>strength</b> (carrying and physical damage) and
 								<b>speed</b> (dodging and movement).
@@ -734,8 +735,9 @@
 							</li>
 							<li>
 								Each character can carry unspent mana over to their next turn, up to a maximum: 1 by
-								default, and items can raise it. The cap is what stops you over-preparing. Mana can
-								turn into actions (neutral mana → mana → neutral action → action).
+								default, and items can raise it. The cap is what stops you over-preparing; to save
+								more, brew it into liquid mana potions. Mana can turn into actions (neutral mana →
+								mana → neutral action → action).
 							</li>
 							<li>
 								A <b>cantrip slot</b>: a few spells or weapon attacks you can use without drawing
@@ -1372,6 +1374,21 @@
 					<section id="wl-epithets">
 						<h2>Epithets</h2>
 						<p>
+							Epithets are achievements that fill in the blank in "Merlin the ___". Every wizard
+							unlocks their own by surviving to the City of Gold, and others come from notable feats
+							(escaping the labyrinth, becoming a king). Once unlocked, any later character can take
+							one, and each has its own effect. The full list is on the
+							<button type="button" class="link" on:click={() => pickTab('epithets')}
+								>Epithets tab</button
+							>.
+						</p>
+					</section>
+				</article>
+			{:else if tab === 'epithets'}
+				<article>
+					<section>
+						<h2>Epithets</h2>
+						<p>
 							Epithets are achievements that fill in the blank in "Merlin the ___". Once one is
 							unlocked, any later character can take it, and each one has its own effect.
 						</p>
@@ -1399,7 +1416,7 @@
 									<tr>
 										<td><b>the Knight</b></td>
 										<td>Get Knick to the City of Gold alive</td>
-										<td>+1 armor and +3 charisma</td>
+										<td>+1 armor and +3 swagger</td>
 									</tr>
 									<tr>
 										<td><b>the Bright</b></td>
@@ -1506,6 +1523,17 @@
 											>Sail better and raid the king's trade, but receive none. +2 happiness to you
 											and +1 to your crew while sailing</td
 										>
+									</tr>
+									<tr>
+										<td><b>the King</b></td>
+										<td>
+											Find Falias, the northernmost of the four Irish islands, and be accepted as
+											king by the Stone of Fál
+										</td>
+										<td>
+											Changes how the rules work: you're now the king of a kingdom, not just a
+											wizard on a quest. <span class="open">Open</span> Exactly how
+										</td>
 									</tr>
 									<tr>
 										<td><b>the Ancient</b></td>
@@ -1718,10 +1746,11 @@
 							</ul>
 						</div>
 						<div class="card">
-							<h3>And more</h3>
-							<ul>
-								<li><b>A king</b> who joins once you've done enough.</li>
-							</ul>
+							<h3>A king</h3>
+							<p>
+								Joins once you've done enough. Or a unit gets promoted to king when you find the
+								four Irish islands.
+							</p>
 						</div>
 					</div>
 				</article>
@@ -1794,6 +1823,12 @@
 							<table>
 								<thead><tr><th>Wearable</th><th>Effect</th></tr></thead>
 								<tbody>
+									<tr><td><b>Knight's armor</b></td><td>+1 armor</td></tr>
+									<tr
+										><td><b>Sticky gloves</b></td><td
+											>A unique ability. <span class="open">Open</span></td
+										></tr
+									>
 									<tr
 										><td><b>Swift boots</b></td><td>+2 speed, +3 movement and +1 draw in combat</td
 										></tr
@@ -1894,6 +1929,107 @@
 								</tbody>
 							</table>
 						</div>
+						<h3>Treasures and other items</h3>
+						<p>
+							Everything else the notes mention. Each wizard's own treasures (Ol' Trusty, the super
+							compass, the battery and the rest) are on their cards on the Wizards tab, and the Four
+							Treasures are on the World tab.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Item</th><th>Where from</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Cupid's arrow</b></td><td><span class="open">Open</span></td><td
+											>Shoot it in combat (it's exhausted, and comes back after a recall effect), or
+											use it out of combat to bring two people closer</td
+										></tr
+									>
+									<tr
+										><td><b>Love letter</b></td><td><span class="open">Open</span></td><td
+											>Improves morale. The letter is "reigning truth"</td
+										></tr
+									>
+									<tr
+										><td><b>Cornucopia</b></td><td><span class="open">Open</span></td><td
+											>Goes in any food slot for free. In the misc slot it might offer a choice, or
+											scale up everything else</td
+										></tr
+									>
+									<tr
+										><td><b>Tom Riddle's diary</b></td><td>A journal you pick up</td><td
+											>Spawns a basilisk</td
+										></tr
+									>
+									<tr
+										><td><b>Other people's journals</b></td><td>Found on the map</td><td
+											>Finding one makes its writer more famous</td
+										></tr
+									>
+									<tr
+										><td><b>Santa's sack</b></td><td>Santa's workshop</td><td
+											><span class="open">Open</span></td
+										></tr
+									>
+									<tr
+										><td><b>The Minotaur's horn</b></td><td>Kill the Minotaur in the labyrinth</td
+										><td><span class="open">Open</span></td></tr
+									>
+									<tr
+										><td><b>Endless wine bottle</b></td><td>Dionysus, at Olympus</td><td
+											>Throw a party while resting: morale, hunger and a little rest</td
+										></tr
+									>
+									<tr
+										><td><b>Fountain of Youth water</b></td><td
+											>The Fountain of Youth, once industrialized</td
+										><td>Sells high. Boosts morale, or makes potions stronger</td></tr
+									>
+									<tr
+										><td><b>Whistle</b></td><td>The General</td><td
+											>Orders take less energy and reach further</td
+										></tr
+									>
+									<tr
+										><td><b>Time stone</b></td><td>Thomas</td><td
+											>Costs mana to use and builds up its own magic each turn, adding fast-forward
+											and rewind cards</td
+										></tr
+									>
+									<tr
+										><td><b>Origin flag</b></td><td>A difficulty twist</td><td
+											>Must be carried to the City of Gold. Weighs 10, and is a useless card in
+											combat</td
+										></tr
+									>
+									<tr
+										><td><b>Crutch</b></td><td><span class="open">Open</span></td><td
+											>A healing aid that speeds up passive healing</td
+										></tr
+									>
+									<tr
+										><td><b>Shields</b></td><td><span class="open">Open</span></td><td
+											>When you fortify, pick a direction to defend. Each shield has its own pattern
+											of bonuses</td
+										></tr
+									>
+									<tr
+										><td><b>Arrows</b></td><td><span class="open">Open</span></td><td
+											>Bows might need them, and special arrows could exist</td
+										></tr
+									>
+									<tr
+										><td><b>Candles, wood and bulbs</b></td><td><span class="open">Open</span></td
+										><td>Light sources that give bonuses at night</td></tr
+									>
+									<tr
+										><td><b>Alcohol</b></td><td><span class="open">Open</span></td><td
+											>Boosts morale, but slows learning</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
 					</section>
 
 					<section>
@@ -1977,6 +2113,11 @@
 											>Everything this character does for a day has the best outcome</td
 										></tr
 									>
+									<tr
+										><td><b>Liquid mana</b></td><td><span class="open">Open</span></td><td
+											>Gives 1 mana. Brew it to store mana beyond your carry-over max</td
+										></tr
+									>
 								</tbody>
 							</table>
 						</div>
@@ -1992,141 +2133,172 @@
 						</p>
 						<div class="table-wrap">
 							<table>
+								<thead><tr><th>Location</th><th>What it does</th></tr></thead>
 								<tbody>
-									<tr>
-										<td><b>Sierra de la Plata</b></td>
-										<td>The mountain of silver</td>
-									</tr>
-									<tr>
-										<td><b>Norumbega, Paititi</b></td>
-										<td>Cities of riches</td>
-									</tr>
-									<tr>
-										<td><b>Camelot, Mount Meru, Atlantis</b></td>
-										<td>Still to be worked out</td>
-									</tr>
-									<tr>
-										<td><b>Muspelheim & Niflheim</b></td>
-										<td>Fire monsters, and its frozen partner. There should be an ice biome too</td>
-									</tr>
-									<tr>
-										<td><b>Ryūgū-jō</b></td>
-										<td>The undersea palace of the Japanese dragon</td>
-									</tr>
-									<tr>
-										<td><b>Library of Alexandria</b></td>
-										<td
-											>Found in deserts, more often near rivers. Holds 5 random books or scrolls
-											(room for 10), and keeps what you leave. A unit working it makes a book or
-											scroll every 8 parts of day (6 for a researcher, and 10% better). A wizard who
-											can see it gets 1 research a turn. A librarian also makes money trading books</td
-										>
-									</tr>
-									<tr>
-										<td><b>Fountain of Youth</b></td>
-										<td
-											>People heal faster nearby, and units within 3 tiles get 3 rest a part of day.
-											Units may work non-stop. Can be bottled and sold</td
-										>
-									</tr>
-									<tr>
-										<td><b>Mount Olympus</b></td>
-										<td
+									<tr><td><b>Sierra de la Plata</b></td><td>The mountain of silver</td></tr>
+									<tr><td><b>Norumbega</b></td><td>A city of riches</td></tr>
+									<tr><td><b>Paititi</b></td><td>Another city of riches</td></tr>
+									<tr><td><b>Camelot</b></td><td>Still to be worked out</td></tr>
+									<tr><td><b>Mount Meru</b></td><td>Still to be worked out</td></tr>
+									<tr><td><b>Atlantis</b></td><td>Still to be worked out</td></tr>
+									<tr
+										><td><b>Muspelheim</b></td><td
+											>Fire monsters, as a place or as the monsters themselves</td
+										></tr
+									>
+									<tr
+										><td><b>Niflheim</b></td><td
+											>Muspelheim's frozen partner. There should be an ice biome too</td
+										></tr
+									>
+									<tr
+										><td><b>Ryūgū-jō</b></td><td>The undersea palace of the Japanese dragon</td></tr
+									>
+									<tr
+										><td><b>Mount Olympus</b></td><td
 											>For real. A mountain that, the first time you summit it, gives one of your
-											party a demigod trait (see below)</td
-										>
-									</tr>
-									<tr>
-										<td><b>The Labyrinth</b></td>
-										<td
+											party a demigod trait (see Olympus below)</td
+										></tr
+									>
+									<tr
+										><td><b>The Labyrinth</b></td><td
 											>Anywhere. A constantly shifting maze with the Minotaur and lesser beasts
 											inside, so getting out isn't easy. Kill the Minotaur for its horn. Escape for
 											an epithet, or lose the run inside and become the Lost. Spend long enough in
 											it to find Daedalus' Journal and the moving-building blueprint</td
-										>
-									</tr>
-									<tr>
-										<td><b>Garden of Eden</b></td>
-										<td
+										></tr
+									>
+									<tr
+										><td><b>Library of Alexandria</b></td><td
+											>Found in deserts, more often near rivers. Holds 5 random books or scrolls
+											(room for 10), and keeps what you leave. A unit working it makes a book or
+											scroll every 8 parts of day (6 for a researcher, and 10% better). A wizard who
+											can see it gets 1 research a turn. A librarian also makes money trading books</td
+										></tr
+									>
+									<tr
+										><td><b>Fountain of Youth</b></td><td
+											>People heal faster nearby, and units within 3 tiles get 3 rest a part of day.
+											Units may work non-stop. Once industrialized it's walled off, bottled and sold</td
+										></tr
+									>
+									<tr
+										><td><b>Garden of Eden</b></td><td
 											>Any green area. Makes 5 food, gives +1 food to every tile around it, and
 											can't be built on. Each time a wizard comes within 3 tiles it gains a
 											temptation (the wizard gains 3 knowledge, maybe 1 research). At 15, both
 											wizards become sinners: +3 wisdom, and a penalty</td
-										>
-									</tr>
-									<tr>
-										<td><b>Baba Yaga's house</b></td>
-										<td>Wanders around a forest. Meeting it can go well or badly</td>
-									</tr>
-									<tr>
-										<td><b>Fortress of Solitude</b></td>
-										<td
+										></tr
+									>
+									<tr
+										><td><b>Scholomance</b></td><td
+											>Dark and devil spells cost less to learn for each part of a day spent there.
+											A battle with the devil. Might clash with the witch expansion</td
+										></tr
+									>
+									<tr
+										><td><b>Hogwarts</b></td><td
+											>Helps you learn. Choose a house for a bonus, with a tree that protects it</td
+										></tr
+									>
+									<tr
+										><td><b>Santa's workshop</b></td><td
+											>Makes toys (money and morale). Get an elf, and Santa's sack</td
+										></tr
+									>
+									<tr
+										><td><b>Baba Yaga's house</b></td><td
+											>Wanders around a forest. Meeting it can go well or badly</td
+										></tr
+									>
+									<tr
+										><td><b>Fortress of Solitude</b></td><td
 											>In frozen biomes. Nobody there can be attacked. The first wizard to arrive
 											gets the "super" trait: +3 strength and speed during the day</td
-										>
-									</tr>
-									<tr>
-										<td><b>The Four Treasures</b></td>
-										<td>Four cities from Irish legend, each with a treasure (see below)</td>
-									</tr>
-									<tr>
-										<td><b>Scholomance</b></td>
-										<td
-											>Dark and devil spells cost less to learn for each part of a day spent there.
-											A battle with the devil</td
-										>
-									</tr>
-									<tr>
-										<td><b>Hogwarts</b></td>
-										<td
-											>Helps you learn. Choose a house for a bonus, with a tree that protects it</td
-										>
-									</tr>
-									<tr>
-										<td><b>Santa's workshop</b></td>
-										<td>Makes toys (money and morale). Get an elf, and Santa's sack</td>
-									</tr>
-									<tr>
-										<td><b>The beanstalk</b></td>
-										<td
+										></tr
+									>
+									<tr
+										><td><b>The four Irish islands</b></td><td
+											>The Four Treasures of the Tuatha Dé Danann: four cities, each with a treasure
+											(see below)</td
+										></tr
+									>
+									<tr
+										><td><b>The beanstalk</b></td><td
 											>Plant beans near something magical and a stalk may grow. Climb it if you can</td
-										>
-									</tr>
-									<tr>
-										<td><b>The Aerie</b></td>
-										<td>On top of a plateau; the trick is getting up there</td>
-									</tr>
-									<tr>
-										<td><b>The gates of hell</b></td>
-										<td>An alternate ending, not necessarily a violent one</td>
-									</tr>
-									<tr>
-										<td><b>The edge of the world</b></td>
-										<td>Makes finding the map's edge a reward instead of just a wall</td>
-									</tr>
-									<tr>
-										<td><b>Iceland</b></td>
-										<td>
-											Its legends of how land formed, mythical creatures, the Golden Circle, and
-											Þorrablót
-										</td>
-									</tr>
-									<tr>
-										<td><b>And more</b></td>
-										<td>
-											Roanoke's disappearance, rainbows and pots of gold, El Capitan, the four Irish
-											islands
-										</td>
-									</tr>
+										></tr
+									>
+									<tr
+										><td><b>The Aerie</b></td><td
+											>On top of a plateau; the trick is getting up there</td
+										></tr
+									>
+									<tr
+										><td><b>El Capitan</b></td><td
+											>Climb it for the first time to earn the Captain epithet</td
+										></tr
+									>
+									<tr><td><b>Rainbows and pots of gold</b></td><td>Still to be worked out</td></tr>
+									<tr
+										><td><b>Roanoke</b></td><td
+											>The colony's sudden disappearance can be part of the world</td
+										></tr
+									>
+									<tr
+										><td><b>The gates of hell</b></td><td
+											>An alternate ending, not necessarily a violent one</td
+										></tr
+									>
+									<tr
+										><td><b>The edge of the world</b></td><td
+											>Makes finding the map's edge a reward instead of just a wall</td
+										></tr
+									>
+									<tr
+										><td><b>The Golden Circle</b></td><td
+											>In Iceland. A location of legend, or at least something with more around it</td
+										></tr
+									>
+									<tr
+										><td><b>Bárður's legend</b></td><td
+											>"The legend of Bordur" from the notes: probably Bárður Snæfellsás, the
+											half-troll guardian of Snæfellsjökull. <span class="open">Open</span></td
+										></tr
+									>
+									<tr
+										><td><b>Þorri</b></td><td
+											>The Icelandic winter god (Iceland has only winter and spring), and his
+											midwinter feast, Þorrablót</td
+										></tr
+									>
+									<tr
+										><td><b>Iceland's legends</b></td><td
+											>How its land masses formed, its fantastic beasts, and the folk tales below</td
+										></tr
+									>
 								</tbody>
 							</table>
 						</div>
+
 						<p class="aside">
 							Legendary artifacts whose location didn't spawn can still turn up with traveling
 							salesmen.
 						</p>
 						<h3>Olympus</h3>
 						<p>Pick who in your party receives the gift, then choose from 3 of the 12 gods.</p>
+						<div class="options">
+							<h4>Options: how the gods choose</h4>
+							<ul>
+								<li>
+									Which god bestows something on you is limited by their bias: only gods who favor
+									you will offer a gift.
+								</li>
+								<li>
+									The gods still give you the choice, but you may have to complete a quest before
+									the reward arrives. How hard it is depends on how that god sees you.
+								</li>
+							</ul>
+						</div>
 						<div class="table-wrap">
 							<table>
 								<thead><tr><th>God</th><th>Gift</th></tr></thead>
@@ -2172,11 +2344,11 @@
 											>+1 armor, and craftsmen need 10% fewer resources</td
 										></tr
 									>
-									<tr><td><b>Aphrodite</b></td><td>+10 charisma</td></tr>
+									<tr><td><b>Aphrodite</b></td><td>+10 swagger</td></tr>
 									<tr><td><b>Hermes</b></td><td>+10 speed</td></tr>
 									<tr
 										><td><b>Dionysus</b></td><td
-											>+3 charisma, and an endless wine bottle to throw a party while resting:
+											>+3 swagger, and an endless wine bottle to throw a party while resting:
 											morale, hunger and a little rest</td
 										></tr
 									>
@@ -2225,6 +2397,128 @@
 							Unlike the legend, gathering all four does nothing special, besides making you very
 							strong.
 						</p>
+						<h3>Iceland</h3>
+						<p>
+							Folk tales from the Iceland photos. Any of them could become a location, an encounter
+							or an item. <span class="open">Open</span> Which ones, and what they do.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Legend</th><th>Where</th><th>The story</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Þrasi's chest of gold</b></td><td>Skógafoss</td><td
+											>A settler hid a chest of gold behind the waterfall. Three men tried to pull
+											it out with a hook in its iron ring, but the ring came loose; it now hangs on
+											the church door at Skógar. "Rewards the one who ventures there with endless
+											riches, great and small"</td
+										></tr
+									>
+									<tr
+										><td><b>The Fálki well</b></td><td>Öndverðarnes</td><td
+											>An ancient well with three sources: fresh water, holy water (very healthy)
+											and ale. Drawing from it after sundown brings bad luck</td
+										></tr
+									>
+									<tr
+										><td><b>The seal skin</b></td><td>Reynisfjara</td><td
+											>Once a year seals come ashore and shed their skins to dance. A man hid one
+											skin and married the seal-woman; years later she found the key and returned to
+											the sea ("seven children in the sea, and seven on land"), and ever after
+											brought him fish and luck</td
+										></tr
+									>
+									<tr
+										><td><b>The merman of Vogar</b></td><td>Vogar (Heifer Bays)</td><td
+											>A farmer caught a merman, who told him where buried gold was. Released, it
+											sent him a herd of grey sea-cows, the best milk cows in Iceland</td
+										></tr
+									>
+									<tr
+										><td><b>Sæmundur the Wise</b></td><td>Oddi</td><td
+											>Studied at the Black School, which taught magic. He tricked the Devil into
+											carrying him home as a seal, then hit it with his Psalter just before land</td
+										></tr
+									>
+									<tr
+										><td><b>Egill's treasure</b></td><td>Mosfell</td><td
+											>The saga hero Egill Skallagrímsson buried two chests of English silver there</td
+										></tr
+									>
+									<tr
+										><td><b>Rauðhöfði (Redhead)</b></td><td>Hvalfjörður</td><td
+											>A man who refused to own his child by an elven woman was cursed into a
+											red-headed whale that drowned many. A pastor with magic led it up the Glymur
+											waterfall to Whale Lake, where it died; its bones are still there</td
+										></tr
+									>
+									<tr
+										><td><b>The Serpent of Skorradalur</b></td><td>Skorradalur Lake</td><td
+											>A slug kept on a gold ring grew into a monstrous serpent, put down by a
+											hymn-writer's incantations. Monsters were also said to live in Baulárvellir
+											Lake, and sea-cows in Haukadalur Lake</td
+										></tr
+									>
+									<tr
+										><td><b>The trolls of the west</b></td><td>Kerlingarskarð, Hítardalur</td><td
+											>Trolls who prank travelers. Hít held great feasts for giants, and one
+											trollwife was turned to stone by the rising sun</td
+										></tr
+									>
+									<tr
+										><td><b>Hruni</b></td><td>Hruni church</td><td
+											>A pastor's Christmas-night dance got so scandalous that the Devil dragged
+											everyone into Hell, church and all</td
+										></tr
+									>
+									<tr
+										><td><b>The Fróðá wonders</b></td><td>Fróðá</td><td
+											>Strange deaths, blood raining down, and drowned sailors by the hearth, until
+											16 ghosts were exorcised</td
+										></tr
+									>
+									<tr
+										><td><b>Kampholtsmóri</b></td><td>Kampholt</td><td
+											>The ghost of a boy turned out to die in the Haze Famine. He haunts the
+											farmer's descendants, and vehicles stall nearby</td
+										></tr
+									>
+									<tr
+										><td><b>Móri of Írafell</b></td><td>Möðruvellir</td><td
+											>A ghost who crouched on a rafter waiting to be served food like the rest of
+											the household</td
+										></tr
+									>
+									<tr
+										><td><b>Krosslaug</b></td><td>Lundarreykjadalur</td><td
+											>A warm spring where westerners were baptized around 1000 AD, said to heal</td
+										></tr
+									>
+									<tr
+										><td><b>Skúli's Run</b></td><td>Kaldidalur</td><td
+											>A man condemned to death fled on his horse Sörli, which outran eight pursuers
+											and carried him home before dying of exhaustion</td
+										></tr
+									>
+									<tr
+										><td><b>The sorcerer burnings</b></td><td>Þingvellir</td><td
+											>In the 17th century, alleged sorcerers were burned at the stake in the Fire
+											Gorge</td
+										></tr
+									>
+									<tr
+										><td><b>Elf stones</b></td><td>Anywhere</td><td
+											>Some rocks are home to elves and shouldn't be moved</td
+										></tr
+									>
+									<tr
+										><td><b>The Black Death</b></td><td>Maríuhöfn</td><td
+											>Arrived by ship in 1402 and killed about half of Iceland</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
 					</section>
 
 					<section>
@@ -2243,21 +2537,41 @@
 								A monster based on the Whomping Willow, the Lorax for anyone clearing a forest, and
 								a basilisk from Tom Riddle's diary (one of the journals you can find).
 							</li>
+							<li>
+								<b>Ice monsters</b> from Inuit legend, and yetis, in the ice arctic. The devil, with
+								the witch expansion and at Scholomance.
+							</li>
 						</ul>
+						<h3>Fantastic beasts of Iceland</h3>
+						<p>From the poster in the Iceland photos.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Beast</th><th>English name</th></tr></thead>
+								<tbody>
+									<tr><td><b>Sækýr</b></td><td>Sea cow</td></tr>
+									<tr><td><b>Fjörulalli</b></td><td>Beach walker</td></tr>
+									<tr><td><b>Bjarndýrakóngur</b></td><td>King of the bears</td></tr>
+									<tr><td><b>Nykur</b></td><td>Water-horse</td></tr>
+									<tr><td><b>Hrosshvalur</b></td><td>Horse-whale</td></tr>
+									<tr><td><b>Vatnaormur</b></td><td>Water serpent</td></tr>
+									<tr><td><b>Skötumóðir</b></td><td>Skate mother</td></tr>
+									<tr><td><b>Selamóðir</b></td><td>Seal mother</td></tr>
+									<tr><td><b>Rauðkembingur</b></td><td>Red-crest</td></tr>
+									<tr><td><b>Urðarköttur</b></td><td>Ghoul cat</td></tr>
+									<tr><td><b>Skeljungur</b></td><td>Shell whale</td></tr>
+									<tr><td><b>Skuggabaldur</b></td><td>Shadow Baldur</td></tr>
+									<tr><td><b>Öfuguggi</b></td><td>Reverse-fin trout</td></tr>
+									<tr><td><b>Eiturgedda</b></td><td>Poisonous pike</td></tr>
+									<tr><td><b>Múshveli</b></td><td>Mouse-whale</td></tr>
+								</tbody>
+							</table>
+						</div>
 					</section>
 
 					<section>
-						<h2>Things to find</h2>
+						<h2>Quests and towns</h2>
+						<p>Every item now lives on the Items tab.</p>
 						<ul>
-							<li>
-								<b>Journals</b> to pick up, which can make their writer famous. An ender chest, an endless
-								book, and scrolls that boost knowledge or spell learning once.
-							</li>
-							<li>
-								<b>Cupid's arrow:</b> shoot it in combat, or use it out of combat to bring two people
-								closer.
-							</li>
-							<li><b>A love letter</b> that improves morale.</li>
 							<li>
 								<b>The pirate quest:</b> cursed treasure, maybe the Kraken, and the Pirate epithet. Pirates
 								sail better and can raid the king's trade, at the cost of receiving none.
