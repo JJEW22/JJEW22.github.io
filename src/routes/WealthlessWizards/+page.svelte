@@ -202,16 +202,18 @@
 						<a href="#wl-party">Your party</a>
 						<a href="#wl-units">Units</a>
 						<a href="#wl-stats">Stats</a>
+						<a href="#wl-bars">The four bars</a>
+						<a href="#wl-fate">Fate</a>
 						<a href="#wl-combat">Combat</a>
-						<a href="#wl-energy">Energy & fatigue</a>
+						<a href="#wl-energy">Fatigue</a>
 						<a href="#wl-cards">Learning spells</a>
 						<a href="#wl-research">Knowledge & research</a>
 						<a href="#wl-shops">Shops & rewards</a>
 						<a href="#wl-resources">Resources</a>
 						<a href="#wl-buildings">Buildings</a>
-						<a href="#wl-food">Food & needs</a>
+						<a href="#wl-food">Food</a>
 						<a href="#wl-morale">Morale & traits</a>
-						<a href="#wl-faith">Faith & fate</a>
+						<a href="#wl-faith">Faith</a>
 						<a href="#wl-fame">Fame & morality</a>
 						<a href="#wl-progress">Progression</a>
 						<a href="#wl-epithets">Epithets</a>
@@ -383,24 +385,30 @@
 						<h2>Time</h2>
 						<ul>
 							<li>
-								<b>Days are split up:</b> morning, afternoon, evening and night. Daylight is for exploring,
-								and night is when your bases can be attacked. Some units are stronger at certain times,
-								and some areas are worse at others (a desert at noon).
+								<b>A day is five turns:</b> morning, noon, evening, night 1 and night 2. Daylight is
+								for exploring, and night is when your bases can be attacked. Some units are stronger
+								at certain times, and some areas are worse at others (a desert at noon).
 							</li>
 							<li>
-								<b>Actions, not hours.</b> Each part of the day gives you actions to spend, not a fixed
-								amount of movement: explore further, boost morale, rest, work the land.
+								<b>Actions take hours.</b> Each part of the day is 5 hours, spent on actions: explore
+								further, boost morale, rest, work the land. You don't normally gain more hours, unless
+								you can turn time like Thomas. Items make actions faster (a pickaxe speeds up mining).
 							</li>
 							<li>
-								<b>Seasons, years and moon cycles</b> could all exist. A lot of witchcraft and the occult
-								follows the moon. Some crops only grow in some seasons. A run could start in any season,
-								each with its own bonuses: in winter ice spells are stronger and food is scarce.
+								<b>Moving.</b> Your speed is how many movement points you get per hour. You move whole
+								tiles, but the time is counted to the nearest tenth of an hour, so a tile that takes
+								part of an hour only uses that part.
+							</li>
+							<li>
+								<b>A moon cycle</b> is 2 "weeks" of 5 days: 10 days, or 50 turns, from new moon to full
+								moon. Your deck resets at the end of each one, not when you rest.
+							</li>
+							<li>
+								<b>Seasons and years</b> could exist too. A lot of witchcraft and the occult follows
+								the moon. Some crops only grow in some seasons. A run could start in any season, each
+								with its own bonuses: in winter ice spells are stronger and food is scarce.
 							</li>
 						</ul>
-						<p class="aside">
-							<span class="open">Open</span> A whole day per turn is also on the table, with quicker
-							battle rounds (like Pathfinder or Humankind).
-						</p>
 					</section>
 
 					<section id="wl-party">
@@ -411,14 +419,14 @@
 								in it. You play as two wizards, or a wizard and an apprentice.
 							</li>
 							<li>
-								<b>Units</b> join you: workers, soldiers, traders, librarians. Each can have one profession,
-								or a number of specialty slots. Horses can work too, like at a farm.
+								<b>Units</b> join you: workers, soldiers, traders, librarians. They're lesser
+								wizards you don't fully control (see <a href="#wl-units">Units</a>). Horses can work
+								too, like at a farm.
 							</li>
 							<li>
-								<b>Orders.</b> Units far from a wizard need orders, like in Old World. An order is sent
-								by spell, so it costs part of a turn. Orders cost more the further away the unit is and
-								the less it likes you. Specially trained units don't need orders for what they're trained
-								in.
+								<b>Orders.</b> Units act on orders, like in Old World. An order costs the wizard who
+								gives it actions (time), more the further away the unit is and the less it likes you.
+								Specially trained units don't need orders for what they're trained in.
 							</li>
 							<li>
 								<b>Communication.</b> Phones and other items let you see distant outposts and need fewer
@@ -435,7 +443,8 @@
 								mode makes a line, and a trailblazing leader speeds up the rest.
 							</li>
 							<li>
-								<b>Outposts.</b> You can build one ring of buildings around an outpost. Buildings make
+								<b>Outposts.</b> You can build one ring of buildings around an outpost (see
+								<a href="#wl-buildings">Buildings</a> for how big each kind of base is). Buildings make
 								monsters spawn less nearby.
 							</li>
 						</ul>
@@ -456,39 +465,49 @@
 					<section id="wl-units">
 						<h2>Units</h2>
 						<p>
-							Human units are lesser wizards. They work tiles, build and upgrade, carry weapons, and
-							have their own stats, movement and carrying capacity. Each costs food, and silver too
-							if they're hired or need supplying.
+							Units are lesser wizards that you don't fully control. They have the same stats as a
+							wizard, usually lower, and the same four bars, plus a <b>loyalty</b> bar. They work tiles,
+							build and upgrade, and carry weapons. Each costs food, and silver too if they're hired
+							or need supplying.
 						</p>
 						<ul>
+							<li>
+								<b>Specialties are traits.</b> There's no separate specialty system: units start with
+								some traits and learn more, and the specialties below are those traits. A unit's first
+								farming trait makes it a farmer, and upgrades are rarer traits further along.
+							</li>
 							<li>
 								<b>Getting units.</b> Buy them (once), hire them (ongoing pay), lure them (they move
 								to one of your outposts) or find them (some events give you one).
 							</li>
 							<li>
-								<b>Knowledge bias.</b> Every unit has a bias from 0 to 100 for each specialty, and learns
+								<b>Learning traits.</b> Units learn by doing the work (farming leads to the farming trait,
+								using a bow to the archer trait). It's faster at a school, slower from sharing a tile
+								with someone who has the trait, or you can pay someone you meet to teach it.
+							</li>
+							<li>
+								<b>Knowledge bias.</b> Every unit has a bias from 0 to 100 for each trait line, and learns
 								it at a bonus of (bias − 50). Some events nudge a bias, like finding a location of legend.
 							</li>
 							<li>
-								<b>Learning a specialty.</b> Units learn by doing the job without the specialty (farming
-								makes a farmer, a bow makes an archer). It's faster at a school, slower from sharing
-								a tile with someone who has it, or you can pay someone you meet to teach it. A unit gets
-								one specialty, maybe two, maybe more, and each grows along a tree.
+								<b>Fate.</b> Every unit rolls a d4 at the start of the turn, which only it can use. Your
+								wizards can also hand it fate from their shared pool when they give it an order, as part
+								of the same action.
 							</li>
 							<li>
 								<b>Civilian or military.</b> Civilian units never start a fight: they only defend when
-								they must, or join an attack someone else started. Military specialties let a unit start
-								combat and defend places.
+								they must, or join an attack someone else started. Military traits let a unit start combat
+								and defend places.
 							</li>
 							<li>
 								<b>Inhuman units</b> like a dragon, a dog or a bird (which can fly out and scout) can't
-								specialize or learn, but start stronger or with unique abilities.
+								learn traits, but start stronger or with unique abilities.
 							</li>
 						</ul>
-						<h3>Specialties</h3>
+						<h3>Starting traits</h3>
 						<div class="table-wrap">
 							<table>
-								<thead><tr><th>Specialty</th><th>Kind</th><th>Effect</th></tr></thead>
+								<thead><tr><th>Trait</th><th>Kind</th><th>Effect</th></tr></thead>
 								<tbody>
 									<tr
 										><td><b>Farmer</b></td><td>Civilian</td><td>+1 food while working a farm</td
@@ -515,7 +534,7 @@
 									>
 									<tr
 										><td><b>Archer</b></td><td>Military</td><td
-											>+1 range and +10% chance on ranged attacks</td
+											>+1 range, and ranged attacks cost less fate</td
 										></tr
 									>
 									<tr><td><b>Swordsman</b></td><td>Military</td><td>+1 melee damage</td></tr>
@@ -527,7 +546,7 @@
 								</tbody>
 							</table>
 						</div>
-						<h3>Specialty upgrades</h3>
+						<h3>Trait upgrades</h3>
 						<div class="table-wrap">
 							<table>
 								<thead><tr><th>Upgrade</th><th>From</th><th>Effect</th></tr></thead>
@@ -629,7 +648,7 @@
 										<td rowspan="4"><b>Physical</b></td>
 										<td><b>Speed</b></td>
 										<td>How many actions you get. Draws your attack cards</td>
-										<td>How fast you move (50 → 5.0 per unit of time)</td>
+										<td>Movement points per hour (50 → 5.0)</td>
 									</tr>
 									<tr>
 										<td><b>Strength</b></td>
@@ -649,7 +668,7 @@
 									<tr>
 										<td rowspan="3"><b>Mental</b></td>
 										<td><b>Intelligence</b></td>
-										<td>Added to your spells' chance. Draws your spell cards</td>
+										<td>Lowers your spells' fate cost. Draws your spell cards</td>
 										<td
 											>How fast you learn intelligence spells and other skills (80 → 80% of points)</td
 										>
@@ -681,8 +700,8 @@
 							</li>
 							<li>
 								Characters can lean physical (more food) or mental (more rest), or somewhere in
-								between. Hunger drops faster the higher your physical stats, and rest drops faster
-								the higher your mental ones.
+								between. Food drops faster the higher your physical stats, and energy drops faster
+								the higher your mental ones (see <a href="#wl-bars">the four bars</a>).
 							</li>
 						</ul>
 						<div class="options">
@@ -695,6 +714,195 @@
 								<b>speed</b> (dodging and movement).
 							</p>
 						</div>
+					</section>
+
+					<section id="wl-bars">
+						<h2>The four bars</h2>
+						<p>
+							Four bars decide how a wizard is doing: <b>health</b>, <b>energy</b>, <b>morale</b>
+							and
+							<b>food</b>. Two of them end a wizard, and the other two drain those.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead>
+									<tr><th>Bar</th><th>Size</th><th>At zero</th></tr>
+								</thead>
+								<tbody>
+									<tr
+										><td><b>Health</b></td><td><span class="open">Open</span></td><td
+											>The wizard dies</td
+										></tr
+									>
+									<tr><td><b>Morale</b></td><td>Fortitude</td><td>The wizard leaves</td></tr>
+									<tr
+										><td><b>Food</b></td><td
+											><span class="open">Open</span> (the desert tummy trait raises it)</td
+										><td>Health starts to drain</td></tr
+									>
+									<tr><td><b>Energy</b></td><td>Endurance</td><td>Morale starts to drain</td></tr>
+								</tbody>
+							</table>
+						</div>
+
+						<h3>Health</h3>
+						<ul>
+							<li>
+								<b>Goes down</b> from damage in combat (fortitude shrugs some off), from ailments like
+								poison, and once food hits zero. Too much cold hurts too, if temperature is on.
+							</li>
+							<li>
+								<b>Comes back</b> very slowly on its own, while you're fed and rested, and faster the
+								more rested you are.
+							</li>
+							<li>
+								<b>To heal quickly:</b> healing spells (Heal works in and out of combat), potions, divine
+								healing paid for with faith, and healing aids like a crutch. A holy elemental sword heals
+								every friendly unit 1, and fruit heals a little.
+							</li>
+							<li>
+								<b>Places that heal:</b> people heal faster near the Fountain of Youth, at holy sites
+								built by a religious leader, and in warm springs like Krosslaug.
+							</li>
+							<li>Endurance decides how fast ailments like poison wear off.</li>
+							<li>A 1UP potion revives a character the moment they die.</li>
+						</ul>
+
+						<h3>Morale</h3>
+						<ul>
+							<li>
+								<b>Drifts down every turn.</b> A beautiful tile slows the drop, and an ugly one speeds
+								it up. It drains once energy hits zero.
+							</li>
+							<li>
+								<b>Fights:</b> killing an enemy boosts the killer's morale, and winning a fight boosts
+								everyone's. A friend dying changes it depending on how close they were, or how much they
+								hated each other.
+							</li>
+							<li>
+								<b>Desires</b> boost it when met and lower it when they aren't.
+							</li>
+							<li>
+								<b>Raised by:</b> relaxing (more with others), spice with a meal, a chef or foodie in
+								the group, alcohol (which slows learning), a love letter, the lyre, a wine party, toys
+								from Santa's workshop, holy sites, and companions with high swagger. Pirates get +2 while
+								sailing, and their crew +1.
+							</li>
+							<li>
+								Hera's marriage means 5% less morale lost while the two wizards are together. Money
+								can keep units' morale up if they need all four food types.
+							</li>
+							<li>
+								Units also have a <b>loyalty</b> bar, which decides how much an outpost sends you.
+							</li>
+						</ul>
+
+						<h3>Food</h3>
+						<ul>
+							<li>
+								<b>Goes down over time</b>, faster the higher your physical stats. At zero you're
+								starving, and health drains.
+							</li>
+							<li>
+								<b>Eating</b> fills it, and a balanced meal fills it more (see
+								<a href="#wl-food">Food</a> for types and slots). The cornucopia fits any slot for free.
+							</li>
+							<li>
+								Survivalists need 1 less food a turn, and the Cauldron of the Dagda means its holder
+								never needs food. Scavengers get more food from hunting.
+							</li>
+							<li>A wine party fills hunger a little, along with morale and some energy.</li>
+						</ul>
+
+						<h3>Energy</h3>
+						<ul>
+							<li>
+								<b>Goes down with every action</b>, since every action is work, unless that action
+								has the <b>rest</b> trait (reading, for example). It drops faster the higher your mental
+								stats. A low-level character working flat out tires in 2–3 days.
+							</li>
+							<li>
+								<b>Also drained by</b> carrying too much (weighed down), skipping sleep (a fatigue card),
+								heat if temperature is on, and Sid's escape hatch (75% of his current energy).
+							</li>
+							<li>
+								<b>Rest refills it:</b>
+								<b>sleeping</b> is night only and the best rest, but you can be attacked in the
+								night, and units woken up are startled. <b>Napping</b> is sleep during the day: less
+								than sleeping, more than relaxing. <b>Relaxing</b> is daytime and the least rest, but
+								boosts morale, and units who relax together get on better.
+							</li>
+							<li>
+								<b>Helps:</b> a pillow or mattress, a wine party, and the Fountain of Youth (3 rest a
+								part of day for units within 3 tiles). An energy drink gives +15 energy now but −6 for
+								each of the next 3 turns, so it costs 3 overall.
+							</li>
+							<li>
+								<b>Saves energy:</b> the General's whistle makes orders cheaper. Tools like the pickaxe
+								and plow make actions faster instead, so they take fewer hours.
+							</li>
+							<li>
+								<b>Mana is separate.</b> Spells cost mana, counted the usual card-game way, not energy.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> Is thirst a fifth bar, or a difficulty setting?
+						</p>
+					</section>
+
+					<section id="wl-fate">
+						<h2>Fate</h2>
+						<p>
+							There's no chance system: nothing succeeds or fails on a hidden roll, so you can plan
+							around everything. Instead, Wealthless Wizards uses the fate system from
+							<a href={resolve('/WealthyWizards')}>Wealthy Wizards</a>.
+						</p>
+						<ul>
+							<li>
+								<b>Every wizard has their own fate</b>, a modifier that can be positive or negative.
+							</li>
+							<li>
+								<b>Roll at the start of each turn:</b> a d20 for each wizard, plus that wizard's fate.
+							</li>
+							<li>
+								<b>One shared pool.</b> Both wizards' totals are added together, and either wizard can
+								spend from it. Wizards can hand some to a unit when they give it an order, as part of
+								that action, so the unit can take actions that need fate.
+							</li>
+							<li>
+								<b>Units roll a d4</b> each turn, for their own use only.
+							</li>
+							<li>
+								<b>Fate replaces chance.</b> Anything that used to have a chance of working now costs
+								fate instead, and works if you can pay. Bonuses that used to raise a chance now lower
+								the fate cost.
+							</li>
+							<li>
+								<b>Costs by kind:</b> in general, melee attacks cost less fate than ranged attacks, and
+								ranged attacks cost less than spells.
+							</li>
+							<li>
+								<b>Tiered and repeatable spells.</b> Some spells can be cast at a higher tier, or again,
+								by paying more fate.
+							</li>
+							<li>
+								<b>Randomness can still exist</b> in places, but never in whether a spell succeeds or
+								fails.
+							</li>
+							<li>
+								<b>Religion is mostly a way of manipulating fate.</b> The evil (dark) side exploits
+								it, and the good (holy) side aligns you with it. See <a href="#wl-faith">Faith</a>.
+							</li>
+							<li>
+								When a character dies they lose 1 fate permanently. Reaching a certain level gains 1
+								fate (2 if they're behind).
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> Whether the rest of Wealthy Wizards' fate rules carry over:
+							overspending at a cost, saving leftover fate, and losing your turn when the roll comes
+							out below 0.
+						</p>
 					</section>
 
 					<section id="wl-combat">
@@ -727,7 +935,7 @@
 						<ul>
 							<li>
 								Each card lists three values: its cost (actions or mana), its damage bonus (usually
-								strength) and its chance bonus (usually intelligence).
+								strength) and its fate cost (lowered by intelligence).
 							</li>
 							<li>
 								Spells and abilities could be separate decks: spells drawn at a rate based on
@@ -748,7 +956,10 @@
 								Spells can work both in and out of combat: healing either way, a fireball to kill or
 								to warm something up, a forceful wind to speed your ship or slow theirs.
 							</li>
-							<li>In-combat upgrades (lower cost, more damage) last until that character rests.</li>
+							<li>
+								In-combat upgrades (lower cost, more damage) last until your deck resets at the end
+								of the moon cycle.
+							</li>
 						</ul>
 						<div class="options">
 							<h4>Earlier draft</h4>
@@ -814,46 +1025,31 @@
 					</section>
 
 					<section id="wl-energy">
-						<h2>Energy & fatigue</h2>
+						<h2>Fatigue</h2>
+						<p>
+							Your <b>energy bar</b> is one of <a href="#wl-bars">the four bars</a>. Fatigue is how
+							a tired character's deck gets worse.
+						</p>
 						<ul>
 							<li>
-								Every character has an <b>energy bar</b>, sized by endurance. Spending mana and
-								cycling your deck drains it.
-							</li>
-							<li>
 								When your deck reshuffles, you get a <b>fatigue</b> card. The first costs 0 to play,
-								and each one after costs 1 more, up to 10. The energy lost could depend on how big your
-								deck is.
+								and each one after costs 1 more, up to 10.
 							</li>
 							<li>
-								You lose 10 × the percentage of energy you spent in a turn, so a low-level character
-								working flat out tires in 2–3 days.
+								Your deck resets once a moon cycle (every 50 turns): all fatigue clears, the counter
+								resets and you draw a new hand.
 							</li>
-							<li>
-								Refilling your energy bar clears all fatigue, resets the counter and draws a new
-								hand.
-							</li>
+							<li>Not sleeping adds a fatigue card.</li>
 							<li>
 								Carrying too much adds <b>weighed down</b> cards (1 mana: draw a card) to your deck,
 								more the heavier you are. That makes it punishing to send one overloaded person into
 								a fight.
 							</li>
-							<li>Not sleeping adds a fatigue card too.</li>
-							<li>
-								Cards that play differently cost different energy: physical &lt; magic &lt; fatigue
-								cards.
-							</li>
 							<li>
 								Removing cards from your deck is never impossible, but bigger decks get rewards too.
-								More cycles mean more energy used, so you tire faster.
+								More cycles mean more fatigue cards.
 							</li>
 						</ul>
-						<h3>Health and rest</h3>
-						<p>
-							Health comes back very slowly on its own, faster while resting. To heal quickly, use
-							potions, healing spells, or healing aids like a crutch. Endurance decides how fast
-							ailments like poison wear off.
-						</p>
 					</section>
 
 					<section id="wl-cards">
@@ -866,8 +1062,10 @@
 							<li>
 								<b>Civilian and military spells.</b> Civilian spells are what a wizard does out in the
 								world: Heal (which works in combat too), Blessing of the farm, Pickpocket (Sid: steal
-								silver from a building or person, with a chance of getting caught), Franchise (Bobby:
-								a building starts working for his company). Military spells go in your combat deck.
+								silver from a building or person. It's a tiered spell: the more fate you spend, the higher
+								the tier and the less likely you are to be caught, and getting caught has consequences),
+								Franchise (Bobby: a building starts working for his company). Military spells go in your
+								combat deck.
 							</li>
 							<li>
 								<b>Knowledge and gold</b> pay for new spells. Casting a spell makes it cheaper to learn,
@@ -1005,12 +1203,36 @@
 
 					<section id="wl-buildings">
 						<h2>Buildings</h2>
+						<h3>Bases</h3>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Base</th><th>Size</th><th>Notes</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Tent</b></td><td>A triangle of 3 tiles</td><td
+											>Temporary, and can be carried. Sleeps 3</td
+										></tr
+									>
+									<tr
+										><td><b>Outpost</b></td><td>1 tile and the 6 around it (7)</td><td
+											>Buildings go in the ring around it</td
+										></tr
+									>
+									<tr
+										><td><b>Castle</b></td><td>A triangle of 3 tiles and the 9 around it (12)</td
+										><td></td></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<h3>Blueprints</h3>
 						<p>
 							Blueprints come in five rarities, and a higher research level makes the rarer ones
 							more likely. A rare roll (a 0.1% legendary) gets a small discount, worked out from its
 							base odds, so rarer buildings get cheaper over time. Upgrades need the base building
 							first, and show up as blueprints of their own.
 						</p>
+
 						<div class="table-wrap">
 							<table>
 								<thead><tr><th>Building</th><th>Rarity</th><th>Effect</th></tr></thead>
@@ -1109,7 +1331,7 @@
 					</section>
 
 					<section id="wl-food">
-						<h2>Food & needs</h2>
+						<h2>Food</h2>
 						<ul>
 							<li>
 								<b>Four food types:</b> fruit, vegetable, protein and carb, plus water. Eating all four
@@ -1133,10 +1355,6 @@
 								The cornucopia can go in any slot for free. A button can eat your best mix
 								automatically.
 							</li>
-							<li>
-								Characters need food and rest. If units need all four basics, money can keep their
-								morale up.
-							</li>
 						</ul>
 						<div class="options">
 							<h4>Earlier draft</h4>
@@ -1148,61 +1366,14 @@
 								counts as grain and vegetable. Rivers and oceans might be endless fishing.
 							</p>
 						</div>
-						<h3>The four bars</h3>
-						<div class="table-wrap">
-							<table>
-								<thead
-									><tr><th>Bar</th><th>At zero</th><th>Goes up</th><th>Goes down</th></tr></thead
-								>
-								<tbody>
-									<tr
-										><td><b>Health</b></td><td>The wizard is lost</td><td
-											>Over time, while fed and rested</td
-										><td>In combat</td></tr
-									>
-									<tr
-										><td><b>Morale</b></td><td>The wizard is lost</td><td>Winning fights</td><td
-											>Over time, faster when hungry or tired</td
-										></tr
-									>
-									<tr
-										><td><b>Hunger</b></td><td>Takes from health, and a starving penalty</td><td
-											>Eating</td
-										><td>Over time, faster with high physical stats</td></tr
-									>
-									<tr
-										><td><b>Rest</b></td><td>Takes from morale, and a tired penalty</td><td
-											>Sleeping, napping, relaxing</td
-										><td>Over time, faster with high mental stats</td></tr
-									>
-								</tbody>
-							</table>
-						</div>
-						<ul>
-							<li>
-								<b>Sleeping</b> is night only and the best rest, but you can be attacked in the night.
-							</li>
-							<li>
-								<b>Napping</b> is sleep during the day: less than sleeping, more than relaxing.
-							</li>
-							<li>
-								<b>Relaxing</b> is daytime and the least rest, but boosts morale, and units who relax
-								together get on better.
-							</li>
-						</ul>
-						<p class="aside">
-							<span class="open">Open</span> Is thirst its own mechanic, or a difficulty setting?
-						</p>
 					</section>
 
 					<section id="wl-morale">
 						<h2>Morale, traits & relationships</h2>
+						<p>Morale itself is one of <a href="#wl-bars">the four bars</a>.</p>
 						<ul>
 							<li>
-								<b>Morale</b> drifts every turn. A beautiful tile slows the drop, an ugly one speeds
-								it up. Killing an enemy boosts the killer's morale, winning a fight boosts everyone's,
-								and a friend dying changes it depending on how close they were (or how much they hated
-								each other).
+								<b>Loyalty</b> decides how much an outpost sends you.
 							</li>
 							<li>
 								<b>Relationships.</b> It's usually better if your two wizards like each other, though
@@ -1214,17 +1385,10 @@
 								learn a task and how much they enjoy it, and big events can change it.
 							</li>
 							<li>
-								<b>Desires</b> boost morale when met and lower it when they aren't.
-							</li>
-							<li>
 								<b>Traits</b> can be temporary or permanent, and their strength is rolled, so the same
 								trait can be good or bad. Gaining traits makes similar, rarer ones more likely. Examples:
 								scavenger, desert tummy, foodie, chef, heavy sleeper, sluggish, greed, adaptive learning,
 								fearless.
-							</li>
-							<li>
-								<b>Loyalty</b> could replace morale for units, and decides how much an outpost sends
-								you.
 							</li>
 							<li>
 								<b>Influence</b> lets wizards talk people into things. It costs less with people who
@@ -1242,7 +1406,11 @@
 					</section>
 
 					<section id="wl-faith">
-						<h2>Faith & fate</h2>
+						<h2>Faith</h2>
+						<p>
+							Religion is mostly a way of manipulating <a href="#wl-fate">fate</a>: the evil (dark)
+							side exploits it, and the good (holy) side aligns you with it.
+						</p>
 						<ul>
 							<li>
 								<b>Faith works like Civ's.</b> Spend it on things like divine healing. People who witness
@@ -1261,14 +1429,6 @@
 							<li>
 								Religions can be spawned by events and change over time. They're tied to spell
 								schools. Evil-leaning people may be wary of yours, and hunts can happen.
-							</li>
-							<li>
-								<b>Fate</b> is closely tied to faith, and could be a roll that depends on who you're
-								traveling with. Damage could be rolled too.
-							</li>
-							<li>
-								When a character dies they lose 1 fate permanently. Reaching a certain level gains 1
-								fate (2 if they're behind).
 							</li>
 						</ul>
 					</section>
@@ -1322,8 +1482,8 @@
 							<li>The start: Merlin and Knick</li>
 							<li>Building materials: Candice</li>
 							<li>Food that rots, food types and water: Frank the Founder</li>
-							<li>Temperature and weather: Pylion</li>
 							<li>Time, moon cycles and seasons: the witch, or Thomas</li>
+							<li>Temperature and weather: Pylion</li>
 							<li>Memory: people recognize you, hostility grows, and fame takes hold</li>
 							<li>Cartography: the map locks in, and the hunt for the City of Gold begins</li>
 						</ol>
@@ -1528,7 +1688,8 @@
 										<td><b>the King</b></td>
 										<td>
 											Find Falias, the northernmost of the four Irish islands, and be accepted as
-											king by the Stone of Fál
+											king by the Stone of Fál. The stronger you are when you find it, the better
+											the odds it accepts you
 										</td>
 										<td>
 											Changes how the rules work: you're now the king of a kingdom, not just a
@@ -1589,7 +1750,7 @@
 								<li><b>Ol' Trusty</b> (start): a weapon that gives about +5 strength.</li>
 								<li>
 									<b>Squire</b> (unlocked): a starting unit who must stay with Knick until they become
-									a knight. Can have two specialties, and starts as a swordsman with a sword.
+									a knight. Can learn two trait lines, and starts with the swordsman trait and a sword.
 								</li>
 								<li>
 									<b>Horse</b> (found wandering the plains): +10 carrying and +5 speed, and eats 1 food
@@ -1620,7 +1781,9 @@
 									<b>Salesman:</b> 25% more silver when he sells, and everything that costs silver is
 									10% cheaper.
 								</li>
-								<li><b>Magicless:</b> 5% worse spell chance, spell prices and spell rarity.</li>
+								<li>
+									<b>Magicless:</b> spells cost more fate, cost more to buy and turn up rarer.
+								</li>
 								<li>
 									<b>Franchising:</b> make a building part of Bobby's business. Outposts within 5 tiles
 									draw 5% more units and turn 25% of what they make into silver, plus 1 silver.
@@ -1678,6 +1841,10 @@
 									mana and remove a fatigue; upgraded, it also draws.
 								</li>
 								<li>"Each unit draws a card." Gives neutral mana to the party.</li>
+								<li>
+									<b>Banner:</b> every unit within 3 tiles rolls a die one size larger (a d6 instead
+									of a d4), and the other wizard rolls a d22 instead of a d20.
+								</li>
 								<li>Joins after you recruit enough units from the armory.</li>
 							</ul>
 						</div>
@@ -1723,8 +1890,8 @@
 							<ul>
 								<li>
 									<b>Stolen chest</b> (discovered, by stealing it from a city): Sid has to spend time
-									picking it open (an active rest, 15% × 1.5^tries). Inside are two random artifacts
-									and 100 knowledge.
+									picking it open (an active rest): it has a total fate cost that he slowly ticks down
+									until it opens. Inside are two random artifacts and 100 knowledge.
 								</li>
 								<li><b>Escape artist:</b> gets out of combat more easily.</li>
 								<li>
@@ -1736,9 +1903,9 @@
 						<div class="card">
 							<h3>Maximus the Mad</h3>
 							<p>Has a mulligan.</p>
-							<p class="small">Chaos, randomness and rigging chance</p>
+							<p class="small">Chaos, randomness and bending fate</p>
 							<ul>
-								<li><b>Rabbit's foot</b> (start): more luck all round.</li>
+								<li><b>Rabbit's foot</b> (start): raises his fate.</li>
 								<li>
 									<b>Wild card</b> (unlocked): when drawn, casts random spells that add up to a cost
 									of X, where X is how many times it's been drawn this game. Then draw a card.
@@ -1781,7 +1948,7 @@
 									>
 									<tr
 										><td><b>Pickaxe</b></td><td
-											>A weak weapon, but mining costs 10% less energy even when it isn't equipped</td
+											>A weak weapon, but mining is 10% faster even when it isn't equipped</td
 										></tr
 									>
 									<tr
@@ -1792,7 +1959,8 @@
 									<tr><td><b>Ballista</b></td><td>Good against cities. Heavy</td></tr>
 									<tr
 										><td><b>The First Wand (legendary)</b></td><td
-											>In combat your spells never miss, +2 mana and +1 draw</td
+											>In combat your spells cost no base fate (higher tiers and repeats still cost
+											fate), +2 mana and +1 draw</td
 										></tr
 									>
 									<tr
@@ -1884,7 +2052,11 @@
 											>A bigger boost to sleep and naps. Heavy, and can be left at a building</td
 										></tr
 									>
-									<tr><td><b>Energy drink</b></td><td>Drink it to raise your rest</td></tr>
+									<tr
+										><td><b>Energy drink</b></td><td
+											>+15 energy this turn, then −6 energy for each of the next 3 turns</td
+										></tr
+									>
 									<tr
 										><td><b>Lyre</b></td><td
 											>An active rest that boosts the whole party's morale while taking up only one
@@ -1903,7 +2075,7 @@
 										></tr
 									>
 									<tr><td><b>Backpack</b></td><td>+25 carrying capacity</td></tr>
-									<tr><td><b>Plow</b></td><td>Working for food costs 15% less energy</td></tr>
+									<tr><td><b>Plow</b></td><td>Working for food is 15% faster</td></tr>
 									<tr><td><b>Hammer</b></td><td>+25% while working on a construction</td></tr>
 									<tr
 										><td><b>Computer</b></td><td
@@ -1912,9 +2084,7 @@
 											move, your deck</td
 										></tr
 									>
-									<tr
-										><td><b>Aimbot</b></td><td>+10% chance to land spells and critical hits</td></tr
-									>
+									<tr><td><b>Aimbot</b></td><td>Spells and critical hits cost less fate</td></tr>
 									<tr
 										><td><b>Cauldron</b></td><td
 											>Lets its carrier brew. At a brewery, brewing costs 10% less</td
@@ -1987,7 +2157,7 @@
 									>
 									<tr
 										><td><b>Whistle</b></td><td>The General</td><td
-											>Orders take less energy and reach further</td
+											>Orders take less time and reach further</td
 										></tr
 									>
 									<tr
@@ -2060,7 +2230,7 @@
 									>
 									<tr
 										><td><b>Invisibility</b></td><td>Rare</td><td
-											>Invisible to enemies for a day (4 parts of day)</td
+											>Invisible to enemies for a day (5 turns)</td
 										></tr
 									>
 									<tr
@@ -2369,7 +2539,8 @@
 									<tr
 										><td><b>Falias</b></td><td>North</td><td>Stone of Fál (Lia Fáil)</td><td
 											>Stays put. It can cry out for one of your wizards, making them a king who can
-											found a nation. The Hill of Tara spawns next to it</td
+											found a nation. The stronger you are when you find it, the better the odds it
+											accepts you. The Hill of Tara spawns next to it</td
 										></tr
 									>
 									<tr
