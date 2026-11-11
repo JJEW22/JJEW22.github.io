@@ -24,15 +24,18 @@
 	import NotesView from '$lib/wizards/NotesView.svelte';
 	import { wealthlessNotes } from '$lib/wizards/notes';
 
-	// overview | rules | wizards | epithets | items | world | notes. Kept in the URL hash so a reload
-	// stays on the same tab.
+	// overview | gameplay | rules | wizards | epithets | traits | items | world | monsters | notes. Kept in the URL hash so
+	// a reload stays on the same tab.
 	const TABS = [
 		{ id: 'overview', label: 'Overview' },
+		{ id: 'gameplay', label: 'Gameplay' },
 		{ id: 'rules', label: 'Rules draft' },
 		{ id: 'wizards', label: 'Wizards' },
 		{ id: 'epithets', label: 'Epithets' },
+		{ id: 'traits', label: 'Traits' },
 		{ id: 'items', label: 'Items' },
 		{ id: 'world', label: 'World & legends' },
+		{ id: 'monsters', label: 'Monsters' },
 		{ id: 'notes', label: 'Notes' }
 	];
 	let tab = 'overview';
@@ -86,7 +89,7 @@
 						<p>
 							A party of wizards sails from the old world to a vast new one, funded by a king, to
 							find the City of Gold. It's part Civilization, part dungeon run (like Slay the Spire),
-							part Oregon Trail. A run takes 1–3 hours, longer than most roguelikes and shorter than
+							part Oregon Trail. A run takes 3–5 hours, longer than most roguelikes and shorter than
 							a game of Civ, and depends on how you play.
 						</p>
 						<p>
@@ -148,6 +151,11 @@
 								subtraction once it's built, to keep it that way.
 							</li>
 							<li>
+								<b>Everything is real.</b> What if every story, fable and myth ever told were true? Every
+								legend is out there to be found. It drives the point home: it doesn't matter how much
+								there is, we will always take more.
+							</li>
+							<li>
 								<b>Systemic.</b> The world should feel like it exists without you, and you should build
 								your own story through synergies and, more importantly, interactions (like the Nemesis
 								system).
@@ -186,6 +194,458 @@
 						</ul>
 					</section>
 				</article>
+			{:else if tab === 'gameplay'}
+				<article class="rules">
+					<p class="intro">
+						How a turn actually plays. The game is turn based, and most of what you do comes from
+						playing cards, but a few actions are always there for every wizard and unit.
+					</p>
+
+					<section>
+						<h2>A turn</h2>
+						<h3>Start of the turn</h3>
+						<ul>
+							<li>
+								<b>Roll fate.</b> Each wizard rolls a d20 plus their fate, into the shared pool, and
+								each unit rolls a d4 for itself (see
+								<button type="button" class="link" on:click={() => pickTab('rules')}
+									>the rules draft</button
+								>).
+							</li>
+							<li>
+								<b>Draw cards.</b> Every character you control (both wizards and every unit) has their
+								own hand, and draws 1 card per 10 speed, plus spell draws equal to swagger ÷ 10 × magic
+								ability ÷ 100.
+							</li>
+							<li>
+								<b>Gain mana:</b> by default, the sum of your other stats × magic ability ÷ 100. Anything
+								left over from last turn carries over, up to your max (1 by default).
+							</li>
+							<li>
+								<b>Buildings trigger.</b> Every per-turn effect from your buildings happens now.
+							</li>
+							<li>
+								<b>Start-of-turn effects</b> from items, traits and places happen now, like the energy
+								drink's −6 energy or morale drifting down.
+							</li>
+						</ul>
+						<h3>Everyone has their own 5 hours</h3>
+						<p>
+							Every wizard and every unit gets its own 5 hours to spend each turn. They all act in
+							parallel, so everything done in a turn is happening at the same time: one wizard can
+							spend their hours walking while the other casts and a unit mines. The turn is over
+							once everyone's hours are spent, or you end it.
+						</p>
+						<ul>
+							<li>
+								<b>Every action takes time</b> from the hours of whoever does it. Giving a unit an order
+								also takes some of the ordering wizard's hours.
+							</li>
+							<li>
+								<b>Most actions drain energy</b>, unless they have the rest trait.
+							</li>
+							<li>
+								<b>Play cards.</b> Most actions, and most of your damage, come from the cards in your
+								hand, paid for with mana (and fate, where a card needs it).
+							</li>
+							<li>
+								<b>Take the basic actions.</b> These are always available, whatever you've drawn.
+							</li>
+						</ul>
+					</section>
+
+					<section>
+						<h2>Basic actions</h2>
+						<p>
+							To start with there are four: <b>move</b>, <b>basic strike</b>, <b>interact</b> and
+							<b>work</b>. Wizards take them directly, and units take them when ordered (which costs
+							the ordering wizard time too).
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Action</th><th>How</th><th>Cost</th><th>Limit</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Move</b></td><td
+											>Select a unit, or a whole corps, and drag to where you want them to go</td
+										><td
+											>Each one spends the time the move takes from its own hours, based on its
+											speed (movement points per hour, counted to the nearest tenth of an hour)</td
+										><td>As far as its hours allow</td></tr
+									>
+									<tr
+										><td><b>Basic strike</b></td><td>Attack with the equipped weapon</td><td
+											>The time and fate cost set by the weapon equipped</td
+										><td>Once per turn</td></tr
+									>
+									<tr
+										><td><b>Interact</b></td><td>Interact with what's on a tile</td><td
+											>Each kind of interaction has its own cost</td
+										><td>As many times as your hours allow</td></tr
+									>
+									<tr
+										><td><b>Work</b></td><td
+											>Work the tile you're on, or speed up something in progress there</td
+										><td>Time</td><td>Once per tile and once per person, each turn</td></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<h3>Move</h3>
+						<ul>
+							<li>Click a unit or a corps to select it, then drag to the tile you want.</li>
+							<li>
+								Everyone selected moves, and every one of them spends the time it takes to get
+								there. You move whole tiles.
+							</li>
+						</ul>
+						<h3>Basic strike</h3>
+						<ul>
+							<li>
+								Usable exactly once per turn. The rest of your damage comes from playing cards.
+							</li>
+							<li>
+								Every <button type="button" class="link" on:click={() => pickTab('items')}
+									>weapon</button
+								> has its own time and fate cost for its basic strike. Melee weapons cost less fate than
+								ranged ones.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> The actual time and fate cost for each weapon, and for striking
+							with no weapon.
+						</p>
+						<h3>Interact</h3>
+						<ul>
+							<li>
+								Interacting with a tile does something that depends on what's there. Interacting
+								with a shop, for example, opens the shop.
+							</li>
+							<li>
+								Learning about the land isn't part of it: that's what the explore cards (and sense)
+								are for.
+							</li>
+							<li>Every interaction has its own cost.</li>
+							<li>
+								There's no limit per turn: you can interact as many times as your hours allow.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> What each interaction costs (time, fate or something else).
+						</p>
+						<h3>Work</h3>
+						<ul>
+							<li>Works the tile you're on, the same way the explore cards work a known tile.</li>
+							<li>
+								It can also speed up something in progress on the tile, like a building going up.
+							</li>
+							<li>
+								<b>Once per tile, once per person.</b> Each turn only one person can work a given tile,
+								and each person can only work once. Both reset at the end of the turn.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> How long working takes, what it gives on each kind of tile,
+							and how much it speeds things up.
+						</p>
+					</section>
+					<section>
+						<h2>Starting deck</h2>
+						<p>
+							The starting deck is 8 fixed cards, plus attacks from your starting weapon and blocks
+							from your starting defensive gear, so its size depends on what you start with.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Card</th><th>Copies</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Explore</b></td><td>4</td><td
+											>On an unknown tile, reveals details about it (explores it). On a known tile,
+											works it</td
+										></tr
+									>
+									<tr><td><b>Soothe</b></td><td>1</td><td>1 mana: heal 5</td></tr>
+									<tr
+										><td><b>Extract</b></td><td>1</td><td
+											>A spell: pick up to 5 things to turn into magic essence, from stacks of up to
+											10 resources, single gold stacks, or the tile you are on (see Building)</td
+										></tr
+									>
+									<tr
+										><td><b>Sense</b></td><td>1</td><td
+											>A spell, and a stronger explore that costs mana: shows more detail, and can
+											show what you're near too</td
+										></tr
+									>
+									<tr
+										><td><b>Outpost blueprint</b></td><td>1</td><td
+											>Builds an outpost. It has exhaust: once played it's swapped for an exhaustion
+											card until it comes back (see Building)</td
+										></tr
+									>
+									<tr
+										><td><b>Basic block</b></td><td>Depends on gear</td><td
+											>Blocks 3 by default. How many you get, and how much each blocks, depend on
+											your starting defensive gear</td
+										></tr
+									>
+									<tr
+										><td><b>Weapon attacks</b></td><td>1–3, by weapon</td><td
+											>Attack cards from your starting weapon. How many depends on the weapon</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<p class="aside">
+							<span class="open">Open</span> What a basic block costs, what explore, extract, sense and
+							the weapon attacks cost, and whether units start with the same deck.
+						</p>
+					</section>
+
+					<section>
+						<h2>Adding cards to your deck</h2>
+						<p>
+							New cards come into your deck in two main ways: you learn them, or your gear gives
+							them to you.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Cards</th><th>How you get them</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Spells</b></td><td
+											>Only by learning: on the study screen, from a teacher, or from a tutor</td
+										></tr
+									>
+									<tr
+										><td><b>Other actions</b></td><td
+											>Learned the same way as spells, or from gear. Buying a pickaxe, for example,
+											gives you a copy of its mine action</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+
+						<h3>Learning</h3>
+						<ul>
+							<li>
+								<b>The study screen</b> is the knowledge shop: 4 spells, 3 buildings (blueprints) and
+								2 traits. It only takes knowledge: no gold or silver.
+							</li>
+							<li>
+								<b>Teachers and tutors</b> work much the same way, and are where money comes in: they
+								cost gold as well as knowledge. They let you pick a specific card, even a legendary,
+								instead of the study screen's random options. Teachers are people you meet or units who
+								know the subject; a unit's bonus as a teacher at a school comes from how much it knows
+								of that subject.
+							</li>
+						</ul>
+
+						<h3>Learning rate</h3>
+						<ul>
+							<li>
+								<b>Intelligence</b> multiplies the points you earn towards learning every spell and other
+								skill: 80 intelligence means you get 80% of the points.
+							</li>
+							<li>
+								<b>Casting a spell makes others cheaper to learn.</b> Every cast takes 1 off the cost
+								of learning any spell, 5 off spells of the same school, and 25 off that exact spell (if
+								you don't own it yet, like a generated one). The discounts are permanent for the rest
+								of the run.
+							</li>
+							<li>
+								<b>Knowledge bias:</b> units learn each trait line at a bonus of (bias − 50), on a 0–100
+								scale.
+							</li>
+							<li>
+								<b>Other modifiers:</b> Bex's elbow pads give +1 knowledge a part of day to everyone
+								within 2 hexes. Alcohol raises morale but slows learning. Fore thought gives about 5%
+								more learning, but a quarter of your knowledge goes towards discounting the purchase
+								after next.
+							</li>
+						</ul>
+
+						<h3>Research</h3>
+						<ul>
+							<li>
+								The <b>research bar</b> runs from 0 to 10 and fills with a tenth of the knowledge you
+								gain, plus extra from universities, books, scrolls and research projects.
+							</li>
+							<li>
+								Each level raises the odds of rarer cards, and levels 2, 4 and 6 add a spell, a
+								building and a trait to the study screen. An average run should reach level 4, a
+								solid one 6.
+							</li>
+							<li>
+								<b>Mystical spells</b> can only be learned from level 8, so they're usually out of reach.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> How the study screen is laid out, and whether a gear card
+							leaves your deck when you sell or unequip the gear.
+						</p>
+					</section>
+
+					<section>
+						<h2>Building</h2>
+						<p>Building something takes two steps:</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Step</th><th>What it is</th><th>Cost</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>1. Blueprint</b></td><td>Learning how to build it</td><td>Knowledge</td
+										></tr
+									>
+									<tr
+										><td><b>2. Building</b></td><td>Actually putting it up</td><td
+											>Resources (wood, iron and so on). Whatever you're short of is covered by
+											magic essence</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<p>
+							Blueprints come from the study screen, like spells, and the buildings themselves are
+							listed under <button type="button" class="link" on:click={() => pickTab('rules')}
+								>Buildings</button
+							>
+							in the rules draft.
+						</p>
+
+						<h3>Blueprints are cards</h3>
+						<p>
+							A blueprint you learn goes into your deck. You draw it like any other card, and play
+							it from your hand to build.
+						</p>
+						<ul>
+							<li>
+								<b>Capped.</b> Some blueprints can only be played a set number of times. A legendary
+								one is usually once.
+							</li>
+							<li><b>Uncapped.</b> Others can be built as often as you draw them.</li>
+							<li>
+								<b>Exhaust.</b> A blueprint with the exhaust keyword is out once played, until it
+								comes back, and an exhaustion card takes its place (see
+								<button type="button" class="link" on:click={() => pickTab('rules')}>Exhaust</button
+								> in the rules draft). In practice that's about once every two weeks. Your starting outpost
+								blueprint works this way.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> Whether a capped blueprint leaves your deck once it's used
+							up.
+						</p>
+
+						<h3>Magic essence (ME)</h3>
+						<p>
+							Magic essence comes from alchemy: the idea that there is one thing everything is made
+							of. That's why it can stand in for any resource you don't have.
+						</p>
+						<ul>
+							<li>
+								<b>Extracting gold</b> with the extract spell makes magic essence without using the gold
+								up.
+							</li>
+							<li>
+								<b>Extracting any other resource</b> destroys it, converting it into magic essence at
+								some rate.
+							</li>
+							<li><b>Gold</b> also makes magic essence passively.</li>
+						</ul>
+
+						<h3>The extract spell</h3>
+						<ul>
+							<li>
+								<b>Up to 5 slots.</b> Each cast lets you pick up to 5 things to extract from.
+							</li>
+							<li>
+								<b>What fits in a slot</b> by default: a stack of up to 10 of a resource that can be
+								converted, or a single stack of gold (a nugget, an ingot or a block).
+							</li>
+							<li>
+								<b>The tile you're on</b> shows up as an option when it can be extracted. It takes up
+								several slots (usually about 3), destroys the resource on the tile, and gives you a lot
+								of it.
+							</li>
+						</ul>
+						<p class="aside">
+							<b>Before resources unlock.</b> To keep the early game simple there are no resources to
+							convert at first, and magic essence is the only thing extraction makes. Until resources
+							are unlocked (the first unlock), the extract spell can only extract gold, or destroy a
+							tile's resource for magic essence instead of getting the resource itself. Buildings are
+							paid for in magic essence alone.
+						</p>
+
+						<h3>Gold</h3>
+						<p>
+							Gold comes in three sizes. Nine of one size merge into one of the next. Gold passively
+							makes the same amount of mana and magic essence. Extracting gold gives ten times as
+							much magic essence.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead
+									><tr
+										><th>Gold</th><th>Made from</th><th>Mana (passive)</th><th>ME (passive)</th><th
+											>ME (extracted)</th
+										></tr
+									></thead
+								>
+								<tbody>
+									<tr><td><b>Nugget</b></td><td>Found</td><td>0.01</td><td>0.01</td><td>0.1</td></tr
+									>
+									<tr><td><b>Ingot</b></td><td>9 nuggets</td><td>0.1</td><td>0.1</td><td>1</td></tr>
+									<tr><td><b>Block</b></td><td>9 ingots</td><td>1</td><td>1</td><td>10</td></tr>
+								</tbody>
+							</table>
+						</div>
+						<p class="aside">
+							<span class="open">Open</span> Whether the passive amounts are per turn, the rate other
+							resources convert at, and how long extracting takes.
+						</p>
+					</section>
+
+					<section>
+						<h2>How a run ends</h2>
+						<p>
+							A run ends once both wizards are gone. Each wizard is gone when they either die or
+							leave, so one dying and the other leaving ends it too.
+						</p>
+						<ul>
+							<li><b>Dying.</b> A wizard whose health hits zero dies.</li>
+							<li>
+								<b>Leaving.</b> A wizard can leave voluntarily, or leaves when their morale drops to
+								zero.
+							</li>
+						</ul>
+						<h3>Failing the king's ransom</h3>
+						<p>
+							Not paying the king's ransom doesn't end the run on its own. Instead it wears you down
+							towards the conditions above:
+						</p>
+						<ul>
+							<li><b>Morale drops</b>, and the drop keeps growing.</li>
+							<li>
+								<b>The king remembers.</b> Across runs, that king comes to dislike that wizard, and gives
+								less funding overall.
+							</li>
+							<li><b>The king's units turn hostile.</b></li>
+						</ul>
+						<p>
+							Together these drain your health and morale until a wizard dies or leaves, but they're
+							never an instant fail.
+						</p>
+						<p class="aside">
+							<span class="open">Open</span> How fast the morale drop grows, how long the king's dislike
+							lasts, and whether paying late stops it.
+						</p>
+					</section>
+				</article>
 			{:else if tab === 'rules'}
 				<article class="rules">
 					<p class="intro">
@@ -204,6 +664,8 @@
 						<a href="#wl-stats">Stats</a>
 						<a href="#wl-bars">The four bars</a>
 						<a href="#wl-fate">Fate</a>
+						<a href="#wl-draw">Drawing cards</a>
+						<a href="#wl-exhaust">Exhaust</a>
 						<a href="#wl-combat">Combat</a>
 						<a href="#wl-energy">Fatigue</a>
 						<a href="#wl-cards">Learning spells</a>
@@ -252,6 +714,13 @@
 							</li>
 							<li>
 								His demands can be framed as his <b>enjoyment</b>: a happier king asks for less.
+							</li>
+							<li>
+								<b>Missing a payment</b> doesn't end the run, but it drains morale, sours the king
+								on you across runs, and turns his units hostile (see
+								<button type="button" class="link" on:click={() => pickTab('gameplay')}
+									>Gameplay</button
+								>).
 							</li>
 							<li>
 								His ship takes 5 days each way, but has none of teleporting's drawbacks. Pay his
@@ -390,9 +859,10 @@
 								at certain times, and some areas are worse at others (a desert at noon).
 							</li>
 							<li>
-								<b>Actions take hours.</b> Each part of the day is 5 hours, spent on actions: explore
-								further, boost morale, rest, work the land. You don't normally gain more hours, unless
-								you can turn time like Thomas. Items make actions faster (a pickaxe speeds up mining).
+								<b>Actions take hours.</b> Each part of the day is 5 hours, and every wizard and unit
+								has their own 5 hours, all spent in parallel, on actions: explore further, boost morale,
+								rest, work the land. You don't normally gain more hours, unless you can turn time like
+								Thomas. Items make actions faster (a pickaxe speeds up mining).
 							</li>
 							<li>
 								<b>Moving.</b> Your speed is how many movement points you get per hour. You move whole
@@ -473,7 +943,7 @@
 						<ul>
 							<li>
 								<b>Specialties are traits.</b> There's no separate specialty system: units start with
-								some traits and learn more, and the specialties below are those traits. A unit's first
+								some traits and learn more, and the old specialties are those traits. A unit's first
 								farming trait makes it a farmer, and upgrades are rarer traits further along.
 							</li>
 							<li>
@@ -504,127 +974,10 @@
 								learn traits, but start stronger or with unique abilities.
 							</li>
 						</ul>
-						<h3>Starting traits</h3>
-						<div class="table-wrap">
-							<table>
-								<thead><tr><th>Trait</th><th>Kind</th><th>Effect</th></tr></thead>
-								<tbody>
-									<tr
-										><td><b>Farmer</b></td><td>Civilian</td><td>+1 food while working a farm</td
-										></tr
-									>
-									<tr
-										><td><b>Teacher</b></td><td>Civilian</td><td
-											>+1 knowledge to everyone studying at their school. Might be dropped so that
-											any unit can teach</td
-										></tr
-									>
-									<tr><td><b>Builder</b></td><td>Civilian</td><td>Construction goes faster</td></tr>
-									<tr><td><b>Miner</b></td><td>Civilian</td><td>+1 ME while working a mine</td></tr>
-									<tr
-										><td><b>Craftsman</b></td><td>Civilian</td><td
-											>Exchanges goods, like at a blacksmith. <span class="open">Open</span> Its exact
-											effect</td
-										></tr
-									>
-									<tr
-										><td><b>Explorer</b></td><td>Civilian</td><td
-											>+10 movement. Wanders the map and looks after itself, with some military uses</td
-										></tr
-									>
-									<tr
-										><td><b>Archer</b></td><td>Military</td><td
-											>+1 range, and ranged attacks cost less fate</td
-										></tr
-									>
-									<tr><td><b>Swordsman</b></td><td>Military</td><td>+1 melee damage</td></tr>
-									<tr
-										><td><b>Spellcaster</b></td><td>Military</td><td
-											>Units can't cast at all without it. Gets a bolt spell</td
-										></tr
-									>
-								</tbody>
-							</table>
-						</div>
-						<h3>Trait upgrades</h3>
-						<div class="table-wrap">
-							<table>
-								<thead><tr><th>Upgrade</th><th>From</th><th>Effect</th></tr></thead>
-								<tbody>
-									<tr
-										><td><b>Horticulture</b></td><td>Farmer</td><td
-											>Spend farming knowledge to make a resource type give +1 silver, ME or food
-											everywhere</td
-										></tr
-									>
-									<tr
-										><td><b>Planter</b></td><td>Farmer</td><td
-											>A chance to collect seed from a farmed resource and plant it somewhere new</td
-										></tr
-									>
-									<tr
-										><td><b>Programmer</b></td><td>Farmer and craftsman</td><td
-											>Production carries on at night. Maybe counts as two workers</td
-										></tr
-									>
-									<tr
-										><td><b>Architect</b></td><td>Builder</td><td
-											>Can start constructions and discover blueprints</td
-										></tr
-									>
-									<tr
-										><td><b>Rapid fire</b></td><td>Archer</td><td
-											>Fires faster: +1 copy of their weapon and +1 draw</td
-										></tr
-									>
-									<tr
-										><td><b>Expanded learning</b></td><td>Teacher</td><td
-											>Their school reaches 1 more tile</td
-										></tr
-									>
-									<tr
-										><td><b>Classroom experience</b></td><td>Teacher</td><td
-											>Teaches 1 more student at a time</td
-										></tr
-									>
-									<tr
-										><td><b>Religious leader</b></td><td>Spellcaster</td><td
-											>Can build holy sites: better outposts that help morale and healing, maybe
-											with miracles</td
-										></tr
-									>
-									<tr
-										><td><b>Religious advancement</b></td><td>Religious leader</td><td
-											>Can set up beliefs</td
-										></tr
-									>
-									<tr
-										><td><b>Elementalist</b></td><td>Spellcaster</td><td
-											>Upgrades each element separately</td
-										></tr
-									>
-									<tr
-										><td><b>Witch</b></td><td>Spellcaster</td><td>Comes with the witch expansion</td
-										></tr
-									>
-									<tr
-										><td><b>Survivalist</b></td><td>Explorer</td><td>Needs 1 less food a turn</td
-										></tr
-									>
-									<tr
-										><td><b>Climber</b></td><td>Explorer</td><td
-											>Uphill costs only 2, and can climb cliffs at twice the uphill cost</td
-										></tr
-									>
-									<tr
-										><td><b>Trader</b></td><td>Craftsman</td><td
-											>Runs trade between places in range: moves resources between yours, or sells
-											what you don't want in another city. Earns on the road, but can be attacked</td
-										></tr
-									>
-								</tbody>
-							</table>
-						</div>
+						<p>
+							Units' traits, the starting ones and their upgrades, are listed on the
+							<button type="button" class="link" on:click={() => pickTab('traits')}>Traits</button> tab.
+						</p>
 					</section>
 
 					<section id="wl-stats">
@@ -647,8 +1000,8 @@
 									<tr>
 										<td rowspan="4"><b>Physical</b></td>
 										<td><b>Speed</b></td>
-										<td>How many actions you get. Draws your attack cards</td>
-										<td>Movement points per hour (50 → 5.0)</td>
+										<td>How many cards you draw: 1 per 10 speed</td>
+										<td>Movement points per hour, exactly (50 speed → 50 points)</td>
 									</tr>
 									<tr>
 										<td><b>Strength</b></td>
@@ -668,35 +1021,32 @@
 									<tr>
 										<td rowspan="3"><b>Mental</b></td>
 										<td><b>Intelligence</b></td>
-										<td>Lowers your spells' fate cost. Draws your spell cards</td>
-										<td
-											>How fast you learn intelligence spells and other skills (80 → 80% of points)</td
-										>
+										<td>Lowers your spells' fate cost</td>
+										<td>How fast you learn every spell and other skill (80 → 80% of points)</td>
 									</tr>
 									<tr>
 										<td><b>Swagger</b></td>
-										<td>Added to your spells' damage</td>
+										<td>Spell draws: swagger ÷ 10, multiplied by magic ability ÷ 100</td>
 										<td>
-											How fast you learn swagger spells and acrobatics. Helps relationships and
-											trading
+											Helps relationships and trading, like charisma for negotiating in D&amp;D
 										</td>
 									</tr>
 									<tr>
 										<td><b>Magic ability</b></td>
-										<td colspan="2">A percentage multiplier on the mana you generate</td>
+										<td>÷ 100, multiplies your spell draws (swagger ÷ 10 × magic ability ÷ 100)</td>
+										<td>The multiplier on the mana you generate</td>
 									</tr>
 								</tbody>
 							</table>
 						</div>
 						<ul>
 							<li>
-								Mana per turn could be the average of all your stats ÷ 10.
-								<span class="open">Open</span>
+								<b>Mana</b> is, by default, the sum of your other stats (speed, strength, fortitude,
+								endurance, intelligence and swagger) × magic ability ÷ 100.
 							</li>
 							<li>
 								Draw rate can be a decimal. Wizards get +0.5 draws a turn for the magic flowing
-								through them (or their intelligence instead), which is most of the difference
-								between a wizard and a unit.
+								through them which is most of the difference between a wizard and a unit.
 							</li>
 							<li>
 								Characters can lean physical (more food) or mental (more rest), or somewhere in
@@ -704,16 +1054,6 @@
 								the higher your mental ones (see <a href="#wl-bars">the four bars</a>).
 							</li>
 						</ul>
-						<div class="options">
-							<h4>Earlier draft</h4>
-							<p>
-								Four stats from 10 to 100, growing linearly (maybe past 100). Mental:
-								<b>knowledge</b> (casting chance and how fast you learn) and <b>swagger</b> (others
-								like being around you, which helps their morale; in combat, maybe a bonus to
-								whoever's next to you). Physical: <b>strength</b> (carrying and physical damage) and
-								<b>speed</b> (dodging and movement).
-							</p>
-						</div>
 					</section>
 
 					<section id="wl-bars">
@@ -905,6 +1245,68 @@
 						</p>
 					</section>
 
+					<section id="wl-draw">
+						<h2>Drawing cards</h2>
+						<ul>
+							<li>
+								<b>Starting deck:</b> 4 explore (explores a tile, or works one you know), 1 soothe,
+								1 extract, 1 sense, 1 outpost blueprint, plus basic blocks from your starting
+								defensive gear and 1–3 attacks from your starting weapon, so the size depends on
+								what you start with. See
+								<button type="button" class="link" on:click={() => pickTab('gameplay')}
+									>Gameplay</button
+								>.
+							</li>
+							<li>
+								<b>Everyone has their own hand.</b> Both wizards and every unit you control hold and
+								play their own cards.
+							</li>
+							<li>
+								<b>Draws per turn:</b> 1 card for every 10 speed (50 speed draws 5).
+							</li>
+							<li>
+								<b>Spell draws:</b> extra draws that only pull spells, equal to swagger ÷ 10 × magic
+								ability ÷ 100 (50 swagger and 80 magic ability give 4). They still come from the same
+								deck, not a separate spell deck.
+							</li>
+							<li>
+								<b>Tutored draws</b>, which fetch a particular kind of card, take a random matching
+								card from the deck, not the first one in it.
+							</li>
+						</ul>
+					</section>
+
+					<section id="wl-exhaust">
+						<h2>Exhaust</h2>
+						<p>
+							Exhaust is a keyword on cards that shouldn't come round every time you cycle your
+							deck, like some blueprints. In practice an exhaust card comes round about once every
+							two weeks.
+						</p>
+						<ul>
+							<li>
+								<b>Playing an exhaust card</b> takes it out of your deck, and puts an
+								<b>exhaustion</b> card in its place.
+							</li>
+							<li>
+								<b>Exhaustion</b> costs 0.5 mana and 1 hour, and draws 1 card. It's a dead card that
+								cycles: playing it only replaces itself.
+							</li>
+							<li>
+								<b>Holding it hurts.</b> If exhaustion is still in your hand at the end of your turn,
+								you lose 1 energy.
+							</li>
+							<li>
+								<b>Coming back.</b> An exhausted card returns later. Cupid's arrow, for example, comes
+								back after a recall effect.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> What brings an exhausted card back in general, and whether
+							its exhaustion card leaves the deck when it does.
+						</p>
+					</section>
+
 					<section id="wl-combat">
 						<h2>Combat</h2>
 						<p>
@@ -926,9 +1328,9 @@
 							</li>
 							<li>Flanking makes attacks hit harder, partly getting past armor.</li>
 							<li>
-								You can move between hexes during a fight, which costs speed (and so draws). Summons
-								can come in from different directions. <span class="open">Open</span> How to handle enemies
-								spread over several hexes, and reinforcements.
+								You can move between hexes during a fight, which costs movement. Summons can come in
+								from different directions. <span class="open">Open</span> How to handle enemies spread
+								over several hexes, and reinforcements.
 							</li>
 						</ul>
 						<h3>Cards</h3>
@@ -938,8 +1340,8 @@
 								strength) and its fate cost (lowered by intelligence).
 							</li>
 							<li>
-								Spells and abilities could be separate decks: spells drawn at a rate based on
-								intelligence, attacks at a rate based on speed.
+								Spells and attacks share one deck. Speed sets your draws and swagger and magic
+								ability add spell-only draws (see <a href="#wl-draw">Drawing cards</a>).
 							</li>
 							<li>
 								Each character can carry unspent mana over to their next turn, up to a maximum: 1 by
@@ -1056,6 +1458,12 @@
 						<h2>Learning spells</h2>
 						<ul>
 							<li>
+								For how learned cards and gear cards get into your deck, see
+								<button type="button" class="link" on:click={() => pickTab('gameplay')}
+									>Gameplay</button
+								>.
+							</li>
+							<li>
 								<b>Spell schools:</b> fire, ice, water, divine, holy, dark, arcane and more. Some characters
 								are better with some schools (Pylion with fire, Bex with arcane).
 							</li>
@@ -1068,17 +1476,17 @@
 								combat deck.
 							</li>
 							<li>
-								<b>Knowledge and gold</b> pay for new spells. Casting a spell makes it cheaper to learn,
-								cheaper to upgrade, and makes its school cheaper. Casting that exact spell gives a bigger,
-								percentage discount. The discount only applies to your next purchase.
+								<b>Knowledge</b> pays for new spells, and teachers and tutors take gold too. Every cast
+								permanently (for the rest of the run) takes 1 off learning any spell, 5 off its school
+								and 25 off that exact spell.
 							</li>
 							<li>
 								Learning spells of one school makes its rarer spells more likely to turn up. Your
 								reputation can matter too: evil schools show up more for the infamous.
 							</li>
 							<li>
-								<b>Tutors</b> let you target a specific card, even a legendary, for gold and knowledge,
-								instead of the shop's random pulls.
+								<b>Teachers and tutors</b> let you target a specific card, even a legendary, for gold
+								and knowledge, instead of the study screen's random pulls.
 							</li>
 							<li>
 								<b>Upgradable shops</b>, like Bob's tavern in Battlegrounds. Research makes
@@ -1121,6 +1529,10 @@
 									<tr><td><b>2</b></td><td>A 5th spell in the shop</td></tr>
 									<tr><td><b>4</b></td><td>A 4th building in the shop</td></tr>
 									<tr><td><b>6</b></td><td>A 3rd trait in the shop</td></tr>
+									<tr
+										><td><b>8</b></td><td>Mystical spells can be learned (usually out of reach)</td
+										></tr
+									>
 								</tbody>
 							</table>
 						</div>
@@ -1161,8 +1573,8 @@
 								them, or a trader moves them and makes silver doing it.
 							</li>
 							<li>
-								<b>From the land.</b> Tiles hold silver, ME, food and maybe gold. You can spend part
-								of a day working the land you're on.
+								<b>From the land.</b> Tiles hold silver, ME (magic essence), food and maybe gold. You
+								can spend part of a day working the land you're on.
 							</li>
 							<li>
 								<b>Supply and demand.</b> Prices follow how much of something is around, so sending traders
@@ -1174,16 +1586,18 @@
 								at the sending end. That lets you set up somewhere, leave, and keep exploring.
 							</li>
 							<li>
-								<b>Gold</b> gives mana to the party carrying it, and can permanently upgrade one spell.
-								Gold left in a city gives that city mana, for things like magic farming.
+								<b>Gold</b> gives mana and ME to whoever holds it, and can permanently upgrade one spell.
+								It comes as nuggets, ingots and blocks (see Gameplay). Gold left in a city gives that
+								city mana, for things like magic farming.
 							</li>
 							<li>
 								<b>Light and heat</b> could be resources: candles, wood and bulbs help at night; clothes
 								and shelter keep you warm through the seasons.
 							</li>
 							<li>
-								<b>Building.</b> A builder can make a building cheaper or faster. At an outpost, materials
-								come from what it produces; away from one you need them up front.
+								<b>Building.</b> Costs resources, with ME covering any shortfall. A builder can make
+								a building cheaper or faster. At an outpost, materials come from what it produces; away
+								from one you need them up front.
 							</li>
 							<li>
 								<b>Working arrangements</b> for people on your land: you take the goods and pay them,
@@ -1203,6 +1617,13 @@
 
 					<section id="wl-buildings">
 						<h2>Buildings</h2>
+						<p>
+							A building needs its blueprint first, learned with knowledge, then resources to build
+							it. Magic essence covers whatever resources you're short of (see
+							<button type="button" class="link" on:click={() => pickTab('gameplay')}
+								>Gameplay</button
+							>).
+						</p>
 						<h3>Bases</h3>
 						<div class="table-wrap">
 							<table>
@@ -1385,10 +1806,11 @@
 								learn a task and how much they enjoy it, and big events can change it.
 							</li>
 							<li>
-								<b>Traits</b> can be temporary or permanent, and their strength is rolled, so the same
-								trait can be good or bad. Gaining traits makes similar, rarer ones more likely. Examples:
-								scavenger, desert tummy, foodie, chef, heavy sleeper, sluggish, greed, adaptive learning,
-								fearless.
+								<b>Traits</b> can be temporary or permanent, and their strength is rolled, so the
+								same trait can be good or bad. Gaining traits makes similar, rarer ones more likely.
+								They're all listed on the
+								<button type="button" class="link" on:click={() => pickTab('traits')}>Traits</button
+								> tab.
 							</li>
 							<li>
 								<b>Influence</b> lets wizards talk people into things. It costs less with people who
@@ -1476,11 +1898,12 @@
 						<h3>Unlocking the world</h3>
 						<p>
 							Mechanics arrive one at a time, each with a new wizard, so complexity grows with the
-							difficulty. At the start, resources barely exist: only food, with no types.
+							difficulty. At the start, resources barely exist: only magic essence, and food with no
+							types.
 						</p>
 						<ol class="unlocks">
 							<li>The start: Merlin and Knick</li>
-							<li>Building materials: Candice</li>
+							<li>Resources (building materials): Candice</li>
 							<li>Food that rots, food types and water: Frank the Founder</li>
 							<li>Time, moon cycles and seasons: the witch, or Thomas</li>
 							<li>Temperature and weather: Pylion</li>
@@ -1536,8 +1959,9 @@
 						<p>
 							Epithets are achievements that fill in the blank in "Merlin the ___". Every wizard
 							unlocks their own by surviving to the City of Gold, and others come from notable feats
-							(escaping the labyrinth, becoming a king). Once unlocked, any later character can take
-							one, and each has its own effect. The full list is on the
+							(escaping the labyrinth, becoming a king). Once unlocked, any character can pick one
+							at the start of a run (your two wizards can't pick the same one), and each has its own
+							effect. The full list is on the
 							<button type="button" class="link" on:click={() => pickTab('epithets')}
 								>Epithets tab</button
 							>.
@@ -1550,7 +1974,8 @@
 						<h2>Epithets</h2>
 						<p>
 							Epithets are achievements that fill in the blank in "Merlin the ___". Once one is
-							unlocked, any later character can take it, and each one has its own effect.
+							unlocked, any character can pick it at the start of a run, and each one has its own
+							effect. Your two wizards can't pick the same epithet.
 						</p>
 						<h3>Character epithets</h3>
 						<p>
@@ -1921,6 +2346,299 @@
 						</div>
 					</div>
 				</article>
+			{:else if tab === 'traits'}
+				<article class="rules">
+					<p class="intro">
+						Every trait so far. Wizards and units both have traits. They can be temporary or
+						permanent, and how strong a trait is gets rolled, so the same trait can turn out good or
+						bad. Gaining a trait makes similar, rarer ones more likely.
+					</p>
+
+					<section>
+						<h2>Unit trait lines</h2>
+						<p>
+							These are what used to be units' specialties. Units learn them by doing the work, at a
+							school, from someone on their tile who has the trait, or by paying a teacher (see
+							<button type="button" class="link" on:click={() => pickTab('rules')}>Units</button> in
+							the rules draft). Civilian traits never let a unit start a fight; military ones do.
+						</p>
+						<h3>Starting traits</h3>
+						<p>The first trait in each line. Most units start with some of these.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Trait</th><th>Kind</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Farmer</b></td><td>Civilian</td><td>+1 food while working a farm</td
+										></tr
+									>
+									<tr
+										><td><b>Teacher</b></td><td>Civilian</td><td
+											>+1 knowledge to everyone studying at their school. Might be dropped so that
+											any unit can teach</td
+										></tr
+									>
+									<tr><td><b>Builder</b></td><td>Civilian</td><td>Construction goes faster</td></tr>
+									<tr><td><b>Miner</b></td><td>Civilian</td><td>+1 ME while working a mine</td></tr>
+									<tr
+										><td><b>Craftsman</b></td><td>Civilian</td><td
+											>Exchanges goods, like at a blacksmith. <span class="open">Open</span> Its exact
+											effect</td
+										></tr
+									>
+									<tr
+										><td><b>Explorer</b></td><td>Civilian</td><td
+											>+10 movement. Wanders the map and looks after itself, with some military uses</td
+										></tr
+									>
+									<tr
+										><td><b>Archer</b></td><td>Military</td><td
+											>+1 range, and ranged attacks cost less fate</td
+										></tr
+									>
+									<tr><td><b>Swordsman</b></td><td>Military</td><td>+1 melee damage</td></tr>
+									<tr
+										><td><b>Spellcaster</b></td><td>Military</td><td
+											>Units can't cast at all without it. Gets a bolt spell</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<h3>Trait upgrades</h3>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Upgrade</th><th>From</th><th>Effect</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Horticulture</b></td><td>Farmer</td><td
+											>Spend farming knowledge to make a resource type give +1 silver, ME or food
+											everywhere</td
+										></tr
+									>
+									<tr
+										><td><b>Planter</b></td><td>Farmer</td><td
+											>A chance to collect seed from a farmed resource and plant it somewhere new</td
+										></tr
+									>
+									<tr
+										><td><b>Programmer</b></td><td>Farmer and craftsman</td><td
+											>Production carries on at night. Maybe counts as two workers</td
+										></tr
+									>
+									<tr
+										><td><b>Architect</b></td><td>Builder</td><td
+											>Can start constructions and discover blueprints</td
+										></tr
+									>
+									<tr
+										><td><b>Rapid fire</b></td><td>Archer</td><td
+											>Fires faster: +1 copy of their weapon and +1 draw</td
+										></tr
+									>
+									<tr
+										><td><b>Expanded learning</b></td><td>Teacher</td><td
+											>Their school reaches 1 more tile</td
+										></tr
+									>
+									<tr
+										><td><b>Classroom experience</b></td><td>Teacher</td><td
+											>Teaches 1 more student at a time</td
+										></tr
+									>
+									<tr
+										><td><b>Religious leader</b></td><td>Spellcaster</td><td
+											>Can build holy sites: better outposts that help morale and healing, maybe
+											with miracles</td
+										></tr
+									>
+									<tr
+										><td><b>Religious advancement</b></td><td>Religious leader</td><td
+											>Can set up beliefs</td
+										></tr
+									>
+									<tr
+										><td><b>Elementalist</b></td><td>Spellcaster</td><td
+											>Upgrades each element separately</td
+										></tr
+									>
+									<tr
+										><td><b>Witch</b></td><td>Spellcaster</td><td>Comes with the witch expansion</td
+										></tr
+									>
+									<tr
+										><td><b>Survivalist</b></td><td>Explorer</td><td>Needs 1 less food a turn</td
+										></tr
+									>
+									<tr
+										><td><b>Climber</b></td><td>Explorer</td><td
+											>Uphill costs only 2, and can climb cliffs at twice the uphill cost</td
+										></tr
+									>
+									<tr
+										><td><b>Trader</b></td><td>Craftsman</td><td
+											>Runs trade between places in range: moves resources between yours, or sells
+											what you don't want in another city. Earns on the road, but can be attacked</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Character traits</h2>
+						<p>Personal traits any wizard or unit can have, often picked up during a run.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Trait</th><th>Effect</th><th>How you get it</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Scavenger</b></td><td
+											>More food from traveling and from killing animals (like a deer). Often
+											temporary</td
+										><td>Picked up during a run</td></tr
+									>
+									<tr
+										><td><b>Desert tummy</b></td><td>Raises your maximum food. Often temporary</td
+										><td>Picked up during a run</td></tr
+									>
+									<tr
+										><td><b>Foodie</b></td><td
+											>Gains some morale from eating, doubled when the meal has spice</td
+										><td><span class="open">Open</span></td></tr
+									>
+									<tr
+										><td><b>Chef</b></td><td
+											>Everyone in their group gains some morale from eating (less than a foodie),
+											doubled with spice</td
+										><td><span class="open">Open</span></td></tr
+									>
+									<tr
+										><td><b>Heavy sleeper</b></td><td
+											>Isn't woken by night attacks while resting, and rests a set percentage better</td
+										><td><span class="open">Open</span></td></tr
+									>
+									<tr
+										><td><b>Sluggish</b></td><td>Starts every combat with a fatigue card</td><td
+											><span class="open">Open</span></td
+										></tr
+									>
+									<tr
+										><td><b>Greed</b></td><td
+											>A morale boost from gaining money, with diminishing returns. Fall short of a
+											threshold and it lowers morale instead</td
+										><td>Bobby starts with it</td></tr
+									>
+									<tr
+										><td><b>Adaptive learning</b></td><td
+											>The first spell you cast each turn costs 1 less, until you rest</td
+										><td><span class="open">Open</span></td></tr
+									>
+									<tr
+										><td><b>Fearless</b></td><td
+											>Removes the movement penalty for revealing new terrain (or reduces it for a
+											whole group), but can't flee, or has to wait longer to</td
+										><td><span class="open">Open</span></td></tr
+									>
+									<tr
+										><td><b>Unnamed</b></td><td
+											>Once you go through your whole deck in a fight, +1 mana (and maybe a draw)
+											for the rest of it</td
+										><td><span class="open">Open</span> Could be a passive instead</td></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Promotions and roles</h2>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Trait</th><th>Effect</th><th>How you get it</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Commander</b></td><td
+											>Can give a few orders to its own corps, so you need fewer of yours</td
+										><td>A promotion</td></tr
+									>
+									<tr
+										><td><b>General</b></td><td
+											>Like a commander, it can give a few orders to its own group</td
+										><td>A promotion</td></tr
+									>
+									<tr
+										><td><b>Trailblazer</b></td><td
+											>Leading a corps in "follow the leader" mode, the units behind travel faster</td
+										><td>A promotion</td></tr
+									>
+									<tr
+										><td><b>Researcher</b></td><td
+											>Working a library makes a book or scroll every 6 parts of day instead of 8,
+											and they are 10% better</td
+										><td>Earlier draft: a specialty</td></tr
+									>
+									<tr
+										><td><b>Librarian</b></td><td
+											>Works a library like the Library of Alexandria for knowledge and research,
+											and makes money trading books</td
+										><td><span class="open">Open</span> May be the same as researcher</td></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Unique traits</h2>
+						<p>Traits from a particular wizard, place or difficulty.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Trait</th><th>Effect</th><th>How you get it</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Nomad</b></td><td
+											>Frank can't start or help with buildings, but pitches a tent wherever he
+											sleeps and farms that tile overnight</td
+										><td>Frank learns the lifestyle from traders and salesmen</td></tr
+									>
+									<tr
+										><td><b>Super</b></td><td>+3 strength and speed during the day</td><td
+											>The first wizard to reach the Fortress of Solitude</td
+										></tr
+									>
+									<tr
+										><td><b>Demigod</b></td><td>A gift from one of the 12 gods, chosen from 3</td
+										><td>The first summit of Mount Olympus, for one of your party</td></tr
+									>
+									<tr
+										><td><b>Sinner</b></td><td>+3 wisdom, and a penalty</td><td
+											>Both wizards, once the Garden of Eden reaches 15 temptation</td
+										></tr
+									>
+									<tr
+										><td><b>Curse</b></td><td>A negative trait</td><td
+											>Every wizard starts with one at the curse difficulty</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<p class="aside">
+							Wisdom isn't one of the seven stats any more, so what sinner's +3 wisdom becomes is
+							<span class="open">Open</span>.
+						</p>
+					</section>
+
+					<section>
+						<h2>Action traits</h2>
+						<p>
+							Actions can have traits too. The only one so far is <b>rest</b>: actions with it (like
+							reading) don't drain energy.
+						</p>
+					</section>
+				</article>
 			{:else if tab === 'items'}
 				<article>
 					<section>
@@ -1930,7 +2648,14 @@
 							didn't spawn can still turn up with traveling salesmen.
 						</p>
 						<h3>Weapons</h3>
-						<p>Each unit and wizard can have one weapon equipped.</p>
+						<p>
+							Each unit and wizard can have one weapon equipped. Every weapon also sets the time and
+							fate cost of its <button
+								type="button"
+								class="link"
+								on:click={() => pickTab('gameplay')}>basic strike</button
+							>.
+						</p>
 						<div class="table-wrap">
 							<table>
 								<thead><tr><th>Weapon</th><th>Effect</th></tr></thead>
@@ -2693,28 +3418,315 @@
 					</section>
 
 					<section>
-						<h2>Monsters and bosses</h2>
+						<h2>Monsters</h2>
+						<p>
+							Every monster, beast and boss is on the
+							<button type="button" class="link" on:click={() => pickTab('monsters')}
+								>Monsters</button
+							>
+							tab.
+						</p>
+					</section>
+
+					<section>
+						<h2>Quests and towns</h2>
+						<p>Every item now lives on the Items tab.</p>
 						<ul>
 							<li>
-								<b>Enemies of legend</b> are mini-bosses, like Slay the Spire's elites: the Minotaur,
-								the Kraken. Killing one can win over nearby towns (it was terrorizing them) or turn them
-								against you (they worshipped it).
+								<b>The pirate quest:</b> cursed treasure, maybe the Kraken, and the Pirate epithet. Pirates
+								sail better and can raid the king's trade, at the cost of receiving none.
 							</li>
 							<li>
-								<b>Final bosses</b> are legendary guardians of the City of Gold, like Cerberus or a dragon,
-								with more added in expansions.
-							</li>
-							<li>
-								A monster based on the Whomping Willow, the Lorax for anyone clearing a forest, and
-								a basilisk from Tom Riddle's diary (one of the journals you can find).
-							</li>
-							<li>
-								<b>Ice monsters</b> from Inuit legend, and yetis, in the ice arctic. The devil, with
-								the witch expansion and at Scholomance.
+								<b>Towns and buildings:</b> hotels in permanent cities for a night's rest, schools that
+								earn money teaching outsiders, wineries, fur traders who take pelts from slain animals.
+								Cities upgrade themselves by producing useful things.
 							</li>
 						</ul>
-						<h3>Fantastic beasts of Iceland</h3>
-						<p>From the poster in the Iceland photos.</p>
+					</section>
+				</article>
+			{:else if tab === 'monsters'}
+				<article class="rules">
+					<p class="intro">
+						Every monster so far, and how they work. Monsters grow stronger as a run goes on, and
+						the world is more dangerous the closer you get to the City of Gold.
+					</p>
+
+					<section>
+						<h2>How monsters work</h2>
+						<h3>Where they appear</h3>
+						<ul>
+							<li>
+								<b>Unexplored land is dangerous.</b> Monsters live out in the wild. The more unexplored
+								land around you, and the more dangerous it is, the more likely they are to find you.
+							</li>
+							<li><b>Buildings push them back.</b> Monsters spawn less near your buildings.</li>
+							<li>
+								<b>Biomes decide what lives there.</b> The harsh biomes near the City of Gold have their
+								own (ice monsters in the arctic, stronger animals in the enchanted forest), and locations
+								of legend have their own guardians.
+							</li>
+							<li>
+								<b>They scale up.</b> Monster strength grows exponentially over a run, so a run that
+								drags on gets harder.
+							</li>
+						</ul>
+						<h3>How they attack</h3>
+						<ul>
+							<li>
+								<b>At night</b> your units and buildings can be attacked. The odds depend on how much
+								unexplored land is nearby and how dangerous it is.
+							</li>
+							<li>
+								<b>Defending:</b> defenders get a bonus from the building they're in, and units
+								woken up by an attack are <b>startled</b>. Heavy sleepers aren't woken.
+							</li>
+							<li>
+								<b>By day</b> whoever starts a fight attacks, and it opens in attack mode, so you can
+								go after monsters yourself.
+							</li>
+							<li>
+								Fights use the normal combat rules (see
+								<button type="button" class="link" on:click={() => pickTab('rules')}>Combat</button>
+								in the rules draft): two lines facing each other, the front line shielding the back,
+								and lobbed attacks that ignore it.
+							</li>
+						</ul>
+						<h3>What they drop</h3>
+						<ul>
+							<li>
+								Winning a fight gives wizards knowledge and units combat experience. Monsters drop
+								artifacts and silver; animals drop food.
+							</li>
+							<li>Killing an enemy boosts the killer's morale, and winning boosts everyone's.</li>
+							<li>
+								Killing a monster can change how nearby towns see you: thankful if it terrorized
+								them, angry if they worshipped it.
+							</li>
+						</ul>
+						<h3>Difficulty</h3>
+						<ul>
+							<li>Each difficulty level makes monsters grow 5% faster (up to 50%).</li>
+							<li>
+								<b>Fighting forest:</b> monsters are 10% more aggressive, and passive animals are rarer.
+							</li>
+							<li><b>Mother's guidance:</b> monsters start working together.</li>
+							<li><b>Multiple protectors:</b> a second boss, and 5% more monsters.</li>
+						</ul>
+					</section>
+
+					<section>
+						<h2>Kinds</h2>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Kind</th><th>Who</th><th>Behavior</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Passive</b></td><td>Animals</td><td>Never attack. Hunted for food</td
+										></tr
+									>
+									<tr
+										><td><b>Neutral</b></td><td>Humans</td><td
+											>Only attack when provoked, or when they severely dislike you</td
+										></tr
+									>
+									<tr
+										><td><b>Hostile</b></td><td>Monsters</td><td
+											>Attack your units and bases, mostly at night</td
+										></tr
+									>
+									<tr
+										><td><b>Enemies of legend</b></td><td>Mini-bosses</td><td
+											>Guard a place, like Slay the Spire's elites</td
+										></tr
+									>
+									<tr
+										><td><b>Final bosses</b></td><td>Guardians of the City of Gold</td><td
+											>The last fight of a run</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Passive: animals</h2>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Animal</th><th>Where</th><th>Notes</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Deer and other game</b></td><td>Everywhere; smaller game in forests</td
+										><td>Hunted for meat. Scavengers get more food from them</td></tr
+									>
+									<tr><td><b>Cattle</b></td><td>Farms and plains</td><td>Twice as much meat</td></tr
+									>
+									<tr><td><b>Sheep</b></td><td>Farms and plains</td><td>Killed for meat</td></tr>
+									<tr
+										><td><b>Horses</b></td><td>Wandering the plains</td><td
+											>Can be ridden or work a farm, and give meat when they die</td
+										></tr
+									>
+									<tr
+										><td><b>Fish</b></td><td>Rivers and oceans</td><td
+											>Maybe an endless supply. <span class="open">Open</span></td
+										></tr
+									>
+									<tr
+										><td><b>Stronger animals</b></td><td>The enchanted forest</td><td
+											>Souped-up versions of normal animals</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+						<p>
+							Some animals can join you as inhuman units instead: a dragon, a dog, or a bird that
+							flies out and scouts.
+						</p>
+					</section>
+
+					<section>
+						<h2>Neutral: humans</h2>
+						<p>
+							People won't attack you unless you provoke them, or they severely dislike you. Your
+							notoriety, your evil deeds and how you've treated them all count: a city that hates
+							you on sight, or has a reward out for your arrest, can come after you.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Who</th><th>Where</th><th>Notes</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Towns and cities</b></td><td>Settlements across the map</td><td
+											>Trade, quests and help. They can turn on you if you kill a monster they
+											worshipped</td
+										></tr
+									>
+									<tr
+										><td><b>Traveling salesmen and traders</b></td><td>On the road</td><td
+											>Sell rare artifacts and blueprints, then move on</td
+										></tr
+									>
+									<tr
+										><td><b>Other wizard groups</b></td><td>Brought by the king's ship</td><td
+											>Settlers who may become friends or enemies</td
+										></tr
+									>
+									<tr
+										><td><b>Fur tradesmen</b></td><td>On the road</td><td
+											>Travel and take pelts from slain animals</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Hostile: monsters</h2>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Monster</th><th>Where</th><th>Notes</th></tr></thead>
+								<tbody>
+									<tr><td><b>Fire monsters</b></td><td>Muspelheim</td><td>From Norse legend</td></tr
+									>
+									<tr
+										><td><b>Ice monsters and yetis</b></td><td>The ice arctic</td><td
+											>From Inuit legend</td
+										></tr
+									>
+									<tr
+										><td><b>Lesser beasts</b></td><td>The labyrinth</td><td
+											>Roam the shifting maze with the Minotaur</td
+										></tr
+									>
+									<tr
+										><td><b>Basilisk</b></td><td>Spawned by Tom Riddle's diary</td><td
+											>One of the journals you can find</td
+										></tr
+									>
+									<tr
+										><td><b>Whomping Willow monster</b></td><td>Forests</td><td
+											>A tree that fights back. <span class="open">Open</span></td
+										></tr
+									>
+									<tr
+										><td><b>The Lorax</b></td><td>Forests</td><td
+											>Comes for anyone clearing a forest</td
+										></tr
+									>
+									<tr
+										><td><b>Trolls and ghosts</b></td><td>Iceland</td><td
+											>From the folk tales on the World &amp; legends tab</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Enemies of legend</h2>
+						<p>Mini-bosses, like Slay the Spire's elites.</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Enemy</th><th>Where</th><th>Notes</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>The Minotaur</b></td><td>The labyrinth</td><td
+											>Killing it gives you its horn</td
+										></tr
+									>
+									<tr
+										><td><b>The Kraken</b></td><td>The sea, maybe on the pirate quest</td><td
+											>Killing it can win over the towns it was terrorizing</td
+										></tr
+									>
+									<tr
+										><td><b>The devil</b></td><td>Scholomance</td><td
+											>A unique battle there. Also a final boss with the witch expansion</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Final bosses</h2>
+						<p>
+							The City of Gold is guarded by a legendary boss, with more added in expansions. The
+							multiple protectors difficulty adds a second one.
+						</p>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Boss</th><th>Where</th><th>Notes</th></tr></thead>
+								<tbody>
+									<tr
+										><td><b>Cerberus</b></td><td>The City of Gold</td><td>A legendary guardian</td
+										></tr
+									>
+									<tr
+										><td><b>A dragon</b></td><td>The City of Gold</td><td>A legendary guardian</td
+										></tr
+									>
+									<tr
+										><td><b>The devil</b></td><td>The City of Gold</td><td
+											>Added with Wyla's witch expansion</td
+										></tr
+									>
+								</tbody>
+							</table>
+						</div>
+					</section>
+
+					<section>
+						<h2>Fantastic beasts of Iceland</h2>
+						<p>
+							From the poster in the Iceland photos. <span class="open">Open</span> Which kind each one
+							is.
+						</p>
 						<div class="table-wrap">
 							<table>
 								<thead><tr><th>Beast</th><th>English name</th></tr></thead>
@@ -2737,22 +3749,6 @@
 								</tbody>
 							</table>
 						</div>
-					</section>
-
-					<section>
-						<h2>Quests and towns</h2>
-						<p>Every item now lives on the Items tab.</p>
-						<ul>
-							<li>
-								<b>The pirate quest:</b> cursed treasure, maybe the Kraken, and the Pirate epithet. Pirates
-								sail better and can raid the king's trade, at the cost of receiving none.
-							</li>
-							<li>
-								<b>Towns and buildings:</b> hotels in permanent cities for a night's rest, schools that
-								earn money teaching outsiders, wineries, fur traders who take pelts from slain animals.
-								Cities upgrade themselves by producing useful things.
-							</li>
-						</ul>
 					</section>
 				</article>
 			{:else}
