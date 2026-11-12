@@ -760,7 +760,7 @@ Slaying them could affect relations with near by settlements as well (positive -
 
 The final boss battles could be with legendary guardians. Like Cerberus or Shazam fear dragon etc.
 
-whenever you fortify and aren’t attacked then you draw an additional attack card.
+(Dated) whenever you fortify and aren’t attacked then you draw an additional attack card.
 
 Could choose different kings that you are sailing from (different demands, different bonuses, different desires (gold, knowledge, etc.).
 
@@ -860,7 +860,7 @@ Have a pirate subquest. Involving cursed treasure?, the kraken?, ends up with th
 
 Speed is what is used to draw military cards. Out of combat cards are drawn with something else.
 
-Fortifying in addition to providing a defensive bonus also preps for combat. Gaining additional mana/actions in combat as well as drawing additional cards at the start (0.5 cards per turn of fortification, an additional mana per turn of fortification (both capped at 4 turns)).
+(Dated) Fortifying in addition to providing a defensive bonus also preps for combat. Gaining additional mana/actions in combat as well as drawing additional cards at the start (0.5 cards per turn of fortification, an additional mana per turn of fortification (both capped at 4 turns)).
 
 Can form corps (where a group of units all move together in any shape). Some effects only trigger if in the corps provide defect to speed but bonus to stamina. The knight could provide a defensive bonus to anyone in the corps. If we have a fixed number of commands commanding a corps could also be easier. Defending within a corps could work by you can move up to 1 square to defend a now adjacent attack (I.e an attack from the complete opposite side of someone is undefendable, if you can’t move into the square you can’t defend - could maybe allow for a swap), say you need to movement to make the block happen. Also if orders become a thing then orders could be saved by only having order unit in the corps to move the whole thing. Orders could be more expensive as the distance between the units is greater and the unit likes you less. -> orders and gold become the things that limit your for having a massive army.
 
@@ -882,7 +882,7 @@ Bobby business instead of generating interest produces a counterfeit currency. T
 
 His unique building could then be a trading hub. when they sell product it is then able to launder some of the money (turn fake into real) something to consider is if fake money should disappear after a while or disappear after traded.
 
-Shields are an object that can be held, when fortifying can choose a direction to fortify against - each shield then has a unique pattern where it will provide some bonus.
+(Dated) Shields are an object that can be held, when fortifying can choose a direction to fortify against - each shield then has a unique pattern where it will provide some bonus.
 
 
 In combat (the divide by 10 value)

@@ -215,7 +215,7 @@
 							<li>
 								<b>Draw cards.</b> Every character you control (both wizards and every unit) has their
 								own hand, and draws 1 card per 10 speed, plus spell draws equal to swagger ÷ 10 × magic
-								ability ÷ 100.
+								ability ÷ 100. A character who slept last turn draws nothing.
 							</li>
 							<li>
 								<b>Gain mana:</b> by default, the sum of your other stats × magic ability ÷ 100. Anything
@@ -245,6 +245,15 @@
 								<b>Most actions drain energy</b>, unless they have the rest trait.
 							</li>
 							<li>
+								<b>How you spend your hours sets your healing.</b> Each turn you heal 1% of max
+								health per active hour, 2% per resting hour (unused, or spent on rest actions),
+								averaged over the 5 hours. Sleeping takes the whole turn and heals 4%, but you draw
+								no cards the next turn (see
+								<button type="button" class="link" on:click={() => pickTab('rules')}
+									>the four bars</button
+								>).
+							</li>
+							<li>
 								<b>Play cards.</b> Most actions, and most of your damage, come from the cards in your
 								hand, paid for with mana (and fate, where a card needs it).
 							</li>
@@ -257,9 +266,10 @@
 					<section>
 						<h2>Basic actions</h2>
 						<p>
-							To start with there are four: <b>move</b>, <b>basic strike</b>, <b>interact</b> and
-							<b>work</b>. Wizards take them directly, and units take them when ordered (which costs
-							the ordering wizard time too).
+							To start with there are five: <b>move</b>, <b>basic strike</b>, <b>interact</b>,
+							<b>work</b>
+							and <b>fortify</b>. Wizards take them directly, and units take them when ordered
+							(which costs the ordering wizard time too).
 						</p>
 						<div class="table-wrap">
 							<table>
@@ -287,6 +297,10 @@
 										><td><b>Work</b></td><td
 											>Work the tile you're on, or speed up something in progress there</td
 										><td>Time</td><td>Once per tile and once per person, each turn</td></tr
+									>
+									<tr
+										><td><b>Fortify</b></td><td>Dig in: gain shielding and draw a combat card</td
+										><td>A lot of hours (about 3–4)</td><td><span class="open">Open</span></td></tr
 									>
 								</tbody>
 							</table>
@@ -348,6 +362,21 @@
 							<span class="open">Open</span> How long working takes, what it gives on each kind of tile,
 							and how much it speeds things up.
 						</p>
+						<h3>Fortify</h3>
+						<ul>
+							<li>Like fortifying in Civilization VI: you spend most of your turn digging in.</li>
+							<li>It takes a lot of hours, about 3–4.</li>
+							<li>
+								You gain <b>shielding</b> (damage absorbed once), an amount based on the
+								<b>armor</b>
+								you're wearing and the <b>protection</b> it gives (how much it cuts the damage you take).
+							</li>
+							<li>You draw a combat card, which can be offensive or defensive.</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> The exact hours, how much shielding it gives, how long the
+							shielding lasts, and whether it's limited per turn.
+						</p>
 					</section>
 					<section>
 						<h2>Starting deck</h2>
@@ -386,8 +415,8 @@
 									>
 									<tr
 										><td><b>Basic block</b></td><td>Depends on gear</td><td
-											>Blocks 3 by default. How many you get, and how much each blocks, depend on
-											your starting defensive gear</td
+											>Triggers the block effect of your armor, weapon or shield. How many you get
+											depends on your starting gear</td
 										></tr
 									>
 									<tr
@@ -666,6 +695,7 @@
 						<a href="#wl-fate">Fate</a>
 						<a href="#wl-draw">Drawing cards</a>
 						<a href="#wl-exhaust">Exhaust</a>
+						<a href="#wl-corps">Corps</a>
 						<a href="#wl-combat">Combat</a>
 						<a href="#wl-energy">Fatigue</a>
 						<a href="#wl-cards">Learning spells</a>
@@ -907,10 +937,10 @@
 								orders to its own group.
 							</li>
 							<li>
-								<b>Corps.</b> Units can move together in any shape. A corps is slower but has more stamina.
-								To defend an attack, a unit moves up to 1 square to block it, so an attack from directly
-								behind can't be blocked. Ordering the leader moves the whole corps. A "follow the leader"
-								mode makes a line, and a trailblazing leader speeds up the rest.
+								<b>Corps.</b> Units can stack on one tile in an order, front to back (see
+								<a href="#wl-corps">Corps</a>). A corps is slower but has more stamina. Ordering the
+								leader moves the whole corps. A "follow the leader" mode makes a line, and a
+								trailblazing leader speeds up the rest.
 							</li>
 							<li>
 								<b>Outposts.</b> You can build one ring of buildings around an outpost (see
@@ -1010,7 +1040,7 @@
 									</tr>
 									<tr>
 										<td><b>Fortitude</b></td>
-										<td>Damage you shrug off</td>
+										<td>Physical protection</td>
 										<td>Your maximum morale</td>
 									</tr>
 									<tr>
@@ -1088,12 +1118,30 @@
 						<h3>Health</h3>
 						<ul>
 							<li>
-								<b>Goes down</b> from damage in combat (fortitude shrugs some off), from ailments like
-								poison, and once food hits zero. Too much cold hurts too, if temperature is on.
+								<b>Goes down</b> from damage in combat (fortitude gives physical protection), from ailments
+								like poison, and once food hits zero. Too much cold hurts too, if temperature is on.
 							</li>
 							<li>
-								<b>Comes back</b> very slowly on its own, while you're fed and rested, and faster the
-								more rested you are.
+								<b>Comes back</b> slowly on its own each turn, by a share of max health that depends
+								on how you spent your hours:
+								<div class="table-wrap">
+									<table>
+										<thead
+											><tr><th>Hours spent</th><th>Heals (of max health, per turn)</th></tr></thead
+										>
+										<tbody>
+											<tr><td><b>Active</b></td><td>1%</td></tr>
+											<tr
+												><td><b>Resting</b> (hours left unused, or spent on rest actions)</td><td
+													>2%</td
+												></tr
+											>
+											<tr><td><b>Sleeping</b> (only ever a whole turn)</td><td>4%</td></tr>
+										</tbody>
+									</table>
+								</div>
+								A turn that mixes them heals the weighted average: 2 hours active and 3 resting heals
+								(2 × 1% + 3 × 2%) ÷ 5 = 1.6%. A whole turn asleep heals 4%.
 							</li>
 							<li>
 								<b>To heal quickly:</b> healing spells (Heal works in and out of combat), potions, divine
@@ -1167,10 +1215,11 @@
 							</li>
 							<li>
 								<b>Rest refills it:</b>
-								<b>sleeping</b> is night only and the best rest, but you can be attacked in the
-								night, and units woken up are startled. <b>Napping</b> is sleep during the day: less
-								than sleeping, more than relaxing. <b>Relaxing</b> is daytime and the least rest, but
-								boosts morale, and units who relax together get on better.
+								<b>sleeping</b> is night only and the best rest. It takes a whole turn, and you draw
+								no cards the turn after, but you can be attacked in the night, and units woken up
+								are startled. <b>Napping</b> is sleep during the day: less than sleeping, more than
+								relaxing. <b>Relaxing</b> is daytime and the least rest, but boosts morale, and units
+								who relax together get on better.
 							</li>
 							<li>
 								<b>Helps:</b> a pillow or mattress, a wine party, and the Fountain of Youth (3 rest a
@@ -1264,6 +1313,7 @@
 							<li>
 								<b>Draws per turn:</b> 1 card for every 10 speed (50 speed draws 5).
 							</li>
+							<li><b>After sleeping</b> you draw no cards at all that turn.</li>
 							<li>
 								<b>Spell draws:</b> extra draws that only pull spells, equal to swagger ÷ 10 × magic
 								ability ÷ 100 (50 swagger and 80 magic ability give 4). They still come from the same
@@ -1307,6 +1357,60 @@
 						</p>
 					</section>
 
+					<section id="wl-corps">
+						<h2>Corps</h2>
+						<p>
+							Units can form a <b>corps</b>: they stack on a single tile and move as one. You put
+							them in order, one unit to each place, so by default a corps holds up to 3:
+							<b>front</b>, <b>middle</b> and <b>back</b>.
+						</p>
+						<h3>Attacking a corps</h3>
+						<div class="table-wrap">
+							<table>
+								<thead><tr><th>Attack</th><th>Who it can hit</th><th>Extra fate</th></tr></thead>
+								<tbody>
+									<tr><td><b>Melee</b></td><td>Only the front unit</td><td>None</td></tr>
+									<tr
+										><td><b>Ranged</b></td><td>One specific unit, anywhere in the order</td><td
+											>1 per place back (2 to reach the back of 3)</td
+										></tr
+									>
+									<tr><td><b>Area (AOE)</b></td><td>Everyone</td><td>None</td></tr>
+								</tbody>
+							</table>
+						</div>
+						<h3>Shared protection</h3>
+						<p>
+							The catch with standing further back: everyone in front of you adds to your
+							protection. The back unit gets bonuses from both units ahead of it, the middle from
+							the front. There's no minimum damage, so a well-protected unit can take 0 from a hit.
+						</p>
+						<h3>Flanking</h3>
+						<ul>
+							<li>
+								<b>Partly flanked</b> (enemies on 2 tiles around the corps that aren't next to each other:
+								the second one is on any of the 3 tiles roughly opposite the first): attackers can hit
+								anyone in it and pay no extra fate, and only half the shared protection applies.
+							</li>
+							<li>
+								<b>Fully surrounded</b> (3 enemies evenly spaced around it, or 4 anywhere around it):
+								attacks ignore shared protection completely.
+							</li>
+							<li>
+								Flanking never gets past <b>personal protection</b>, the protection a unit has from
+								its own armor and fortitude.
+							</li>
+							<li>
+								<b>Lobbed</b> is a keyword on attacks: a lobbed attack ignores shared protection for
+								its damage, but still pays the extra fate to reach further back.
+							</li>
+						</ul>
+						<p class="aside">
+							<span class="open">Open</span> How much protection each unit in front shares, and what
+							barreling attacks do now.
+						</p>
+					</section>
+
 					<section id="wl-combat">
 						<h2>Combat</h2>
 						<p>
@@ -1316,17 +1420,17 @@
 						<h3>Positioning</h3>
 						<ul>
 							<li>
-								Units in front protect the ones behind. Range decides where you can stand and who
-								you can reach.
+								In a corps, units in front protect the ones behind (see <a href="#wl-corps">Corps</a
+								>). Range decides where you can stand and who you can reach.
 							</li>
 							<li>
-								There are two kinds of area attack: <b>lobbed</b> attacks (like a bow) ignore the
-								front line, and <b>barreling</b> attacks hit it.
+								<b>Lobbed</b> attacks (like a bow) ignore a corps' shared protection for damage, but
+								not for fate (see <a href="#wl-corps">Corps</a>). <b>Barreling</b> attacks hit the front.
 							</li>
 							<li>
-								Being shielded takes at least 1 off a hit, but every hit still does at least 1.
+								Flanking a corps lets attackers reach anyone in it, and weakens or removes its
+								shared protection.
 							</li>
-							<li>Flanking makes attacks hit harder, partly getting past armor.</li>
 							<li>
 								You can move between hexes during a fight, which costs movement. Summons can come in
 								from different directions. <span class="open">Open</span> How to handle enemies spread
@@ -1394,26 +1498,30 @@
 						<h3>Weapons and armor</h3>
 						<ul>
 							<li>
+								<b>Armor</b> is what you wear. It gives <b>protection</b>, which cuts the damage you
+								take from every hit. Protection is <b>physical</b>, <b>magical</b> or
+								<b>universal</b> (either kind). Fortitude gives physical protection.
+							</li>
+							<li>
+								<b>Shielding</b> absorbs damage once, then it's gone. Fortifying and some cards give
+								it.
+							</li>
+							<li>
 								A weapon changes one kind of spell or keyword: extra damage, a mana discount, a
 								bonus effect, or a "whenever you cast" effect. It can also add copies of its own
 								cards.
 							</li>
 							<li>Equipment slots: hand, off-hand and clothes (or hat, chest and lower).</li>
 							<li>
-								Shields: when you fortify, pick a direction to defend. Each shield has its own
-								pattern of bonuses.
+								<b>Shields</b> work like weapons: they power basic block cards, or add a special card
+								of their own to your deck that does something based on the shield. There's no direction
+								to pick; flanking covers that.
 							</li>
 							<li>
 								Bows could need arrows, with special arrows too. Thrown weapons leave your deck
 								until you pick them up.
 							</li>
 						</ul>
-						<h3>Fortifying</h3>
-						<p>
-							Fortifying gives a defensive bonus and prepares you for combat: +0.5 cards drawn and
-							+1 mana at the start of a fight per turn spent fortifying, up to 4 turns. Fortify and
-							don't get attacked, and you draw an extra attack card.
-						</p>
 						<h3>Buildings in combat</h3>
 						<ul>
 							<li><b>Obelisk:</b> +1 to all combat within 1 hex.</li>
@@ -1422,7 +1530,7 @@
 								card. It can be upgraded to a <b>spotlight</b>, which costs light each night but
 								sees further and makes attacks less likely.
 							</li>
-							<li><b>Fortifications:</b> every unit starts combat with 1 permanent armor.</li>
+							<li><b>Fortifications:</b> every unit starts combat with 1 shielding.</li>
 						</ul>
 					</section>
 
@@ -2001,7 +2109,7 @@
 									<tr>
 										<td><b>the Knight</b></td>
 										<td>Get Knick to the City of Gold alive</td>
-										<td>+1 armor and +3 swagger</td>
+										<td>1 universal protection and +3 swagger</td>
 									</tr>
 									<tr>
 										<td><b>the Bright</b></td>
@@ -2663,7 +2771,7 @@
 									<tr
 										><td><b>Elemental sword</b></td><td
 											>Takes on the school of the last spell cast. Fire: +1 damage. Holy: heal every
-											friendly unit 1. Ice: 1 armor this turn</td
+											friendly unit 1. Ice: gain 3 shielding</td
 										></tr
 									>
 									<tr
@@ -2708,15 +2816,15 @@
 						</div>
 						<h3>Wearables</h3>
 						<p>
-							Each unit and wizard can wear one or two. They give armor (knight's armor: +1), a
-							unique ability (sticky gloves) or a passive (more mana, more damage of a type, cheaper
-							spells, more speed).
+							Each unit and wizard can wear one or two. They give protection (knight's armor: 1
+							universal), a unique ability (sticky gloves) or a passive (more mana, more damage of a
+							type, cheaper spells, more speed).
 						</p>
 						<div class="table-wrap">
 							<table>
 								<thead><tr><th>Wearable</th><th>Effect</th></tr></thead>
 								<tbody>
-									<tr><td><b>Knight's armor</b></td><td>+1 armor</td></tr>
+									<tr><td><b>Knight's armor</b></td><td>Provides 1 universal protection</td></tr>
 									<tr
 										><td><b>Sticky gloves</b></td><td
 											>A unique ability. <span class="open">Open</span></td
@@ -2904,8 +3012,8 @@
 									>
 									<tr
 										><td><b>Shields</b></td><td><span class="open">Open</span></td><td
-											>When you fortify, pick a direction to defend. Each shield has its own pattern
-											of bonuses</td
+											>Works like a weapon: powers your basic block cards, or adds a special card of
+											its own based on the shield. No direction to pick</td
 										></tr
 									>
 									<tr
@@ -3487,8 +3595,8 @@
 							<li>
 								Fights use the normal combat rules (see
 								<button type="button" class="link" on:click={() => pickTab('rules')}>Combat</button>
-								in the rules draft): two lines facing each other, the front line shielding the back,
-								and lobbed attacks that ignore it.
+								in the rules draft): units stacked in corps, where the units in front protect the ones
+								behind, and flanking gets past that.
 							</li>
 						</ul>
 						<h3>What they drop</h3>

@@ -94,6 +94,21 @@ export interface Viewer {
 	teamIds: number[];
 }
 
+// Teams an admin has marked missing, keyed by league night ('YYYY-MM-DD').
+// Every viewer's weekly schedule is rebalanced around the same set.
+export type Absences = Record<string, number[]>;
+
+// A locked night's starred games, as match ids, keyed by night. Only the stars
+// are frozen: replacements for a missing team's games are still worked out
+// live from the night's absences. A night with no entry is not locked, and the
+// page works its stars out live too.
+export type WeekSchedules = Record<string, number[]>;
+
+const NIGHT_RE = /^\d{4}-\d{2}-\d{2}$/;
+export function isNight(value: unknown): value is string {
+	return typeof value === 'string' && NIGHT_RE.test(value) && !isNaN(Date.parse(value));
+}
+
 // site:admin implies this one, via hasRole().
 export const JPFLICKS_ADMIN_ROLE = 'jpflicks:admin';
 

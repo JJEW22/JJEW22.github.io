@@ -21,13 +21,15 @@ import {
 	canApprove,
 	canSubmit,
 	cellFor,
+	type Absences,
 	type Match,
 	type PartialRound,
 	type Round,
 	type Season,
 	type Team,
 	type Venue,
-	type Viewer
+	type Viewer,
+	type WeekSchedules
 } from '$lib/jpFlicks';
 
 export { JPFLICKS_ADMIN_ROLE };
@@ -217,6 +219,26 @@ async function viewerTeams(seasonId: number, userId: number | null): Promise<num
 	return rows.map((r) => Number(r.team_id));
 }
 
+async function loadAbsences(seasonId: number): Promise<Absences> {
+	const rows = await sql<{ night: string; team_id: string | number }[]>`
+		select to_char(night, 'YYYY-MM-DD') as night, team_id
+		from jpflicks_absences where season_id = ${seasonId}
+		order by night, team_id`;
+	const out: Absences = {};
+	for (const r of rows) (out[r.night] ??= []).push(Number(r.team_id));
+	return out;
+}
+
+async function loadWeekSchedules(seasonId: number): Promise<WeekSchedules> {
+	const rows = await sql<{ night: string; match_id: string | number }[]>`
+		select to_char(night, 'YYYY-MM-DD') as night, match_id
+		from jpflicks_week_games where season_id = ${seasonId}
+		order by night, match_id`;
+	const out: WeekSchedules = {};
+	for (const r of rows) (out[r.night] ??= []).push(Number(r.match_id));
+	return out;
+}
+
 interface Sheet {
 	json: Record<string, string | number>[];
 	array: (string | number)[][];
@@ -280,6 +302,8 @@ export interface FlicksState {
 	tournamentPoints: Record<string, number>;
 	teams: Team[];
 	matches: (Match & { canSubmit: boolean; canApprove: boolean })[];
+	absences: Absences;
+	weekSchedules: WeekSchedules;
 	viewer: Viewer;
 }
 
@@ -302,16 +326,20 @@ export async function loadState(user: SessionUser | null, slug?: string): Promis
 			tournamentPoints: {},
 			teams: [],
 			matches: [],
+			absences: {},
+			weekSchedules: {},
 			viewer: viewerBase
 		};
 	}
 
 	const seasonId = Number(row.id);
 	const season = toSeason(row);
-	const [teams, matches, teamIds] = await Promise.all([
+	const [teams, matches, teamIds, absences, weekSchedules] = await Promise.all([
 		loadTeams(seasonId),
 		loadMatches(seasonId),
-		viewerTeams(seasonId, user?.id ?? null)
+		viewerTeams(seasonId, user?.id ?? null),
+		loadAbsences(seasonId),
+		loadWeekSchedules(seasonId)
 	]);
 	const viewer: Viewer = { ...viewerBase, teamIds };
 
@@ -335,8 +363,62 @@ export async function loadState(user: SessionUser | null, slug?: string): Promis
 			canSubmit: canSubmit(season, viewer, m),
 			canApprove: canApprove(season, viewer, m)
 		})),
+		absences,
+		weekSchedules,
 		viewer
 	};
+}
+
+// Save one league night: who is missing, and optionally its starred games.
+//
+// The absences are always replaced. `stars` is three-way:
+//   undefined  leave the night's stars as they are -- how an admin changes who
+//              is missing on a night that is already locked
+//   number[]   lock the night with these stars
+//   null       unlock it, and the page goes back to working the stars out live
+export async function saveWeek(
+	user: SessionUser,
+	slug: string,
+	night: string,
+	teamIds: number[],
+	stars: number[] | null | undefined
+): Promise<void> {
+	if (!hasRole(user, JPFLICKS_ADMIN_ROLE)) throw new FlicksError('Admin access required.', 403);
+	const seasonId = await seasonIdOf(slug);
+
+	const ids = [...new Set(teamIds)];
+	if (ids.length) {
+		const found = await sql<{ id: string | number }[]>`
+			select id from jpflicks_teams where season_id = ${seasonId} and id in ${sql(ids)}`;
+		if (found.length !== ids.length) throw new FlicksError('A team is not in this season.');
+	}
+
+	const matchIds = [...new Set(stars ?? [])];
+	if (matchIds.length) {
+		const found = await sql<{ id: string | number }[]>`
+			select id from jpflicks_matches
+			where season_id = ${seasonId} and status <> 'disallowed' and id in ${sql(matchIds)}`;
+		if (found.length !== matchIds.length) {
+			throw new FlicksError('A scheduled game is not a playable match in this season.');
+		}
+	}
+
+	await sql.begin(async (tx) => {
+		await tx`delete from jpflicks_absences where season_id = ${seasonId} and night = ${night}`;
+		for (const id of ids) {
+			await tx`
+				insert into jpflicks_absences (season_id, night, team_id, created_by)
+				values (${seasonId}, ${night}, ${id}, ${user.id})`;
+		}
+
+		if (stars === undefined) return;
+		await tx`delete from jpflicks_week_games where season_id = ${seasonId} and night = ${night}`;
+		for (const matchId of matchIds) {
+			await tx`
+				insert into jpflicks_week_games (season_id, night, match_id, created_by)
+				values (${seasonId}, ${night}, ${matchId}, ${user.id})`;
+		}
+	});
 }
 
 // --- writing ---

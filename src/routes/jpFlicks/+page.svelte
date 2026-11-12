@@ -36,6 +36,8 @@
 	let matches = [];
 	/** @type {Viewer} */
 	let viewer = { userId: null, username: null, isAdmin: false, teamIds: [] };
+	/** @type {import('$lib/jpFlicks').Absences} absent team ids by league night */
+	let absences = {};
 
 	// Result entry, which lives in the Games Finder: each game there carries its
 	// own Enter score / Approve buttons, and its form opens under it.
@@ -255,6 +257,11 @@
 
 	// Get the current Thursday seed
 	const thursdaySeed = getThursdaySeed();
+	// The same night as 'YYYY-MM-DD': the key absences are stored under.
+	const THIS_NIGHT = (() => {
+		const s = String(thursdaySeed);
+		return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+	})();
 	console.log('ðŸ—“ï¸ THURSDAY SEED:', thursdaySeed);
 
 	/**
@@ -1040,6 +1047,8 @@
 		viewer = data.viewer || viewer;
 		tournamentPoints = data.tournamentPoints || {};
 		excelData = data.sheets || {};
+		absences = data.absences || {};
+		weekSchedules = data.weekSchedules || {};
 	}
 
 	/** @param {string} slug */
@@ -1879,9 +1888,11 @@
 				return isGameSuggested(game);
 			});
 		} else {
-			// Filter games where the player is involved and not yet played
+			// Filter games where the player is involved and not yet played. By
+			// default only this week's schedule; the rest of the season on request.
 			playerGames = allGames.filter((game) => {
 				if (game.played) return false;
+				if (!showUnscheduled && !isGameSuggested(game)) return false;
 
 				const playerInTeam1 =
 					game[PLAYER1_TEAM1].toLowerCase().includes(searchName) ||
@@ -1966,8 +1977,104 @@
 		});
 	}
 
-	// Toggle team filter
+	// --- who is missing tonight ---
+	//
+	// Absent teams are recorded once, by an admin, and saved to the backend, so
+	// everyone gets the same rebalanced schedule and the same forfeits. hiddenTeams
+	// follows the saved list, except while an admin has unsaved changes.
+	let absencesDirty = false;
+	let showUnscheduled = false;
+	$: savedAbsentNames = (absences[THIS_NIGHT] || [])
+		.map((id) => teamNameById.get(id))
+		.filter(Boolean);
+	/** @type {import('$lib/jpFlicks').WeekSchedules} frozen schedules by league night */
+	let weekSchedules = {};
+	$: lockedWeek = weekSchedules[THIS_NIGHT] || null;
+
+	// Fixture id <-> the finder's game id, so a stored schedule (match ids) can
+	// drive the finder (game ids) and the finder's schedule can be stored.
+	$: gameIdByMatchId = buildGameIndex(allGames, matchByGame);
+
+	/**
+	 * @param {any[]} games the finder's games
+	 * @param {Map<string, LiveMatch>} index
+	 * @returns {Map<number, string>}
+	 */
+	function buildGameIndex(games, index) {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt and reassigned, not mutated
+		const out = /** @type {Map<number, string>} */ (new Map());
+		for (const game of games) {
+			const match = matchFor(game, index);
+			if (match) out.set(match.id, getGameId(game));
+		}
+		return out;
+	}
+	$: matchIdByGameId = new Map([...gameIdByMatchId].map(([m, g]) => [g, m]));
+
+	/**
+	 * @param {number[]} matchIds
+	 * @param {Map<number, string>} index
+	 */
+	function gameIdsFor(matchIds, index) {
+		return new Set(matchIds.map((id) => index.get(id)).filter(Boolean));
+	}
+
+	// Naming selectedGamesThisWeek makes this re-run whenever the week's schedule
+	// is recomputed, after the statement that computes it.
+	$: if (dataReady && selectedGamesThisWeek) syncSchedule(savedAbsentNames);
+
+	/** @param {(string | undefined)[]} saved team names */
+	function syncSchedule(saved) {
+		if (!absencesDirty) hiddenTeams = new Set(saved);
+		// The same rebalancing as ever, run against the stars, locked or live. On
+		// a locked night only the replacement games move when absences change.
+		rebalanceSchedule();
+		filterGamesByPlayer();
+	}
+
+	// Save tonight.
+	//   'absences'  who is missing. Locks the stars too if the night isn't locked
+	//               yet; on a locked night the stars are left exactly as they are.
+	//   'lock'      freeze tonight's stars as they stand.
+	//   'unlock'    drop them, so the stars are worked out live again.
+	/** @param {'absences' | 'lock' | 'unlock'} mode */
+	async function saveWeek(mode) {
+		const ids = teams.filter((t) => hiddenTeams.has(t.name)).map((t) => t.id);
+		const stars = [...selectedGamesThisWeek]
+			.map((gid) => matchIdByGameId.get(gid))
+			.filter((id) => id !== undefined);
+		/** @type {Record<string, unknown>} */
+		const body = { action: 'week', night: THIS_NIGHT, teamIds: ids };
+		if (mode === 'unlock') body.stars = null;
+		else if (mode === 'lock' || !lockedWeek) body.stars = stars;
+		const wasLocked = Boolean(lockedWeek);
+		const ok = await sendResult('/jpFlicks/api/admin/setup', 'POST', body);
+		if (ok) {
+			absencesDirty = false;
+			const night = scheduleDate(THIS_NIGHT);
+			resultMsg =
+				mode === 'unlock'
+					? `Unlocked ${night}: its starred games are worked out live again.`
+					: mode === 'lock'
+						? `Locked the starred games for ${night}.`
+						: wasLocked
+							? `Updated who is missing on ${night}. The starred games are unchanged.`
+							: `Saved who is missing on ${night} and locked its starred games.`;
+		}
+	}
+
+	const saveAbsences = () => saveWeek('absences');
+
+	function discardAbsences() {
+		absencesDirty = false;
+		syncSchedule(savedAbsentNames);
+	}
+
+	// Toggle team filter. Marking a team absent is an admin's job; nobody else
+	// filters the schedule on their own screen any more.
 	function toggleTeamFilter(teamName) {
+		if (!viewer.isAdmin) return;
+		absencesDirty = true;
 		if (hiddenTeams.has(teamName)) {
 			hiddenTeams.delete(teamName);
 		} else {
@@ -2014,6 +2121,8 @@
 
 	// Toggle all teams for a player
 	function togglePlayerFilter(playerNameToToggle) {
+		if (!viewer.isAdmin) return;
+		absencesDirty = true;
 		const teams = getTeamsForPlayer(playerNameToToggle);
 		const allHidden = isPlayerHidden(playerNameToToggle);
 
@@ -2053,7 +2162,9 @@
 
 	// Reset filters
 	function resetFilters() {
-		hiddenTeams.clear();
+		if (!viewer.isAdmin) return;
+		absencesDirty = true;
+		hiddenTeams = new Set();
 		rebalancedGameIds = new Set(); // Clear rebalanced games
 		filterGamesByPlayer();
 	}
@@ -2331,6 +2442,12 @@
 			result.teamXValues,
 			result.maxGamesPerPlayer
 		);
+
+		// A locked night plays the games an admin saved, not today's recomputation:
+		// otherwise every result entered during the night reshuffles the rest.
+		if (lockedWeek) {
+			selectedGamesThisWeek = gameIdsFor(lockedWeek, gameIdByMatchId);
+		}
 
 		// Step 2.5: Calculate actual games per team from selected games
 		const actualGamesPerTeam = {};
@@ -2924,6 +3041,63 @@
 								</button>
 							{/if}
 						</div>
+						<p class="schedule-note">
+							Schedule for <strong>{scheduleDate(THIS_NIGHT)}</strong>. Search your name for your
+							games this week, or type <strong>all</strong> for every game.
+							{#if savedAbsentNames.length}
+								Missing tonight: <strong>{savedAbsentNames.join(', ')}</strong>.
+							{/if}
+							{#if lockedWeek}
+								🔒 The ⭐ games are locked in for the night.
+							{/if}
+						</p>
+						{#if viewer.isAdmin && !absencesDirty && isCurrentSeason}
+							<div class="absence-bar admin-lock">
+								{#if lockedWeek}
+									<span>
+										{scheduleDate(THIS_NIGHT)}'s {lockedWeek.length} ⭐ games are locked. You can still
+										change who is missing; only the 🔄 replacement games move.
+									</span>
+									<button
+										type="button"
+										class="reset-btn"
+										disabled={resultBusy}
+										on:click={() => saveWeek('unlock')}
+									>
+										Unlock and recompute stars
+									</button>
+								{:else}
+									<span>
+										{scheduleDate(THIS_NIGHT)}'s ⭐ games are worked out live and can shift as
+										results come in.
+									</span>
+									<button type="button" disabled={resultBusy} on:click={() => saveWeek('lock')}>
+										Lock ⭐ games
+									</button>
+								{/if}
+							</div>
+						{/if}
+						{#if playerName && !isAllMode}
+							<label class="schedule-toggle">
+								<input
+									type="checkbox"
+									bind:checked={showUnscheduled}
+									on:change={filterGamesByPlayer}
+								/>
+								Also show my games that aren't scheduled this week
+							</label>
+						{/if}
+						{#if viewer.isAdmin && absencesDirty}
+							<div class="absence-bar">
+								<span>Unsaved changes to who is missing on {scheduleDate(THIS_NIGHT)}.</span>
+								<button type="button" disabled={resultBusy} on:click={saveAbsences}>
+									{lockedWeek ? 'Save absences' : 'Save absences and lock ⭐ games'}
+								</button>
+								<button type="button" class="reset-btn" on:click={discardAbsences}>
+									Discard
+								</button>
+							</div>
+						{/if}
 
 						{#if playerName && (shownGames > 0 || hiddenTeams.size > 0)}
 							<div class="summary-section">
@@ -2957,24 +3131,24 @@
 								</div>
 
 								<div class="team-summary">
-									<h4>Filter by player:</h4>
-									<div class="player-pills">
-										{#each allPlayers as player (player)}
-											<button
-												class="player-pill"
-												class:hidden={isPlayerHidden(player)}
-												on:click={() => togglePlayerFilter(player)}
-												title="Click to {isPlayerHidden(player)
-													? 'show'
-													: 'hide'} all games with {player}"
-											>
-												{player}
-												{#if isPlayerHidden(player)}
-													<span class="pill-icon">✕</span>
-												{/if}
-											</button>
-										{/each}
-									</div>
+									{#if viewer.isAdmin}
+										<h4>Mark players missing (admin):</h4>
+										<div class="player-pills">
+											{#each allPlayers as player (player)}
+												<button
+													class="player-pill"
+													class:hidden={isPlayerHidden(player)}
+													on:click={() => togglePlayerFilter(player)}
+													title="Mark {player} {isPlayerHidden(player) ? 'present' : 'missing'}"
+												>
+													{player}
+													{#if isPlayerHidden(player)}
+														<span class="pill-icon">✕</span>
+													{/if}
+												</button>
+											{/each}
+										</div>
+									{/if}
 
 									<h4>Games by team:</h4>
 									<div class="team-pills">
@@ -2982,8 +3156,12 @@
 											<button
 												class="team-pill"
 												class:hidden={hiddenTeams.has(team)}
+												class:readonly={!viewer.isAdmin}
+												disabled={!viewer.isAdmin}
 												on:click={() => toggleTeamFilter(team)}
-												title="Click to {hiddenTeams.has(team) ? 'show' : 'hide'} games with {team}"
+												title={viewer.isAdmin
+													? `Mark ${team} ${hiddenTeams.has(team) ? 'present' : 'missing'}`
+													: undefined}
 											>
 												{#if isAllMode}
 													{team}: {count}
@@ -3002,9 +3180,9 @@
 										{/each}
 									</div>
 
-									{#if hiddenTeams.size > 0}
+									{#if viewer.isAdmin && hiddenTeams.size > 0}
 										<div class="active-filters">
-											<h4>Active filters (hidden teams):</h4>
+											<h4>Missing on {scheduleDate(THIS_NIGHT)}:</h4>
 											<div class="filter-tags">
 												{#each [...hiddenTeams] as team (team)}
 													<div class="filter-tag">
@@ -3012,7 +3190,7 @@
 														<button
 															class="remove-filter"
 															on:click={() => toggleTeamFilter(team)}
-															title="Show games with {team}"
+															title="Mark {team} present"
 														>
 															✕
 														</button>
@@ -3020,7 +3198,9 @@
 												{/each}
 											</div>
 										</div>
-										<button on:click={resetFilters} class="reset-btn"> Clear all filters </button>
+										<button on:click={resetFilters} class="reset-btn">
+											Mark everyone present
+										</button>
 									{/if}
 								</div>
 							</div>
@@ -3060,13 +3240,17 @@
 													>
 														{#if rebalanced}<span class="rebalanced-star">🔄</span
 															>{:else if suggested}<span class="suggested-star">⭐</span>{/if}
-														<button
-															class="team-link"
-															on:click={() => toggleTeamFilter(playerTeam)}
-															title="Click to hide games with {playerTeam}"
-														>
+														{#if viewer.isAdmin}
+															<button
+																class="team-link"
+																on:click={() => toggleTeamFilter(playerTeam)}
+																title="Mark {playerTeam} missing"
+															>
+																{playerTeam}
+															</button>
+														{:else}
 															{playerTeam}
-														</button>
+														{/if}
 													</td>
 													<td
 														data-label="Your partner"
@@ -3094,13 +3278,17 @@
 														class:suggested-cell={suggested && !rebalanced}
 														class:rebalanced-cell={rebalanced}
 													>
-														<button
-															class="team-link"
-															on:click={() => toggleTeamFilter(opponentTeam)}
-															title="Click to hide games with {opponentTeam}"
-														>
+														{#if viewer.isAdmin}
+															<button
+																class="team-link"
+																on:click={() => toggleTeamFilter(opponentTeam)}
+																title="Mark {opponentTeam} missing"
+															>
+																{opponentTeam}
+															</button>
+														{:else}
 															{opponentTeam}
-														</button>
+														{/if}
 													</td>
 													<td
 														data-label="Opponent 1"
@@ -3195,12 +3383,11 @@
 								</div>
 							{:else if hiddenTeams.size > 0}
 								<div class="no-games filtered">
-									<p>All games have been filtered out.</p>
-									<button on:click={resetFilters} class="reset-btn-large"> Show all games </button>
+									<p>No games for "{playerName}" this week — their opponents are missing.</p>
 								</div>
 							{:else}
 								<div class="no-games">
-									No games found for "{playerName}"
+									No games {showUnscheduled || isAllMode ? 'found' : 'scheduled this week'} for "{playerName}"
 								</div>
 							{/if}
 						{/if}
@@ -4414,6 +4601,42 @@
 		transform: translateY(-1px);
 	}
 
+	.team-pill.readonly {
+		cursor: default;
+		transform: none;
+		background: #2c5aa0;
+	}
+
+	.schedule-note {
+		margin: 0.5rem 0 1rem;
+		color: #374151;
+	}
+
+	.schedule-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+		font-size: 0.9rem;
+	}
+
+	.absence-bar.admin-lock {
+		background: #eef2ff;
+		border-color: #6366f1;
+	}
+
+	.absence-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
+		margin-bottom: 1rem;
+		background: #fef3c7;
+		border: 1px solid #f59e0b;
+		border-radius: 8px;
+	}
+
 	.team-pill.hidden {
 		background: #9ca3af;
 		text-decoration: line-through;
@@ -4547,24 +4770,6 @@
 		border: 1px solid #fecaca;
 		border-radius: 8px;
 		margin-top: 1rem;
-	}
-
-	.reset-btn-large {
-		margin-top: 1rem;
-		padding: 0.75rem 2rem;
-		background: #2c5aa0;
-		color: white;
-		border: none;
-		border-radius: 8px;
-		cursor: pointer;
-		font-size: 1rem;
-		font-weight: 500;
-		transition: all 0.2s;
-	}
-
-	.reset-btn-large:hover {
-		background: #1e4080;
-		transform: translateY(-1px);
 	}
 
 	.filtered-warning {

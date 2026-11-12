@@ -9,6 +9,7 @@
 //   team      create or update a team and both its players
 //   delete    remove a team (its fixtures cascade)
 //   fixtures  generate the home/away grid for the teams that exist
+//   week      save a league night: who is missing, and its frozen schedule
 import { json } from '@sveltejs/kit';
 import { requireAdmin } from '$lib/server/roles';
 import {
@@ -19,8 +20,10 @@ import {
 	loadState,
 	saveSeason,
 	saveTeam,
+	saveWeek,
 	setDisallowed
 } from '$lib/server/jpFlicks';
+import { isNight } from '$lib/jpFlicks';
 import type { RequestHandler } from './$types';
 
 export const prerender = false;
@@ -106,6 +109,25 @@ export const POST: RequestHandler = async ({ url, request, locals }) => {
 			const id = Number(body?.matchId);
 			if (!Number.isInteger(id) || id <= 0) throw new FlicksError('Which match?');
 			await setDisallowed(locals.user!, slug, id, Boolean(body?.disallowed));
+		} else if (action === 'week') {
+			if (!slug) throw new FlicksError('Which season?');
+			if (!isNight(body?.night)) throw new FlicksError('Which night? (YYYY-MM-DD)');
+			const raw = Array.isArray(body?.teamIds) ? body.teamIds : [];
+			const teamIds = raw.map(Number);
+			if (teamIds.some((id: number) => !Number.isInteger(id) || id <= 0)) {
+				throw new FlicksError('Those are not team ids.');
+			}
+			// Absent: keep the night's stars. null: unlock. A list: lock with these.
+			let stars: number[] | null | undefined = undefined;
+			if (body?.stars === null) stars = null;
+			else if (body?.stars !== undefined) {
+				if (!Array.isArray(body.stars)) throw new FlicksError('stars must be a list.');
+				stars = body.stars.map(Number);
+				if (stars!.some((id) => !Number.isInteger(id) || id <= 0)) {
+					throw new FlicksError('Those are not match ids.');
+				}
+			}
+			await saveWeek(locals.user!, slug, body.night, teamIds, stars);
 		} else {
 			throw new FlicksError(`Unknown action "${action}".`);
 		}
