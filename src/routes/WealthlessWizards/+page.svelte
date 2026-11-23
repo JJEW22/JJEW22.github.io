@@ -245,10 +245,10 @@
 								<b>Most actions drain energy</b>, unless they have the rest trait.
 							</li>
 							<li>
-								<b>How you spend your hours sets your healing.</b> Each turn you heal 1% of max
-								health per active hour, 2% per resting hour (unused, or spent on rest actions),
-								averaged over the 5 hours. Sleeping takes the whole turn and heals 4%, but you draw
-								no cards the next turn (see
+								<b>How you spend your hours sets your healing.</b> A full turn of activity heals 1
+								health, a full turn of rest (hours unused, or spent on rest actions) heals 2, and a
+								turn asleep heals 3. A mixed turn heals the weighted average over its 5 hours.
+								Sleeping takes the whole turn, and you draw no cards the next turn (see
 								<button type="button" class="link" on:click={() => pickTab('rules')}
 									>the four bars</button
 								>).
@@ -281,7 +281,7 @@
 										><td
 											>Each one spends the time the move takes from its own hours, based on its
 											speed (movement points per hour, counted to the nearest tenth of an hour)</td
-										><td>As far as its hours allow</td></tr
+										><td>As far as its hours allow. Not in a turn you fortify</td></tr
 									>
 									<tr
 										><td><b>Basic strike</b></td><td>Attack with the equipped weapon</td><td
@@ -300,7 +300,7 @@
 									>
 									<tr
 										><td><b>Fortify</b></td><td>Dig in: gain shielding and draw a combat card</td
-										><td>A lot of hours (about 3–4)</td><td><span class="open">Open</span></td></tr
+										><td>A lot of hours (about 3–4)</td><td>Not in a turn you move</td></tr
 									>
 								</tbody>
 							</table>
@@ -343,6 +343,15 @@
 							<li>
 								There's no limit per turn: you can interact as many times as your hours allow.
 							</li>
+							<li>
+								<b>Looting</b> is an interaction: you loot a tile, a chest or a body by interacting
+								with it.
+							</li>
+							<li>
+								<b>Working buildings.</b> Interacting with a building that works a tile (like the exact
+								tile an outpost stands on) works it for you. Since work is limited to once per tile
+								and once per person, this is how a unit effectively works more tiles in a turn.
+							</li>
 						</ul>
 						<p class="aside">
 							<span class="open">Open</span> What each interaction costs (time, fate or something else).
@@ -351,7 +360,8 @@
 						<ul>
 							<li>Works the tile you're on, the same way the explore cards work a known tile.</li>
 							<li>
-								It can also speed up something in progress on the tile, like a building going up.
+								It can also speed up something in progress on the tile, like a building under
+								construction.
 							</li>
 							<li>
 								<b>Once per tile, once per person.</b> Each turn only one person can work a given tile,
@@ -367,21 +377,29 @@
 							<li>Like fortifying in Civilization VI: you spend most of your turn digging in.</li>
 							<li>It takes a lot of hours, about 3–4.</li>
 							<li>
+								<b>Move or fortify, not both.</b> Once you've moved in a turn, fortify is locked until
+								the next one, and once you've fortified, move is locked.
+							</li>
+							<li>
 								You gain <b>shielding</b> (damage absorbed once), an amount based on the
 								<b>armor</b>
 								you're wearing and the <b>protection</b> it gives (how much it cuts the damage you take).
 							</li>
 							<li>You draw a combat card, which can be offensive or defensive.</li>
+							<li>
+								<b>Armor only protects while fortified.</b> The protection from the armor you wear
+								only applies once you've fortified, so digging in is how you get its benefit.
+							</li>
 						</ul>
 						<p class="aside">
-							<span class="open">Open</span> The exact hours, how much shielding it gives, how long the
-							shielding lasts, and whether it's limited per turn.
+							<span class="open">Open</span> The exact hours, how much shielding it gives, and how long
+							the shielding lasts.
 						</p>
 					</section>
 					<section>
 						<h2>Starting deck</h2>
 						<p>
-							The starting deck is 8 fixed cards, plus attacks from your starting weapon and blocks
+							The starting deck is 9 fixed cards, plus attacks from your starting weapon and blocks
 							from your starting defensive gear, so its size depends on what you start with.
 						</p>
 						<div class="table-wrap">
@@ -408,9 +426,14 @@
 										></tr
 									>
 									<tr
+										><td><b>Dock blueprint</b></td><td>1</td><td
+											>Innate: always starts at the top of your deck. Builds your dock, and decides
+											where you touch down (see Landing in the rules draft)</td
+										></tr
+									>
+									<tr
 										><td><b>Outpost blueprint</b></td><td>1</td><td
-											>Builds an outpost. It has exhaust: once played it's swapped for an exhaustion
-											card until it comes back (see Building)</td
+											>Builds an outpost. Single use: once played it's gone for good</td
 										></tr
 									>
 									<tr
@@ -520,7 +543,7 @@
 
 					<section>
 						<h2>Building</h2>
-						<p>Building something takes two steps:</p>
+						<p>Building something takes three steps:</p>
 						<div class="table-wrap">
 							<table>
 								<thead><tr><th>Step</th><th>What it is</th><th>Cost</th></tr></thead>
@@ -530,9 +553,15 @@
 										></tr
 									>
 									<tr
-										><td><b>2. Building</b></td><td>Actually putting it up</td><td
+										><td><b>2. Building</b></td><td>Playing the blueprint to start it</td><td
 											>Resources (wood, iron and so on). Whatever you're short of is covered by
 											magic essence</td
+										></tr
+									>
+									<tr
+										><td><b>3. Construction</b></td><td>The building going up</td><td
+											>Time. Each building takes a set amount, and it can be sped up (working the
+											tile, a builder)</td
 										></tr
 									>
 								</tbody>
@@ -561,8 +590,8 @@
 								<b>Exhaust.</b> A blueprint with the exhaust keyword is out once played, until it
 								comes back, and an exhaustion card takes its place (see
 								<button type="button" class="link" on:click={() => pickTab('rules')}>Exhaust</button
-								> in the rules draft). In practice that's about once every two weeks. Your starting outpost
-								blueprint works this way.
+								> in the rules draft). It comes back when a full night's sleep removes that
+								exhaustion.
 							</li>
 						</ul>
 						<p class="aside">
@@ -585,6 +614,10 @@
 								some rate.
 							</li>
 							<li><b>Gold</b> also makes magic essence passively.</li>
+							<li>
+								<b>Blacksmiths</b> extract better. Finding (or building) a blacksmith lets you extract
+								at a better rate than usual.
+							</li>
 						</ul>
 
 						<h3>The extract spell</h3>
@@ -658,7 +691,10 @@
 							towards the conditions above:
 						</p>
 						<ul>
-							<li><b>Morale drops</b>, and the drop keeps growing.</li>
+							<li>
+								<b>Moral weight grows.</b> Every day the ransom goes unpaid adds 1 moral weight, so the
+								morale drop keeps growing.
+							</li>
 							<li>
 								<b>The king remembers.</b> Across runs, that king comes to dislike that wizard, and gives
 								less funding overall.
@@ -669,9 +705,24 @@
 							Together these drain your health and morale until a wizard dies or leaves, but they're
 							never an instant fail.
 						</p>
+						<h3>Moral weight</h3>
+						<p>
+							<b>Moral weight</b> (<i>W</i>) is a permanent morale penalty. A character's morale
+							<i>x</i> becomes (1 + 0.1<i>W</i>)(<i>x</i> − 0.1<i>W</i>), so every point makes it
+							harsher. Each of these adds 1 to <i>W</i>:
+						</p>
+						<ul>
+							<li>Every day the king's ransom goes unpaid.</li>
+							<li>
+								Every time Knick dies and revives (see
+								<button type="button" class="link" on:click={() => pickTab('wizards')}
+									>Chivalry never dies</button
+								>).
+							</li>
+						</ul>
 						<p class="aside">
-							<span class="open">Open</span> How fast the morale drop grows, how long the king's dislike
-							lasts, and whether paying late stops it.
+							<span class="open">Open</span> How long the king's dislike lasts, and whether paying late
+							stops the morale penalty.
 						</p>
 					</section>
 				</article>
@@ -732,9 +783,15 @@
 						</ul>
 						<h3>Landing</h3>
 						<p>
-							You arrive by boat and can sail around to choose where to land. The first place you
-							land becomes your <b>dock</b>, built from part of the boat. The dock is storage, and
-							where you trade with your homeland or the locals.
+							You arrive by boat and can sail around to choose where to land. Your deck holds a
+							<b>dock blueprint</b>, which is <b>innate</b>: it always starts at the top of your deck,
+							so it's in your first hand. Where you play it is where you touch down. The dock
+							is built from part of the boat. It's storage, and where you trade with your homeland or
+							the locals.
+						</p>
+						<p>
+							You also start with a single-use <b>outpost blueprint</b>: one outpost, rather than an
+							outpost blueprint that exhausts and comes back.
 						</p>
 						<h3>The king's demands</h3>
 						<ul>
@@ -755,6 +812,10 @@
 							<li>
 								His ship takes 5 days each way, but has none of teleporting's drawbacks. Pay his
 								ransom 5 days early and it's cheaper.
+							</li>
+							<li>
+								<b>Tasks lower the ransom.</b> Something like Civ's era score: the king sets tasks,
+								and completing them takes some off what he demands.
 							</li>
 							<li>
 								It can also bring more settlers: other wizard groups who may be friends or enemies.
@@ -901,7 +962,9 @@
 							</li>
 							<li>
 								<b>A moon cycle</b> is 2 "weeks" of 5 days: 10 days, or 50 turns, from new moon to full
-								moon. Your deck resets at the end of each one, not when you rest.
+								moon. Your deck resets at the end of each one, but exhaustion no longer clears with it:
+								sleeping is what removes it (see
+								<a href="#wl-exhaust">Exhaust</a>).
 							</li>
 							<li>
 								<b>Seasons and years</b> could exist too. A lot of witchcraft and the occult follows
@@ -1122,29 +1185,28 @@
 								like poison, and once food hits zero. Too much cold hurts too, if temperature is on.
 							</li>
 							<li>
-								<b>Comes back</b> slowly on its own each turn, by a share of max health that depends
-								on how you spent your hours:
+								<b>Comes back</b> slowly on its own each turn, by a flat amount that depends on how you
+								spent your hours:
 								<div class="table-wrap">
 									<table>
-										<thead
-											><tr><th>Hours spent</th><th>Heals (of max health, per turn)</th></tr></thead
-										>
+										<thead><tr><th>Hours spent</th><th>Heals (per full 5 hours)</th></tr></thead>
 										<tbody>
-											<tr><td><b>Active</b></td><td>1%</td></tr>
+											<tr><td><b>Active</b></td><td>1</td></tr>
 											<tr
 												><td><b>Resting</b> (hours left unused, or spent on rest actions)</td><td
-													>2%</td
+													>2</td
 												></tr
 											>
-											<tr><td><b>Sleeping</b> (only ever a whole turn)</td><td>4%</td></tr>
+											<tr><td><b>Sleeping</b> (only ever a whole turn)</td><td>3</td></tr>
 										</tbody>
 									</table>
 								</div>
 								A turn that mixes them heals the weighted average: 2 hours active and 3 resting heals
-								(2 × 1% + 3 × 2%) ÷ 5 = 1.6%. A whole turn asleep heals 4%.
+								(2 × 1 + 3 × 2) ÷ 5 = 1.6. A whole turn asleep heals 3.
 							</li>
 							<li>
-								<b>To heal quickly:</b> healing spells (Heal works in and out of combat), potions, divine
+								<b>To heal quickly:</b> healing spells (<b>Heal</b> restores 25 health, exactly balanced
+								against fireball; the weaker <b>Mend</b> works in and out of combat), potions, divine
 								healing paid for with faith, and healing aids like a crutch. A holy elemental sword heals
 								every friendly unit 1, and fruit heals a little.
 							</li>
@@ -1210,7 +1272,7 @@
 								stats. A low-level character working flat out tires in 2–3 days.
 							</li>
 							<li>
-								<b>Also drained by</b> carrying too much (weighed down), skipping sleep (a fatigue card),
+								<b>Also drained by</b> carrying too much (weighed down), skipping sleep (an exhaustion card),
 								heat if temperature is on, and Sid's escape hatch (75% of his current energy).
 							</li>
 							<li>
@@ -1315,6 +1377,10 @@
 							</li>
 							<li><b>After sleeping</b> you draw no cards at all that turn.</li>
 							<li>
+								<b>Dream cards.</b> Sleeping could draw (or generate) a dream card.
+								<span class="open">Open</span> What dreams do.
+							</li>
+							<li>
 								<b>Spell draws:</b> extra draws that only pull spells, equal to swagger ÷ 10 × magic
 								ability ÷ 100 (50 swagger and 80 magic ability give 4). They still come from the same
 								deck, not a separate spell deck.
@@ -1330,10 +1396,14 @@
 						<h2>Exhaust</h2>
 						<p>
 							Exhaust is a keyword on cards that shouldn't come round every time you cycle your
-							deck, like some blueprints. In practice an exhaust card comes round about once every
-							two weeks.
+							deck, like some blueprints. <b>Exhaustion</b> is the dead card that builds up as a
+							character tires.
 						</p>
 						<ul>
+							<li>
+								<b>Every shuffle adds one.</b> Each time your deck is shuffled, an exhaustion card is
+								added to it.
+							</li>
 							<li>
 								<b>Playing an exhaust card</b> takes it out of your deck, and puts an
 								<b>exhaustion</b> card in its place.
@@ -1347,14 +1417,20 @@
 								you lose 1 energy.
 							</li>
 							<li>
-								<b>Coming back.</b> An exhausted card returns later. Cupid's arrow, for example, comes
+								<b>Sleep adds or removes one.</b> A night has two turns (night 1 and night 2):
+								<ul>
+									<li>Not sleeping at all that night adds an exhaustion card.</li>
+									<li>Sleeping through just one of the two does nothing.</li>
+									<li>Sleeping through both removes one, and you choose which.</li>
+								</ul>
+								Exhaustion is no longer cleared at the end of the moon cycle.
+							</li>
+							<li>
+								<b>Coming back.</b> Removing an exhaustion that came from an exhaust card returns that
+								card to your deck. Some effects bring one back too: Cupid's arrow, for example, comes
 								back after a recall effect.
 							</li>
 						</ul>
-						<p class="aside">
-							<span class="open">Open</span> What brings an exhausted card back in general, and whether
-							its exhaustion card leaves the deck when it does.
-						</p>
 					</section>
 
 					<section id="wl-corps">
@@ -1381,8 +1457,8 @@
 						</div>
 						<h3>Shared protection</h3>
 						<p>
-							The catch with standing further back: everyone in front of you adds to your
-							protection. The back unit gets bonuses from both units ahead of it, the middle from
+							The order you set is what decides each unit's defense. The catch with standing further
+							back: everyone in front of you adds to your protection. The back unit gets bonuses from both units ahead of it, the middle from
 							the front. There's no minimum damage, so a well-protected unit can take 0 from a hit.
 						</p>
 						<h3>Flanking</h3>
@@ -1482,6 +1558,10 @@
 								unexplored land is nearby and how dangerous it is.
 							</li>
 							<li>
+								<b>Night spawns.</b> Vision shrinks at night, and enemies spawn in the tiles you can no
+								longer see.
+							</li>
+							<li>
 								Defenders get a bonus from the building they're in. Units woken up by an attack are
 								<b>startled</b>, a debuff.
 							</li>
@@ -1500,7 +1580,13 @@
 							<li>
 								<b>Armor</b> is what you wear. It gives <b>protection</b>, which cuts the damage you
 								take from every hit. Protection is <b>physical</b>, <b>magical</b> or
-								<b>universal</b> (either kind). Fortitude gives physical protection.
+								<b>universal</b> (either kind). 1 physical and 1 magical together become 1 universal.
+								Fortitude gives physical protection.
+							</li>
+							<li>
+								<b>Armor only protects while you're fortified</b> (see
+								<button type="button" class="link" on:click={() => pickTab('gameplay')}>Fortify</button
+								>).
 							</li>
 							<li>
 								<b>Shielding</b> absorbs damage once, then it's gone. Fortifying and some cards give
@@ -1542,14 +1628,13 @@
 						</p>
 						<ul>
 							<li>
-								When your deck reshuffles, you get a <b>fatigue</b> card. The first costs 0 to play,
-								and each one after costs 1 more, up to 10.
+								When your deck reshuffles, you get an <b>exhaustion</b> card.
 							</li>
 							<li>
-								Your deck resets once a moon cycle (every 50 turns): all fatigue clears, the counter
-								resets and you draw a new hand.
+								<b>Sleep decides the rest.</b> Not sleeping at all during a night adds an exhaustion,
+								sleeping through one of the two night turns does nothing, and sleeping through both
+								removes one (see <a href="#wl-exhaust">Exhaust</a>).
 							</li>
-							<li>Not sleeping adds a fatigue card.</li>
 							<li>
 								Carrying too much adds <b>weighed down</b> cards (1 mana: draw a card) to your deck,
 								more the heavier you are. That makes it punishing to send one overloaded person into
@@ -1577,7 +1662,7 @@
 							</li>
 							<li>
 								<b>Civilian and military spells.</b> Civilian spells are what a wizard does out in the
-								world: Heal (which works in combat too), Blessing of the farm, Pickpocket (Sid: steal
+								world: Mend (which works in combat too), Heal (25 health, balanced against fireball), Blessing of the farm, Pickpocket (Sid: steal
 								silver from a building or person. It's a tiered spell: the more fate you spend, the higher
 								the tier and the less likely you are to be caught, and getting caught has consequences),
 								Franchise (Bobby: a building starts working for his company). Military spells go in your
@@ -1727,7 +1812,7 @@
 						<h2>Buildings</h2>
 						<p>
 							A building needs its blueprint first, learned with knowledge, then resources to build
-							it. Magic essence covers whatever resources you're short of (see
+							it, then time to construct it, which can be sped up. Magic essence covers whatever resources you're short of (see
 							<button type="button" class="link" on:click={() => pickTab('gameplay')}
 								>Gameplay</button
 							>).
@@ -1802,7 +1887,8 @@
 									>
 									<tr
 										><td><b>Blacksmith</b></td><td>Common</td><td
-											>Turns silver and ME into artifacts</td
+											>Turns silver and ME into artifacts. Extracting here gives a better rate than
+											usual</td
 										></tr
 									>
 									<tr
@@ -1813,6 +1899,17 @@
 									<tr
 										><td><b>Stone walls</b></td><td>Common</td><td
 											>Add to any building. More fortification than wood</td
+										></tr
+									>
+									<tr
+										><td><b>Wall</b></td><td><span class="open">Open</span></td><td
+											>A standalone wall that gives 3 protection, with a movement penalty to enter its
+											tile. The blueprint always cycles back into your deck</td
+										></tr
+									>
+									<tr
+										><td><b>Dome shield</b></td><td><span class="open">Open</span></td><td
+											>Blocks lobbed attacks, but can just be walked into</td
 										></tr
 									>
 									<tr><td><b>Brewery</b></td><td>Rare (~5%)</td><td>Turns ME into potions</td></tr>
@@ -1959,6 +2056,29 @@
 							<li>
 								Religions can be spawned by events and change over time. They're tied to spell
 								schools. Evil-leaning people may be wary of yours, and hunts can happen.
+							</li>
+						</ul>
+						<h3>The faith bar</h3>
+						<ul>
+							<li>
+								<b>Faith fills a bar.</b> Each person has their own, and once it reaches the top their
+								fate goes up by 1.
+							</li>
+							<li>
+								<b>Leftover fate becomes faith.</b> Any fate a character hasn't spent by the end of the
+								turn goes into their faith bar.
+							</li>
+							<li>
+								<b>Followers make faith the same way.</b> Everyone who follows a religion rolls their d4,
+								and whatever's left over at the end of the turn is the faith they produce.
+							</li>
+							<li>
+								<b>The bar's size</b> is a base value plus an amount that grows with level. That lets
+								some things be locked behind level, and stops faith (and so fate) climbing forever.
+							</li>
+							<li>
+								<b>Prayer</b> (card): gain 5 faith. When a religion takes this tenet, everyone who follows
+								it gets a copy of the card.
 							</li>
 						</ul>
 					</section>
@@ -2114,7 +2234,7 @@
 									<tr>
 										<td><b>the Bright</b></td>
 										<td>Get Bex to the City of Gold alive</td>
-										<td>+3 wisdom, and start at research level 1</td>
+										<td>+3 intelligence, and start at research level 1</td>
 									</tr>
 									<tr>
 										<td><b>the Founder</b></td>
@@ -2275,9 +2395,16 @@
 						<div class="card">
 							<h3>Knick the Knight</h3>
 							<p class="small">Fortitude, strength, endurance · low speed</p>
+							<p>Gives a defensive bonus to everyone in his corps.</p>
 							<p>
-								Gives a defensive bonus to everyone in his corps. Chivalry never dies: blocking
-								damage for someone else improves their relationship.
+								<b>Chivalry never dies:</b> instead of dying, Knick revives at half health and gains 1
+								<button type="button" class="link" on:click={() => pickTab('gameplay')}
+									>moral weight</button
+								>, a permanent morale penalty that gets harsher with each death.
+							</p>
+							<p class="small">
+								Earlier idea for chivalry never dies: blocking damage for someone else improves their
+								relationship.
 							</p>
 							<ul>
 								<li><b>Ol' Trusty</b> (start): a weapon that gives about +5 strength.</li>
@@ -2330,6 +2457,10 @@
 								<li>Combo and spell damage, and good with arcane.</li>
 								<li>Learns by teaching units, and her study session works out of combat too.</li>
 								<li>Chaos: an adaptive random spell each turn, which helps her learn faster.</li>
+								<li>
+									<b>Thorough cast</b> (card idea): lower a card's mana cost by 0.1 and raise its time
+									by 0.25. A more general card could go the other way (faster, but costs more mana).
+								</li>
 							</ul>
 							<ul>
 								<li>
@@ -2419,8 +2550,11 @@
 						</div>
 						<div class="card">
 							<h3>Sid the Sly</h3>
-							<p>The first time his deck cycles, he ignores the fatigue card.</p>
+							<p>The first time his deck cycles, he ignores the exhaustion card.</p>
 							<ul>
+								<li>
+									A spell that removes an exhaustion from your hand. It's an exhaust card itself.
+								</li>
 								<li>
 									<b>Stolen chest</b> (discovered, by stealing it from a city): Sid has to spend time
 									picking it open (an active rest): it has a total fate cost that he slowly ticks down
@@ -2817,7 +2951,7 @@
 						<h3>Wearables</h3>
 						<p>
 							Each unit and wizard can wear one or two. They give protection (knight's armor: 1
-							universal), a unique ability (sticky gloves) or a passive (more mana, more damage of a
+							universal), which only applies while fortified, a unique ability (sticky gloves) or a passive (more mana, more damage of a
 							type, cheaper spells, more speed).
 						</p>
 						<div class="table-wrap">
@@ -3313,7 +3447,8 @@
 									<tr
 										><td><b>Hera</b></td><td
 											>Marries your two wizards: their relationship goes to max, they lose 5% less
-											morale while together, and either can cast the other's spells in combat</td
+											morale while together, and either can cast the other's spells in combat.
+											<b>What's mine is yours:</b> the two share one inventory</td
 										></tr
 									>
 									<tr

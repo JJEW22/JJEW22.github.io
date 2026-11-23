@@ -992,3 +992,49 @@ Bex chaos - could have an adaptive random spell each turn (like random spell in 
 Sustain/endurance/whatever determines how quickly you recover from ailments. Like poison ticks down by X more per turn.
 
 The discount for casting of a spell apply just to the next purchase. Casting the exact spell is a % discount (larger that way)
+Add that each time the deck is shuffled an exhaustion is added to the deck. 
+
+Finding a blacksmith can allow you to extract at a rate that is better than usual
+
+Within a corps you set an ordering to your units. The defense of an individual is determined by that ordering (if you are flanked that bonus is removed or partly removed if partial flanked)
+
+The interact action with a working building (like the exact location of an outpost) is how you can effectively work more than 2 tiles with a unit
+
+Only gain protection from armor when fortified. 
+
+Hera should give the effect of what’s mine is yours (allowing both units to share an inventory)
+
+Walls (blueprint always cycles and creates a wall that provides 3 protection). With a movement penalty to enter
+
+There. An also be a dome shield that also blocks lobs but can just be walked into. 
+
+There could also be armor that blocks physical damage and/or magic damage. And there would be a universal block (when you have 1 physical and 1 magic it becomes 1 universal) 
+
+There could be a dream card that is drawn (or generated) when you sleep.
+
+Think instead of 1,2,3 % do a flat 1,2,3 per hour
+
+You loot using the interact action
+
+Sleeping a full night removes an exhaustion (they are no longer removed at the 2 weeks - and you get to choose which is removed). Removing one that was from an exhaust card returns the card. 
+
+The starting hand contains a dock which is a building that decides where you touch down. Each person now gets only a single use outpost instead of an outpost that exhausts
+
+Thoughough cast (decrease a cards mana cost by 0.1 increase time by 0.25). Card idea for bex there could also be a more general one that goes the other way. 
+
+Call the heal actually mend (to preserve the power growth). Heal does 25 hp (exactly balanced with fireball)
+
+For Sid add a spell that is remove an exhaustion from your hand (it is itself an exhaust card) 
+
+The handling of spawned enemies at night can occur by visibility reducing at night (they spawn in what is no longer seen)
+
+The idea of like era score can be used as task that would decrease the kings ransom
+
+Chivalry never dies. Instead of dying revive at half health with a permanent 0.1 and 1.1 multiplier on morale. 
+
+Faith increases a bar that once it hits the top increases the fate of that individual by 1. Any left over fate at the end of the turn will increase their faith. Each follower of a religion also rolls their d4 and any amount left over is how much faith is produced. 
+
+The maximum capacity of faith of the faith bar is some base value plus a value that scales based on level. This makes it so some things can be locked by level and so your faith value can’t shoot up forever. 
+
+Prayer (card) - gain 5 faith. When this tenant is taken everyone who follows the religion gets a copy of this card. 
+
