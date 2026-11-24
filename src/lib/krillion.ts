@@ -313,7 +313,9 @@ export function scorePrompt(
 
 	// smoothed share -> surprisal -> x (vs the rarest) -> u (vs the most-given)
 	const I = K.map((k) => -Math.log((k + SMOOTH_ALPHA) / (L + SMOOTH_ALPHA * n)));
-	const iMax = Math.max(...I);
+	// Not Math.max(...I): a broad prompt can have ~200k answers, which overflows
+	// the call stack when spread as arguments.
+	const iMax = I.reduce((m, v) => (v > m ? v : m), -Infinity);
 	const x = I.map((v) => (iMax > 0 ? v / iMax : 0));
 	let top = 0;
 	for (let i = 1; i < n; i++) if (K[i] > K[top]) top = i;
@@ -342,8 +344,22 @@ export function scorePrompt(
 	const targetSd = SPLIT_W * gameSd + (1 - SPLIT_W) * sortedSd;
 
 	const pts = (a: number, b: number) => u.map((v) => bottom + (topScore - bottom) * kuma(v, a, b));
+	// u depends only on the count, so the fit runs over each distinct count once,
+	// weighted by count x how many answers share it. Same moments; a prompt with
+	// ~200k answers has only a few hundred distinct counts.
+	const groups = new Map<number, { u: number; w: number }>();
+	K.forEach((k, i) => {
+		const g = groups.get(k);
+		if (g) g.w += k;
+		else groups.set(k, { u: u[i], w: k });
+	});
+	const gU = [...groups.values()].map((g) => g.u);
+	const gK = [...groups.values()].map((g) => g.w);
 	const err = (a: number, b: number) => {
-		const [m, sd] = weightedMoments(K, pts(a, b));
+		const [m, sd] = weightedMoments(
+			gK,
+			gU.map((v) => bottom + (topScore - bottom) * kuma(v, a, b))
+		);
 		const em = targetMean > 0 ? (m - targetMean) / targetMean : 0;
 		const es = targetSd > 0 ? (sd - targetSd) / targetSd : 0;
 		return 100 * em * em + es * es;
