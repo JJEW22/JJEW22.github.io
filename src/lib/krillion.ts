@@ -547,16 +547,18 @@ export const GAME_TIERS: { points: number; emoji: string; name: string }[] = [
 // left out -- it's krillion.io's hand-picked "famously obscure" label, not a
 // rarity level, so rescoring can't land on it. Rescored tops reach 125, past
 // anything the game gives, so 105+ gets a tier of its own: 💎.
-// The top bands, named: the all-time leaderboard counts rounds in 🌟 and 💎,
-// and the rarest-answers board only takes Deep Cut (🏮) and up.
+// The bands the leaderboards use, named: the all-time board counts rounds in
+// 🌟 and 💎; the rarest-answers board only takes Deep Cut (🏮) and up, and the
+// worst-answers board only Plankton (🫧, under PLANKTON_MAX).
+export const PLANKTON_MAX = 20;
 export const DEEP_CUT_MIN = 72.5;
 export const STAR_MIN = 95;
 export const DIAMOND_MIN = 105;
-// How many answers the all-time rarest-answers board shows.
-export const RAREST_ANSWERS_LIMIT = 100;
+// How many answers each all-time answers board (rarest, worst) shows.
+export const ANSWER_BOARD_LIMIT = 100;
 export const RESCORED_TIERS: { min: number; emoji: string }[] = [
 	{ min: 0, emoji: '🫧' },
-	{ min: 20, emoji: '🐟' },
+	{ min: PLANKTON_MAX, emoji: '🐟' },
 	{ min: 45, emoji: '🦑' },
 	{ min: DEEP_CUT_MIN, emoji: '🏮' },
 	{ min: STAR_MIN, emoji: '🌟' },

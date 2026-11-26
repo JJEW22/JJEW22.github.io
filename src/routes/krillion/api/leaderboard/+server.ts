@@ -1,18 +1,18 @@
 // src/routes/krillion/api/leaderboard/+server.ts
 // One day's board (guests included), the all-time averages (accounts only) and
-// the all-time rarest answers. The day and all-time boards are totals only;
-// the rarest answers do show answers, but only from dives whose submissions
-// have closed, so nothing here spoils a dive that's still open. `?mine=12,15`
-// lists dives this browser submitted as a guest, so those rows are marked as
-// the viewer's.
+// the all-time rarest and worst answers. The day and all-time boards are
+// totals only; the answers boards do show answers, but only from dives whose
+// submissions have closed, so nothing here spoils a dive that's still open.
+// `?mine=12,15` lists dives this browser submitted as a guest, so those rows
+// are marked as the viewer's.
 import { json } from '@sveltejs/kit';
 import { dateForDay, openDiveDate } from '$lib/krillion';
 import {
+	answerBoardRounds,
+	answerBoardRows,
 	leaderboardAllTime,
 	leaderboardForDate,
-	listScoredDays,
-	rarestAnswers,
-	rarestRounds
+	listScoredDays
 } from '$lib/server/krillion';
 import type { RequestHandler } from './$types';
 
@@ -27,12 +27,13 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		.map(Number)
 		.filter((id) => Number.isInteger(id) && id > 0)
 		.slice(0, 50);
-	const [day, rare, days] = await Promise.all([
+	const [day, rare, worst, days] = await Promise.all([
 		leaderboardForDate(date, viewer, mine),
-		rarestRounds(),
+		answerBoardRounds('rarest'),
+		answerBoardRounds('worst'),
 		listScoredDays()
 	]);
-	const allTime = await leaderboardAllTime(viewer, rare);
+	const allTime = await leaderboardAllTime(viewer, rare, worst);
 	return json(
 		{
 			ok: true,
@@ -40,7 +41,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			today: openDiveDate(),
 			day,
 			allTime,
-			rarest: rarestAnswers(rare, viewer),
+			rarest: answerBoardRows(rare, viewer),
+			worst: answerBoardRows(worst, viewer),
 			days
 		},
 		{ headers: { 'cache-control': 'private, no-store' } }

@@ -30,7 +30,8 @@ import {
 	matchAnswer,
 	STAR_MIN,
 	openDiveDate,
-	RAREST_ANSWERS_LIMIT,
+	ANSWER_BOARD_LIMIT,
+	PLANKTON_MAX,
 	rarityPercentile,
 	SUBMIT_DEADLINE_TEXT,
 	scoreDay,
@@ -1014,14 +1015,15 @@ export interface AllTimeRow {
 	stars: number; // rounds rescored into 🌟 (STAR_MIN up to DIAMOND_MIN), all time
 	diamonds: number; // rounds rescored into 💎 (DIAMOND_MIN and up), all time
 	rarest: number; // their answers on the all-time rarest-answers board
+	worst: number; // their answers on the all-time worst-answers board
 	qualified: boolean; // at least MIN_DIVES_FOR_AVERAGE dives: ranked by average
 	isYou: boolean;
 }
 
-// ---------------- the rarest answers, all time ----------------
+// ---------------- the rarest and worst answers, all time ----------------
 
-// One round on the rarest-answers board, as the server keeps it: user_id
-// stays here, for the per-player counts, and never goes to the browser.
+// One round on an answers board, as the server keeps it: user_id stays here,
+// for the per-player counts, and never goes to the browser.
 export interface RareRound {
 	userId: string | null;
 	name: string;
@@ -1043,12 +1045,25 @@ export interface RareAnswerRow {
 	points: number;
 }
 
-// The RAREST_ANSWERS_LIMIT highest-scoring rounds ever submitted, Deep Cut and
-// up. Only dives whose submissions have closed: the board otherwise never
-// shows answers, and this mustn't spoil a dive that's still open. A round
-// scores (and shows) an accepted override's word in place of its answer.
-// Ties go to whoever got there first.
-export async function rarestRounds(now = new Date()): Promise<RareRound[]> {
+// The answers boards, ANSWER_BOARD_LIMIT rounds each:
+//   'rarest' -- the highest-scoring rounds ever submitted, Deep Cut and up.
+//   'worst'  -- the lowest-scoring, Plankton only. Blanks and misses (a round
+//               with no listed answer and no accepted override) don't count.
+// Only dives whose submissions have closed: the other boards never show
+// answers, and these mustn't spoil a dive that's still open. A round scores
+// (and shows) an accepted override's word in place of its answer. Ties go to
+// whoever got there first.
+export async function answerBoardRounds(
+	kind: 'rarest' | 'worst',
+	now = new Date()
+): Promise<RareRound[]> {
+	const pts = sql`(r->>'points')::float8`;
+	const qualifies =
+		kind === 'rarest'
+			? sql`${pts} >= ${DEEP_CUT_MIN}`
+			: sql`${pts} < ${PLANKTON_MAX}
+				and (r->>'match' is not null or r->'override'->>'points' is not null)`;
+	const order = kind === 'rarest' ? sql`points desc` : sql`points asc`;
 	const rows = await sql<
 		{
 			user_id: string | null;
@@ -1068,9 +1083,9 @@ export async function rarestRounds(now = new Date()): Promise<RareRound[]> {
 		from krillion_submissions s
 		left join users u on u.id = s.user_id
 		cross join lateral jsonb_array_elements(coalesce(s.scored, '[]'::jsonb)) r
-		where s.date < ${openDiveDate(now)} and (r->>'points')::float8 >= ${DEEP_CUT_MIN}
-		order by points desc, s.date, s.id
-		limit ${RAREST_ANSWERS_LIMIT}
+		where s.date < ${openDiveDate(now)} and ${qualifies}
+		order by ${order}, s.date, s.id
+		limit ${ANSWER_BOARD_LIMIT}
 	`;
 	return rows.map((r) => ({
 		userId: r.user_id,
@@ -1083,8 +1098,8 @@ export async function rarestRounds(now = new Date()): Promise<RareRound[]> {
 	}));
 }
 
-export function rarestAnswers(rare: RareRound[], viewerId: number | null): RareAnswerRow[] {
-	return rare.map(({ userId, ...r }) => ({
+export function answerBoardRows(rounds: RareRound[], viewerId: number | null): RareAnswerRow[] {
+	return rounds.map(({ userId, ...r }) => ({
 		...r,
 		guest: userId === null,
 		isYou: viewerId !== null && userId !== null && Number(userId) === viewerId
@@ -1093,14 +1108,20 @@ export function rarestAnswers(rare: RareRound[], viewerId: number | null): RareA
 
 // Every signed-in player with a scored dive. Players with MIN_DIVES_FOR_AVERAGE
 // or more are ranked first, by average rescored total; the rest follow, still
-// building up to it, so one lucky dive can't top the board. `rare` is the
-// rarest-answers board, for each player's count on it.
+// building up to it, so one lucky dive can't top the board. `rare` and `worst`
+// are the answers boards, for each player's count on them.
 export async function leaderboardAllTime(
 	viewerId: number | null,
-	rare: RareRound[] = []
+	rare: RareRound[] = [],
+	worst: RareRound[] = []
 ): Promise<AllTimeRow[]> {
-	const onBoard = new Map<string, number>();
-	for (const r of rare) if (r.userId) onBoard.set(r.userId, (onBoard.get(r.userId) ?? 0) + 1);
+	const tally = (rounds: RareRound[]) => {
+		const m = new Map<string, number>();
+		for (const r of rounds) if (r.userId) m.set(r.userId, (m.get(r.userId) ?? 0) + 1);
+		return m;
+	};
+	const onRarest = tally(rare);
+	const onWorst = tally(worst);
 	const rows = await sql<
 		{
 			user_id: string;
@@ -1138,7 +1159,8 @@ export async function leaderboardAllTime(
 		averageGame: r.average_game,
 		stars: r.stars,
 		diamonds: r.diamonds,
-		rarest: onBoard.get(String(r.user_id)) ?? 0,
+		rarest: onRarest.get(String(r.user_id)) ?? 0,
+		worst: onWorst.get(String(r.user_id)) ?? 0,
 		qualified: r.dives >= MIN_DIVES_FOR_AVERAGE,
 		isYou: viewerId !== null && Number(r.user_id) === viewerId
 	}));

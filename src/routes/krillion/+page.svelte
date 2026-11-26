@@ -15,7 +15,8 @@
 		DEEP_CUT_MIN,
 		DIAMOND_MIN,
 		MIN_DIVES_FOR_AVERAGE,
-		RAREST_ANSWERS_LIMIT,
+		ANSWER_BOARD_LIMIT,
+		PLANKTON_MAX,
 		STAR_MIN,
 		openDiveDate,
 		SUBMIT_DEADLINE_TEXT,
@@ -207,6 +208,7 @@
 		stars: number;
 		diamonds: number;
 		rarest: number;
+		worst: number;
 		qualified: boolean;
 		isYou: boolean;
 	}
@@ -220,11 +222,14 @@
 		answer: string;
 		points: number;
 	}
-	let boardView: 'day' | 'all' | 'rarest' = 'day';
+	let boardView: 'day' | 'all' | 'rarest' | 'worst' = 'day';
 	let boardDate = '';
 	let boardDay: LeaderRow[] = [];
 	let boardAll: AllTimeRow[] = [];
 	let boardRarest: RareAnswerRow[] = [];
+	let boardWorst: RareAnswerRow[] = [];
+	// The answers boards share one table.
+	$: answerRows = boardView === 'worst' ? boardWorst : boardRarest;
 	let boardDays: { date: string; dayNumber: number }[] = [];
 	let boardDayNumber: number | null = null;
 	let isAdmin = false;
@@ -242,6 +247,7 @@
 			boardDay = b.day ?? [];
 			boardAll = b.allTime ?? [];
 			boardRarest = b.rarest ?? [];
+			boardWorst = b.worst ?? [];
 			boardDays = b.days ?? [];
 			boardDayNumber = dayNumber;
 		} catch {
@@ -852,13 +858,20 @@
 						aria-pressed={boardView === 'rarest'}
 						on:click={() => (boardView = 'rarest')}>Rarest answers</button
 					>
+					<button
+						type="button"
+						class:on={boardView === 'worst'}
+						aria-pressed={boardView === 'worst'}
+						on:click={() => (boardView = 'worst')}>Worst answers</button
+					>
 				</div>
 			</div>
 			<p class="hint">
 				Everyone who submits, by rescored total — guests included on each day's board. All time
 				ranks average rescored total for signed-in players, once they have {MIN_DIVES_FOR_AVERAGE}
-				dives. Those two are totals only, so they never spoil the dive. Rarest answers lists the {RAREST_ANSWERS_LIMIT}
-				highest-scoring answers ever given (Deep Cut, {DEEP_CUT_MIN}+, and up), and only from dives
+				dives. Those two are totals only, so they never spoil the dive. Rarest answers lists the {ANSWER_BOARD_LIMIT}
+				highest-scoring answers ever given (Deep Cut, {DEEP_CUT_MIN}+, and up); worst answers the {ANSWER_BOARD_LIMIT}
+				lowest (Plankton, under {PLANKTON_MAX}; blanks and misses don't count). Both only take dives
 				that have closed. {#if !me}<a href="{resolve('/account')}?redirect=/krillion">Sign in</a> to
 					count toward the averages.{/if}
 			</p>
@@ -915,8 +928,8 @@
 						Nobody has submitted {boardDate ? `for ${boardDate}` : ''} yet.
 					</p>
 				{/if}
-			{:else if boardView === 'rarest'}
-				{#if boardRarest.length}
+			{:else if boardView === 'rarest' || boardView === 'worst'}
+				{#if answerRows.length}
 					<table>
 						<thead>
 							<tr
@@ -926,7 +939,7 @@
 							>
 						</thead>
 						<tbody>
-							{#each boardRarest as r, i (i)}
+							{#each answerRows as r, i (i)}
 								<tr class:you={r.isYou}>
 									<td>{i + 1}</td>
 									<td><b>{r.answer}</b></td>
@@ -942,7 +955,9 @@
 						</tbody>
 					</table>
 				{:else}
-					<p class="sub">No Deep Cuts or better yet.</p>
+					<p class="sub">
+						{boardView === 'worst' ? 'No Plankton answers yet.' : 'No Deep Cuts or better yet.'}
+					</p>
 				{/if}
 			{:else if boardAll.length}
 				<table>
@@ -957,8 +972,10 @@
 								>🌟</th
 							><th
 								class="num"
-								title="Answers on the all-time top {RAREST_ANSWERS_LIMIT} rarest answers"
-								>Top {RAREST_ANSWERS_LIMIT}</th
+								title="Answers on the all-time top {ANSWER_BOARD_LIMIT} rarest answers"
+								>Top {ANSWER_BOARD_LIMIT}</th
+							><th class="num" title="Answers on the all-time {ANSWER_BOARD_LIMIT} worst answers"
+								>Bottom {ANSWER_BOARD_LIMIT}</th
 							></tr
 						>
 					</thead>
@@ -966,7 +983,7 @@
 						{#each boardAll as r, i (r.name + i)}
 							{#if !r.qualified && (i === 0 || boardAll[i - 1].qualified)}
 								<tr class="divider">
-									<td colspan="9"
+									<td colspan="10"
 										>Still building to {MIN_DIVES_FOR_AVERAGE} dives — not ranked on average yet</td
 									>
 								</tr>
@@ -983,6 +1000,7 @@
 								<td class="num">{r.diamonds}</td>
 								<td class="num">{r.stars}</td>
 								<td class="num">{r.rarest}</td>
+								<td class="num">{r.worst}</td>
 							</tr>
 						{/each}
 					</tbody>
