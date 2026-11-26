@@ -12,7 +12,9 @@
 	import '../../app.css';
 	import { onMount } from 'svelte';
 	import {
+		DIAMOND_MIN,
 		MIN_DIVES_FOR_AVERAGE,
+		STAR_MIN,
 		openDiveDate,
 		SUBMIT_DEADLINE_TEXT,
 		formatPercentile,
@@ -200,6 +202,8 @@
 		average: number;
 		best: number;
 		averageGame: number | null;
+		stars: number;
+		diamonds: number;
 		qualified: boolean;
 		isYou: boolean;
 	}
@@ -895,14 +899,19 @@
 						<tr
 							><th>#</th><th>Name</th><th class="num">Dives</th><th class="num">Average</th><th
 								class="num">Best</th
-							><th class="num">Avg game</th></tr
+							><th class="num">Avg game</th><th
+								class="num"
+								title="Rounds rescored {DIAMOND_MIN} or more, all time">💎</th
+							><th class="num" title="Rounds rescored {STAR_MIN} up to {DIAMOND_MIN}, all time"
+								>🌟</th
+							></tr
 						>
 					</thead>
 					<tbody>
 						{#each boardAll as r, i (r.name + i)}
 							{#if !r.qualified && (i === 0 || boardAll[i - 1].qualified)}
 								<tr class="divider">
-									<td colspan="6"
+									<td colspan="8"
 										>Still building to {MIN_DIVES_FOR_AVERAGE} dives — not ranked on average yet</td
 									>
 								</tr>
@@ -916,6 +925,8 @@
 								<td class="num"><b>{r.average.toFixed(1)}</b></td>
 								<td class="num">{r.best.toFixed(1)}</td>
 								<td class="num">{r.averageGame === null ? '—' : r.averageGame.toFixed(0)}</td>
+								<td class="num">{r.diamonds}</td>
+								<td class="num">{r.stars}</td>
 							</tr>
 						{/each}
 					</tbody>

@@ -25,7 +25,9 @@ import {
 	etHour,
 	MIN_DIVES_FOR_AVERAGE,
 	breadth,
+	DIAMOND_MIN,
 	matchAnswer,
+	STAR_MIN,
 	openDiveDate,
 	rarityPercentile,
 	SUBMIT_DEADLINE_TEXT,
@@ -1007,6 +1009,8 @@ export interface AllTimeRow {
 	average: number;
 	best: number;
 	averageGame: number | null;
+	stars: number; // rounds rescored into 🌟 (STAR_MIN up to DIAMOND_MIN), all time
+	diamonds: number; // rounds rescored into 💎 (DIAMOND_MIN and up), all time
 	qualified: boolean; // at least MIN_DIVES_FOR_AVERAGE dives: ranked by average
 	isYou: boolean;
 }
@@ -1023,12 +1027,23 @@ export async function leaderboardAllTime(viewerId: number | null): Promise<AllTi
 			average: number;
 			best: number;
 			average_game: number | null;
+			stars: number;
+			diamonds: number;
 		}[]
 	>`
 		select s.user_id, coalesce(u.real_name, u.username) as name,
 			count(*)::int as dives, avg(s.updated_score)::float8 as average,
-			max(s.updated_score)::float8 as best, avg(s.game_score)::float8 as average_game
+			max(s.updated_score)::float8 as best, avg(s.game_score)::float8 as average_game,
+			coalesce(sum(t.stars), 0)::int as stars, coalesce(sum(t.diamonds), 0)::int as diamonds
 		from krillion_submissions s join users u on u.id = s.user_id
+		-- Banded by the round's points alone, like the share text's rescored row.
+		cross join lateral (
+			select
+				count(*) filter (where (r->>'points')::float8 >= ${STAR_MIN}
+					and (r->>'points')::float8 < ${DIAMOND_MIN}) as stars,
+				count(*) filter (where (r->>'points')::float8 >= ${DIAMOND_MIN}) as diamonds
+			from jsonb_array_elements(coalesce(s.scored, '[]'::jsonb)) r
+		) t
 		where s.updated_score is not null
 		group by s.user_id, u.real_name, u.username
 		order by (count(*) >= ${MIN_DIVES_FOR_AVERAGE}) desc, average desc, dives desc
@@ -1039,6 +1054,8 @@ export async function leaderboardAllTime(viewerId: number | null): Promise<AllTi
 		average: r.average,
 		best: r.best,
 		averageGame: r.average_game,
+		stars: r.stars,
+		diamonds: r.diamonds,
 		qualified: r.dives >= MIN_DIVES_FOR_AVERAGE,
 		isYou: viewerId !== null && Number(r.user_id) === viewerId
 	}));

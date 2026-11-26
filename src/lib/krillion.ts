@@ -312,7 +312,10 @@ export function scorePrompt(
 	const L = K.reduce((s, k) => s + k, 0);
 
 	// smoothed share -> surprisal -> x (vs the rarest) -> u (vs the most-given)
-	const I = K.map((k) => -Math.log((k + SMOOTH_ALPHA) / (L + SMOOTH_ALPHA * n)));
+	// Rarity treats 0 as 1: a sheet answer nobody had given by the snapshot is
+	// only ever scored for someone who gave it, so it's as rare as a lone answer.
+	// The fit's weights (K) still use the real count, so unused answers carry none.
+	const I = K.map((k) => -Math.log((Math.max(1, k) + SMOOTH_ALPHA) / (L + SMOOTH_ALPHA * n)));
 	// Not Math.max(...I): a broad prompt can have ~200k answers, which overflows
 	// the call stack when spread as arguments.
 	const iMax = I.reduce((m, v) => (v > m ? v : m), -Infinity);
@@ -544,13 +547,16 @@ export const GAME_TIERS: { points: number; emoji: string; name: string }[] = [
 // left out -- it's krillion.io's hand-picked "famously obscure" label, not a
 // rarity level, so rescoring can't land on it. Rescored tops reach 125, past
 // anything the game gives, so 105+ gets a tier of its own: 💎.
+// The top two bands, named: the all-time leaderboard counts rounds in each.
+export const STAR_MIN = 95;
+export const DIAMOND_MIN = 105;
 export const RESCORED_TIERS: { min: number; emoji: string }[] = [
 	{ min: 0, emoji: '🫧' },
 	{ min: 20, emoji: '🐟' },
 	{ min: 45, emoji: '🦑' },
 	{ min: 72.5, emoji: '🏮' },
-	{ min: 95, emoji: '🌟' },
-	{ min: 105, emoji: '💎' }
+	{ min: STAR_MIN, emoji: '🌟' },
+	{ min: DIAMOND_MIN, emoji: '💎' }
 ];
 
 export function gameEmoji(points: number | null, miss: boolean): string {
