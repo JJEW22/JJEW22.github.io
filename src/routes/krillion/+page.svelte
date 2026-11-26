@@ -12,8 +12,10 @@
 	import '../../app.css';
 	import { onMount } from 'svelte';
 	import {
+		DEEP_CUT_MIN,
 		DIAMOND_MIN,
 		MIN_DIVES_FOR_AVERAGE,
+		RAREST_ANSWERS_LIMIT,
 		STAR_MIN,
 		openDiveDate,
 		SUBMIT_DEADLINE_TEXT,
@@ -204,13 +206,25 @@
 		averageGame: number | null;
 		stars: number;
 		diamonds: number;
+		rarest: number;
 		qualified: boolean;
 		isYou: boolean;
 	}
-	let boardView: 'day' | 'all' = 'day';
+	interface RareAnswerRow {
+		name: string;
+		guest: boolean;
+		isYou: boolean;
+		dayNumber: number;
+		date: string;
+		prompt: string;
+		answer: string;
+		points: number;
+	}
+	let boardView: 'day' | 'all' | 'rarest' = 'day';
 	let boardDate = '';
 	let boardDay: LeaderRow[] = [];
 	let boardAll: AllTimeRow[] = [];
+	let boardRarest: RareAnswerRow[] = [];
 	let boardDays: { date: string; dayNumber: number }[] = [];
 	let boardDayNumber: number | null = null;
 	let isAdmin = false;
@@ -227,6 +241,7 @@
 			boardDate = b.date;
 			boardDay = b.day ?? [];
 			boardAll = b.allTime ?? [];
+			boardRarest = b.rarest ?? [];
 			boardDays = b.days ?? [];
 			boardDayNumber = dayNumber;
 		} catch {
@@ -831,14 +846,21 @@
 						aria-pressed={boardView === 'all'}
 						on:click={() => (boardView = 'all')}>All time</button
 					>
+					<button
+						type="button"
+						class:on={boardView === 'rarest'}
+						aria-pressed={boardView === 'rarest'}
+						on:click={() => (boardView = 'rarest')}>Rarest answers</button
+					>
 				</div>
 			</div>
 			<p class="hint">
 				Everyone who submits, by rescored total — guests included on each day's board. All time
 				ranks average rescored total for signed-in players, once they have {MIN_DIVES_FOR_AVERAGE}
-				dives. Totals only — no answers, so it never spoils the dive. {#if !me}<a
-						href="{resolve('/account')}?redirect=/krillion">Sign in</a
-					> to count toward the averages.{/if}
+				dives. Those two are totals only, so they never spoil the dive. Rarest answers lists the {RAREST_ANSWERS_LIMIT}
+				highest-scoring answers ever given (Deep Cut, {DEEP_CUT_MIN}+, and up), and only from dives
+				that have closed. {#if !me}<a href="{resolve('/account')}?redirect=/krillion">Sign in</a> to
+					count toward the averages.{/if}
 			</p>
 
 			{#if boardView === 'day'}
@@ -893,6 +915,35 @@
 						Nobody has submitted {boardDate ? `for ${boardDate}` : ''} yet.
 					</p>
 				{/if}
+			{:else if boardView === 'rarest'}
+				{#if boardRarest.length}
+					<table>
+						<thead>
+							<tr
+								><th>#</th><th>Answer</th><th>Prompt</th><th>Dive</th><th>Name</th><th class="num"
+									>Score</th
+								></tr
+							>
+						</thead>
+						<tbody>
+							{#each boardRarest as r, i (i)}
+								<tr class:you={r.isYou}>
+									<td>{i + 1}</td>
+									<td><b>{r.answer}</b></td>
+									<td class="sub">{r.prompt}</td>
+									<td title={r.date}>#{r.dayNumber}</td>
+									<td
+										>{r.name}{#if r.guest}<span class="guest-flag">guest</span
+											>{/if}{#if r.isYou}<span class="you-flag">you</span>{/if}</td
+									>
+									<td class="num"><b>{r.points.toFixed(1)}</b></td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{:else}
+					<p class="sub">No Deep Cuts or better yet.</p>
+				{/if}
 			{:else if boardAll.length}
 				<table>
 					<thead>
@@ -904,6 +955,10 @@
 								title="Rounds rescored {DIAMOND_MIN} or more, all time">💎</th
 							><th class="num" title="Rounds rescored {STAR_MIN} up to {DIAMOND_MIN}, all time"
 								>🌟</th
+							><th
+								class="num"
+								title="Answers on the all-time top {RAREST_ANSWERS_LIMIT} rarest answers"
+								>Top {RAREST_ANSWERS_LIMIT}</th
 							></tr
 						>
 					</thead>
@@ -911,7 +966,7 @@
 						{#each boardAll as r, i (r.name + i)}
 							{#if !r.qualified && (i === 0 || boardAll[i - 1].qualified)}
 								<tr class="divider">
-									<td colspan="8"
+									<td colspan="9"
 										>Still building to {MIN_DIVES_FOR_AVERAGE} dives — not ranked on average yet</td
 									>
 								</tr>
@@ -927,6 +982,7 @@
 								<td class="num">{r.averageGame === null ? '—' : r.averageGame.toFixed(0)}</td>
 								<td class="num">{r.diamonds}</td>
 								<td class="num">{r.stars}</td>
+								<td class="num">{r.rarest}</td>
 							</tr>
 						{/each}
 					</tbody>

@@ -25,10 +25,12 @@ import {
 	etHour,
 	MIN_DIVES_FOR_AVERAGE,
 	breadth,
+	DEEP_CUT_MIN,
 	DIAMOND_MIN,
 	matchAnswer,
 	STAR_MIN,
 	openDiveDate,
+	RAREST_ANSWERS_LIMIT,
 	rarityPercentile,
 	SUBMIT_DEADLINE_TEXT,
 	scoreDay,
@@ -1011,14 +1013,94 @@ export interface AllTimeRow {
 	averageGame: number | null;
 	stars: number; // rounds rescored into 🌟 (STAR_MIN up to DIAMOND_MIN), all time
 	diamonds: number; // rounds rescored into 💎 (DIAMOND_MIN and up), all time
+	rarest: number; // their answers on the all-time rarest-answers board
 	qualified: boolean; // at least MIN_DIVES_FOR_AVERAGE dives: ranked by average
 	isYou: boolean;
 }
 
+// ---------------- the rarest answers, all time ----------------
+
+// One round on the rarest-answers board, as the server keeps it: user_id
+// stays here, for the per-player counts, and never goes to the browser.
+export interface RareRound {
+	userId: string | null;
+	name: string;
+	dayNumber: number;
+	date: string;
+	prompt: string;
+	answer: string;
+	points: number;
+}
+
+export interface RareAnswerRow {
+	name: string;
+	guest: boolean;
+	isYou: boolean;
+	dayNumber: number;
+	date: string;
+	prompt: string;
+	answer: string;
+	points: number;
+}
+
+// The RAREST_ANSWERS_LIMIT highest-scoring rounds ever submitted, Deep Cut and
+// up. Only dives whose submissions have closed: the board otherwise never
+// shows answers, and this mustn't spoil a dive that's still open. A round
+// scores (and shows) an accepted override's word in place of its answer.
+// Ties go to whoever got there first.
+export async function rarestRounds(now = new Date()): Promise<RareRound[]> {
+	const rows = await sql<
+		{
+			user_id: string | null;
+			name: string;
+			day_number: number;
+			date: string;
+			prompt: string;
+			answer: string;
+			points: number;
+		}[]
+	>`
+		select s.user_id, coalesce(u.real_name, u.username, s.guest_name, 'Guest') as name,
+			s.day_number, to_char(s.date, 'YYYY-MM-DD') as date, r->>'prompt' as prompt,
+			case when r->'override'->>'points' is not null then r->'override'->>'word'
+				else coalesce(r->>'match', r->>'submitted') end as answer,
+			(r->>'points')::float8 as points
+		from krillion_submissions s
+		left join users u on u.id = s.user_id
+		cross join lateral jsonb_array_elements(coalesce(s.scored, '[]'::jsonb)) r
+		where s.date < ${openDiveDate(now)} and (r->>'points')::float8 >= ${DEEP_CUT_MIN}
+		order by points desc, s.date, s.id
+		limit ${RAREST_ANSWERS_LIMIT}
+	`;
+	return rows.map((r) => ({
+		userId: r.user_id,
+		name: r.name,
+		dayNumber: r.day_number,
+		date: r.date,
+		prompt: r.prompt,
+		answer: r.answer,
+		points: r.points
+	}));
+}
+
+export function rarestAnswers(rare: RareRound[], viewerId: number | null): RareAnswerRow[] {
+	return rare.map(({ userId, ...r }) => ({
+		...r,
+		guest: userId === null,
+		isYou: viewerId !== null && userId !== null && Number(userId) === viewerId
+	}));
+}
+
 // Every signed-in player with a scored dive. Players with MIN_DIVES_FOR_AVERAGE
 // or more are ranked first, by average rescored total; the rest follow, still
-// building up to it, so one lucky dive can't top the board.
-export async function leaderboardAllTime(viewerId: number | null): Promise<AllTimeRow[]> {
+// building up to it, so one lucky dive can't top the board. `rare` is the
+// rarest-answers board, for each player's count on it.
+export async function leaderboardAllTime(
+	viewerId: number | null,
+	rare: RareRound[] = []
+): Promise<AllTimeRow[]> {
+	const onBoard = new Map<string, number>();
+	for (const r of rare) if (r.userId) onBoard.set(r.userId, (onBoard.get(r.userId) ?? 0) + 1);
 	const rows = await sql<
 		{
 			user_id: string;
@@ -1056,6 +1138,7 @@ export async function leaderboardAllTime(viewerId: number | null): Promise<AllTi
 		averageGame: r.average_game,
 		stars: r.stars,
 		diamonds: r.diamonds,
+		rarest: onBoard.get(String(r.user_id)) ?? 0,
 		qualified: r.dives >= MIN_DIVES_FOR_AVERAGE,
 		isYou: viewerId !== null && Number(r.user_id) === viewerId
 	}));
